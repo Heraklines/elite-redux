@@ -610,7 +610,7 @@ def main(summary):
     require((OUTPUT / "achievement-one.json").read_bytes() == (OUTPUT / "achievement-two.json").read_bytes(),
             "two actual fresh achievement outputs are not byte-identical")
     run(["node", str(ROOT / VERIFIER), str(OUTPUT / "achievement-one.json"),
-         str(OUTPUT / "achievement-two.json"), str(OUTPUT / "validation.json")],
+         str(OUTPUT / "achievement-two.json"), str(OUTPUT / "validation.json"), str(OUTPUT / "flash-pool.rs")],
         "independent-achievement-verification", seconds=60, bound=65536)
     summary["data_validation"] = json.loads((OUTPUT / "validation.json").read_bytes())
     require(summary["data_validation"].get("status") == "passed", "independent verifier did not pass")
@@ -625,7 +625,7 @@ def main(summary):
     summary["conservation"] = {"candidate": True, "oracle_after_install": True,
                                "oracle_after_each_export": True, "oracle_after_achievement_verification": True, "injected_exporter": True, "asset": True}
     summary["generated"] = {path.name: file_fact(path, 32768) for path in sorted(OUTPUT.iterdir())}
-    require(set(summary["generated"]) == {"achievement-one.json", "achievement-two.json", "source-methods.txt", "validation.json"}, "exact output inventory")
+    require(set(summary["generated"]) == {"achievement-one.json", "achievement-two.json", "source-methods.txt", "validation.json", "flash-pool.rs"}, "exact output inventory")
     require(sum(row["bytes"] for row in summary["generated"].values()) <= 6 * 32768, "aggregate generated bound")
     require(time.monotonic() < WORK_DEADLINE, "work deadline exceeded before reserved cleanup")
 
@@ -640,7 +640,7 @@ def bound_partial_outputs():
     removed = []
     for path in sorted(OUTPUT.iterdir()):
         require(path.parent == OUTPUT and path.is_file() and not path.is_symlink(), "unexpected generated output type")
-        if path.name not in {"achievement-one.json", "achievement-two.json", "source-methods.txt", "validation.json"} or path.stat().st_size > (8192 if path.name == "validation.json" else 32768):
+        if path.name not in {"achievement-one.json", "achievement-two.json", "source-methods.txt", "validation.json", "flash-pool.rs"} or path.stat().st_size > (8192 if path.name in {"validation.json", "flash-pool.rs"} else 32768):
             removed.append({"name": path.name[:128], "bytes": path.stat().st_size})
             path.unlink()
     return removed

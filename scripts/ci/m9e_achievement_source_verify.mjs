@@ -2,8 +2,8 @@ import { readFileSync, writeFileSync, lstatSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 
-const [one, two, output] = process.argv.slice(2);
-assert.equal(process.argv.length, 5);
+const [one, two, output, rustOutput] = process.argv.slice(2);
+assert.equal(process.argv.length, 6);
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const read = path => {
   const stat = lstatSync(path);
@@ -190,3 +190,20 @@ const result = { schema_version: 1, status: 'passed', source_sha: a.data.source_
 const bytes = Buffer.from(JSON.stringify(result) + '\n');
 assert(bytes.length <= 8192);
 writeFileSync(output, bytes, { flag: 'wx' });
+
+// Emit source only after both actual observations and all independent controls pass.
+let cumulative=0;
+const rustRows=a.data.rare_pool.map(row => {
+  const clamped=Math.min(5,Math.max(4,row.cost));
+  let weight=Math.floor((((5-clamped)/2)*1.5+1)*100);
+  if(row.species===201) weight=Math.max(1,Math.floor(weight*0.1));
+  weight=Math.max(1,Math.floor(weight/row.divisor));
+  cumulative+=weight;
+  return `    (${row.species}, ${cumulative}, ${row.caught}),`;
+});
+const rust=Buffer.from('// Initialized pinned399d Rare EVENT pool, independently checked against actual Egg construction.\n'
+  +'// Generated remotely; tuple fields are species, exclusive cumulative weight, fresh caught flag.\n'
+  +'pub(crate) const RARE_EVENT_POOL: &[(u32, u32, bool)] = &[\n'+rustRows.join('\n')+'\n];\n'
+  +`pub(crate) const RARE_EGG_MOVE_RATE: u64 = ${a.data.rare_move_rate};\n`);
+assert(rust.length<=8192);
+writeFileSync(rustOutput,rust,{flag:'wx'});
