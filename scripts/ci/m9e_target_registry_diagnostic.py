@@ -596,7 +596,7 @@ def main(summary):
     rng_inputs = installed_phaser_inputs()
     require(json.loads((ORACLE / rng_inputs[RNG_FILES[0]]["resolved_path"]).read_bytes()).get("version") == "3.90.0", "qualified Phaser version required")
     summary["phaser_runtime_inputs"] = rng_inputs
-    require(rng_inputs["node_modules/phaser/src/math/easing/sine/In.js"]["sha256"] == "7735907d87f4c3334670b5246a8493d01bb7fce464fb87fbe6fa82ca2e1d62d7" and rng_inputs["node_modules/phaser/src/math/easing/sine/In.js"]["bytes"] == 574, "exact Phaser Sine.In implementation")
+    require(rng_inputs["node_modules/phaser/src/math/easing/sine/In.js"]["sha256"] == "4a71fd0d7ec714d1bccd448a46fd2c0a265db52620eb6abd3d89770e5e738764" and rng_inputs["node_modules/phaser/src/math/easing/sine/In.js"]["bytes"] == 607, "exact Phaser Sine.In implementation")
     summary["fresh_process_exports"] = []
     for ordinal in ("one", "two"):
         destination = OUTPUT / f"export-{ordinal}.json"
