@@ -105,7 +105,7 @@ fn natural(content: Arc<PreparedGameContentV2>) -> Result<GameKernelV7> {
     };
     let mut kernel = GameKernelV7::natural_start_with_fresh_friendship(FreshFriendshipStartV7 {
         profile,
-        seed: "m9e-target-execution-source-0".to_owned(),
+        seed: "m9e-phase-execution-18".to_owned(),
         local_seat: seat()?,
         save_slots: vec!["phase-source-slot".to_owned()],
         content: content.clone(),
