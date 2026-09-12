@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 BOUNDED_HELPER_BYTES = 38620
-EXPORTER_SHA256 = "d27e06f7f77b633955aebe596b0591a6b2684facebbebd209f83d48922e511a7"
+EXPORTER_SHA256 = "85e380d5a6660c2e2ad77f275904177337d03b10d43791c84d153846d4bcbab3"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -45,6 +45,7 @@ logs = {}
 failed_log = None
 active_step = "initialization"
 ORACLE_PINS = {
+  "src/data/elite-redux/init-elite-redux-evolutions.ts": ["18dda39001270a5bffec6bb839f9fd277d6f6e16cf673b1a6c54a1c698033ba8", 19679],
   "src/data/balance/pokemon-level-moves.ts": ["9e0529d2cc63d70ba00484aba958805c3377c5cb4f274bd2308c49aad3b7ae6b", 572049],
   "src/data/pokemon-species.ts": ["16c53ee35deea1d2d39a6161b86e9c1e8c144c4792f68765cfdd1549fe9b442a", 63883],
   "src/enums/unlockables.ts": ["4706fd971f59df8f483254bb92ae6e3f002c771e13be6847999f4d95afdbd67d", 99],

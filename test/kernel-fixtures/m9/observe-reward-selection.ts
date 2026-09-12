@@ -115,6 +115,26 @@ function exactJsonArg(value:unknown,depth=0):void {
 
 // An explicit direct-method probe after the existing observations. This is not
 // a victory, applied reward, queued phase execution, or natural wave journey.
+function observeBattleFormat(format:Battle["format"]){
+  const before=Phaser.Math.RND.state();
+  expect(format.sides.length).toBeGreaterThan(0);expect(format.sides.length).toBeLessThanOrEqual(4);
+  const sides=format.sides.map(side=>({baseIndex:side.baseIndex,capacity:side.capacity,kind:side.kind,mirrored:side.mirrored}));
+  const slots:number[]=[];
+  for(const side of sides){
+    expect(Number.isSafeInteger(side.baseIndex)&&side.baseIndex>=0).toBe(true);
+    expect(Number.isSafeInteger(side.capacity)&&side.capacity>0&&side.capacity<=6).toBe(true);
+    for(let offset=0;offset<side.capacity;offset++)slots.push(side.baseIndex+offset);
+  }
+  expect(slots.length).toBeLessThanOrEqual(16);expect(new Set(slots).size).toBe(slots.length);
+  expect(typeof format.adjacency.reaches).toBe("function");expect(vi.isMockFunction(format.adjacency.reaches)).toBe(false);
+  const rows:Array<[number,number,boolean]>=[];
+  for(const from of slots)for(const to of slots){
+    const reachable=format.adjacency.reaches(from,to);expect(typeof reachable).toBe("boolean");
+    expect(Phaser.Math.RND.state()).toBe(before);rows.push([from,to,reachable]);
+  }
+  return {id:format.id,sides,localPlayerSide:format.localPlayerSide,adjacency:{slots,rows}};
+}
+
 function observeDirectNextBattle(){
   const scene=globalScene;
   expect(scene.currentBattle.waveIndex).toBe(1);
@@ -127,7 +147,7 @@ function observeDirectNextBattle(){
     battle_data_keys:Object.keys(p.battleData).sort(),summon_data_keys:Object.keys(p.summonData).sort(),
     moves:p.getMoveset().map(m=>({id:m.moveId,pp_used:m.ppUsed}))}));
   const pre={wave:scene.currentBattle.waveIndex,turn:scene.currentBattle.turn,seed:scene.seed,wave_seed:scene.waveSeed,
-    battle_seed:scene.currentBattle.battleSeed,format:scene.currentBattle.format,enemy_levels:[...scene.currentBattle.enemyLevels],
+    battle_seed:scene.currentBattle.battleSeed,format:observeBattleFormat(scene.currentBattle.format),enemy_levels:[...scene.currentBattle.enemyLevels],
     rng:Phaser.Math.RND.state(),party:metadata()};
   function wrap(target:object,key:string,after?:(args:unknown[],result:unknown,receiver:unknown)=>void){
     const original:unknown=Reflect.get(target,key);
@@ -173,7 +193,7 @@ function observeDirectNextBattle(){
   try{
     const battle=scene.newBattle();
     const post={wave:battle.waveIndex,turn:battle.turn,seed:scene.seed,wave_seed:scene.waveSeed,
-      battle_seed:battle.battleSeed,format:battle.format,enemy_levels:[...battle.enemyLevels],rng:Phaser.Math.RND.state(),party:metadata()};
+      battle_seed:battle.battleSeed,format:observeBattleFormat(battle.format),enemy_levels:[...battle.enemyLevels],rng:Phaser.Math.RND.state(),party:metadata()};
     expect(post.wave).toBe(2);expect(trace.some(row=>row.method==="doPostBattleCleanup")).toBe(true);
     expect(queued.some(row=>row.name==="NextEncounterPhase")).toBe(true);
     return {scope:"direct actual scene.newBattle after initialized wave1; no victory or reward application and no queued phase execution",pre,post,trace,draws,queued,level_calls:levelCalls};

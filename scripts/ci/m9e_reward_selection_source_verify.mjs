@@ -46,7 +46,7 @@ function validateBinder(b){
     }
     for(const key of ['evolutions','forms']){shape(p[key],['present','rows']);assert.equal(typeof p[key].present,'boolean');assert(Array.isArray(p[key].rows)&&p[key].rows.length<=16);if(!p[key].present)assert.equal(p[key].rows.length,0);}
     for(const e of p.evolutions.rows){
-      shape(e,['species','pre_form','evo_form','level','item','conditions','level_threshold']);integer(e.species,1,100000);integer(e.level,0,10000);integer(e.item,0,100000);
+      shape(e,['species','pre_form','evo_form','level','item','conditions','level_threshold']);integer(e.species,1,100000);integer(e.level,0,10000);if(e.item!==null)integer(e.item,0,100000);
       for(const key of ['pre_form','evo_form'])assert(e[key]===null||(typeof e[key]==='string'&&e[key].length<=128));
       exactJsonArg(e.conditions);exactJsonArg(e.level_threshold);
     }
@@ -72,7 +72,18 @@ function validate(d){
     assert(typeof state.battle_seed==='string'&&state.battle_seed.length===16);
     assert(typeof state.rng==='string'&&state.rng.startsWith('!rnd,')&&state.rng.length<=512);
     assert(state.enemy_levels.length>=1&&state.enemy_levels.length<=3);state.enemy_levels.forEach(n=>integer(n,1,10000));
-    exactJsonArg(state.format);assert.equal(state.party.length,1);
+    const format=state.format;
+    shape(format,['id','sides','localPlayerSide','adjacency']);assert(typeof format.id==='string'&&format.id.length<=128);
+    assert(Array.isArray(format.sides)&&format.sides.length>0&&format.sides.length<=4);
+    integer(format.localPlayerSide,0,format.sides.length-1);
+    const slots=[];
+    for(const side of format.sides){shape(side,['baseIndex','capacity','kind','mirrored']);integer(side.baseIndex,0,255);integer(side.capacity,1,6);integer(side.kind,0,8);assert.equal(typeof side.mirrored,'boolean');for(let offset=0;offset<side.capacity;offset++)slots.push(side.baseIndex+offset);}
+    assert(slots.length<=16&&new Set(slots).size===slots.length);
+    shape(format.adjacency,['slots','rows']);assert.deepEqual(format.adjacency.slots,slots);
+    assert.equal(format.adjacency.rows.length,slots.length*slots.length);
+    let rowIndex=0;
+    for(const from of slots)for(const to of slots){const row=format.adjacency.rows[rowIndex++];assert(Array.isArray(row)&&row.length===3);assert.equal(row[0],from);assert.equal(row[1],to);assert.equal(typeof row[2],'boolean');}
+    assert.equal(state.party.length,1);
     for(const p of state.party){assert.equal(p.species,1);integer(p.id,0,Number.MAX_SAFE_INTEGER);integer(p.level,1,10000);integer(p.hp,0,p.max_hp);assert(p.moves.length<=4);for(const m of p.moves){integer(m.id,1,100000);integer(m.pp_used,0,10000);}assert(p.battle_data_keys.length<=128&&p.summon_data_keys.length<=128);}
   }
   assert(next.trace.length>0&&next.trace.length<=48);
@@ -159,9 +170,11 @@ function validate(d){
   }
 }
 validate(data);
-const mutations=[d=>d.binder.party[0].level_cap=11,d=>d.binder.party[0].move_closure.pop(),d=>d.option_count=2,d=>d.free_picks=2,d=>d.catalog[0][1]=99,d=>d.catalog[0][6]=-1,
+const mutations=[d=>d.binder.party[0].evolutions.rows[0].item=-1,d=>d.binder.party[0].evolutions.rows[0].item="0",d=>d.binder.party[0].level_cap=11,d=>d.binder.party[0].move_closure.pop(),d=>d.option_count=2,d=>d.free_picks=2,d=>d.catalog[0][1]=99,d=>d.catalog[0][6]=-1,
  d=>d.options.pop(),d=>d.count_draws=[[0,1,1]],d=>d.source_sha='bad',
- d=>d.direct_next_battle.post.wave=3,d=>d.direct_next_battle.trace=[],d=>d.direct_next_battle.queued=[],d=>d.direct_next_battle.level_calls[0].battle_seed='wrong'];
+ d=>d.direct_next_battle.post.wave=3,d=>d.direct_next_battle.trace=[],d=>d.direct_next_battle.queued=[],d=>d.direct_next_battle.level_calls[0].battle_seed='wrong',
+ d=>d.direct_next_battle.post.format.adjacency={},d=>d.direct_next_battle.pre.format.adjacency.rows.pop(),
+ d=>d.direct_next_battle.post.format.adjacency.rows[0][0]=255];
 for(const change of mutations){const m=structuredClone(data);change(m);assert.throws(()=>validate(m));}
 const summary={schema_version:1,status:'passed',source_sha:data.source_sha,scope:data.scope,
  exports:raws.map(r=>({bytes:r.length,sha256:hash(r)})),identical_fresh_processes:2,negative_checks:mutations.length,
