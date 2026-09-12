@@ -756,14 +756,40 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+// Diagnostic writes bypass libtest capture so an abort retains the last boundary.
+fn save_stack_marker(stage: &str) {
+    use std::io::Write;
+    let mut stderr = std::io::stderr().lock();
+    let _ = writeln!(stderr, "m9e-save-stack: {stage}");
+}
+
 #[test]
 fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
 -> Result<(), Box<dyn Error>> {
+    save_stack_marker("wrapper entered");
+    {
+        use std::io::Write;
+        let _ = writeln!(
+            std::io::stderr().lock(),
+            "m9e-save-stack: sizes kernel={} snapshot={} state={}",
+            std::mem::size_of::<GameKernelV7>(),
+            std::mem::size_of::<er_kernel::snapshot_v7::CoreGameKernelSnapshotV7>(),
+            std::mem::size_of::<GameStateV6>(),
+        );
+    }
+    save_presentation_stack_diagnostic()
+}
+
+#[inline(never)]
+fn save_presentation_stack_diagnostic() -> Result<(), Box<dyn Error>> {
+    save_stack_marker("body entered; content");
     let content = content()?;
     let host = SeatId::new(safe(1));
     let guest = SeatId::new(safe(2));
     let generation = ConnectionGeneration::new(safe(1));
+    save_stack_marker("natural bootstrap");
     let (mut state, revision, menu_instance) = natural_coop_state(content.clone(), host)?;
+    save_stack_marker("bootstrap returned");
     // The run is natural; the Save menu is an explicit controlled action seam.
     let mut control = generic_vertical_control_v2(
         menu_instance,
@@ -789,6 +815,7 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
         .authority_seat = host;
     state.active_run.as_mut().ok_or("run missing")?.control = control;
     state.validate_with(content.as_ref())?;
+    save_stack_marker("authority from_active");
     let mut authority = GameKernelV7::from_active(
         state.clone(),
         revision,
@@ -802,6 +829,7 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
             host,
         )?),
     )?;
+    save_stack_marker("replica from_active");
     let mut replica = GameKernelV7::from_active(
         state,
         revision,
@@ -815,6 +843,7 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
             guest,
         )?),
     )?;
+    save_stack_marker("replica Save press");
     let proposal_step = press(&mut replica, PhysicalKey::Space)?;
     let proposal = proposal_step
         .effects
@@ -824,8 +853,11 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
             _ => None,
         })
         .ok_or("guest Save proposal missing")?;
+    save_stack_marker("replica snapshot");
     let before_delivery = replica.snapshot()?;
+    save_stack_marker("authority snapshot");
     let before_admission = authority.snapshot()?;
+    save_stack_marker("exhausted snapshot clone and restore");
     let mut exhausted_snapshot = before_admission.clone();
     exhausted_snapshot.replay_sequence = SafeU53::MAX;
     let mut exhausted = GameKernelV7::from_snapshot(
@@ -834,6 +866,7 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
         GameKernelRoleV7::Authority,
         content.clone(),
     )?;
+    save_stack_marker("exhausted admit");
     assert_eq!(
         exhausted.admit_game_proposal(proposal),
         Err(GameKernelV7Error::Invalid),
@@ -844,6 +877,7 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
         exhausted_snapshot,
         "late admission rejection must retain state, effects, private control and protocol"
     );
+    save_stack_marker("authority admit");
     let authority_step = authority.admit_game_proposal(proposal)?;
     let material = authority_step
         .effects
@@ -853,6 +887,7 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
             _ => None,
         })
         .ok_or("Save material missing")?;
+    save_stack_marker("material decode");
     let decoded = GameMaterialV6::decode(material)?;
 
     let semantic = PresentationSemanticIdV1::Cue(PresentationCueFamilyV1::Save);
@@ -902,6 +937,7 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
     assert_eq!(*generation, safe(1));
     assert!(!bytes.is_empty());
     assert_eq!(decoded.transition().platform_effects, platforms);
+    save_stack_marker("post-admission snapshot");
     let authority_snapshot = authority.snapshot()?;
     assert_eq!(
         authority_snapshot.pending_platform,
@@ -924,6 +960,7 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
 
     // In this controlled fixture, correct only the exhausted replay frontier.
     // The same real guest proposal must still be available for admission.
+    save_stack_marker("corrected snapshot and restore");
     let mut corrected_snapshot = exhausted.snapshot()?;
     corrected_snapshot.replay_sequence = before_admission.replay_sequence;
     assert_eq!(corrected_snapshot, before_admission);
@@ -939,6 +976,7 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
     // Exact duplicates remain preflight no-ops even when a new admission's
     // replay increment would fail. They must not advance the replay sequence
     // or reinstall effects.
+    save_stack_marker("duplicate snapshot and restore");
     let mut duplicate_snapshot = authority_snapshot.clone();
     duplicate_snapshot.replay_sequence = SafeU53::MAX;
     let mut duplicate = GameKernelV7::from_snapshot(
@@ -956,6 +994,7 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
     // The actual Save owns both a write and a presentation. At an exhausted
     // replay frontier, neither callback may retire ownership or publish a CAS
     // frontier before reporting its late failure.
+    save_stack_marker("callback snapshot and restore");
     let mut callback_snapshot = authority_snapshot.clone();
     callback_snapshot.replay_sequence = SafeU53::MAX;
     let mut callbacks = GameKernelV7::from_snapshot(
@@ -964,17 +1003,20 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
         GameKernelRoleV7::Authority,
         content.clone(),
     )?;
+    save_stack_marker("exhausted storage callback");
     assert_eq!(
         callbacks.apply_storage_result(*request, KernelStorageResultV2::Written),
         Err(GameKernelV7Error::Invalid)
     );
     assert_eq!(callbacks.snapshot()?, callback_snapshot);
+    save_stack_marker("exhausted presentation callback");
     assert_eq!(
         callbacks.settle_presentation(expected_presentation.event_id),
         Err(GameKernelV7Error::Invalid)
     );
     assert_eq!(callbacks.snapshot()?, callback_snapshot);
 
+    save_stack_marker("callback retry snapshot and restore");
     let mut callback_retry_snapshot = callbacks.snapshot()?;
     callback_retry_snapshot.replay_sequence = authority_snapshot.replay_sequence;
     assert_eq!(callback_retry_snapshot, authority_snapshot);
@@ -1012,6 +1054,7 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
 
     // This is a valid pre-delivery snapshot. The collision is detected only
     // when presentation ownership is installed after common material apply.
+    save_stack_marker("collision snapshot and restore");
     let mut collision_snapshot = before_delivery.clone();
     collision_snapshot
         .pending_presentations
@@ -1029,6 +1072,7 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
     );
     assert_eq!(collision.snapshot()?, collision_snapshot);
 
+    save_stack_marker("replica material delivery");
     let delivered = replica.apply_authority_material(material)?;
     assert_eq!(
         delivered,
@@ -1060,6 +1104,7 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
     );
     assert_eq!(replica.snapshot()?, delivered_snapshot);
 
+    save_stack_marker("replica presentation settle");
     replica.settle_presentation(expected_presentation.event_id)?;
     let settled = replica.snapshot()?;
     assert!(settled.pending_presentations.is_empty());
@@ -1070,6 +1115,7 @@ fn replica_delivers_save_presentation_once_without_repeating_authority_storage()
     assert_eq!(replica.snapshot()?, settled);
     assert!(authority.admit_game_proposal(proposal)?.effects.is_empty());
     assert_eq!(authority.snapshot()?, authority_snapshot);
+    save_stack_marker("body completed");
     Ok(())
 }
 
