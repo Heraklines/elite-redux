@@ -17,7 +17,7 @@ import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import { PromptHandler } from "#test/helpers/prompt-handler";
 import { execFileSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { writeFileSync,readFileSync,existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import Phaser from "phaser";
@@ -41,11 +41,23 @@ async function observeTownAtActualEntry(){
 let captured:ReturnType<typeof extractTownStatic>|undefined;
 function extractTown(tiers:readonly (readonly [number,readonly number[]])[]){
  const actual=globalScene.randBattleSeedInt;let calls=0;const spy=vi.spyOn(globalScene,"randBattleSeedInt").mockImplementation(function(...args){calls++;return Reflect.apply(actual,globalScene,args);});
- try{const result=extractTownStatic(tiers);expect(calls).toBe(0);return result;}finally{spy.mockRestore();}
+ try{const result=extractTownStatic(tiers);expect(calls).toBe(0);return result;}finally{expect(calls).toBe(0);spy.mockRestore();}
 }
 function extractTownStatic(tiers:readonly (readonly [number,readonly number[]])[]){
  expect([PokemonForm.prototype.getLevelMoves,PokemonForm.prototype.getAbility,PokemonForm.prototype.getAbilityCount,PokemonForm.prototype.getPassiveAbilities,PokemonSpecies.prototype.getPrevolutionLevels]).toEqual(originalRegistryMethods);
  const before=Phaser.Math.RND.state();const roots=[...new Set(tiers.flatMap(r=>[...r[1]]))];expect(roots.length).toBe(54);
+ const countQueue=roots.map(id=>[id,0] as const),countSeen=new Set<number>(),formCounts:Array<[number,number]>=[];
+ for(let i=0;i<countQueue.length;i++){
+  const [id,depth]=countQueue[i];if(countSeen.has(id))continue;expect(depth).toBeLessThanOrEqual(32);expect(countSeen.size).toBeLessThan(256);countSeen.add(id);
+  const species=getPokemonSpecies(id);expect(species.getPrevolutionLevels).toBe(originalRegistryMethods[4]);formCounts.push([id,species.forms.length||1]);
+  for(const e of pokemonEvolutions[id]??[])countQueue.push([e.speciesId,depth+1]);for(const row of species.getPrevolutionLevels(true))countQueue.push([row[0],depth+1]);
+  if(Object.hasOwn(pokemonPrevolutions,id))countQueue.push([pokemonPrevolutions[id],depth+1]);
+  for(const key of Object.keys(pokemonEvolutions))for(const e of pokemonEvolutions[Number(key)])if(e.speciesId===id)countQueue.push([Number(key),depth+1]);
+ }
+ const maxForms=Math.max(...formCounts.map(r=>r[1]));const countReceipt={source:PIN,scope:"complete visited Town evolution graph source form counts before payload extraction",roots:roots.length,visited:formCounts.length,max_forms:maxForms,counts:formCounts};
+ const countRaw=Buffer.from(JSON.stringify(countReceipt)+"\n");expect(countRaw.length).toBeLessThanOrEqual(4096);expect(Phaser.Math.RND.state()).toBe(before);
+ const countPath=process.env.M9_TOWN_CONSTRUCTOR_COUNTS;expect(countPath).toBeTruthy();if(existsSync(countPath!))expect(readFileSync(countPath!).equals(countRaw)).toBe(true);else writeFileSync(countPath!,countRaw,{flag:"wx"});
+ expect(maxForms,`Source form bound16 disproved: max${maxForms}, species${formCounts.filter(r=>r[1]===maxForms).map(r=>r[0]).join(",")}; complete count receipt retained`).toBeLessThanOrEqual(16);
  const moveIds=new Set<number>(),abilityIds=new Set<number>();const speciesRows:unknown[]=[];
  function encoder(){const functions:Array<[string,number]>=[];const intern=new Map<string,number>();
   function encode(value:unknown,depth=0,seen=new Set<object>()):unknown{
@@ -70,7 +82,7 @@ function extractTownStatic(tiers:readonly (readonly [number,readonly number[]])[
   const preLevels=species.getPrevolutionLevels(true);expect(preLevels.length).toBeLessThanOrEqual(128);
   for(const e of evolutions)queue.push([e.speciesId,depth+1]);for(const row of preLevels)queue.push([row[0],depth+1]);if(preOwn){expect(Number.isSafeInteger(preValue)).toBe(true);queue.push([preValue,depth+1]);}
   for(const [parent] of incoming)queue.push([parent,depth+1]);
-  const forms=species.forms.length?species.forms:[species];expect(forms.length).toBeLessThanOrEqual(16);
+  const forms=species.forms.length?species.forms:[species];expect(forms.length,`species${id} forms`).toBeLessThanOrEqual(16);
   const formRows=forms.map((form,index)=>{
    expect([form.getLevelMoves,form.getAbility,form.getAbilityCount,form.getPassiveAbilities]).toEqual(originalRegistryMethods.slice(0,4));
    // PokemonForm registry method only: never Pokemon.getLevelMoves or simulated evolution chain.
