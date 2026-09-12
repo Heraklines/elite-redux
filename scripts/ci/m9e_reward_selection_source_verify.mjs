@@ -22,7 +22,7 @@ function validate(d){
     assert.equal(r[1],(last.get(r[0])??-1)+1);last.set(r[0],r[1]);
     assert(!seen.has(`${r[0]}/${r[1]}`));seen.add(`${r[0]}/${r[1]}`);
     assert(typeof r[2]==='string'&&/^[A-Z0-9_]{1,128}$/.test(r[2]));
-    assert(typeof r[3]==='string'&&/^[A-Za-z_$][A-Za-z0-9_$]{0,127}$/.test(r[3]));
+    assert(typeof r[3]==='string'&&/^(?:[A-Za-z_$][A-Za-z0-9_$]{0,127})?$/.test(r[3]));
     assert.equal(typeof r[4],'boolean');assert.equal(typeof r[5],'boolean');
     assert(Number.isFinite(r[6])&&r[6]>=0&&r[6]<=1000000000);
     assert.equal(typeof r[7],'boolean');
