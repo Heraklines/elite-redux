@@ -173,6 +173,15 @@ pub struct CurrentReproCapsuleV1 {
 
 impl CurrentReproCapsuleV1 {
     pub fn validate(&self, limits: CurrentReproLimitsV1) -> Result<(), CurrentReproErrorV1> {
+        self.validated_encoded_len(limits).map(|_| ())
+    }
+
+    // Return the exact bounded count already required by validation. The
+    // caller can retain it without serializing the same immutable capsule twice.
+    fn validated_encoded_len(
+        &self,
+        limits: CurrentReproLimitsV1,
+    ) -> Result<usize, CurrentReproErrorV1> {
         limits.validate()?;
         if self.schema_version != CURRENT_REPRO_SCHEMA_VERSION_V1
             || self.checkpoint.schema_version != 7
@@ -184,9 +193,11 @@ impl CurrentReproCapsuleV1 {
         {
             return Err(invalid("unsafe attempt position"));
         }
-        if self.attempts.len() > limits.maximum_events || !fits(self, limits.maximum_bytes) {
+        if self.attempts.len() > limits.maximum_events {
             return Err(invalid("capsule bounds"));
         }
+        let bytes = encoded_len(self, limits.maximum_bytes)
+            .ok_or_else(|| invalid("capsule bounds"))?;
         let mut position = self.base_position;
         let mut browser_generation = self
             .browser_transport
@@ -248,7 +259,7 @@ impl CurrentReproCapsuleV1 {
         {
             return Err(divergence(position, "final browser generation"));
         }
-        Ok(())
+        Ok(bytes)
     }
 }
 
@@ -320,9 +331,8 @@ impl CurrentReproRecorderV1 {
         content: Arc<PreparedGameContentV2>,
         limits: CurrentReproLimitsV1,
     ) -> Result<(Self, CurrentGameSession), CurrentReproErrorV1> {
-        let session = replay_current_capsule_v1(&capsule, Arc::clone(&content), limits)?;
-        let capsule_bytes = encoded_len(&capsule, limits.maximum_bytes)
-            .ok_or_else(|| invalid("imported capsule byte bound"))?;
+        let (session, capsule_bytes) =
+            replay_current_capsule_with_size(&capsule, Arc::clone(&content), limits)?;
         let browser_context_required = capsule.browser_transport.is_some();
         let recorder = Self {
             content,
@@ -818,7 +828,15 @@ pub fn replay_current_capsule_v1(
     content: Arc<PreparedGameContentV2>,
     limits: CurrentReproLimitsV1,
 ) -> Result<CurrentGameSession, CurrentReproErrorV1> {
-    capsule.validate(limits)?;
+    replay_current_capsule_with_size(capsule, content, limits).map(|(session, _)| session)
+}
+
+fn replay_current_capsule_with_size(
+    capsule: &CurrentReproCapsuleV1,
+    content: Arc<PreparedGameContentV2>,
+    limits: CurrentReproLimitsV1,
+) -> Result<(CurrentGameSession, usize), CurrentReproErrorV1> {
+    let capsule_bytes = capsule.validated_encoded_len(limits)?;
     if capsule.content_identity != *content.identity() {
         return Err(invalid("content_identity"));
     }
@@ -828,6 +846,7 @@ pub fn replay_current_capsule_v1(
         capsule.role,
         content,
     )?;
+    let mut verified_final_digest = None;
     for attempt in &capsule.attempts {
         let before = session
             .snapshot()
@@ -888,17 +907,27 @@ pub fn replay_current_capsule_v1(
         let snapshot = session
             .snapshot()
             .map_err(|_| divergence(attempt.position, "snapshot"))?;
-        if snapshot_digest(&snapshot)? != expected_digest {
+        let actual_digest = snapshot_digest(&snapshot)?;
+        if actual_digest != expected_digest {
             return Err(divergence(attempt.position, "snapshot_digest"));
         }
+        verified_final_digest = Some(actual_digest);
     }
-    let final_snapshot = session
-        .snapshot()
-        .map_err(|_| divergence(capsule.final_position, "final snapshot"))?;
-    if snapshot_digest(&final_snapshot)? != capsule.final_snapshot_digest {
+    // No session mutation occurs after the last independently checked attempt.
+    // Empty capsules still verify the restored checkpoint's digest here.
+    let final_digest = match verified_final_digest {
+        Some(digest) => digest,
+        None => {
+            let final_snapshot = session
+                .snapshot()
+                .map_err(|_| divergence(capsule.final_position, "final snapshot"))?;
+            snapshot_digest(&final_snapshot)?
+        }
+    };
+    if final_digest != capsule.final_snapshot_digest {
         return Err(divergence(capsule.final_position, "final_snapshot_digest"));
     }
-    Ok(session)
+    Ok((session, capsule_bytes))
 }
 
 fn restored(
