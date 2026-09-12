@@ -141,7 +141,7 @@ impl GameKernelV7 {
         }
         let mut candidate = self.clone();
         candidate.pending_platform.remove(&input.request);
-        let step = candidate.execute_owned_phase(GameOwnedPhaseV1::FlashEgg { input })?;
+        let step = candidate.execute_owned_phase(GameOwnedPhaseV1::FlashEgg { input: Box::new(input) })?;
         candidate.validate()?;
         *self = candidate;
         Ok(step)

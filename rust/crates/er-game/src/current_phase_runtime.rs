@@ -34,7 +34,7 @@ pub enum GameOwnedPhaseV1 {
         utc_milliseconds: i64,
     },
     FlashEgg {
-        input: er_state::current_achievement_execution::CurrentFlashEggInputsV1,
+        input: Box<er_state::current_achievement_execution::CurrentFlashEggInputsV1>,
     },
     FriendshipClock {
         request: CurrentFriendshipClockRequestV1,

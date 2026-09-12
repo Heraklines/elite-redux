@@ -149,7 +149,7 @@ pub enum BrowserRequestV2 {
         utc_milliseconds: i64,
     },
     FlashEggInputs {
-        input: er_state::current_achievement_execution::CurrentFlashEggInputsV1,
+        input: Box<er_state::current_achievement_execution::CurrentFlashEggInputsV1>,
     },
     PresentationSettled {
         event_id: PresentationEventId,

@@ -7,7 +7,7 @@ use er_rng::phaser::{PhaserRdg, shift_char_codes};
 use er_types::SafeU53;
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct CurrentInitialBattleConstructionV1 {
+pub(crate) struct CurrentEarlySingleBattleConstructionV1 {
     pub wave_seed: String,
     pub battle_seed: String,
     pub enemy_level: u16,
@@ -26,9 +26,22 @@ pub(crate) fn construct_current_initial_battle(
     run_seed: &str,
     wave_slope: f64,
     quadratic_divisor: f64,
-) -> Result<CurrentInitialBattleConstructionV1, GameRuntimeV6Error> {
+) -> Result<CurrentEarlySingleBattleConstructionV1, GameRuntimeV6Error> {
+    construct_current_early_single_battle(run_seed, 1, wave_slope, quadratic_divisor)
+}
+
+/// Isolated constructor arithmetic only. The caller must separately resolve
+/// ordinary wild/single format, difficulty, and all post-constructor modifiers.
+/// Early waves exclude ordinary Classic boss and fixed-trainer construction.
+pub(crate) fn construct_current_early_single_battle(
+    run_seed: &str,
+    wave: u16,
+    wave_slope: f64,
+    quadratic_divisor: f64,
+) -> Result<CurrentEarlySingleBattleConstructionV1, GameRuntimeV6Error> {
     let failure = || GameRuntimeV6Error::Action;
-    if run_seed.is_empty()
+    if !(1..=4).contains(&wave)
+        || run_seed.is_empty()
         || !wave_slope.is_finite()
         || wave_slope <= 0.0
         || !quadratic_divisor.is_finite()
@@ -36,8 +49,8 @@ pub(crate) fn construct_current_initial_battle(
     {
         return Err(failure());
     }
-    let wave_seed = shift_char_codes(run_seed, 1).map_err(|_| failure())?;
-    let scoped_seed = shift_char_codes(&wave_seed, 8).map_err(|_| failure())?;
+    let wave_seed = shift_char_codes(run_seed, i64::from(wave)).map_err(|_| failure())?;
+    let scoped_seed = shift_char_codes(&wave_seed, i64::from(wave) << 3).map_err(|_| failure())?;
     let mut rng = PhaserRdg::from_seed(&scoped_seed);
     const ALPHABET: &[u8; 62] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     let mut battle_seed = String::with_capacity(16);
@@ -50,17 +63,23 @@ pub(crate) fn construct_current_initial_battle(
     }
     #[cfg(test)]
     let level_rng_before = rng.state();
+    let deviation = 10.0 / f64::from(wave);
+    let mut remaining = deviation;
     let mut sum = 0.0;
-    for _ in 0..10 {
+    // Source decrements the fractional loop bound, then divides by that original
+    // fractional value. Truncating 10 / wave would change wave3/4 draws and level.
+    while remaining > 0.0 {
         sum += rng.frac();
+        remaining -= 1.0;
     }
     // Preserve source Number evaluation order and Math.round on positive values.
-    let base = 1.0 + 1.0 / wave_slope + (1.0 / quadratic_divisor).powi(2);
-    let rounded = (base + (sum / 10.0_f64).abs()).round().max(1.0);
+    let level_wave = f64::from(wave);
+    let base = 1.0 + level_wave / wave_slope + (level_wave / quadratic_divisor).powi(2);
+    let rounded = (base + (sum / deviation).abs()).round().max(1.0);
     if !rounded.is_finite() || rounded > f64::from(u16::MAX) {
         return Err(failure());
     }
-    Ok(CurrentInitialBattleConstructionV1 {
+    Ok(CurrentEarlySingleBattleConstructionV1 {
         wave_seed,
         battle_seed,
         enemy_level: rounded as u16,
@@ -109,5 +128,25 @@ mod tests {
             before,
             "isolated constructor preserves encounter RNG"
         );
+    }
+    #[test]
+    fn second_wave_single_constructor_matches_direct_source_trace() {
+        // Two identical source399d observations, run34696971671/6793ae2.
+        // This is constructor parity, not a completed reward/encounter journey.
+        let constructed = construct_current_early_single_battle("test", 2, 2.0, 25.0)
+            .expect("qualified second-wave single constructor");
+        assert_eq!(constructed.wave_seed, "vguv");
+        assert_eq!(constructed.battle_seed, "wlyeDByVgyoYo7Rp");
+        assert_eq!(constructed.enemy_level, 2);
+        assert_eq!(
+            constructed.level_rng_before.state_string,
+            "!rnd,597402,0.22146011772565544,0.6669190502725542,0.7517027526628226"
+        );
+        assert_eq!(
+            constructed.level_rng_after.state_string,
+            "!rnd,286543,0.09186502173542976,0.10179232736118138,0.29759153397753835"
+        );
+        assert!(construct_current_early_single_battle("test", 0, 2.0, 25.0).is_err());
+        assert!(construct_current_early_single_battle("test", 5, 2.0, 25.0).is_err());
     }
 }

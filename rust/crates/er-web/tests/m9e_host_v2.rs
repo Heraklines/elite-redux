@@ -459,7 +459,7 @@ fn assert_unowned_flash_input_rejected(
         },
         egg_utc_milliseconds: 0,
     };
-    assert!(send(host, *sequence, BrowserRequestV2::FlashEggInputs { input }).is_err());
+    assert!(send(host, *sequence, BrowserRequestV2::FlashEggInputs { input: Box::new(input) }).is_err());
     let BrowserResponseV2::Snapshot { snapshot: after } =
         send(host, *sequence, BrowserRequestV2::Snapshot)?
     else {
