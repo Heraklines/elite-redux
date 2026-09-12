@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 BOUNDED_HELPER_BYTES = 38620
-EXPORTER_SHA256 = "28a4acdef8789d12d9fc8ee89b0ee51ac79478f57cb862f82c6ebbe6a3a19868"
+EXPORTER_SHA256 = "6d0df906d0fd801b0dd970a8ce96872cfc9d6502e1c758174491b75634f70aa5"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -184,6 +184,7 @@ TUNING_BLOB = "04755b16e916c3e364917b67a9718cf0ee01ae6b"
 RNG_FILES = ["node_modules/phaser/package.json", "node_modules/phaser/src/math/random-data-generator/RandomDataGenerator.js", "node_modules/phaser/src/math/easing/sine/In.js"]
 
 TAIL_SOURCE_PINS = {
+    "src/phases/stat-stage-change-phase.ts": ["35acb491e3a7169a6aa2ce340b51b748ae3c421ca8ee5fe1bc0d23aa39a2cd0a", 20491],
     "src/data/pokemon/pokemon-data.ts": ["ce9b474196c5a3c68e0d1c11b23804632d7931f65715eb11a687ec8de667675c", 32866],
     "src/phases/field-phase.ts": ["7619f1a859536fe8ecbe975dd52e09d45c0ea1558073d6efd01f8cfd3a99631a", 455],
     "src/utils/speed-order-generator.ts": ["2db57c46db58f441987164017fc1461861841838aa954485244cb87298181852", 1263],

@@ -1,3 +1,6 @@
+import { BooleanHolder } from "#utils/common";
+import { StatStageChangePhase } from "#phases/stat-stage-change-phase";
+import { Stat } from "#enums/stat";
 import { TurnEndPhase } from "#phases/turn-end-phase";
 import { MapModifier, LapsingPersistentModifier, LapsingPokemonHeldItemModifier } from "#modifiers/modifier";
 import { erAdvanceCommunityItemCharges } from "#data/elite-redux/er-community-items";
@@ -301,8 +304,9 @@ test("observe actual initialized target capability registry", async () => {
   if (!tailPath) throw new Error("M9_VICTORY_TAIL_OUTPUT required");
   const turnCounters=observeActualNeutralTurnEnd();
   const battleScores=observeActualBattleEndScoreTurns();
-  const tail=`${JSON.stringify({schema_version:3,source_sha:PIN,seed:SEED,legacy_sha256:legacySha,
-    scope:"initialized registry, initial-context consumers and actual direct neutral TurnEnd counter dispatch; not full battle-loop execution",...tailClosure,turn_counters:turnCounters,battle_scores:battleScores})}\n`;
+  const growl=observeActualGrowlChild();
+  const tail=`${JSON.stringify({schema_version:4,source_sha:PIN,seed:SEED,legacy_sha256:legacySha,
+    scope:"initialized registry, initial-context consumers and actual direct neutral TurnEnd counter dispatch; not full battle-loop execution",...tailClosure,turn_counters:turnCounters,battle_scores:battleScores,growl})}\n`;
   expect(Buffer.byteLength(tail,"utf8")).toBeLessThanOrEqual(16384);
   writeFileSync(tailPath,tail,{encoding:"utf8",flag:"wx"});
 });
@@ -754,4 +758,48 @@ function observeActualBattleEndScoreTurns() {
     enemy_count:scene.getEnemyParty().length,double:battle.double,is_boss:enemy.isBoss(),cases,
     restored:battle.turn===original.turn&&battle.battleScore===original.battle_score&&scene.score===original.scene_score,
     rng_restored:Phaser.Math.RND.state()===rng};
+}
+
+function observeActualGrowlChild() {
+  const scene=globalScene, target=scene.getPlayerParty()[0], user=scene.getEnemyParty()[0], move=allMoves[45];
+  const attrs=move.getAttrs("StatStageChangeAttr");expect(attrs).toHaveLength(1);
+  const attr=attrs[0];
+  for(const method of [attr.apply,attr.getMoveChance,StatStageChangePhase.prototype.start,target.setStatStage])expect(vi.isMockFunction(method)).toBe(false);
+  const families=["MoveEffectChanceMultiplierAbAttr","IgnoreMoveEffectsAbAttr","UserFieldIgnoreMoveEffectsAbAttr",
+    "StatStageChangeMultiplierAbAttr","ProtectStatAbAttr","ConditionalUserFieldProtectStatAbAttr",
+    "ReflectStatStageChangeAbAttr","PostStatStageChangeAbAttr","PostAllyStatStageChangeAbAttr"] as const;
+  const abilities=ABILITIES.map(id=>({id,families:families.map(family=>allAbilities[id].getAttrs(family).map(a=>({name:a.constructor.name,stats:(a as unknown as {stats?:unknown}).stats??null,protected_stat:(a as unknown as {protectedStat?:unknown}).protectedStat??null,protects_attack:a.constructor.name==="ProtectStatAbAttr"?(a as unknown as {canApply:(arg:unknown)=>boolean}).canApply({pokemon:target,stat:Stat.ATK,cancelled:new BooleanHolder(false),simulated:false,target,stages:-1}):null})))}));
+  const category=user.getMoveCategory(target,move), power=move.calculateBattlePower(user,target,true);
+  const query=target.getAttackDamage({source:user,move,simulated:true,isCritical:false,forcedRandomMultiplier:1});
+  expect(query.damage).toBeGreaterThan(0);
+  const original={stage:target.getStatStage(Stat.ATK),decreased:target.turnData.statStagesDecreased,animations:scene.moveAnimations};
+  const rng=Phaser.Math.RND.state();
+  const battleRng=scene.currentBattle.captureDeterministicRngState();
+  const cases:Array<{before:number;queued:number;after:number;decreased:boolean;applied:boolean;chance:number;message:boolean}>=[];
+  try {
+    // Exercise the actual synchronous callback branch, explicitly disabling its
+    // visual tween; no replacement of the attr, phase, setter or achievement hook.
+    scene.moveAnimations=false;
+    for(const before of [0,6,-6]) {
+      target.setStatStage(Stat.ATK,before);target.turnData.statStagesDecreased=false;
+      expect(scene.phaseManager.hasPhaseOfType("StatStageChangePhase")).toBe(false);
+      const chance=attr.getMoveChance(user,target,move,false,true);
+      const applied=attr.apply(user,target,move);
+      let child:StatStageChangePhase|null=null;
+      expect(scene.phaseManager.hasPhaseOfType("StatStageChangePhase",phase=>{child=phase;return true;})).toBe(true);
+      const queued=target.getStatStage(Stat.ATK);expect(queued).toBe(before);
+      expect(child).not.toBeNull();
+      expect(scene.phaseManager.tryRemovePhase("StatStageChangePhase",phase=>phase===child)).toBe(true);
+      (child as unknown as StatStageChangePhase).start();
+      cases.push({before,queued,after:target.getStatStage(Stat.ATK),decreased:target.turnData.statStagesDecreased,
+        applied,chance,message:scene.phaseManager.hasPhaseOfType("MessagePhase")});
+      scene.phaseManager.removeAllPhasesOfType("MessagePhase");
+      expect(Phaser.Math.RND.state()).toBe(rng);
+    }
+  } finally {
+    target.setStatStage(Stat.ATK,original.stage);target.turnData.statStagesDecreased=original.decreased;scene.moveAnimations=original.animations;
+  }
+  return {scope:"actual Growl attr and captured stat child; controlled Attack stages, visual tween disabled; not a selected move or full battle loop",
+    move:{id:move.id,category:move.category,power:move.power,attack_class:move.is("AttackMove"),status_class:move.is("StatusMove"),effective_category:category,effective_power:power,simulated_damage:query.damage,chance:move.chance,stats:attr.stats,stages:attr.stages,self_target:attr.selfTarget},
+    families,abilities,cases,battle_rng_unchanged:scene.currentBattle.captureDeterministicRngState()===battleRng,rng_restored:Phaser.Math.RND.state()===rng};
 }
