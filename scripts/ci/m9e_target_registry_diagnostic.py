@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 BOUNDED_HELPER_BYTES = 38620
-EXPORTER_SHA256 = "430d0e3bc68b252885e85cb03cb20dcfa9ce8c5303dfcd5fd2c1e674aef16324"
+EXPORTER_SHA256 = "3eb2c1cd93e37f2ea60b3307a9c276432ec424e33037b5a7b0581164c2a16790"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -184,6 +184,9 @@ TUNING_BLOB = "04755b16e916c3e364917b67a9718cf0ee01ae6b"
 RNG_FILES = ["node_modules/phaser/package.json", "node_modules/phaser/src/math/random-data-generator/RandomDataGenerator.js"]
 
 TAIL_SOURCE_PINS = {
+    "src/data/pokemon/pokemon-data.ts": ["ce9b474196c5a3c68e0d1c11b23804632d7931f65715eb11a687ec8de667675c", 32866],
+    "src/phases/field-phase.ts": ["7619f1a859536fe8ecbe975dd52e09d45c0ea1558073d6efd01f8cfd3a99631a", 455],
+    "src/utils/speed-order-generator.ts": ["2db57c46db58f441987164017fc1461861841838aa954485244cb87298181852", 1263],
     "src/data/elite-redux/er-community-items.ts": ["76801e7cefa497c2d3584030c36eb0e14c48791620a4b05478789571abd97cc3", 12194],
     "src/data/elite-redux/er-tactical-items.ts": ["0efe0e9f834e6fe6a06008450b17da98e3f5d4a7edc033ce98f481ab03232092", 41316],
     "src/data/elite-redux/er-ward-stones.ts": ["bc2adb31e44f414515118a772bc8c35d4568638ab8c91de4ecdb4dd41c662640", 19393],
@@ -616,7 +619,9 @@ def main(summary):
     phase_paths = ["src/phase-tree.ts", "src/phase-manager.ts", "src/phases/turn-start-phase.ts",
         "src/phases/move-phase.ts", "src/phases/move-effect-phase.ts", "src/phases/faint-phase.ts",
         "src/phases/victory-phase.ts", "src/field/pokemon.ts", "src/battle-scene.ts",
-        "src/data/elite-redux/archetypes/ability-meta-consumers.ts", "src/battle.ts"]
+        "src/data/elite-redux/archetypes/ability-meta-consumers.ts", "src/battle.ts",
+        "src/phases/turn-end-phase.ts", "src/phases/field-phase.ts",
+        "src/utils/speed-order-generator.ts", "src/data/pokemon/pokemon-data.ts"]
     phase_pins = FULL / "phase-source-pins.json"
     phase_pins.write_text(json.dumps({"oracle": PIN, "sources": {path: ORACLE_PINS[path]
         for path in phase_paths}}, sort_keys=True) + "\n", encoding="utf-8")

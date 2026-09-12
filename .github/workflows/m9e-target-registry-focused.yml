@@ -1,4 +1,4 @@
-name: M9E Victory Tail Source Diagnostic
+name: M9E Victory Tail Counter Source Diagnostic
 on:
   push:
     branches: [codex/m9e-victory-tail-source-20260912]

@@ -1,3 +1,4 @@
+import { TurnEndPhase } from "#phases/turn-end-phase";
 import { MapModifier, LapsingPersistentModifier, LapsingPokemonHeldItemModifier } from "#modifiers/modifier";
 import { erAdvanceCommunityItemCharges } from "#data/elite-redux/er-community-items";
 import { erAdvanceTacticalRecharges } from "#data/elite-redux/er-tactical-items";
@@ -298,8 +299,9 @@ test("observe actual initialized target capability registry", async () => {
   writeFileSync(sidecarPath,sidecar,{encoding:"utf8",flag:"wx"});
   const tailPath=process.env.M9_VICTORY_TAIL_OUTPUT;
   if (!tailPath) throw new Error("M9_VICTORY_TAIL_OUTPUT required");
-  const tail=`${JSON.stringify({schema_version:1,source_sha:PIN,seed:SEED,legacy_sha256:legacySha,
-    scope:"initialized registry and direct initial-context consumers; not full TurnEnd/BattleEnd execution",...tailClosure})}\n`;
+  const turnCounters=observeActualNeutralTurnEnd();
+  const tail=`${JSON.stringify({schema_version:2,source_sha:PIN,seed:SEED,legacy_sha256:legacySha,
+    scope:"initialized registry, initial-context consumers and actual direct neutral TurnEnd counter dispatch; not full battle-loop execution",...tailClosure,turn_counters:turnCounters})}\n`;
   expect(Buffer.byteLength(tail,"utf8")).toBeLessThanOrEqual(16384);
   writeFileSync(tailPath,tail,{encoding:"utf8",flag:"wx"});
 });
@@ -700,4 +702,24 @@ function observeInitialVictoryTailClosure() {
     training_cache:{difficulty,before:cacheBefore,awards,after:cacheAfter},
     money:{before:moneyBefore,calculated,returned,captured,after:moneyAfter,restored:moneyRestored},
     rng_unchanged:true};
+}
+function observeActualNeutralTurnEnd() {
+  const scene=globalScene;
+  const field=scene.getField(true);
+  const capture=()=>({turn:scene.currentBattle.turn,holders:field.map(p=>({
+    id:p.id,player:p.isPlayer(),hp:p.hp,max_hp:p.getMaxHp(),
+    turn_count:p.tempSummonData.turnCount,wave_turn_count:p.tempSummonData.waveTurnCount,
+  }))});
+  const before=capture();
+  expect(before.turn).toBe(1);
+  expect(before.holders.length).toBe(2);
+  expect(before.holders.every(p=>p.turn_count===1&&p.wave_turn_count===1)).toBe(true);
+  const phase=new TurnEndPhase();
+  expect(phase.upcomingInterlude).toBe(false);
+  phase.start();
+  const after=capture();
+  expect(after.turn).toBe(2);
+  expect(after.holders.map(p=>[p.id,p.hp,p.max_hp])).toEqual(before.holders.map(p=>[p.id,p.hp,p.max_hp]));
+  expect(after.holders.every(p=>p.turn_count===2&&p.wave_turn_count===2)).toBe(true);
+  return {scope:"actual initialized fresh holders and direct source TurnEndPhase.start; no selected turn or battle-loop witness",before,after};
 }

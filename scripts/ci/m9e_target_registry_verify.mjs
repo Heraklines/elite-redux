@@ -501,7 +501,9 @@ assert.equal(pins.oracle, row.source_sha);
 const required = ["src/phase-tree.ts", "src/phase-manager.ts", "src/phases/turn-start-phase.ts",
   "src/phases/move-phase.ts", "src/phases/move-effect-phase.ts", "src/phases/faint-phase.ts",
   "src/phases/victory-phase.ts", "src/field/pokemon.ts", "src/battle-scene.ts",
-  "src/data/elite-redux/archetypes/ability-meta-consumers.ts","src/battle.ts"];
+  "src/data/elite-redux/archetypes/ability-meta-consumers.ts","src/battle.ts",
+  "src/phases/turn-end-phase.ts","src/phases/field-phase.ts",
+  "src/utils/speed-order-generator.ts","src/data/pokemon/pokemon-data.ts"];
 keys(pins.sources, required);
 const sources = new Map();
 const sourceHashes = {};
@@ -517,6 +519,12 @@ for (const path of required) {
   sources.set(path, bytes.toString("utf8"));
 }
 const contains = (path, text) => assert(sources.get(path).includes(text), `${path}: ${text}`);
+contains("src/data/pokemon/pokemon-data.ts","turnCount = 1;");
+contains("src/data/pokemon/pokemon-data.ts","waveTurnCount = 1;");
+contains("src/phases/turn-end-phase.ts","pokemon.tempSummonData.turnCount++;");
+contains("src/phases/turn-end-phase.ts","pokemon.tempSummonData.waveTurnCount++;");
+contains("src/phases/field-phase.ts","inSpeedOrder(ArenaTagSide.BOTH)");
+contains("src/utils/speed-order-generator.ts","pokemonList = globalScene.getField(true);");
 contains("src/battle.ts","public battleScore = 0;");
 contains("src/battle.ts","public enemyFaints = 0;");
 contains("src/battle.ts","public playerFaintsHistory: FaintLogEntry[] = [];");
@@ -600,12 +608,25 @@ const families = {post_faint:row.abilities.filter(a => a.post_faint).map(a => a.
   experience_meta:row.abilities.filter(a => a.meta_kinds.includes("experience-gain-multiplier")).map(a => a.id)};
 function validateVictoryTail(t) {
   keys(t,["schema_version","source_sha","seed","legacy_sha256","scope","abilities","raw_bulbasaur",
-    "modifiers","charge_steps","training_cache","money","rng_unchanged"]);
-  assert.equal(t.schema_version,1); assert.equal(t.source_sha,"399d5d368f0b5642ebf8f45bd8a5e73350fa4de7");
+    "modifiers","charge_steps","training_cache","money","rng_unchanged","turn_counters"]);
+  assert.equal(t.schema_version,2); assert.equal(t.source_sha,"399d5d368f0b5642ebf8f45bd8a5e73350fa4de7");
   assert.equal(t.seed,"m9e-target-registry-source-v1");
   assert.equal(t.legacy_sha256,"9b58691e1c5b3796e2b1bfe511483a445b7ab158e72e895fd15c86e5f9bc4576");
-  assert.equal(t.scope,"initialized registry and direct initial-context consumers; not full TurnEnd/BattleEnd execution");
+  assert.equal(t.scope,"initialized registry, initial-context consumers and actual direct neutral TurnEnd counter dispatch; not full battle-loop execution");
   assert.equal(t.rng_unchanged,true);
+  const counters=t.turn_counters;
+  keys(counters,["scope","before","after"]);
+  assert.equal(counters.scope,"actual initialized fresh holders and direct source TurnEndPhase.start; no selected turn or battle-loop witness");
+  for(const [index,image]of[counters.before,counters.after].entries()){
+    keys(image,["turn","holders"]);assert.equal(image.turn,index+1);
+    assert.equal(image.holders.length,2);assert.equal(new Set(image.holders.map(p=>p.id)).size,2);
+    assert.deepEqual(image.holders.map(p=>p.player),[true,false]);
+    for(const p of image.holders){keys(p,["id","player","hp","max_hp","turn_count","wave_turn_count"]);
+      integer(p.id,0,Number.MAX_SAFE_INTEGER);bool(p.player);integer(p.max_hp,1,1000000);integer(p.hp,1,p.max_hp);
+      assert.equal(p.turn_count,index+1);assert.equal(p.wave_turn_count,index+1);}
+  }
+  assert.deepEqual(counters.after.holders.map(p=>[p.id,p.player,p.hp,p.max_hp]),
+    counters.before.holders.map(p=>[p.id,p.player,p.hp,p.max_hp]));
   assert.deepEqual(t.abilities.map(a=>a.id),abilityIds);
   for (const a of t.abilities) {keys(a,["id","post_turn","post_battle"]); attrs(a.post_turn); attrs(a.post_battle);}
   const p=t.raw_bulbasaur;
@@ -645,10 +666,13 @@ let tailNegatives=0;
 for(const change of [t=>t.abilities.pop(),t=>t.abilities[1].id=t.abilities[0].id,
   t=>t.abilities[0].post_turn=[false],t=>t.raw_bulbasaur.applicable_sources=[],
   t=>t.modifiers[0].lapsing=true,t=>t.rng_unchanged=false,t=>t.money.captured=-1,
+  t=>{delete t.turn_counters;},t=>t.turn_counters.before.holders[0].turn_count=0,
+  t=>t.turn_counters.after.holders[0].turn_count=1,t=>t.turn_counters.after.holders[1].wave_turn_count=3,
+  t=>t.turn_counters.after.holders[0].hp--,t=>t.turn_counters.after.turn=1,
   t=>t.charge_steps[0].after=[],t=>t.training_cache.after={},t=>t.legacy_sha256="bad",t=>t.source_sha="bad"]){
   const mutant=structuredClone(tailObservation);change(mutant);assert.throws(()=>validateVictoryTail(mutant));tailNegatives++;
 }
-const tailSummary={scope:tailObservation.scope,negative_cases:tailNegatives,
+const tailSummary={scope:tailObservation.scope,negative_cases:tailNegatives,turn_counters:tailObservation.turn_counters,
   exports:tailRaws.map(raw=>({bytes:raw.length,sha256:digest(raw)})),
   empty_post_turn_and_battle_ids:tailObservation.abilities.filter(a=>a.post_turn.length===0&&a.post_battle.length===0).map(a=>a.id),
   nonempty_families:tailObservation.abilities.filter(a=>a.post_turn.length||a.post_battle.length),
