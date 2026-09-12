@@ -799,7 +799,8 @@ fn commands(
 #[test]
 fn natural_raw_turn_uses_current_targets_and_preserves_save_material() -> Result<()> {
     let content = content()?;
-    let mut kernel = natural(content.clone(), 2, "m9e-target-execution-v2-7")?;
+    let mut kernel = natural(content.clone(), 2, "m9e-target-execution-v2-7")
+        .map_err(|error| format!("natural target bootstrap: {error}"))?;
     let before = kernel.snapshot()?;
     let state = active(&before)?;
     let actor = active_run(state)?.party[0].id;
@@ -832,7 +833,8 @@ fn natural_raw_turn_uses_current_targets_and_preserves_save_material() -> Result
         )])?)
         .is_err()
     );
-    let step = choose_move(&mut kernel, 1)?;
+    let step = choose_move(&mut kernel, 1)
+        .map_err(|error| format!("natural Tackle admission: {error}"))?;
     let actual = material(&step)?;
     let mut journal = MaterialJournal {
         live: Some(state.clone()),
@@ -840,7 +842,8 @@ fn natural_raw_turn_uses_current_targets_and_preserves_save_material() -> Result
         materials: Vec::new(),
     };
     journal.accept(&kernel, content.as_ref(), &step)?;
-    journal.drain_non_fainting_turn(&mut kernel, content.as_ref())?;
+    journal.drain_non_fainting_turn(&mut kernel, content.as_ref())
+        .map_err(|error| format!("target witness retained turn drain: {error}"))?;
     assert_eq!(
         actual.transition().after_state.current_targeting,
         state.current_targeting
@@ -975,7 +978,8 @@ fn source_spread_group_executes_all_opponents_and_multihit_exception() -> Result
     navigate(&mut kernel, "battle/move/0")?;
     let step = press(&mut kernel, PhysicalKey::Space)?;
     journal.accept(&kernel, content.as_ref(), &step)?;
-    journal.drain_non_fainting_turn(&mut kernel, content.as_ref())?;
+    journal.drain_non_fainting_turn(&mut kernel, content.as_ref())
+        .map_err(|error| format!("target witness retained turn drain: {error}"))?;
     let after = active_run(kernel.state().ok_or("state absent")?)?
         .battle
         .as_ref()
@@ -1103,7 +1107,8 @@ fn poison_redirect_and_source_passive_gate_share_actual_owner() -> Result<()> {
     let mut journal = MaterialJournal::before_command(&kernel.snapshot()?)?;
     let step = press(&mut kernel, PhysicalKey::Space)?;
     journal.accept(&kernel, content.as_ref(), &step)?;
-    journal.drain_non_fainting_turn(&mut kernel, content.as_ref())?;
+    journal.drain_non_fainting_turn(&mut kernel, content.as_ref())
+        .map_err(|error| format!("target witness retained turn drain: {error}"))?;
     let enemies = &active_run(kernel.state().ok_or("state absent")?)?
         .battle
         .as_ref()
@@ -1271,9 +1276,12 @@ fn queued_faint_retargets_opponents_but_preserves_same_side_cancellation() -> Re
 #[test]
 fn unsupported_selection_and_owner_stripping_fail_atomically() -> Result<()> {
     let content = content()?;
-    let mut kernel = natural(content.clone(), 2, "m9e-target-execution-v2-7")?;
+    let mut kernel = natural(content.clone(), 2, "m9e-target-execution-v2-7")
+        .map_err(|error| format!("natural target bootstrap: {error}"))?;
     let before = kernel.snapshot()?;
-    let step = choose_first_move(&mut kernel)?;
+    // The ownership forgery starts from an admitted single-hit Tackle material.
+    let step = choose_move(&mut kernel, 1)
+        .map_err(|error| format!("ownership witness Tackle admission: {error}"))?;
     let actual = material(&step)?;
     let mut stripped = actual.clone();
     let GameMaterialV6::BattleTurn(transition) = &mut stripped else {

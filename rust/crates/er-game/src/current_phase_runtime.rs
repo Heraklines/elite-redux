@@ -29,6 +29,13 @@ pub enum GameOwnedPhaseV1 {
         pending: SafeU53,
         event_id: PresentationEventId,
     },
+    AchievementClock {
+        request: er_state::current_achievement_execution::CurrentAchievementClockRequestV1,
+        utc_milliseconds: i64,
+    },
+    FlashEgg {
+        input: er_state::current_achievement_execution::CurrentFlashEggInputsV1,
+    },
     FriendshipClock {
         request: CurrentFriendshipClockRequestV1,
         utc_milliseconds: i64,
@@ -335,7 +342,7 @@ fn phase_transition(
     }
     if matches!(
         phase,
-        GameOwnedPhaseV1::Victory { .. } | GameOwnedPhaseV1::VictoryPresentation { .. }
+        GameOwnedPhaseV1::Victory { .. } | GameOwnedPhaseV1::VictoryPresentation { .. } | GameOwnedPhaseV1::AchievementClock { .. } | GameOwnedPhaseV1::FlashEgg { .. }
     ) {
         return current_victory_transition::transition(
             before,

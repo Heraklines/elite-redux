@@ -174,9 +174,11 @@ impl CampaignRecorder {
                 .unwrap_or(0);
             writeln!(
                 std::io::stdout().lock(),
-                "M9E_REPLAY_PROGRESS events={} segments={} wave={wave}",
+                "M9E_REPLAY_PROGRESS events={} segments={} wave={wave} active={} control={:?}",
                 self.position,
-                self.segments
+                self.segments,
+                self.session.kernel_ref()?.state().is_some(),
+                self.current_control().map(|control| control.kind)
             )?;
         }
         Ok(())

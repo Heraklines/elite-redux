@@ -1,11 +1,49 @@
-import { describe, expect, it } from "vitest";
-import type { BrowserEffectBatchV2 } from "../../../../src/rust-browser/contracts/browser-contracts-v2";
+import { describe, expect, it, vi } from "vitest";
+import type { BrowserEffectBatchV2, BrowserRequestV2 } from "../../../../src/rust-browser/contracts/browser-contracts-v2";
 import {
   type BrowserEffectAdaptersV2,
   BrowserEffectRouterV2,
 } from "../../../../src/rust-browser/routes/browser-effects-v2";
 
 describe("BrowserEffectRouterV2", () => {
+  it("captures requested clock and Flash inputs once, without inventing Egg outputs", async () => {
+    const delivered: BrowserRequestV2[] = [];
+    const noop = () => {};
+    const adapters: BrowserEffectAdaptersV2 = {
+      completeExternalRequest: request => { delivered.push(request); },
+      renderUi: noop, present: noop, changePresentationScene: noop, sendNetworkFrame: noop,
+      handleStorageRequest: noop, requestAsset: noop, playAudioCue: noop, showTerminal: noop,
+      recordTelemetry: noop, publishRepro: noop, publishCurrentRepro: noop, dispose: noop,
+    };
+    const random = vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const now = vi.spyOn(Date, "now").mockReturnValue(1234);
+    try {
+      const router = new BrowserEffectRouterV2(adapters);
+      const batch: BrowserEffectBatchV2 = { external_sequence: 1, effects: [
+        { kind: "UTC_CLOCK_REQUEST", request_id: 7 },
+        { kind: "FLASH_EGG_INPUTS_REQUEST", request: { request: 8, pending: 1 } },
+      ] };
+      await router.dispatch(batch);
+      expect(delivered).toEqual([
+        { kind: "UTC_CLOCK_RESULT", request_id: 7, utc_milliseconds: 1234 },
+        { kind: "FLASH_EGG_INPUTS", input: { request: 8, pending: 1,
+          seed_draws: Array.from({ length: 24 }, () => ({ ieee754_bits: "3fe0000000000000" })),
+          id_draw: { ieee754_bits: "3fe0000000000000" }, egg_utc_milliseconds: 1234 } },
+      ]);
+      expect(random).toHaveBeenCalledTimes(25);
+      await expect(router.dispatch(batch)).rejects.toThrow("stale");
+      expect(random).toHaveBeenCalledTimes(25);
+      // SAVE READ can reissue an exact retained request in a later wire batch.
+      await router.dispatch({ external_sequence: 2, effects: batch.effects });
+      expect(delivered.slice(2)).toEqual(delivered.slice(0, 2));
+      expect(random).toHaveBeenCalledTimes(50);
+      delete adapters.completeExternalRequest;
+      await expect(new BrowserEffectRouterV2(adapters).dispatch({ external_sequence: 2,
+        effects: [{ kind: "FLASH_EGG_INPUTS_REQUEST", request: { request: 9, pending: 1 } }],
+      })).rejects.toThrow("adapter is unavailable");
+      expect(random).toHaveBeenCalledTimes(50);
+    } finally { random.mockRestore(); now.mockRestore(); }
+  });
   it("routes every typed effect once and fences stale or disposed batches", async () => {
     const calls: string[] = [];
     const capsuleBytes = [123, 34, 120, 34, 58, 34, 195, 169, 34, 125];

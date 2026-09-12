@@ -116,6 +116,7 @@ pub(crate) fn begin_current_victory(
             next_phase: 0,
             completed: Vec::new(),
             descendant,
+            level_achievements: None,
         },
     )?;
     Ok(candidate)

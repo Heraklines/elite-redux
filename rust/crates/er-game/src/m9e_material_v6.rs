@@ -134,6 +134,12 @@ pub enum GamePlatformEffectV2 {
         request: PlatformRequestId,
         context: crate::current_starter_pokerus::StarterPokerusClockV1,
     },
+    CurrentAchievementClock {
+        request: er_state::current_achievement_execution::CurrentAchievementClockRequestV1,
+    },
+    CurrentFlashEgg {
+        request: er_state::current_achievement_execution::CurrentFlashEggRequestV1,
+    },
     CurrentFriendshipClock {
         request: er_state::current_experience_owner::CurrentFriendshipClockRequestV1,
     },
@@ -788,6 +794,8 @@ fn invalid_platform_effects(
         let (request, invalid) = match effect {
             // Daily sampling belongs to Bootstrap, outside active game material.
             GamePlatformEffectV2::StarterPokerusClock { request, .. } => (*request, true),
+            GamePlatformEffectV2::CurrentAchievementClock { request } => (request.request, request.pending == SafeU53::ZERO),
+            GamePlatformEffectV2::CurrentFlashEgg { request } => (request.request, request.pending == SafeU53::ZERO),
             GamePlatformEffectV2::CurrentFriendshipClock { request } => (
                 request.request,
                 request.pending == SafeU53::ZERO || request.recipient.get() == SafeU53::ZERO,

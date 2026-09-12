@@ -48,6 +48,12 @@ pub(crate) mod current_experience_validation;
 pub(crate) mod current_faint_execution;
 pub(crate) mod current_initial_victory_tail;
 pub(crate) mod current_level_account;
+pub(crate) mod current_level_dispatch;
+pub(crate) mod current_flash_dispatch;
+pub(crate) mod current_flash_egg;
+pub(crate) mod current_achievement_rewards;
 pub(crate) mod current_source_progression;
 pub(crate) mod current_victory_pump;
 pub(crate) mod current_victory_start;
+
+pub(crate) mod current_initial_battle;

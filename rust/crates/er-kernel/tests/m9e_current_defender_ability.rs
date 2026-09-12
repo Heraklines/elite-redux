@@ -485,7 +485,8 @@ fn actual_poison_redirect_absorbs_with_ordered_payload_and_material_conservation
                 action: er_types::BattleUiActionV1::SelectMoveTarget { target, move_slot, .. }
             }) if target == slot(BattleSide::Enemy, 1) && move_slot.get() == 0));
         journal.accept(&kernel, content.as_ref(), &step)?;
-        journal.drain_non_fainting_turn(&mut kernel, content.as_ref())?;
+        journal.drain_non_fainting_turn(&mut kernel, content.as_ref())
+        .map_err(|error| format!("defender retained turn drain: {error}"))?;
         let after = kernel.state().ok_or("current state absent")?;
         let enemies = &active_run(after)?
             .battle
@@ -663,7 +664,8 @@ fn assert_actual_spread_hit_check_order(content: Arc<PreparedGameContentV2>) -> 
         content.as_ref(),
     )?;
     journal.accept(&kernel, content.as_ref(), &step)?;
-    journal.drain_non_fainting_turn(&mut kernel, content.as_ref())?;
+    journal.drain_non_fainting_turn(&mut kernel, content.as_ref())
+        .map_err(|error| format!("defender retained turn drain: {error}"))?;
     let reasons: Vec<_> = journal
         .materials
         .iter()
@@ -868,7 +870,9 @@ fn assert_unsupported_source_hit_mode_preserves_checkpoint(
 fn actual_innate_absorb_uses_admitted_slot_and_shared_immutable_query() -> Result<()> {
     let content = content()?;
     assert_controlled_withdraw(content.as_ref())?;
-    let mut snapshot = natural(content.clone(), 0, "m9e-defender-ability-28")?.snapshot()?;
+    let mut snapshot = natural(content.clone(), 0, "m9e-defender-ability-28")
+        .map_err(|error| format!("innate bootstrap: {error}"))?
+        .snapshot()?;
     let state = active_mut(&mut snapshot)?;
     let species = active_run(state)?.party[0].species_id;
     {
@@ -996,14 +1000,16 @@ fn actual_innate_absorb_uses_admitted_slot_and_shared_immutable_query() -> Resul
     press(&mut kernel, PhysicalKey::Space)?;
     navigate(&mut kernel, "battle/move/0")?;
     let mut journal = MaterialJournal::before_command(&kernel.snapshot()?)?;
-    let step = press(&mut kernel, PhysicalKey::Space)?;
+    let step = press(&mut kernel, PhysicalKey::Space)
+        .map_err(|error| format!("innate move admission: {error}"))?;
     let proof = material(&step)?;
     assert!(matches!(
         proof.transition().accepted_action,
         Some(er_types::GameActionV1::Battle { .. })
     ));
     journal.accept(&kernel, content.as_ref(), &step)?;
-    journal.drain_non_fainting_turn(&mut kernel, content.as_ref())?;
+    journal.drain_non_fainting_turn(&mut kernel, content.as_ref())
+        .map_err(|error| format!("defender retained turn drain: {error}"))?;
     let after = kernel.state().ok_or("current state absent")?;
     assert_eq!(active_run(after)?.party[0].hp, 9);
     let shown: Vec<_> = journal

@@ -10,6 +10,14 @@ use crate::m9e_content_v2::{PresentationCueFamilyV1, PresentationSemanticIdV1};
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GamePresentationAchievementV1 {
     MaxFriendship,
+    #[serde(rename = "LV_100")]
+    Level100,
+    #[serde(rename = "LV_250")]
+    Level250,
+    #[serde(rename = "LV_1000")]
+    Level1000,
+    #[serde(rename = "REALISTIC_FLASH_IS_BORING")]
+    RealisticFlash,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

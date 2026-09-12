@@ -51,6 +51,8 @@ export interface CurrentSessionRebindOutputV1 {
 }
 
 export type BrowserRequestV2 =
+  | { kind: "UTC_CLOCK_RESULT"; request_id: number; utc_milliseconds: number }
+  | { kind: "FLASH_EGG_INPUTS"; input: CurrentFlashEggInputsV1 }
   | { kind: "COOP_REBIND"; control: CurrentCoopRebindEventV1 }
   | { kind: "INITIALIZE"; initialization: BrowserSessionInitializationV2 }
   | { kind: "RAW_INPUT"; event: RawInputEventV1 }
@@ -62,6 +64,14 @@ export type BrowserRequestV2 =
   | { kind: "PRESENTATION_SETTLED"; event_id: number; outcome: BrowserPresentationOutcomeV2 }
   | { kind: "LIFECYCLE"; event: "SUSPEND" | "RESUME" | "HIDDEN" | "VISIBLE" | "PAGE_HIDE" | "PAGE_SHOW" }
   | { kind: "SNAPSHOT" | "EXPORT_REPRO" | "RETRY_COOP_SETUP" | "DISPOSE" };
+
+export interface CurrentFlashEggInputsV1 {
+  request: number;
+  pending: number;
+  seed_draws: { ieee754_bits: string }[];
+  id_draw: { ieee754_bits: string };
+  egg_utc_milliseconds: number;
+}
 
 export interface BrowserRequestEnvelopeV2 {
   version: 2;
@@ -146,6 +156,8 @@ export interface BrowserStorageRequestV2Wire {
 }
 
 export type BrowserEffectV2 =
+  | { kind: "UTC_CLOCK_REQUEST"; request_id: number }
+  | { kind: "FLASH_EGG_INPUTS_REQUEST"; request: { request: number; pending: number } }
   | { kind: "UI_CHANGED"; control: GameControlPlanV2Wire }
   | { kind: "PRESENTATION"; effect: GamePresentationEffectV2Wire }
   | { kind: "PRESENTATION_SCENE_CHANGED"; semantic: unknown }
@@ -221,6 +233,7 @@ export function safeCurrentInteger(value: unknown): value is number {
 }
 
 const CURRENT_EFFECT_KINDS_V2 = new Set<string>([
+  "UTC_CLOCK_REQUEST", "FLASH_EGG_INPUTS_REQUEST",
   "UI_CHANGED", "PRESENTATION", "PRESENTATION_SCENE_CHANGED", "SEND_NETWORK_FRAME", "STORAGE_REQUEST",
   "ASSET_REQUEST", "AUDIO_CUE", "TERMINAL", "TELEMETRY", "REPRO_READY", "CURRENT_REPRO_READY",
 ]);

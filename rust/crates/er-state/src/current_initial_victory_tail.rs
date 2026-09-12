@@ -15,6 +15,8 @@ pub struct CurrentInitialVictoryTailV1 {
     pub cancelled_from: u8,
     pub cancelled_to: u8,
     pub phase: CurrentInitialVictoryTailPhaseV1,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flash: Option<crate::current_achievement_execution::CurrentFlashAchievementExecutionV1>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -28,6 +30,12 @@ pub enum CurrentInitialVictoryTailPhaseV1 {
     BattleEnd {
         xp_endpoint: Vec<CurrentExperienceRecipientV1>,
         field_turns: Vec<CurrentFieldTurnCountV1>,
+    },
+    /// Empty solo EggLapse completed; actual modifier choices are not generated.
+    RewardSelectionPending {
+        xp_endpoint: Vec<CurrentExperienceRecipientV1>,
+        field_turns: Vec<CurrentFieldTurnCountV1>,
+        accounting: CurrentInitialBattleEndAccountingV1,
     },
     /// This is a real post-BattleEnd state, not a reward or next-wave grant.
     EggLapse {
@@ -62,7 +70,8 @@ impl CurrentInitialVictoryTailV1 {
             CurrentInitialVictoryTailPhaseV1::Claimed => None,
             CurrentInitialVictoryTailPhaseV1::TurnSettlement { xp_endpoint }
             | CurrentInitialVictoryTailPhaseV1::BattleEnd { xp_endpoint, .. }
-            | CurrentInitialVictoryTailPhaseV1::EggLapse { xp_endpoint, .. } => Some(xp_endpoint),
+            | CurrentInitialVictoryTailPhaseV1::EggLapse { xp_endpoint, .. }
+            | CurrentInitialVictoryTailPhaseV1::RewardSelectionPending { xp_endpoint, .. } => Some(xp_endpoint),
         }
     }
 
@@ -71,6 +80,7 @@ impl CurrentInitialVictoryTailV1 {
             &self.phase,
             CurrentInitialVictoryTailPhaseV1::BattleEnd { .. }
                 | CurrentInitialVictoryTailPhaseV1::EggLapse { .. }
+                | CurrentInitialVictoryTailPhaseV1::RewardSelectionPending { .. }
         )
     }
 }

@@ -719,6 +719,11 @@ impl CurrentDispatcher {
                 },
                 method, context,
             ),
+            "session.flash_egg_inputs" => self.apply(
+                params,
+                CurrentExternalEvent::CurrentFlashEggInputs { input: required(params, "input")? },
+                method, context,
+            ),
             "session.clock_result" => self.apply(
                 params,
                 CurrentExternalEvent::CurrentUtcClockResult {

@@ -39,6 +39,8 @@ pub struct CurrentFriendshipProfileV1 {
     /// source's empty timestamp/ribbon/cosmetic state; restore never backfills it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rewards: Option<CurrentFriendshipRewardProfileV1>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub egg_account: Option<crate::current_egg_account::CurrentEggAccountV1>,
 }
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -67,6 +69,7 @@ impl CurrentFriendshipProfileV1 {
                 })
                 .collect(),
             rewards: Some(CurrentFriendshipRewardProfileV1::fresh()),
+            egg_account: Some(crate::current_egg_account::CurrentEggAccountV1::fresh()),
         };
         value.validate()?;
         Ok(value)
@@ -89,6 +92,7 @@ impl CurrentFriendshipProfileV1 {
         {
             return Err(CurrentFriendshipProfileError);
         }
+        if let Some(eggs) = &self.egg_account { eggs.validate()?; }
         if let Some(rewards) = &self.rewards {
             rewards.validate()?;
         }

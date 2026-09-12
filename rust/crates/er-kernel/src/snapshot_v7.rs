@@ -572,7 +572,26 @@ fn validate_active_state(
             _ => None,
         })
         .collect::<Vec<_>>();
-    if clocks.len() > 1
+    let mut achievement_clocks = state.current_battle_participation.as_ref()
+        .and_then(|p| p.experience.as_ref()).into_iter().flat_map(|o| &o.pending)
+        .filter_map(|p| p.victory.as_ref()).filter_map(|v| v.level_achievements.as_ref())
+        .filter_map(|v| v.clock.as_ref()).collect::<Vec<_>>();
+    achievement_clocks.extend(state.current_battle_participation.as_ref().and_then(|p| p.experience.as_ref())
+        .into_iter().flat_map(|o| &o.pending).filter_map(|p| p.victory_tail.as_ref())
+        .filter_map(|t| t.flash.as_ref()).filter_map(|f| f.clock.as_ref()));
+    let egg_requests = state.current_battle_participation.as_ref().and_then(|p| p.experience.as_ref())
+        .into_iter().flat_map(|o| &o.pending).filter_map(|p| p.victory_tail.as_ref())
+        .filter_map(|t| t.flash.as_ref()).filter_map(|f| f.egg_request.as_ref()).collect::<Vec<_>>();
+    let egg_effects = snapshot.pending_platform.iter().filter_map(|p| match &p.effect {
+        GamePlatformEffectV2::CurrentFlashEgg { request } => Some(request), _ => None,
+    }).collect::<Vec<_>>();
+    let achievement_effects = snapshot.pending_platform.iter().filter_map(|p| match &p.effect {
+        GamePlatformEffectV2::CurrentAchievementClock { request } => Some(request),
+        _ => None,
+    }).collect::<Vec<_>>();
+    if clocks.len() + achievement_clocks.len() + egg_requests.len() > 1
+        || if snapshot.authority_ai.is_some() { egg_effects != egg_requests } else { !egg_effects.is_empty() }
+        || if snapshot.authority_ai.is_some() { achievement_effects != achievement_clocks } else { !achievement_effects.is_empty() }
         || if snapshot.authority_ai.is_some() {
             effects != clocks
         } else {
@@ -611,6 +630,8 @@ fn platform_request_id(effect: &GamePlatformEffectV2) -> PlatformRequestId {
     match effect {
         GamePlatformEffectV2::StarterPokerusClock { request, .. } => *request,
         GamePlatformEffectV2::CurrentFriendshipClock { request } => request.request,
+        GamePlatformEffectV2::CurrentAchievementClock { request } => request.request,
+        GamePlatformEffectV2::CurrentFlashEgg { request } => request.request,
         GamePlatformEffectV2::StorageRead { request, .. }
         | GamePlatformEffectV2::StorageWrite { request, .. }
         | GamePlatformEffectV2::StorageDelete { request, .. }
@@ -694,6 +715,12 @@ fn valid_platform_effect(effect: &GamePlatformEffectV2) -> bool {
             *request != PlatformRequestId::ZERO
                 && context.menu_instance.get() != SafeU53::ZERO
                 && context.menu_revision != SafeU53::ZERO
+        }
+        GamePlatformEffectV2::CurrentAchievementClock { request } => {
+            request.request != PlatformRequestId::ZERO && request.pending != SafeU53::ZERO
+        }
+        GamePlatformEffectV2::CurrentFlashEgg { request } => {
+            request.request != PlatformRequestId::ZERO && request.pending != SafeU53::ZERO
         }
         GamePlatformEffectV2::CurrentFriendshipClock { request } => {
             request.request != PlatformRequestId::ZERO

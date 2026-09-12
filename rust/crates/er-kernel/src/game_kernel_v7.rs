@@ -1629,6 +1629,8 @@ impl GameKernelV7 {
                 matches!(
                     pending.effect,
                     GamePlatformEffectV2::CurrentFriendshipClock { .. }
+                        | GamePlatformEffectV2::CurrentAchievementClock { .. }
+                        | GamePlatformEffectV2::CurrentFlashEgg { .. }
                         | GamePlatformEffectV2::StarterPokerusClock { .. }
                 )
             })
@@ -4483,6 +4485,8 @@ fn platform_request_id(effect: &GamePlatformEffectV2) -> PlatformRequestId {
     match effect {
         GamePlatformEffectV2::StarterPokerusClock { request, .. } => *request,
         GamePlatformEffectV2::CurrentFriendshipClock { request } => request.request,
+        GamePlatformEffectV2::CurrentAchievementClock { request } => request.request,
+        GamePlatformEffectV2::CurrentFlashEgg { request } => request.request,
         GamePlatformEffectV2::StorageRead { request, .. }
         | GamePlatformEffectV2::StorageWrite { request, .. }
         | GamePlatformEffectV2::StorageDelete { request, .. }

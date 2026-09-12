@@ -83,6 +83,9 @@ impl From<er_kernel::game_kernel_v7::current_coop_rebind_v7::CurrentCoopRebindOu
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
 pub enum CurrentExternalEvent {
+    CurrentFlashEggInputs {
+        input: er_state::current_achievement_execution::CurrentFlashEggInputsV1,
+    },
     CurrentUtcClockResult {
         request_id: PlatformRequestId,
         utc_milliseconds: i64,
@@ -461,6 +464,7 @@ fn reduce(
             request_id,
             utc_milliseconds,
         } => kernel.apply_current_utc_clock_result(request_id, utc_milliseconds),
+        CurrentExternalEvent::CurrentFlashEggInputs { input } => kernel.apply_current_flash_egg_inputs(input),
         CurrentExternalEvent::StorageResult { request_id, result } => {
             kernel.apply_storage_result(request_id, result)
         }

@@ -7,6 +7,25 @@ use er_state::current_experience_owner::CurrentExperienceExecutionOriginV1;
 use er_state::current_turn_execution::CurrentTurnStageV1;
 use er_state::current_victory_execution::CurrentVictoryDescendantV1 as D;
 
+fn retained_requests(state: &GameStateV6) -> Vec<GamePlatformEffectV2> {
+    let mut effects = Vec::new();
+    if let Some(owner) = state.current_battle_participation.as_ref().and_then(|p| p.experience.as_ref()) {
+        for pending in &owner.pending {
+            if let Some(request) = pending.friendship.as_ref().and_then(|p| p.clock.as_ref()) {
+                effects.push(GamePlatformEffectV2::CurrentFriendshipClock { request: request.clone() });
+            }
+            if let Some(request) = pending.victory.as_ref().and_then(|v| v.level_achievements.as_ref()).and_then(|v| v.clock.as_ref()) {
+                effects.push(GamePlatformEffectV2::CurrentAchievementClock { request: *request });
+            }
+            if let Some(flash) = pending.victory_tail.as_ref().and_then(|t| t.flash.as_ref()) {
+                if let Some(request) = flash.clock { effects.push(GamePlatformEffectV2::CurrentAchievementClock { request }); }
+                if let Some(request) = flash.egg_request { effects.push(GamePlatformEffectV2::CurrentFlashEgg { request }); }
+            }
+        }
+    }
+    effects
+}
+
 pub(super) fn owned_waiting_phase(
     state: &GameStateV6,
     content: &PreparedGameContentV2,
@@ -29,6 +48,7 @@ pub(super) fn owned_waiting_phase(
         return false;
     };
     let expected = current_phase_receipt_v7::expected_presentations(state);
+    let requests = retained_requests(state);
     run.control.kind == GameControlKindV2::Waiting
         && !run.control.actionable
         && run.control.owner_seat.is_none()
@@ -45,8 +65,10 @@ pub(super) fn owned_waiting_phase(
         && owner.execution_origin == Some(CurrentExperienceExecutionOriginV1::FreshNormalClassic)
         && owner.source_progression.is_some()
         && owner.pending.len() == 1
-        && expected.len() == 1
-        && expected[0].pending == owner.pending[0].id
+        && ((expected.len() == 1 && requests.is_empty()
+            && expected[0].pending == owner.pending[0].id
+            && current_phase_receipt_v7::receipt_matches(state, content, expected[0]))
+            || (expected.is_empty() && requests.len() == 1))
         && run
             .party
             .iter()
@@ -56,7 +78,6 @@ pub(super) fn owned_waiting_phase(
             .enemy_party
             .iter()
             .all(|pokemon| pokemon.owner_seat.is_none())
-        && current_phase_receipt_v7::receipt_matches(state, content, expected[0])
         && state.validate_with(content).is_ok()
 }
 
@@ -175,7 +196,8 @@ pub(super) fn reissue_effects(
     has_protocol: bool,
 ) -> Result<Vec<GameKernelEffectV7>, GameKernelV7Error> {
     let expected = current_phase_receipt_v7::expected_presentations(state);
-    if expected.is_empty() {
+    let requests = retained_requests(state);
+    if expected.is_empty() && requests.is_empty() {
         return Ok(Vec::new());
     }
     if role != GameKernelRoleV7::Authority
@@ -183,6 +205,11 @@ pub(super) fn reissue_effects(
         || !owned_waiting_phase(state, content, local_seat)
     {
         return Err(GameKernelV7Error::Invalid);
+    }
+    if !requests.is_empty() {
+        // A save omits private host delivery. Reissue the retained identity;
+        // never consume Date/random inputs or allocate another request here.
+        return Ok(requests.into_iter().map(GameKernelEffectV7::Platform).collect());
     }
     // No event allocation, receipt append, phase mutation or inferred acknowledgement.
     Ok(vec![GameKernelEffectV7::Presentation(retained_effect(

@@ -208,22 +208,19 @@ pub(crate) fn claim(
         .as_ref()
         .and_then(|t| t.battle.as_ref())
         .ok_or_else(failure)?;
-    let achievements = if tracker.player_ever_acted && !tracker.flash_failed {
-        vec!["REALISTIC_FLASH_IS_BORING".to_owned()]
-    } else {
-        Vec::new()
-    };
-    if !achievements.is_empty() {
-        return Ok(None);
-    }
-    let tail = CurrentInitialVictoryTailV1 {
+    let flash_reached = tracker.player_ever_acted && !tracker.flash_failed;
+    let mut tail = CurrentInitialVictoryTailV1 {
         faint: address.clone(),
         original_turn: Box::new(turn.clone()),
         cancelled_from: turn.next_action,
         cancelled_to: u8::try_from(turn.actions.len()).map_err(|_| failure())?,
         phase: P::Claimed,
+        flash: None,
     };
     let mut state = before.clone();
+    if flash_reached {
+        tail.flash = crate::current_flash_dispatch::begin(&mut state, id)?;
+    }
     set_tail(&mut state, id, tail)?;
     Ok(Some(state))
 }
@@ -375,6 +372,7 @@ pub(crate) fn settle_battle_end(
 pub(crate) fn validate(state: &GameStateV6, id: SafeU53) -> Result<(), GameRuntimeV6Error> {
     let pending = pending(state, id)?;
     let tail = pending.victory_tail.as_ref().ok_or_else(failure)?;
+    crate::current_flash_dispatch::validate(state, id)?;
     let run = state.active_run.as_ref().ok_or_else(failure)?;
     let battle = run.battle.as_ref().ok_or_else(failure)?;
     let source = state
@@ -427,7 +425,8 @@ pub(crate) fn validate(state: &GameStateV6, id: SafeU53) -> Result<(), GameRunti
         return Err(failure());
     }
     let field_turns = match &tail.phase {
-        P::BattleEnd { field_turns, .. } | P::EggLapse { field_turns, .. } => Some(field_turns),
+        P::BattleEnd { field_turns, .. } | P::EggLapse { field_turns, .. }
+        | P::RewardSelectionPending { field_turns, .. } => Some(field_turns),
         _ => None,
     };
     if let Some(counts) = field_turns
@@ -441,7 +440,7 @@ pub(crate) fn validate(state: &GameStateV6, id: SafeU53) -> Result<(), GameRunti
     {
         return Err(failure());
     }
-    if let P::EggLapse { accounting, .. } = &tail.phase
+    if let P::EggLapse { accounting, .. } | P::RewardSelectionPending { accounting, .. } = &tail.phase
         && (accounting.battles != one()?
             || accounting.score != tail.faint.score_increase
             || accounting.money_multiplier != one()?
@@ -449,6 +448,11 @@ pub(crate) fn validate(state: &GameStateV6, id: SafeU53) -> Result<(), GameRunti
             || accounting.money_streaks.as_slice() != [(run.party[0].id, one()?)])
     {
         return Err(failure());
+    }
+    if matches!(&tail.phase, P::RewardSelectionPending { .. }) {
+        if tail.flash.as_ref().is_some_and(|f| f.completed_input.is_some()) {
+            crate::current_flash_dispatch::validate_egg(state, id, true)?;
+        } else { empty_egg_account(state)?; }
     }
     Ok(())
 }
@@ -539,4 +543,38 @@ pub(crate) fn validate_all(
         return Err(failure());
     }
     validate(state, owner.pending[0].id)
+}
+/// Explicit ownership is mandatory: missing historical data is not empty.
+fn empty_egg_account(state: &GameStateV6) -> Result<(), GameRuntimeV6Error> {
+    let account = state.current_friendship_profile.as_ref().and_then(|p| p.egg_account.as_ref())
+        .ok_or_else(|| GameRuntimeV6Error::Domain("source Egg account is unknown".into()))?;
+    account.validate().map_err(|_| failure())?;
+    if !account.eggs.is_empty() || account.auto_restock.enabled {
+        return Err(GameRuntimeV6Error::Domain("source EggLapse has unresolved hatch/restock descendants".into()));
+    }
+    Ok(())
+}
+
+/// Actual solo empty-inventory EggLapse: filter/decrement visits no eggs, and
+/// planAutoRestock's disabled branch returns no purchases. Source oracle
+/// run34692247388 established the fresh settings and actual empty plan.
+pub(crate) fn settle_egg_lapse(before: &GameStateV6, content: &PreparedGameContentV2, id: SafeU53) -> Result<GameStateV6, GameRuntimeV6Error> {
+    neutral_context(before, content)?;
+    validate(before, id)?;
+    let mut tail = pending(before, id)?.victory_tail.clone().ok_or_else(failure)?;
+    let flash = tail.flash.as_ref().is_some_and(|f| f.completed_input.is_some());
+    if flash { crate::current_flash_dispatch::validate_egg(before, id, false)?; }
+    else { empty_egg_account(before)?; }
+    let P::EggLapse { xp_endpoint, field_turns, accounting } = &tail.phase else { return Err(failure()); };
+    tail.phase = P::RewardSelectionPending {
+        xp_endpoint: xp_endpoint.clone(), field_turns: field_turns.clone(), accounting: accounting.clone(),
+    };
+    let mut state = before.clone();
+    if flash {
+        let account = state.current_friendship_profile.as_mut().and_then(|p| p.egg_account.as_mut()).ok_or_else(failure)?;
+        account.eggs.first_mut().ok_or_else(failure)?.hatch_waves = 24;
+    }
+    set_tail(&mut state, id, tail)?;
+    validate(&state, id)?;
+    Ok(state)
 }

@@ -112,6 +112,12 @@ export class CurrentStorageWorker {
         }
       } });
     this.#router = new BrowserEffectRouterV2({
+      completeExternalRequest: request => {
+        this.#usable();
+        // The owner's existing wire queue waits for this effect batch. Never
+        // await that queue from inside the batch that created the callback.
+        void this.#send(request).catch(error => { this.#fence(error); });
+      },
       renderUi: control => { this.#usable(); return application.renderUi(control); },
       changePresentationScene: semantic => { this.#usable(); return application.changePresentationScene(semantic); },
       sendNetworkFrame: (generation, bytes) => { this.#usable(); return application.sendNetworkFrame(generation, bytes); },

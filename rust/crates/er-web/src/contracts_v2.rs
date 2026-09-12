@@ -148,6 +148,9 @@ pub enum BrowserRequestV2 {
         request_id: PlatformRequestId,
         utc_milliseconds: i64,
     },
+    FlashEggInputs {
+        input: er_state::current_achievement_execution::CurrentFlashEggInputsV1,
+    },
     PresentationSettled {
         event_id: PresentationEventId,
         outcome: BrowserPresentationOutcomeV2,
@@ -191,6 +194,9 @@ pub struct BrowserStorageRequestV2 {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind")]
 pub enum BrowserEffectV2 {
+    FlashEggInputsRequest {
+        request: er_state::current_achievement_execution::CurrentFlashEggRequestV1,
+    },
     UtcClockRequest {
         request_id: PlatformRequestId,
     },

@@ -122,6 +122,22 @@ pub(super) fn bootstrap_clock_effect(
 }
 
 impl GameKernelV7 {
+    pub fn apply_current_flash_egg_inputs(
+        &mut self,
+        input: er_state::current_achievement_execution::CurrentFlashEggInputsV1,
+    ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        self.require_current_rebind_gameplay()?;
+        if self.role != GameKernelRoleV7::Authority || !input.valid() { return Err(GameKernelV7Error::Invalid); }
+        let pending = self.pending_platform.get(&input.request).ok_or(GameKernelV7Error::Invalid)?;
+        if !matches!(&pending.effect, GamePlatformEffectV2::CurrentFlashEgg { request }
+            if request.request == input.request && request.pending == input.pending) { return Err(GameKernelV7Error::Invalid); }
+        let mut candidate = self.clone();
+        candidate.pending_platform.remove(&input.request);
+        let step = candidate.execute_owned_phase(GameOwnedPhaseV1::FlashEgg { input })?;
+        candidate.validate()?;
+        *self = candidate;
+        Ok(step)
+    }
     pub fn apply_current_utc_clock_result(
         &mut self,
         request_id: PlatformRequestId,
@@ -162,15 +178,14 @@ impl GameKernelV7 {
                 internal_events: Vec::new(),
             });
         }
-        let GamePlatformEffectV2::CurrentFriendshipClock { request } = &pending.effect else {
-            return Err(GameKernelV7Error::Invalid);
-        };
-        if request.request != request_id {
-            return Err(GameKernelV7Error::Invalid);
-        }
-        let phase = GameOwnedPhaseV1::FriendshipClock {
-            request: request.clone(),
-            utc_milliseconds,
+        let phase = match &pending.effect {
+            GamePlatformEffectV2::CurrentFriendshipClock { request } if request.request == request_id => GameOwnedPhaseV1::FriendshipClock {
+                request: request.clone(), utc_milliseconds,
+            },
+            GamePlatformEffectV2::CurrentAchievementClock { request } if request.request == request_id => GameOwnedPhaseV1::AchievementClock {
+                request: *request, utc_milliseconds,
+            },
+            _ => return Err(GameKernelV7Error::Invalid),
         };
         // The exact retained source request is consumed only in the cloned
         // transaction. Callback rejection, material caps or output admission
@@ -207,12 +222,13 @@ impl GameKernelV7 {
             .and_then(|o| o.pending.first())
             && let Some(tail) = &pending.victory_tail
         {
+            if tail.flash.as_ref().is_some_and(|flash| flash.clock.is_some() || flash.egg_request.is_some()) { return Ok(()); }
             use er_state::current_initial_victory_tail::CurrentInitialVictoryTailPhaseV1 as T;
-            if matches!(&tail.phase, T::EggLapse { .. }) {
+            if matches!(&tail.phase, T::RewardSelectionPending { .. }) {
                 // Retain the explicit pending source boundary; do not restart or grant a reward.
                 return Ok(());
             }
-            if matches!(&tail.phase, T::TurnSettlement { .. } | T::BattleEnd { .. }) {
+            if matches!(&tail.phase, T::TurnSettlement { .. } | T::BattleEnd { .. } | T::EggLapse { .. }) {
                 if self.pending_current_phase_ack.is_some() {
                     return Err(GameKernelV7Error::Invalid);
                 }
@@ -295,6 +311,9 @@ impl GameKernelV7 {
                             .friendship
                             .as_ref()
                             .ok_or(GameKernelV7Error::Invalid)?;
+                        if pending.victory.as_ref().and_then(|v| v.level_achievements.as_ref()).and_then(|v| v.clock.as_ref()).is_some() {
+                            return Ok(());
+                        }
                         if friendship.complete {
                             GameOwnedPhaseV1::Victory {
                                 pending: pending.id,

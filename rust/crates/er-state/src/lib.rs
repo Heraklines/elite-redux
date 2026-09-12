@@ -38,9 +38,12 @@ pub mod current_defender_dispatch;
 
 pub mod current_experience_settlement;
 pub mod current_victory_execution;
+pub mod current_achievement_execution;
 
 pub mod current_battle_source_events;
 
 pub mod current_achievement_tracker;
 pub mod current_faint_execution;
 pub mod current_source_progression;
+
+pub mod current_egg_account;

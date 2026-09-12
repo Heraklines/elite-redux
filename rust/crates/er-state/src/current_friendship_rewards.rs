@@ -20,6 +20,8 @@ pub struct CurrentFriendshipRewardProfileV1 {
     /// Actual fresh account initializer is zero; LevelUp.start raises this
     /// high-water before evaluating level achievements and calculating stats.
     pub highest_level: SafeU53,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub achievements: Option<crate::current_achievement_execution::CurrentAchievementUnlocksV1>,
     /// Source GameStats fresh counter, advanced once by actual Victory.start.
     pub pokemon_defeated: SafeU53,
     /// Actual Date.now input. Presence implements source Object.hasOwn:
@@ -38,6 +40,7 @@ impl CurrentFriendshipRewardProfileV1 {
         Self {
             schema_version: 1,
             highest_level: SafeU53::ZERO,
+            achievements: Some(crate::current_achievement_execution::CurrentAchievementUnlocksV1::fresh()),
             pokemon_defeated: SafeU53::ZERO,
             max_friendship_unlocked_at: None,
             ribbons: Vec::new(),
@@ -51,6 +54,7 @@ impl CurrentFriendshipRewardProfileV1 {
 
     pub fn validate(&self) -> Result<(), CurrentFriendshipProfileError> {
         if self.schema_version != 1
+            || self.achievements.as_ref().is_some_and(|value| !value.valid())
             || self.max_friendship_unlocked_at.is_some_and(|date| {
                 !(-8_640_000_000_000_000..=8_640_000_000_000_000).contains(&date)
             })

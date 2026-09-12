@@ -54,7 +54,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
-      - name: Check all83 inherited and added whole-target witnesses
+      - name: Check all113 inherited and added whole-target witnesses
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python3 scripts/ci/m9e_current_phase_diagnostic.py
@@ -72,5 +72,43 @@ jobs:
         with:
           name: m9e-current-phase-diagnostics-${{ github.sha }}
           path: ${{ runner.temp }}/m9e-current-phase/diagnostics/
+          if-no-files-found: error
+          retention-days: 14
+  browser-inputs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      CI: 'true'
+    steps:
+      - name: Start bounded browser qualification before checkout
+        run: echo "M9E_JS_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v6
+        timeout-minutes: 2
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - uses: actions/setup-node@v6
+        timeout-minutes: 2
+        with:
+          node-version: 24.9.0
+      - uses: pnpm/action-setup@v4
+        timeout-minutes: 2
+        with:
+          version: 10.33.2
+          run_install: false
+      - name: Execute all eighteen browser input adapter witnesses
+        run: python3 scripts/ci/m9e_current_phase_js_diagnostic.py
+      - name: Compact browser adapter qualification
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-current-phase-js-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/m9e-current-phase-js/summary.json
+            ${{ runner.temp }}/m9e-current-phase-js/failure.txt
           if-no-files-found: error
           retention-days: 14

@@ -375,6 +375,7 @@ fn install_save_control(
 fn natural_browser_route_produces_typed_ui_transport_presentation_audio_and_assets()
 -> Result<(), Box<dyn Error>> {
     let (mut host, mut sequence) = natural_host()?;
+    assert_unowned_flash_input_rejected(&mut host, &mut sequence)?;
     let first = press(&mut host, &mut sequence, PhysicalKey::Space)?;
     let BrowserResponseV2::Effects { batch } = first else {
         return Err("raw input did not return effects".into());
@@ -432,6 +433,32 @@ fn natural_browser_route_produces_typed_ui_transport_presentation_audio_and_asse
             .iter()
             .any(|effect| matches!(effect, BrowserEffectV2::Telemetry { .. }))
     );
+    Ok(())
+}
+
+#[inline(never)]
+fn assert_unowned_flash_input_rejected(
+    host: &mut BrowserKernelHostV2,
+    sequence: &mut u64,
+) -> Result<(), Box<dyn Error>> {
+    use er_state::current_achievement_execution::{CurrentFlashEggInputsV1, CurrentUnseededUnitV1};
+    let BrowserResponseV2::Snapshot { snapshot: before } = send(host, *sequence, BrowserRequestV2::Snapshot)? else {
+        return Err("missing browser snapshot".into());
+    };
+    *sequence += 1;
+    let input = CurrentFlashEggInputsV1 {
+        request: er_types::PlatformRequestId::new(safe(999)),
+        pending: safe(1),
+        seed_draws: std::array::from_fn(|_| CurrentUnseededUnitV1 { ieee754_bits: "0000000000000000".into() }),
+        id_draw: CurrentUnseededUnitV1 { ieee754_bits: "0000000000000000".into() },
+        egg_utc_milliseconds: 0,
+    };
+    assert!(send(host, *sequence, BrowserRequestV2::FlashEggInputs { input }).is_err());
+    let BrowserResponseV2::Snapshot { snapshot: after } = send(host, *sequence, BrowserRequestV2::Snapshot)? else {
+        return Err("missing browser snapshot after rejected Flash input".into());
+    };
+    *sequence += 1;
+    assert_eq!(before, after);
     Ok(())
 }
 
