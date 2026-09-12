@@ -193,3 +193,16 @@ Run 34690516838 on 3e69351 passed the entire workspace/all-target compile check.
 Run 34690762700 on f5bb364 passed formatting and workspace/all-target compilation. Clippy reported one nested storage guard in snapshot validation; the successor preserves every condition in a combined guard. Added an epoch-zero achievement regression after exact source review established Object.hasOwn deduplication: Some(0) is already unlocked, not absent. The new whole-phase target count is two tests, bringing the diagnostic to 19 whole targets / 82 tests. No tests ran in the preceding lint-blocked run.
 
 Run 34690994401 on f0fddf8 passed workspace compilation; Clippy rejected two unnecessary Copy clones in the raw phase fixture. Applied the verified formatter output and removed only those calls. All 19 targets / 82 tests remain selected, with zero tests executed in that run. Separately published source probe e5fbf14 / 34691075973 failed on an incorrect party accessor before new observations; it provides no tail qualification.
+
+## Initial post-victory source observations, 2026-09-12
+
+Source-only run 34691284958 on observer commit 84913319 passed against pinned game source 399d5d368f0b5642ebf8f45bd8a5e73350fa4de7. Two fresh process observations were byte-identical (2521 bytes each, SHA256 5b2256b1d0327351f206c9629ed7128adb4a3c2b4a86530bcb1e7978de079357); all retained source-oracle contracts and 11 new rejection mutations passed.
+
+The actual raw Bulbasaur has active ability 5006, passive slots [65,47,5082], and only active 5006 applicable while the innates are locked. All 24 observed PostBattle families are empty. Only 5082 has PostTurn PassiveRecoveryAbAttr; admission must inspect applicable sources, not reject locked slots or infer all registered abilities neutral. The initial MapModifier stack1 is not lapsing, the three actual charge calls leave it unchanged, Ace training-cache settlement returns no awards and retains the empty cache, and actual money capture changes multiplier1/capturedfalse to multiplier1/capturedtrue.
+
+These are initialized registry and direct initial-context observations, not execution of the complete TurnEnd/BattleEnd phases. Their integration into the retained tail remains pending the runtime witness. They do not qualify rewards, subsequent encounter construction or aggregate M9 completion.
+### eb7f1d3 remote result and defender fixture provenance
+
+Run 34691242781 passed formatting, workspace check, Clippy, and compilation. Whole er-game library (12), content (4), and co-op (4) targets passed with default stack settings. Defender had one pass and one failure: its manually substituted Withdraw/innate/HP fixture incorrectly retained FreshComplete source history, and the production fold correctly rejected an unsupported player stat-stage observation. Later targets remain unexecuted on this SHA.
+
+The defender fixture now explicitly retains its valid 1v1 participation shell with UnobservedMechanicalFixture history and removes source XP authority. Existing immutable-query, innate-slot, HP, material, and restore assertions remain, with added tracker-conservation and absent-XP assertions. This does not implement or qualify the missing genuine source stat-stage achievement hook, which remains outstanding. This successor requires a fresh remote result.

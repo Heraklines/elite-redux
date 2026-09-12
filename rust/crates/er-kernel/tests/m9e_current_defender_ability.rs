@@ -889,6 +889,23 @@ fn actual_innate_absorb_uses_admitted_slot_and_shared_immutable_query() -> Resul
         enemy.abilities.passives = [None, None, None];
         only_move(enemy, 40)?;
     }
+    // The substituted abilities, moves and HP form a mechanical fixture. Retain
+    // its valid single-battle participation shell, but no source XP authority.
+    assert!(
+        state
+            .current_battle_participation
+            .as_mut()
+            .ok_or("natural participation absent")?
+            .experience
+            .take()
+            .is_some()
+    );
+    state
+        .current_achievement_tracker
+        .as_mut()
+        .ok_or("natural tracker absent")?
+        .history = er_state::current_achievement_tracker::CurrentAchievementHistoryV1::UnobservedMechanicalFixture;
+    let mechanical_tracker = state.current_achievement_tracker.clone();
     for (mask, immune) in [(0, false), (16, false), (32, false), (48, true)] {
         state
             .current_friendship_profile
@@ -1003,5 +1020,14 @@ fn actual_innate_absorb_uses_admitted_slot_and_shared_immutable_query() -> Resul
         })
         .collect();
     assert_eq!(shown, vec![(holder, AbilityId::new(safe(5082)), Some(2))]);
+    assert_eq!(after.current_achievement_tracker, mechanical_tracker);
+    assert!(
+        after
+            .current_battle_participation
+            .as_ref()
+            .ok_or("retained participation absent")?
+            .experience
+            .is_none()
+    );
     Ok(())
 }
