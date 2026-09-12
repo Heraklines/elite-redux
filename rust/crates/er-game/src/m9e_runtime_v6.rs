@@ -735,7 +735,8 @@ fn execute_battle(
         proposal.validate().map_err(|error| {
             GameRuntimeV6Error::Domain(format!("battle retention proposal: {error}"))
         })?;
-        let mut candidate = before.clone();
+        let (mut candidate, command_audit) =
+            crate::current_random_target_admission::stage_human_command(before, proposal, content)?;
         let offer = battle_command_offer(&candidate, proposal.actor, content).map_err(|error| {
             GameRuntimeV6Error::Domain(format!("battle retention offer: {error}"))
         })?;
@@ -791,6 +792,7 @@ fn execute_battle(
         })?;
         return Ok(DomainExecutionV1 {
             candidate: Some(candidate),
+            rng_audit: command_audit,
             ..Default::default()
         });
     }
@@ -1052,7 +1054,7 @@ fn battle_command_offer(
                 u8::try_from(index).map_err(|_| GameRuntimeV6Error::Action)?,
             )
             .map_err(|_| GameRuntimeV6Error::Action)?;
-            let (definition, _) = match er_battle::m7_resolver::effective_move_definition_v5(
+            let (definition, struggle) = match er_battle::m7_resolver::effective_move_definition_v5(
                 &content.battle,
                 pokemon,
                 move_slot,
@@ -1062,7 +1064,7 @@ fn battle_command_offer(
                 Err(error) => return Err(GameRuntimeV6Error::Domain(error.to_string())),
             };
             let choices = owner
-                .plan(run, actor, definition)
+                .command_plan(run, actor, definition, struggle)
                 .and_then(|plan| plan.selections())
                 .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
             if !choices.is_empty() {
@@ -2834,6 +2836,11 @@ fn adopt_v5_with_turn(
             .flatten(),
         current_presentation: before.current_presentation.clone(),
         current_friendship_profile: before.current_friendship_profile.clone(),
+        current_random_target_commands: before.current_random_target_commands.clone().filter(|owner| {
+            after.active_run.as_ref().is_some_and(|run| run.run_id == owner.run
+                && run.battle.as_ref().is_some_and(|battle| battle.battle_id == owner.battle
+                    && battle.wave == owner.wave && battle.turn == owner.turn))
+        }),
         current_targeting: if after.active_run.is_some() {
             before.current_targeting
         } else {

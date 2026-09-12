@@ -72,28 +72,35 @@ pub(super) fn begin_owned_turn(
     {
         return Err(GameRuntimeV6Error::Action);
     }
-    let targeting = er_battle::current_target_execution::CurrentTargetExecution::from_state(before)
+    let (command_state, mut command_audit) =
+        crate::current_random_target_admission::stage_complete_commands(before, commands, content)?;
+    let command_sequence = command_state.current_random_target_commands.as_ref()
+        .and_then(|owner| owner.entries.last()).map(|entry| entry.draw.sequence.get())
+        .map(|sequence| SafeU53::new(sequence.checked_add(1).ok_or(GameRuntimeV6Error::Invalid)?)
+            .map_err(|_| GameRuntimeV6Error::Invalid)).transpose()?.unwrap_or(SafeU53::ZERO);
+    let targeting = er_battle::current_target_execution::CurrentTargetExecution::from_state(&command_state)
         .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
     let chunk = er_battle::m7_resolver::begin_current_turn(
-        &project_v5(before),
+        &project_v5(&command_state),
         commands,
         &content.battle,
         authority,
         &targeting,
-        SafeU53::ZERO,
+        command_sequence,
     )
     .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
     let mut candidate = adopt_v5_with_turn(
-        before,
+        &command_state,
         chunk.transition.after_state,
         before.current_battle_participation.clone(),
         Some(chunk.continuation),
     )?;
     install_waiting(&mut candidate, authority.revision)?;
     fold_action_tracker(before, &mut candidate, content, &[], &[])?;
+    command_audit.extend(chunk.transition.rng_audit);
     Ok(DomainExecutionV1 {
         candidate: Some(candidate),
-        rng_audit: chunk.transition.rng_audit,
+        rng_audit: command_audit,
         ..Default::default()
     })
 }

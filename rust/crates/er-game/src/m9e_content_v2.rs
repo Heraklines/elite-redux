@@ -676,6 +676,9 @@ impl PreparedGameContentV2 {
 }
 
 impl GameStateV6ContentContext for PreparedGameContentV2 {
+    fn current_random_target_commands_match(&self, state: &er_state::m9e_state_v6::GameStateV6) -> bool {
+        crate::current_random_target_admission::validate_live_pending_commands(state, self).is_ok()
+    }
     fn current_initial_victory_tail_matches(
         &self,
         state: &er_state::m9e_state_v6::GameStateV6,

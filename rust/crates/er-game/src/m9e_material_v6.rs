@@ -560,6 +560,8 @@ fn apply_to_validated_ledger(
             return Err(GameMaterialV6Error::Invalid);
         }
     }
+    crate::current_random_target_admission::validate_transition(live.as_ref(), content, transition)
+        .map_err(|_| GameMaterialV6Error::Invalid)?;
     crate::m9e_runtime_v6::validate_current_turn_transition(live.as_ref(), content, transition)
         .map_err(|_| GameMaterialV6Error::Invalid)?;
     if let Some(prior) = live.as_ref() {

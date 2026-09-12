@@ -325,6 +325,7 @@ pub fn construct_natural_run_v6(
     };
     let mut state = GameStateV6 {
         current_targeting,
+        current_random_target_commands: None,
         current_turn_execution: None,
         current_defender_dispatch: None,
         current_achievement_tracker: None,

@@ -89,6 +89,7 @@ fn state_v6_validates_the_complete_content_identity() -> Result<(), Box<dyn Erro
         current_presentation: None,
         current_run_difficulty: None,
         current_targeting: None,
+        current_random_target_commands: None,
         current_turn_execution: None,
         schema_version: GAME_STATE_SCHEMA_VERSION_V6,
         content_identity: prepared.identity().clone(),

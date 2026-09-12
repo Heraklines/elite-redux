@@ -47,6 +47,7 @@ fn state(content: &PreparedGameContentV2) -> Result<GameStateV6, Box<dyn Error>>
         current_battle_participation: None,
         current_run_difficulty: None,
         current_targeting: None,
+        current_random_target_commands: None,
         current_turn_execution: None,
         current_defender_dispatch: None,
         current_achievement_tracker: None,

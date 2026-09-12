@@ -48,6 +48,8 @@ pub struct GameStateV6 {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_targeting: Option<crate::current_targeting::CurrentTargetingV1>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_random_target_commands: Option<crate::current_random_target_commands::CurrentRandomTargetCommandsV1>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_turn_execution: Option<crate::current_turn_execution::CurrentTurnExecutionV1>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_defender_dispatch:
@@ -79,6 +81,9 @@ pub trait GameStateV6ContentContext {
         false
     }
     fn supports_current_experience_mode(&self, _mode: GameModeId) -> bool {
+        false
+    }
+    fn current_random_target_commands_match(&self, _state: &GameStateV6) -> bool {
         false
     }
     fn current_initial_victory_tail_matches(&self, _state: &GameStateV6) -> bool {
@@ -283,6 +288,13 @@ impl GameStateV6 {
             }
             turn.validate(run).map_err(|_| GameStateV6Error::Invalid)?;
         }
+        if let Some(owner) = &self.current_random_target_commands {
+            if self.current_targeting.is_none() || self.current_presentation.is_none() {
+                return Err(GameStateV6Error::Invalid);
+            }
+            owner.validate(self.active_run.as_ref().ok_or(GameStateV6Error::Invalid)?,
+                self.current_turn_execution.as_ref()).map_err(|_| GameStateV6Error::Invalid)?;
+        }
         if let Some(owner) = self.current_run_difficulty
             && self.active_run.as_ref().map(|run| run.run_id) != Some(owner.run_id)
         {
@@ -368,6 +380,10 @@ impl GameStateV6 {
                     .iter()
                     .all(|source| content.current_experience_source_matches(source)))
         {
+            return Err(GameStateV6Error::Content);
+        }
+        if self.current_targeting.is_some()
+            && !content.current_random_target_commands_match(self) {
             return Err(GameStateV6Error::Content);
         }
         if self.current_targeting.is_some_and(|owner| {
@@ -462,6 +478,7 @@ impl GameStateV6 {
             current_battle_participation: None,
             current_run_difficulty: None,
             current_targeting: None,
+            current_random_target_commands: None,
             current_turn_execution: None,
             current_defender_dispatch: None,
             current_achievement_tracker: None,

@@ -302,6 +302,7 @@ pub(crate) fn settle_turn(
     // The exact original cursor/actions survive in the tail. They are cancelled,
     // never falsely marked executed by advancing next_action over the suffix.
     state.current_turn_execution = None;
+    state.current_random_target_commands = None;
     state
         .current_battle_participation
         .as_mut()

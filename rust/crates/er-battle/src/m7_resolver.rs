@@ -543,7 +543,7 @@ fn build_actions(
                 }
                 Some(
                     owner
-                        .retain_command_targets(run, *actor_id, definition, targets, rng)
+                        .retain_command_targets(run, *actor_id, definition, targets, accepted, rng)
                         .map_err(|_| BattleV5Error::Target)?,
                 )
             }

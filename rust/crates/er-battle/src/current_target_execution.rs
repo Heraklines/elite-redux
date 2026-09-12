@@ -24,6 +24,7 @@ pub struct CurrentTargetExecutionError;
 pub struct CurrentTargetExecution<'a> {
     owner: &'a CurrentTargetingV1,
     profile: &'a CurrentFriendshipProfileV1,
+    random_commands: Option<&'a er_state::current_random_target_commands::CurrentRandomTargetCommandsV1>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -31,6 +32,31 @@ pub struct CurrentTargetPlan {
     /// Source order, independently of canonical command serialization order.
     pub ordered: Vec<FieldSlot>,
     pub multiple: bool,
+}
+
+/// A random command has no selected target until authoritative admission.
+#[derive(Clone, Debug)]
+pub enum CurrentCommandTargetPlan {
+    Deterministic(CurrentTargetPlan),
+    RandomStruggle,
+}
+impl CurrentCommandTargetPlan {
+    pub fn selections(&self) -> Result<Vec<BattleTargetSelection>, CurrentTargetExecutionError> {
+        match self {
+            Self::Deterministic(plan) => plan.selections(),
+            Self::RandomStruggle => Ok(vec![BattleTargetSelection::Implicit]),
+        }
+    }
+    pub fn requires_choice(&self) -> bool {
+        matches!(self, Self::Deterministic(plan) if !plan.multiple && plan.ordered.len() > 1)
+    }
+    pub fn retain(&self, selection: &BattleTargetSelection) -> Result<(), CurrentTargetExecutionError> {
+        match self {
+            Self::Deterministic(plan) => plan.retain(selection).map(|_| ()),
+            Self::RandomStruggle if *selection == BattleTargetSelection::Implicit => Ok(()),
+            Self::RandomStruggle => Err(CurrentTargetExecutionError),
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -44,6 +70,7 @@ struct SourceAbility {
 impl<'a> CurrentTargetExecution<'a> {
     pub fn from_state(state: &'a GameStateV6) -> Result<Self, CurrentTargetExecutionError> {
         let value = Self {
+            random_commands: state.current_random_target_commands.as_ref(),
             owner: state
                 .current_targeting
                 .as_ref()
@@ -365,6 +392,22 @@ impl<'a> CurrentTargetExecution<'a> {
         });
         Ok(result)
     }
+    pub fn command_plan(
+        &self,
+        run: &RunStateV3,
+        actor: PokemonId,
+        definition: &MoveDefinitionV3,
+        struggle: bool,
+    ) -> Result<CurrentCommandTargetPlan, CurrentTargetExecutionError> {
+        if definition.id.get().get() == 165 {
+            if !struggle { return Err(CurrentTargetExecutionError); }
+            self.random_command_candidates(run, actor, definition)?;
+            Ok(CurrentCommandTargetPlan::RandomStruggle)
+        } else {
+            Ok(CurrentCommandTargetPlan::Deterministic(self.plan(run, actor, definition)?))
+        }
+    }
+
     /// Resolve the current command's random target once, before speed ordering.
     /// The public read-only plan still rejects unresolved random selection.
     pub(crate) fn retain_command_targets(
@@ -373,6 +416,7 @@ impl<'a> CurrentTargetExecution<'a> {
         actor: PokemonId,
         definition: &MoveDefinitionV3,
         selection: &BattleTargetSelection,
+        accepted: &er_types::battle_command::AcceptedBattleCommand,
         rng: &mut er_rng::battle::RngRuntime,
     ) -> Result<Vec<FieldSlot>, CurrentTargetExecutionError> {
         if definition.id.get().get() != 165 {
@@ -381,28 +425,30 @@ impl<'a> CurrentTargetExecution<'a> {
         if *selection != BattleTargetSelection::Implicit {
             return Err(CurrentTargetExecutionError);
         }
+        if let Some(owner) = self.random_commands {
+            let battle = run.battle.as_ref().ok_or(CurrentTargetExecutionError)?;
+            if owner.run != run.run_id || owner.battle != battle.battle_id
+                || owner.wave != battle.wave || owner.turn != battle.turn {
+                return Err(CurrentTargetExecutionError);
+            }
+            if let Some(entry) = owner.entries.iter().find(|entry| entry.command.operation_id() == accepted.operation_id()) {
+                if &entry.command != accepted { return Err(CurrentTargetExecutionError); }
+                return Ok(vec![entry.selected]);
+            }
+        }
         // The source calls Pokemon.randBattleSeedInt even with one opponent;
         // Battle.randSeedInt returns zero without advancing that one-value draw.
 
-        let candidates = self.random_opponents(run, actor, definition)?;
-        let index = rng
-            .battle_rand_seed_int(
-                er_types::SafeU53::new(
-                    u64::try_from(candidates.len()).map_err(|_| CurrentTargetExecutionError)?,
-                )
+        let candidates = self.random_command_candidates(run, actor, definition)?;
+        let index = rng.battle_rand_seed_int(
+            er_types::SafeU53::new(u64::try_from(candidates.len()).map_err(|_| CurrentTargetExecutionError)?)
                 .map_err(|_| CurrentTargetExecutionError)?,
-                er_types::SafeU53::ZERO,
-                er_rng::audit::RngReason::RandomTarget,
-                er_rng::audit::RngCallsiteId::current_move_target(),
-            )
-            .map_err(|_| CurrentTargetExecutionError)?;
-        self.plan_with_random_index(
-            run,
-            actor,
-            definition,
-            Some(usize::try_from(index.get()).map_err(|_| CurrentTargetExecutionError)?),
-        )?
-        .retain(selection)
+            er_types::SafeU53::ZERO,
+            er_rng::audit::RngReason::RandomTarget,
+            er_rng::audit::RngCallsiteId::current_move_target(),
+        ).map_err(|_| CurrentTargetExecutionError)?;
+        self.plan_with_random_index(run, actor, definition, Some(usize::try_from(index.get()).map_err(|_| CurrentTargetExecutionError)?))?
+            .retain(selection)
     }
 
     pub(crate) fn validate_resolved_random_hit(
@@ -412,20 +458,17 @@ impl<'a> CurrentTargetExecution<'a> {
         defender: PokemonId,
         definition: &MoveDefinitionV3,
     ) -> Result<(), CurrentTargetExecutionError> {
-        let candidates = self.random_opponents(run, actor, definition)?;
+        let candidates = self.random_command_candidates(run, actor, definition)?;
         let battle = run.battle.as_ref().ok_or(CurrentTargetExecutionError)?;
-        if !battle
-            .field
-            .slots
-            .iter()
-            .any(|row| row.occupant == Some(defender) && candidates.contains(&row.slot))
-        {
+        if !battle.field.slots.iter().any(|row| {
+            row.occupant == Some(defender) && candidates.contains(&row.slot)
+        }) {
             return Err(CurrentTargetExecutionError);
         }
         Ok(())
     }
 
-    fn random_opponents(
+    pub fn random_command_candidates(
         &self,
         run: &RunStateV3,
         actor: PokemonId,
@@ -442,57 +485,20 @@ impl<'a> CurrentTargetExecution<'a> {
         // Pokemon.getAllActiveAbilityAttrs directly flattens eligible ability.attrs;
         // future targeting catalog additions do not inherit recoil neutrality.
         if self.ability_sources(run, user)?.iter().any(|source| {
-            !matches!(
-                ability_numeric_id(source),
-                Some(
-                    0 | 18
-                        | 41
-                        | 43
-                        | 47
-                        | 49
-                        | 51
-                        | 62
-                        | 65
-                        | 66
-                        | 67
-                        | 75
-                        | 82
-                        | 94
-                        | 113
-                        | 172
-                        | 192
-                        | 257
-                        | 268
-                        | 5006
-                        | 5033
-                        | 5082
-                        | 5097
-                        | 5115
-                )
-            )
+            !matches!(ability_numeric_id(source), Some(
+                0 | 18 | 41 | 43 | 47 | 49 | 51 | 62 | 65 | 66 | 67 | 75 | 82 | 94
+                | 113 | 172 | 192 | 257 | 268 | 5006 | 5033 | 5082 | 5097 | 5115
+            ))
         }) {
             return Err(CurrentTargetExecutionError);
         }
         let battle = run.battle.as_ref().ok_or(CurrentTargetExecutionError)?;
-        let user = battle
-            .field
-            .slots
-            .iter()
-            .find(|row| row.occupant == Some(actor))
+        let user = battle.field.slots.iter().find(|row| row.occupant == Some(actor))
             .ok_or(CurrentTargetExecutionError)?;
-        let candidates = battle
-            .field
-            .slots
-            .iter()
-            .filter(|row| {
-                row.slot.side != user.slot.side
-                    && row
-                        .occupant
-                        .and_then(|id| find_pokemon(run, id))
-                        .is_some_and(|pokemon| pokemon.hp > 0 && !pokemon.fainted)
-            })
-            .map(|row| row.slot)
-            .collect::<Vec<_>>();
+        let candidates = battle.field.slots.iter().filter(|row| {
+            row.slot.side != user.slot.side && row.occupant.and_then(|id| find_pokemon(run, id))
+                .is_some_and(|pokemon| pokemon.hp > 0 && !pokemon.fainted)
+        }).map(|row| row.slot).collect::<Vec<_>>();
         if candidates.is_empty() {
             return Err(CurrentTargetExecutionError);
         }
@@ -533,8 +539,10 @@ impl<'a> CurrentTargetExecution<'a> {
         }
         // RANDOM_NEAR_ENEMY needs retained command-stage RNG ownership. ATTACKER
         // and CURSE need additional source phase/type/weather owners. None is faked.
-        if matches!(source_target, MoveTarget::Attacker | MoveTarget::Curse)
-            || (source_target == MoveTarget::RandomNearEnemy && random_index.is_none())
+        if matches!(
+            source_target,
+            MoveTarget::Attacker | MoveTarget::Curse
+        ) || (source_target == MoveTarget::RandomNearEnemy && random_index.is_none())
             || (source_target != MoveTarget::RandomNearEnemy && random_index.is_some())
         {
             return Err(CurrentTargetExecutionError);

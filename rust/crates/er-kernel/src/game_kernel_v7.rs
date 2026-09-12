@@ -567,11 +567,18 @@ impl GameKernelV7 {
     pub fn prepare_authority_ai_commands(
         &mut self,
     ) -> Result<Vec<er_types::battle_command::AcceptedBattleCommand>, GameKernelV7Error> {
+        let state = self.state().cloned().ok_or(GameKernelV7Error::Invalid)?;
+        self.prepare_authority_ai_commands_for_state(&state)
+    }
+
+    fn prepare_authority_ai_commands_for_state(
+        &mut self,
+        state: &GameStateV6,
+    ) -> Result<Vec<er_types::battle_command::AcceptedBattleCommand>, GameKernelV7Error> {
         self.require_current_rebind_gameplay()?;
         if self.role != GameKernelRoleV7::Authority {
             return Err(GameKernelV7Error::Invalid);
         }
-        let state = self.state().cloned().ok_or(GameKernelV7Error::Invalid)?;
         let run = state
             .active_run
             .as_ref()
@@ -598,7 +605,7 @@ impl GameKernelV7 {
             .current_targeting
             .as_ref()
             .map(|_| {
-                er_battle::current_target_execution::CurrentTargetExecution::from_state(&state)
+                er_battle::current_target_execution::CurrentTargetExecution::from_state(state)
                     .map_err(|_| GameKernelV7Error::Invalid)
             })
             .transpose()?;
@@ -2828,10 +2835,10 @@ impl GameKernelV7 {
                     *actor,
                     *move_slot,
                 )?;
-                if plan.ordered.is_empty() {
+                if plan.selections().map_err(|_| GameKernelV7Error::Invalid)?.is_empty() {
                     return Err(GameKernelV7Error::Invalid);
                 }
-                if !plan.multiple && plan.ordered.len() > 1 {
+                if plan.requires_choice() {
                     let instance = self.allocate_menu_instance()?;
                     let revision = self.active_runtime()?.next_authority_revision();
                     let mut control = target_select_control(
@@ -3145,7 +3152,10 @@ impl GameKernelV7 {
                 .any(|entry| accepted_command_owner(entry) == Some(*seat))
         });
         let input = if human_complete {
-            entries.extend(self.prepare_authority_ai_commands()?);
+            let (ai_state, _) = er_game::current_random_target_admission::stage_human_command(
+                &state, &proposal, self.content.as_ref(),
+            ).map_err(runtime_error)?;
+            entries.extend(self.prepare_authority_ai_commands_for_state(&ai_state)?);
             entries.sort_by_key(|entry| entry.field_slot());
             let commands = er_types::battle_command::CommandSet::new(entries)
                 .map_err(|_| GameKernelV7Error::Invalid)?;
@@ -4001,7 +4011,7 @@ fn current_move_target_plan(
     seat: SeatId,
     actor: er_types::battle_ids::PokemonId,
     move_slot: er_types::battle_ids::MoveSlotIndex,
-) -> Result<er_battle::current_target_execution::CurrentTargetPlan, GameKernelV7Error> {
+) -> Result<er_battle::current_target_execution::CurrentCommandTargetPlan, GameKernelV7Error> {
     let (_, actual_actor, _) = local_battle_actor(state, seat)?;
     if actual_actor != actor {
         return Err(GameKernelV7Error::Invalid);
@@ -4015,11 +4025,11 @@ fn current_move_target_plan(
         .iter()
         .find(|pokemon| pokemon.id == actor)
         .ok_or(GameKernelV7Error::Invalid)?;
-    let (definition, _) =
+    let (definition, struggle) =
         er_battle::m7_resolver::effective_move_definition_v5(content, pokemon, move_slot)
             .map_err(|_| GameKernelV7Error::Invalid)?;
     er_battle::current_target_execution::CurrentTargetExecution::from_state(state)
-        .and_then(|owner| owner.plan(run, actor, definition))
+        .and_then(|owner| owner.command_plan(run, actor, definition, struggle))
         .map_err(|_| GameKernelV7Error::Invalid)
 }
 
@@ -4034,7 +4044,10 @@ fn target_select_control(
     revision: SafeU53,
 ) -> Result<GameControlPlanV2, GameKernelV7Error> {
     let (battle, _, field) = local_battle_actor(state, seat)?;
-    let plan = current_move_target_plan(state, content, seat, actor, move_slot)?;
+    let er_battle::current_target_execution::CurrentCommandTargetPlan::Deterministic(plan) =
+        current_move_target_plan(state, content, seat, actor, move_slot)? else {
+        return Err(GameKernelV7Error::Invalid);
+    };
     if plan.multiple || plan.ordered.len() <= 1 {
         return Err(GameKernelV7Error::Invalid);
     }

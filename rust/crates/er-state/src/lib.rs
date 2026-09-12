@@ -47,3 +47,4 @@ pub mod current_faint_execution;
 pub mod current_source_progression;
 
 pub mod current_egg_account;
+pub mod current_random_target_commands;

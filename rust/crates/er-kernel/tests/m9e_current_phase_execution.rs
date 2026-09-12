@@ -731,10 +731,10 @@ fn advance_raw_phase_after_callbacks(
         assert_eq!(live.as_ref(), kernel.state());
     }
     let snapshot = kernel.snapshot()?;
-    *kernel = Box::new(restore(
+    **kernel = restore(
         serde_json::from_slice(&canonical_bytes(&snapshot)?)?,
         content.clone(),
-    )?);
+    )?;
     assert_eq!(
         canonical_bytes(&kernel.snapshot()?)?,
         canonical_bytes(&snapshot)?,
@@ -962,7 +962,7 @@ fn assert_phase_title_read_reissues(
             .event_id,
         event_id
     );
-    reader = Box::new(restore(acknowledged, content.clone())?);
+    *reader = restore(acknowledged, content.clone())?;
     let mut live = reader.state().cloned();
     let mut ledger = reader.snapshot()?.material_ledger;
     let continuation = reader.advance_time(SafeU53::ZERO)?;
@@ -1281,7 +1281,7 @@ fn assert_request_title_read_reissues(
             .is_err()
     );
     assert_eq!(reader.snapshot()?, after);
-    reader = Box::new(restore(after.clone(), content)?);
+    *reader = restore(after.clone(), content)?;
     let blocked = reader.advance_time(SafeU53::ZERO)?;
     assert!(
         !blocked
@@ -1364,7 +1364,7 @@ fn controlled_early_ko_flash_owns_clock_egg_candy_and_canceled_suffix() -> Resul
         }
         let step = if let Some(pending) = snapshot.pending_platform.first() {
             assert_request_title_read_reissues(&snapshot, &pending.effect, content.clone())?;
-            kernel = Box::new(restore(snapshot.clone(), content.clone())?);
+            *kernel = restore(snapshot.clone(), content.clone())?;
             match &pending.effect {
                 GamePlatformEffectV2::CurrentFriendshipClock { request } => {
                     kernel.apply_current_utc_clock_result(request.request, 1783641600000)?
