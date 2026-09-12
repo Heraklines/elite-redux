@@ -925,3 +925,52 @@ fn assert_phase_title_read_reissues(
     assert!(reader.snapshot()?.pending_current_phase_ack.is_none());
     Ok(())
 }
+
+// Append to m9e_current_phase_execution.rs; explicit prior source-account grant
+// at epoch zero plus friendship 252 are controlled inputs to this regression.
+#[test]
+fn epoch_zero_max_unlock_does_not_request_or_repeat_achievement_reward() -> Result<()> {
+    use er_state::current_experience_owner::CurrentFriendshipClockPurposeV1;
+    use er_state::current_friendship_profile::{CurrentFriendshipRibbonV1, CURRENT_FRIENDSHIP_RIBBON_V1};
+    let content = content()?;
+    let kernel = controlled_before_knockout(content.clone(), 5, &[33])?;
+    let mut snapshot = kernel.snapshot()?;
+    let GameKernelLifecycleSnapshotV7::Active(state) = &mut snapshot.lifecycle else {
+        return Err("actual pre-knockout state absent".into());
+    };
+    let pokemon = &mut state.active_run.as_mut().ok_or("run absent")?.party[0];
+    pokemon.friendship = 252;
+    let species = pokemon.species_id;
+    let profile = state.current_friendship_profile.as_mut().ok_or("fresh account absent")?;
+    let rewards = profile.rewards.as_mut().ok_or("reward owner absent")?;
+    rewards.max_friendship_unlocked_at = Some(0);
+    rewards.ribbons = vec![CurrentFriendshipRibbonV1 { species, bits: safe(CURRENT_FRIENDSHIP_RIBBON_V1)? }];
+    rewards.cosmetic_bits = vec![0, 0, 0, 0, 128, 1];
+    let previous_candy = profile.accounts.iter().map(|row| (row.species, row.candy_count)).collect::<Vec<_>>();
+    state.validate_with(content.as_ref())?;
+    snapshot.material_ledger = AppliedGameMaterialLedgerV1::new(snapshot.material_ledger.next_authority_revision)?;
+    let mut kernel = restore(snapshot, content.clone())?;
+    let (mut live, mut ledger) = admit_knockout(&mut kernel, &content)?;
+    for _ in 0..96 {
+        let current = kernel.snapshot()?;
+        for pending in &current.pending_platform {
+            if let GamePlatformEffectV2::CurrentFriendshipClock { request } = &pending.effect {
+                assert_eq!(request.purpose, CurrentFriendshipClockPurposeV1::TimedEvent,
+                    "Object.hasOwn treats epoch-zero unlock as present: no second achievement clock");
+                let state = active(&current)?;
+                let profile = state.current_friendship_profile.as_ref().ok_or("account absent")?;
+                assert_eq!(profile.rewards.as_ref().ok_or("rewards absent")?.max_friendship_unlocked_at, Some(0));
+                assert_eq!(profile.accounts.iter().map(|row| (row.species, row.candy_count)).collect::<Vec<_>>(), previous_candy);
+                let restored = restore(current.clone(), content.clone())?;
+                assert_eq!(restored.snapshot()?, current);
+                return Ok(());
+            }
+        }
+        for pending in current.pending_presentations {
+            kernel.settle_presentation(pending.event_id)?;
+        }
+        let step = kernel.advance_time(SafeU53::ZERO)?;
+        accept_material(&mut live, &mut ledger, &kernel, &content, &step)?;
+    }
+    Err("source friendship clock was never reached".into())
+}

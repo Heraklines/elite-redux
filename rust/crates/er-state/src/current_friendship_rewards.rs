@@ -22,8 +22,8 @@ pub struct CurrentFriendshipRewardProfileV1 {
     pub highest_level: SafeU53,
     /// Source GameStats fresh counter, advanced once by actual Victory.start.
     pub pokemon_defeated: SafeU53,
-    /// Actual Date.now input. A stored zero remains distinguishable from absence
-    /// and is falsy in the source's existing-unlock test.
+    /// Actual Date.now input. Presence implements source Object.hasOwn:
+    /// timestamp zero is already unlocked and cannot grant again.
     pub max_friendship_unlocked_at: Option<i64>,
     /// Sparse nonzero entries; fresh initDexData gives every allSpecies entry
     /// RibbonData(0). This cut can add only the actual friendship OR flag.
@@ -46,8 +46,7 @@ impl CurrentFriendshipRewardProfileV1 {
     }
 
     pub fn max_is_unlocked(&self) -> bool {
-        self.max_friendship_unlocked_at
-            .is_some_and(|date| date != 0)
+        self.max_friendship_unlocked_at.is_some()
     }
 
     pub fn validate(&self) -> Result<(), CurrentFriendshipProfileError> {
