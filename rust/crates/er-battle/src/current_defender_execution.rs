@@ -147,7 +147,7 @@ pub(super) fn execute(
                     input.definition,
                     input.actor,
                     &target,
-                    critical,
+                    DamagePolicy { critical, current_source: input.targeting.source_damage() },
                     rng,
                 )?;
                 let damage = calculated.damage;

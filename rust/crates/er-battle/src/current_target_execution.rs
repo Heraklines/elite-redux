@@ -24,6 +24,7 @@ pub struct CurrentTargetExecutionError;
 pub struct CurrentTargetExecution<'a> {
     owner: &'a CurrentTargetingV1,
     profile: &'a CurrentFriendshipProfileV1,
+    source_damage: bool,
     random_commands:
         Option<&'a er_state::current_random_target_commands::CurrentRandomTargetCommandsV1>,
 }
@@ -74,6 +75,7 @@ struct SourceAbility {
 impl<'a> CurrentTargetExecution<'a> {
     pub fn from_state(state: &'a GameStateV6) -> Result<Self, CurrentTargetExecutionError> {
         let value = Self {
+            source_damage: state.current_achievement_tracker.as_ref().is_some_and(|tracker| tracker.history == er_state::current_achievement_tracker::CurrentAchievementHistoryV1::FreshComplete),
             random_commands: state.current_random_target_commands.as_ref(),
             owner: state
                 .current_targeting
@@ -99,11 +101,17 @@ impl<'a> CurrentTargetExecution<'a> {
         Ok(value)
     }
 
+    pub(crate) fn source_damage(&self) -> bool { self.source_damage }
+
     pub fn validate_run(&self, run: &RunStateV3) -> Result<(), CurrentTargetExecutionError> {
         if run.run_id != self.owner.run_id || run.mode != self.owner.mode {
             return Err(CurrentTargetExecutionError);
         }
         let battle = run.battle.as_ref().ok_or(CurrentTargetExecutionError)?;
+        if self.source_damage
+            && (self.owner.origin != er_state::current_targeting::CurrentTargetingOriginV1::FreshNormalClassic
+                || battle.format.player_capacity != 1 || battle.format.enemy_capacity != 1)
+        { return Err(CurrentTargetExecutionError); }
         if !matches!(
             (battle.format.player_capacity, battle.format.enemy_capacity),
             (1, 1) | (2, 2)

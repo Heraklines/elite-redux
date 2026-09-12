@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::io::Write;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use er_env::current::{CurrentExternalEvent, CurrentGameSession};
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
@@ -70,6 +71,12 @@ struct CampaignRecorder {
     position: u64,
     segments: usize,
     presentations: usize,
+    // Capture includes apply, snapshot/observation and record; roundtrip is
+    // separate. These diagnostic clocks never enter the captured game state.
+    capture_elapsed: Duration,
+    apply_elapsed: Duration,
+    record_elapsed: Duration,
+    roundtrip_elapsed: Duration,
 }
 
 impl std::ops::Deref for CampaignRecorder {
@@ -84,13 +91,18 @@ impl std::ops::Deref for CampaignRecorder {
 
 impl CampaignRecorder {
     fn capture(&mut self, event: CurrentExternalEvent) -> Result<GameKernelStepV7, Box<dyn Error>> {
+        let capture_started = Instant::now();
         let before = self.session.snapshot()?;
+        let apply_started = Instant::now();
         let result = self.session.apply(event.clone());
+        self.apply_elapsed += apply_started.elapsed();
         let after = self.session.snapshot()?;
         let observation = self.session.observe()?;
+        let record_started = Instant::now();
         let status = self
             .recorder
             .record(&before, event, result.as_ref(), &after, &observation);
+        self.record_elapsed += record_started.elapsed();
         self.position += 1;
         assert_eq!(
             status,
@@ -99,6 +111,7 @@ impl CampaignRecorder {
                 final_position: self.position,
             }
         );
+        self.capture_elapsed += capture_started.elapsed();
         let step = result?;
         // The first segment ends with Space still held, proving that decoding
         // and importing a capsule preserves input state before the key-up.
@@ -130,6 +143,7 @@ impl CampaignRecorder {
         if self.position == self.base {
             return Ok(());
         }
+        let roundtrip_started = Instant::now();
         let capsule = self.recorder.export()?;
         assert_eq!(capsule.base_position, self.base);
         assert_eq!(capsule.final_position, self.position);
@@ -163,8 +177,9 @@ impl CampaignRecorder {
             CurrentReproLimitsV1::default(),
             self.position,
         )?;
+        self.roundtrip_elapsed += roundtrip_started.elapsed();
         self.segments += 1;
-        if self.segments.is_multiple_of(64) {
+        if self.segments == 1 || self.segments.is_multiple_of(64) {
             let wave = self
                 .session
                 .kernel_ref()?
@@ -174,11 +189,15 @@ impl CampaignRecorder {
                 .unwrap_or(0);
             writeln!(
                 std::io::stdout().lock(),
-                "M9E_REPLAY_PROGRESS events={} segments={} wave={wave} active={} control={:?}",
+                "M9E_REPLAY_PROGRESS events={} segments={} wave={wave} active={} control={:?} capture_ms={} apply_ms={} record_ms={} roundtrip_ms={}",
                 self.position,
                 self.segments,
                 self.session.kernel_ref()?.state().is_some(),
-                self.current_control().map(|control| control.kind)
+                self.current_control().map(|control| control.kind),
+                self.capture_elapsed.as_millis(),
+                self.apply_elapsed.as_millis(),
+                self.record_elapsed.as_millis(),
+                self.roundtrip_elapsed.as_millis()
             )?;
         }
         Ok(())
@@ -213,6 +232,10 @@ fn kernel(content: Arc<PreparedGameContentV2>) -> Result<CampaignRecorder, Box<d
         position: 0,
         segments: 0,
         presentations: 0,
+        capture_elapsed: Duration::ZERO,
+        apply_elapsed: Duration::ZERO,
+        record_elapsed: Duration::ZERO,
+        roundtrip_elapsed: Duration::ZERO,
     })
 }
 
