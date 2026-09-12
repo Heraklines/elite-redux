@@ -2108,11 +2108,7 @@ fn assert_struggle_restore_action(
         canonical_bytes(struggle_snapshot(&restored)?.as_ref())?,
         canonical_bytes(accepted)?
     );
-    let mut journal = MaterialJournal {
-        live: Some(active(before)?.clone()),
-        ledger: before.material_ledger.clone(),
-        materials: Vec::new(),
-    };
+    let mut journal = MaterialJournal::before_command(before)?;
     journal.accept(&restored, content.as_ref(), step)?;
     journal.settle_actual_presentations(&mut restored)?;
     let action = restored.advance_time(SafeU53::ZERO)?;

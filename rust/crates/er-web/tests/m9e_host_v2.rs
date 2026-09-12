@@ -868,9 +868,13 @@ fn browser_time_and_lifecycle_requests_execute_kernel_state_changes() -> Result<
 
 #[test]
 fn browser_network_and_transport_requests_execute_protocol_state() -> Result<(), Box<dyn Error>> {
+    eprintln!("M9E_HOST_NETWORK setup");
     let (mut browser, proposal) = network_host_setup()?;
+    eprintln!("M9E_HOST_NETWORK ingress");
     network_ingress(&mut browser, proposal)?;
+    eprintln!("M9E_HOST_NETWORK transport");
     let staged = network_transport_changes(&mut browser)?;
+    eprintln!("M9E_HOST_NETWORK replay");
     network_transport_replay(&mut browser, &staged)
 }
 
@@ -887,7 +891,9 @@ fn network_snapshot(
 fn network_host_setup() -> Result<(Box<BrowserKernelHostV2>, GameProposalEnvelopeV2), Box<dyn Error>>
 {
     let prepared = shared_content()?;
+    eprintln!("M9E_HOST_NETWORK active_host");
     let (source, _) = active_host()?;
+    eprintln!("M9E_HOST_NETWORK active_host_ready");
     let mut snapshot = source.kernel_ref().ok_or("kernel missing")?.snapshot()?;
     let host = SeatId::new(safe(1));
     let guest = SeatId::new(safe(2));
@@ -1011,7 +1017,9 @@ fn network_transport_changes(
         TransportState::Connected
     );
     assert!(connected.scheduler.pauses.is_empty());
+    eprintln!("M9E_HOST_NETWORK byte_boundaries");
     retained_generation_decimal_byte_boundaries(&connected)?;
+    eprintln!("M9E_HOST_NETWORK byte_boundaries_done");
     send(
         browser,
         4,
@@ -1916,13 +1924,14 @@ fn record_real_generation_event(
     Ok(())
 }
 
+#[inline(never)]
 fn retained_generation_decimal_byte_boundaries(
     snapshot: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7,
 ) -> Result<(), Box<dyn Error>> {
     use er_repro::current::{
-        CurrentReproLimitsV1, CurrentReproRecorderV1, replay_current_capsule_v1,
+        CurrentReproLimitsV1, CurrentReproRecorderV1,
     };
-    let prepared = std::sync::Arc::new(content()?);
+    let prepared = shared_content()?;
     let protocol = snapshot
         .protocol
         .as_ref()
@@ -1967,9 +1976,9 @@ fn retained_generation_decimal_byte_boundaries(
         generation: ConnectionGeneration::new(safe(10)),
         connected: true,
     };
-    record_real_generation_event(&mut session, &mut recorder, event.clone(), 9, 10)?;
+    record_real_generation_event(&mut session, &mut recorder, event, 9, 10)?;
     let expected = recorder.export()?;
-    let expected_snapshot = session.snapshot()?;
+    let expected_snapshot = Box::new(session.snapshot()?);
     assert_eq!(
         expected.attempts.len(),
         2,
@@ -1995,55 +2004,81 @@ fn retained_generation_decimal_byte_boundaries(
     assert!(serde_json::to_vec(&baseline)?.len() < bytes);
 
     for exact in [true, false] {
-        let bounded = CurrentReproLimitsV1 {
-            maximum_bytes: bytes - usize::from(!exact),
-            ..limits
-        };
-        let (mut recorder, mut resumed) = CurrentReproRecorderV1::from_capsule(
-            baseline.clone(),
-            std::sync::Arc::clone(&prepared),
-            bounded,
+        retained_generation_one_bound(
+            &baseline,
+            &expected,
+            &expected_snapshot,
+            &prepared,
+            bytes,
+            exact,
         )?;
-        let before = resumed.snapshot()?;
-        record_real_generation_event(&mut resumed, &mut recorder, event.clone(), 9, 10)?;
-        let actual = recorder.export()?;
-        assert!(serde_json::to_vec(&actual)?.len() <= bounded.maximum_bytes);
-        if exact {
-            assert_eq!(
-                actual, expected,
-                "exact byte bound must retain the live 9->10 metadata append"
-            );
-        } else {
-            assert_eq!(
-                actual.attempts.len(),
-                1,
-                "one-byte deficit must rotate the previous history"
-            );
-            assert_eq!(*actual.checkpoint, before);
-            assert_eq!(actual.attempts[0], expected.attempts[1]);
-        }
-        assert_eq!(
-            actual
-                .browser_transport
-                .as_ref()
-                .ok_or("browser context")?
-                .base_generation,
-            safe(9)
-        );
-        assert_eq!(
-            actual
-                .browser_transport
-                .as_ref()
-                .ok_or("browser context")?
-                .final_generation,
-            safe(10)
-        );
-        assert_eq!(resumed.snapshot()?, expected_snapshot);
-        assert_eq!(
-            replay_current_capsule_v1(&actual, std::sync::Arc::clone(&prepared), bounded)?
-                .snapshot()?,
-            expected_snapshot
-        );
     }
+    Ok(())
+}
+
+#[inline(never)]
+fn retained_generation_one_bound(
+    baseline: &CurrentReproCapsuleV1,
+    expected: &CurrentReproCapsuleV1,
+    expected_snapshot: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7,
+    prepared: &Arc<PreparedGameContentV2>,
+    bytes: usize,
+    exact: bool,
+) -> Result<(), Box<dyn Error>> {
+    use er_repro::current::{CurrentReproLimitsV1, CurrentReproRecorderV1, replay_current_capsule_v1};
+    let event = CurrentExternalEvent::TransportChanged {
+        generation: ConnectionGeneration::new(safe(10)),
+        connected: true,
+    };
+    let bounded = CurrentReproLimitsV1 {
+        maximum_bytes: bytes - usize::from(!exact),
+        ..CurrentReproLimitsV1::default()
+    };
+    let (mut recorder, resumed) = CurrentReproRecorderV1::from_capsule(
+        baseline.clone(),
+        std::sync::Arc::clone(prepared),
+        bounded,
+    )?;
+    let mut resumed = Box::new(resumed);
+    let before = Box::new(resumed.snapshot()?);
+    record_real_generation_event(&mut resumed, &mut recorder, event, 9, 10)?;
+    let actual = recorder.export()?;
+    assert!(serde_json::to_vec(&actual)?.len() <= bounded.maximum_bytes);
+    if exact {
+        assert_eq!(
+            &actual, expected,
+            "exact byte bound must retain the live 9->10 metadata append"
+        );
+    } else {
+        assert_eq!(
+            actual.attempts.len(),
+            1,
+            "one-byte deficit must rotate the previous history"
+        );
+        assert_eq!(*actual.checkpoint, *before);
+        assert_eq!(actual.attempts[0], expected.attempts[1]);
+    }
+    assert_eq!(
+        actual
+            .browser_transport
+            .as_ref()
+            .ok_or("browser context")?
+            .base_generation,
+        safe(9)
+    );
+    assert_eq!(
+        actual
+            .browser_transport
+            .as_ref()
+            .ok_or("browser context")?
+            .final_generation,
+        safe(10)
+    );
+    assert_eq!(&resumed.snapshot()?, expected_snapshot);
+    assert_eq!(
+        &replay_current_capsule_v1(&actual, std::sync::Arc::clone(prepared), bounded)?
+            .snapshot()?,
+        expected_snapshot
+    );
     Ok(())
 }

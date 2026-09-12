@@ -228,7 +228,7 @@ pub(super) fn execute(
                 actor.fainted = actor.hp == 0;
                 // The source achievement hook receives actual clamped damage
                 // after damage(), before PostDamage callbacks and recoil text.
-                if let Some(events) = source_events.as_deref_mut() {
+                if let Some(events) = source_events {
                     events.push(CurrentBattleSourceEventV1::StruggleRecoilDamage {
                         user: actor.id,
                         source_slot: input.source_slot,
