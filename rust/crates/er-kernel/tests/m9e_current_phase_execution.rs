@@ -1328,34 +1328,33 @@ fn controlled_early_ko_flash_owns_clock_egg_candy_and_canceled_suffix() -> Resul
             .and_then(|p| p.experience.as_ref())
             .and_then(|o| o.pending.first())
             .and_then(|p| p.victory_tail.as_ref())
+            && matches!(&tail.phase, T::RewardSelectionPending { .. })
         {
-            if matches!(&tail.phase, T::RewardSelectionPending { .. }) {
-                assert!(clock_seen && egg_seen);
-                assert!(
-                    tail.cancelled_from < tail.cancelled_to,
-                    "enemy action remained in the canceled suffix"
-                );
-                let account = state
-                    .current_friendship_profile
-                    .as_ref()
-                    .and_then(|p| p.egg_account.as_ref())
-                    .ok_or("owned egg account absent")?;
-                assert_eq!(account.eggs.len(), 1);
-                assert_eq!(account.eggs[0].hatch_waves, 24);
-                assert_eq!(
-                    account.eggs[0].species.get().get(),
-                    10821,
-                    "qualified actual source seed projection"
-                );
-                let unchanged = kernel.advance_time(SafeU53::ZERO)?;
-                assert!(
-                    !unchanged
-                        .effects
-                        .iter()
-                        .any(|e| matches!(e, GameKernelEffectV7::AuthorityMaterial { .. }))
-                );
-                return Ok(());
-            }
+            assert!(clock_seen && egg_seen);
+            assert!(
+                tail.cancelled_from < tail.cancelled_to,
+                "enemy action remained in the canceled suffix"
+            );
+            let account = state
+                .current_friendship_profile
+                .as_ref()
+                .and_then(|p| p.egg_account.as_ref())
+                .ok_or("owned egg account absent")?;
+            assert_eq!(account.eggs.len(), 1);
+            assert_eq!(account.eggs[0].hatch_waves, 24);
+            assert_eq!(
+                account.eggs[0].species.get().get(),
+                10821,
+                "qualified actual source seed projection"
+            );
+            let unchanged = kernel.advance_time(SafeU53::ZERO)?;
+            assert!(
+                !unchanged
+                    .effects
+                    .iter()
+                    .any(|e| matches!(e, GameKernelEffectV7::AuthorityMaterial { .. }))
+            );
+            return Ok(());
         }
         if !snapshot.pending_presentations.is_empty() {
             for pending in &snapshot.pending_presentations {

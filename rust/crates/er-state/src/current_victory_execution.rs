@@ -65,12 +65,11 @@ pub enum CurrentVictoryDescendantV1 {
 
 impl CurrentVictoryExecutionV1 {
     pub fn valid(&self, pending_id: SafeU53) -> bool {
-        if let Some(level) = &self.level_achievements {
-            if !level.valid(pending_id)
-                || !matches!(&self.descendant, CurrentVictoryDescendantV1::LevelUpStart { level_up } if level_up == &level.level_up)
-            {
-                return false;
-            }
+        if let Some(level) = &self.level_achievements
+            && (!level.valid(pending_id)
+                || !matches!(&self.descendant, CurrentVictoryDescendantV1::LevelUpStart { level_up } if level_up == &level.level_up))
+        {
+            return false;
         }
         let next = usize::from(self.next_phase);
         if self.phases.len() > 6

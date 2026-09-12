@@ -155,7 +155,26 @@ impl GameMenuV2 {
             }
             GameMenuCancelV2::Disabled | GameMenuCancelV2::Select { .. } => {}
         }
-        self.logical_menu()?;
+        // The checks above already validate every option/layout and every
+        // visible selected/cancel/edge endpoint. Validate the remaining logical
+        // projection shape without cloning all option IDs, layouts and edges.
+        // LogicalMenu::new sorts before validating, so storage order remains
+        // irrelevant here and hidden duplicate IDs remain permitted.
+        if self.instance_id.get() == crate::SafeU53::ZERO {
+            return Err(LogicalMenuError::ZeroInstanceId.into());
+        }
+        if self.control_id.is_empty() {
+            return Err(LogicalMenuError::EmptyControlId.into());
+        }
+        if visible_ids.len() != self.options.iter().filter(|option| option.visible).count() {
+            return Err(LogicalMenuError::DuplicateOption.into());
+        }
+        let mut navigation_keys = BTreeSet::new();
+        for edge in &self.navigation {
+            if !navigation_keys.insert((&edge.from, edge.direction)) {
+                return Err(LogicalMenuError::DuplicateNavigationEdge.into());
+            }
+        }
         Ok(())
     }
 

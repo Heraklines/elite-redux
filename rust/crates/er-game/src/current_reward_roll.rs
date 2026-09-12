@@ -52,7 +52,8 @@ pub(crate) trait SourcePool {
         index: usize,
         budget: &mut usize,
     ) -> Result<Option<Offer>, RollError>;
-    /// Actual mega-stone appearance gate, neutral true for other classes.
+    /// Every FormChangeItemModifierType calls the actual appearance gate, even
+    /// non-mega form items. Other modifier classes return neutral true.
     fn appearance_gate(&mut self, offer: &Offer, budget: &mut usize) -> Result<bool, RollError>;
 }
 
@@ -164,12 +165,12 @@ fn next(
             .find(|row| value < row.0)
             .ok_or(RollError::Invalid)?
             .1;
-        if let Some(mut offer) = pool.generate(resolved, index, budget)? {
-            if pool.appearance_gate(&offer, budget)? {
-                offer.tier = resolved;
-                offer.upgrade_count = upgrades.ok_or(RollError::Invalid)?;
-                return Ok(offer);
-            }
+        if let Some(mut offer) = pool.generate(resolved, index, budget)?
+            && pool.appearance_gate(&offer, budget)?
+        {
+            offer.tier = resolved;
+            offer.upgrade_count = upgrades.ok_or(RollError::Invalid)?;
+            return Ok(offer);
         }
         retries = retries.checked_add(1).ok_or(RollError::Budget)?;
     }

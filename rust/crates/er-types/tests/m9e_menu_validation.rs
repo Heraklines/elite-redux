@@ -145,3 +145,22 @@ fn visible_membership_does_not_hide_duplicate_navigation_keys() {
         ))
     );
 }
+
+#[test]
+fn borrowed_projection_keeps_logical_identity_error_precedence() {
+    let mut value = menu();
+    value.options.push(option("b", true, true));
+    value.navigation.push(value.navigation[0].clone());
+    value.instance_id = MenuInstanceId::new(SafeU53::ZERO);
+    value.control_id.clear();
+    assert_eq!(value.validate(), Err(GameMenuError::Logical(LogicalMenuError::ZeroInstanceId)));
+    value.instance_id = MenuInstanceId::new(SafeU53::new(1).expect("nonzero instance"));
+    assert_eq!(value.validate(), Err(GameMenuError::Logical(LogicalMenuError::EmptyControlId)));
+    value.control_id = "test/menu".to_owned();
+    assert_eq!(value.validate(), Err(GameMenuError::Logical(LogicalMenuError::DuplicateOption)));
+    value.options.pop();
+    assert_eq!(value.validate(), Err(GameMenuError::Logical(LogicalMenuError::DuplicateNavigationEdge)));
+    value.navigation.pop();
+    assert_eq!(value.validate(), Ok(()));
+    value.logical_menu().expect("same accepted canonical projection");
+}

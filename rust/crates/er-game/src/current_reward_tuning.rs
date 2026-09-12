@@ -212,11 +212,11 @@ pub(crate) fn apply<T>(pools: &mut [Vec<Row<T>>; 5]) -> Result<(), RollError> {
         if let Some(weight) = tuning.weight {
             pools[current_tier][index].weight = Weight::Fixed(weight);
         }
-        if let Some(target) = tuning.tier {
-            if target != current_tier {
-                let row = pools[current_tier].remove(index);
-                pools[target].push(row);
-            }
+        if let Some(target) = tuning.tier
+            && target != current_tier
+        {
+            let row = pools[current_tier].remove(index);
+            pools[target].push(row);
         }
     }
     Ok(())
