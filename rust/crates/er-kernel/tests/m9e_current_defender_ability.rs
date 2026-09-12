@@ -1009,8 +1009,11 @@ fn actual_innate_absorb_uses_admitted_slot_and_shared_immutable_query() -> Resul
     // explicit history marker must not turn its absent XP owner into authority.
     let mut forged_complete = proof.transition().after_state.clone();
     assert!(forged_complete.current_turn_execution.is_some());
-    forged_complete.current_achievement_tracker.as_mut()
-        .ok_or("mechanical tracker absent")?.history =
+    forged_complete
+        .current_achievement_tracker
+        .as_mut()
+        .ok_or("mechanical tracker absent")?
+        .history =
         er_state::current_achievement_tracker::CurrentAchievementHistoryV1::FreshComplete;
     assert!(forged_complete.validate_with(content.as_ref()).is_err());
     assert!(matches!(

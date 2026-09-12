@@ -2,113 +2,217 @@
 //! SHA6a7b0011527ef729bb366918b980aa56668bc9de0517cfe6dc727a73eeb3dc24.
 //! These are scoped algorithm parity witnesses, not a complete reward owner.
 #[allow(dead_code)]
-#[path = "../src/current_reward_roll.rs"]
-mod current_reward_roll;
-#[allow(dead_code)]
 #[path = "../src/current_reward_common.rs"]
 mod current_reward_common;
 #[allow(dead_code)]
 #[path = "../src/current_reward_generators.rs"]
 mod current_reward_generators;
 #[allow(dead_code)]
+#[path = "../src/current_reward_great.rs"]
+mod current_reward_great;
+#[allow(dead_code)]
+#[path = "../src/current_reward_high.rs"]
+mod current_reward_high;
+#[allow(dead_code)]
 #[path = "../src/current_reward_pool.rs"]
 mod current_reward_pool;
+#[allow(dead_code)]
+#[path = "../src/current_reward_roll.rs"]
+mod current_reward_roll;
 #[allow(dead_code)]
 #[path = "../src/current_reward_tuning.rs"]
 mod current_reward_tuning;
 #[allow(dead_code)]
-#[path = "../src/current_reward_great.rs"]
-mod current_reward_great;
-#[allow(dead_code)]
 #[path = "../src/current_reward_ultra.rs"]
 mod current_reward_ultra;
-#[allow(dead_code)]
-#[path = "../src/current_reward_high.rs"]
-mod current_reward_high;
 use current_reward_roll::{Offer, PregenArgs, RollError, SourcePool};
 use er_rng::phaser::{PhaserRdg, PhaserRdgState};
 use er_types::SafeU53;
 
-struct OraclePool { rng: PhaserRdg, draws: Vec<(u32,u32,u32)> }
+struct OraclePool {
+    rng: PhaserRdg,
+    draws: Vec<(u32, u32, u32)>,
+}
 impl OraclePool {
     fn at(state: &str) -> Result<Self, RollError> {
-        let state=PhaserRdgState::from_state_string(state).map_err(|_| RollError::Invalid)?;
-        Ok(Self {rng:PhaserRdg::from_state(&state).map_err(|_| RollError::Invalid)?,draws:Vec::new()})
+        let state = PhaserRdgState::from_state_string(state).map_err(|_| RollError::Invalid)?;
+        Ok(Self {
+            rng: PhaserRdg::from_state(&state).map_err(|_| RollError::Invalid)?,
+            draws: Vec::new(),
+        })
     }
 }
 impl SourcePool for OraclePool {
-    fn has_tier(&self,tier:u16)->bool {tier<5}
-    fn party_luck(&self)->Result<u8,RollError>{Ok(0)}
-    fn draw(&mut self,range:u32,minimum:u32)->Result<u32,RollError>{
-        let lo=SafeU53::new(u64::from(minimum)).map_err(|_|RollError::Invalid)?;
-        let hi=SafeU53::new(u64::from(minimum)+u64::from(range)-1).map_err(|_|RollError::Invalid)?;
-        let value=self.rng.integer_in_range(lo,hi).map_err(|_|RollError::Invalid)?.get() as u32;
-        self.draws.push((minimum,minimum+range-1,value));Ok(value)
+    fn has_tier(&self, tier: u16) -> bool {
+        tier < 5
     }
-    fn thresholds(&self,tier:u16)->Result<Vec<(u32,usize)>,RollError>{
-        if tier!=0{return Err(RollError::UnresolvedSource);}
+    fn party_luck(&self) -> Result<u8, RollError> {
+        Ok(0)
+    }
+    fn draw(&mut self, range: u32, minimum: u32) -> Result<u32, RollError> {
+        let lo = SafeU53::new(u64::from(minimum)).map_err(|_| RollError::Invalid)?;
+        let hi = SafeU53::new(u64::from(minimum) + u64::from(range) - 1)
+            .map_err(|_| RollError::Invalid)?;
+        let value = self
+            .rng
+            .integer_in_range(lo, hi)
+            .map_err(|_| RollError::Invalid)?
+            .get() as u32;
+        self.draws.push((minimum, minimum + range - 1, value));
+        Ok(value)
+    }
+    fn thresholds(&self, tier: u16) -> Result<Vec<(u32, usize)>, RollError> {
+        if tier != 0 {
+            return Err(RollError::UnresolvedSource);
+        }
         // Actual common predicates for healthy initialized Bulbasaur, no usedPP,
         // Map only, ordinary Classic wave1, below the Pokeball cap.
-        let context=current_reward_common::Context {
-            party:vec![current_reward_common::PartyMember{hp:20,max_hp:20,fainted:false,has_leppa:false,moves:vec![]}],
-            classic:true,coop:false,forced_doubles:false,forced_triples:false,wave:1,
-            pokeballs:5,maximum_pokeballs:99,lures:vec![],
+        let context = current_reward_common::Context {
+            party: vec![current_reward_common::PartyMember {
+                hp: 20,
+                max_hp: 20,
+                fainted: false,
+                has_leppa: false,
+                moves: vec![],
+            }],
+            classic: true,
+            coop: false,
+            forced_doubles: false,
+            forced_triples: false,
+            wave: 1,
+            pokeballs: 5,
+            maximum_pokeballs: 99,
+            lures: vec![],
         };
-        let mut sum=0;
-        Ok(current_reward_common::weights(&context)?.into_iter().enumerate().filter_map(|(index,weight)|{
-            if weight==0{None}else{sum+=weight;Some((sum,index))}
-        }).collect())
+        let mut sum = 0;
+        Ok(current_reward_common::weights(&context)?
+            .into_iter()
+            .enumerate()
+            .filter_map(|(index, weight)| {
+                if weight == 0 {
+                    None
+                } else {
+                    sum += weight;
+                    Some((sum, index))
+                }
+            })
+            .collect())
     }
-    fn generate(&mut self,_tier:u16,index:usize,_budget:&mut usize)->Result<Option<Offer>,RollError>{
-        let (id,name,group)=match index {
-            0=>("POKEBALL","Poké Ball",None),1=>("RARE_CANDY","Rare Candy",None),
-            2=>("POTION","Potion",None),3=>("SUPER_POTION","Super Potion",None),
-            4=>("ETHER","Ether",None),5=>("MAX_ETHER","Max Ether",None),
-            6=>("LURE","Lure",Some("lure")),9=>("TM_CASE","TM Case",None),
-            _=>return Err(RollError::UnresolvedSource),
+    fn generate(
+        &mut self,
+        _tier: u16,
+        index: usize,
+        _budget: &mut usize,
+    ) -> Result<Option<Offer>, RollError> {
+        let (id, name, group) = match index {
+            0 => ("POKEBALL", "Poké Ball", None),
+            1 => ("RARE_CANDY", "Rare Candy", None),
+            2 => ("POTION", "Potion", None),
+            3 => ("SUPER_POTION", "Super Potion", None),
+            4 => ("ETHER", "Ether", None),
+            5 => ("MAX_ETHER", "Max Ether", None),
+            6 => ("LURE", "Lure", Some("lure")),
+            9 => ("TM_CASE", "TM Case", None),
+            _ => return Err(RollError::UnresolvedSource),
         };
-        Ok(Some(Offer{id:id.into(),name:name.into(),group:group.map(str::to_owned),tier:0,upgrade_count:0,pregen_args:None}))
+        Ok(Some(Offer {
+            id: id.into(),
+            name: name.into(),
+            group: group.map(str::to_owned),
+            tier: 0,
+            upgrade_count: 0,
+            pregen_args: None,
+        }))
     }
-    fn appearance_gate(&mut self,_offer:&Offer,_budget:&mut usize)->Result<bool,RollError>{Ok(true)}
+    fn appearance_gate(&mut self, _offer: &Offer, _budget: &mut usize) -> Result<bool, RollError> {
+        Ok(true)
+    }
 }
 
 #[test]
-fn qualified_initial_regeneration_stream_matches_actual_source()->Result<(),RollError>{
-    let mut pool=OraclePool::at("!rnd,1,0.7569267088547349,0.8554245429113507,0.5650219917297363")?;
-    let mut budget=4096;
-    assert_eq!(current_reward_generators::simple("TEMP_STAT_STAGE_BOOSTER",&mut pool,&mut budget)?,PregenArgs::TemporaryStat{stat:3});
-    assert_eq!(current_reward_generators::simple("BERRY",&mut pool,&mut budget)?,PregenArgs::Berry{kind:0});
-    assert_eq!(current_reward_generators::simple("BASE_STAT_BOOSTER",&mut pool,&mut budget)?,PregenArgs::BaseStat{stat:5});
-    assert_eq!(current_reward_generators::simple("MINT",&mut pool,&mut budget)?,PregenArgs::Mint{nature:22});
-    assert_eq!(current_reward_generators::attack_type(&[vec![11]],&mut pool,&mut budget)?,Some(PregenArgs::AttackType{kind:11}));
-    assert_eq!(pool.draws,vec![(1,6,3),(0,11,0),(0,5,5),(0,24,22)]);
-    assert_eq!(pool.rng.state().state_string,"!rnd,2058891,0.23871867964044213,0.8970677766483277,0.6264764200896025");
+fn qualified_initial_regeneration_stream_matches_actual_source() -> Result<(), RollError> {
+    let mut pool =
+        OraclePool::at("!rnd,1,0.7569267088547349,0.8554245429113507,0.5650219917297363")?;
+    let mut budget = 4096;
+    assert_eq!(
+        current_reward_generators::simple("TEMP_STAT_STAGE_BOOSTER", &mut pool, &mut budget)?,
+        PregenArgs::TemporaryStat { stat: 3 }
+    );
+    assert_eq!(
+        current_reward_generators::simple("BERRY", &mut pool, &mut budget)?,
+        PregenArgs::Berry { kind: 0 }
+    );
+    assert_eq!(
+        current_reward_generators::simple("BASE_STAT_BOOSTER", &mut pool, &mut budget)?,
+        PregenArgs::BaseStat { stat: 5 }
+    );
+    assert_eq!(
+        current_reward_generators::simple("MINT", &mut pool, &mut budget)?,
+        PregenArgs::Mint { nature: 22 }
+    );
+    assert_eq!(
+        current_reward_generators::attack_type(&[vec![11]], &mut pool, &mut budget)?,
+        Some(PregenArgs::AttackType { kind: 11 })
+    );
+    assert_eq!(
+        pool.draws,
+        vec![(1, 6, 3), (0, 11, 0), (0, 5, 5), (0, 24, 22)]
+    );
+    assert_eq!(
+        pool.rng.state().state_string,
+        "!rnd,2058891,0.23871867964044213,0.8970677766483277,0.6264764200896025"
+    );
     Ok(())
 }
 
 #[test]
-fn qualified_common_roll_stream_matches_actual_source()->Result<(),RollError>{
-    let mut pool=OraclePool::at("!rnd,2058891,0.23871867964044213,0.8970677766483277,0.6264764200896025")?;
-    let offers=current_reward_roll::three_options(&mut pool)?;
-    assert_eq!(offers.iter().map(|offer|offer.id.as_str()).collect::<Vec<_>>(),vec!["TM_CASE","LURE","RARE_CANDY"]);
-    assert!(offers.iter().all(|offer|offer.tier==0&&offer.upgrade_count==0&&offer.pregen_args.is_none()));
-    assert_eq!(pool.draws.len(),11);
-    assert_eq!(pool.rng.state().state_string,"!rnd,337008,0.9894045835826546,0.36157823260873556,0.12534510577097535");
+fn qualified_common_roll_stream_matches_actual_source() -> Result<(), RollError> {
+    let mut pool =
+        OraclePool::at("!rnd,2058891,0.23871867964044213,0.8970677766483277,0.6264764200896025")?;
+    let offers = current_reward_roll::three_options(&mut pool)?;
+    assert_eq!(
+        offers
+            .iter()
+            .map(|offer| offer.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["TM_CASE", "LURE", "RARE_CANDY"]
+    );
+    assert!(
+        offers.iter().all(|offer| offer.tier == 0
+            && offer.upgrade_count == 0
+            && offer.pregen_args.is_none())
+    );
+    assert_eq!(pool.draws.len(), 11);
+    assert_eq!(
+        pool.rng.state().state_string,
+        "!rnd,337008,0.9894045835826546,0.36157823260873556,0.12534510577097535"
+    );
     Ok(())
 }
 
 #[test]
-fn qualified_complete_tuned_pool_metadata_matches_actual_source()->Result<(),RollError>{
-    let mut pools=current_reward_pool::base();
-    assert_eq!(pools.iter().map(Vec::len).sum::<usize>(),129);
+fn qualified_complete_tuned_pool_metadata_matches_actual_source() -> Result<(), RollError> {
+    let mut pools = current_reward_pool::base();
+    assert_eq!(pools.iter().map(Vec::len).sum::<usize>(), 129);
     current_reward_tuning::apply(&mut pools)?;
-    let actual=pools.iter().enumerate().flat_map(|(tier,rows)|rows.iter().enumerate().map(move |(index,row)|{
-        match row.weight {
-            current_reward_tuning::Weight::Fixed(value)=>(tier,index,row.id,false,Some(value)),
-            current_reward_tuning::Weight::SourcePredicate(id)=>{assert_eq!(id,row.id);(tier,index,row.id,true,None)},
-        }
-    })).collect::<Vec<_>>();
-    let expected=vec![
+    let actual = pools
+        .iter()
+        .enumerate()
+        .flat_map(|(tier, rows)| {
+            rows.iter()
+                .enumerate()
+                .map(move |(index, row)| match row.weight {
+                    current_reward_tuning::Weight::Fixed(value) => {
+                        (tier, index, row.id, false, Some(value))
+                    }
+                    current_reward_tuning::Weight::SourcePredicate(id) => {
+                        assert_eq!(id, row.id);
+                        (tier, index, row.id, true, None)
+                    }
+                })
+        })
+        .collect::<Vec<_>>();
+    let expected = vec![
         (0, 0, "POKEBALL", true, None),
         (0, 1, "RARE_CANDY", false, Some(2)),
         (0, 2, "POTION", true, None),
@@ -238,6 +342,6 @@ fn qualified_complete_tuned_pool_metadata_matches_actual_source()->Result<(),Rol
         (4, 5, "MINI_BLACK_HOLE", true, None),
         (4, 6, "ER_GREATER_ABILITY_RANDOMIZER", false, Some(2)),
     ];
-    assert_eq!(actual,expected);
+    assert_eq!(actual, expected);
     Ok(())
 }

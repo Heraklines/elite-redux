@@ -58,8 +58,15 @@ pub(super) fn execute(
             }
             continue;
         }
-        let absorb = pre_hit_absorb(input.targeting, run, input.actor, target, input.definition, true)
-            .map_err(|_| BattleV5Error::UnsupportedContent)?;
+        let absorb = pre_hit_absorb(
+            input.targeting,
+            run,
+            input.actor,
+            target,
+            input.definition,
+            true,
+        )
+        .map_err(|_| BattleV5Error::UnsupportedContent)?;
         if let Some(plan) = absorb {
             let result = if plan.suppress_no_effect_message() {
                 CurrentHitCheckV1::NoEffectNoMessage

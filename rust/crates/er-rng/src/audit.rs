@@ -34,8 +34,7 @@ const M5_STATUS_DURATION_ID: &str =
     "328824692f95b1aa1b38af85b54a6b72d9259eb4:rust/mechanics:status-duration";
 const M5_VOLATILE_DURATION_ID: &str =
     "328824692f95b1aa1b38af85b54a6b72d9259eb4:rust/mechanics:volatile-duration";
-const CURRENT_MOVE_TARGET_ID: &str =
-    "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7:src/data/moves/move-utils.ts:getMoveTargets:RANDOM_NEAR_ENEMY";
+const CURRENT_MOVE_TARGET_ID: &str = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7:src/data/moves/move-utils.ts:getMoveTargets:RANDOM_NEAR_ENEMY";
 const M5_RANDOM_TARGET_ID: &str =
     "328824692f95b1aa1b38af85b54a6b72d9259eb4:rust/mechanics:random-target";
 const M5_RANDOM_MOVE_ID: &str =

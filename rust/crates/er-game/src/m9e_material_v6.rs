@@ -455,7 +455,8 @@ impl<'a> ValidatedAppliedLedger<'a> {
         live: &mut Option<GameStateV6>,
         content: &PreparedGameContentV2,
         bytes: &[u8],
-    ) -> Result<(GameMaterialApplyOutcomeV6, AppliedGameMaterialLedgerV1), GameMaterialV6Error> {
+    ) -> Result<(GameMaterialApplyOutcomeV6, AppliedGameMaterialLedgerV1), GameMaterialV6Error>
+    {
         let mut ledger = self.ledger.clone();
         let outcome = apply_to_validated_ledger(live, &mut ledger, content, bytes, self.retention)?;
         Ok((outcome, ledger))

@@ -317,12 +317,16 @@ impl LogicalMenu {
     }
 
     pub fn contains_option(&self, option_id: &MenuOptionId) -> bool {
-        self.option(option_id.clone()).is_some()
+        self.options
+            .binary_search_by(|option| option.option_id.cmp(option_id))
+            .is_ok()
     }
 
     pub fn is_enabled(&self, option_id: &MenuOptionId) -> bool {
-        self.option(option_id.clone())
-            .is_some_and(|option| option.enabled)
+        self.options
+            .binary_search_by(|option| option.option_id.cmp(option_id))
+            .ok()
+            .is_some_and(|index| self.options[index].enabled)
     }
 }
 

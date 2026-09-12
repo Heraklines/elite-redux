@@ -2,7 +2,10 @@
 //! Input flags must come from owned source state; absence is not false.
 use super::current_reward_roll::RollError;
 
-pub(crate) struct MovePp { pub total: u32, pub used: u32 }
+pub(crate) struct MovePp {
+    pub total: u32,
+    pub used: u32,
+}
 pub(crate) struct PartyMember {
     pub hp: u32,
     pub max_hp: u32,
@@ -10,7 +13,10 @@ pub(crate) struct PartyMember {
     pub has_leppa: bool,
     pub moves: Vec<MovePp>,
 }
-pub(crate) struct Lure { pub max_battles: u32, pub battles_left: u32 }
+pub(crate) struct Lure {
+    pub max_battles: u32,
+    pub battles_left: u32,
+}
 pub(crate) struct Context {
     pub party: Vec<PartyMember>,
     pub classic: bool,
@@ -24,8 +30,16 @@ pub(crate) struct Context {
 }
 
 pub(crate) const IDS: [&str; 10] = [
-    "POKEBALL", "RARE_CANDY", "POTION", "SUPER_POTION", "ETHER", "MAX_ETHER",
-    "LURE", "TEMP_STAT_STAGE_BOOSTER", "BERRY", "TM_CASE",
+    "POKEBALL",
+    "RARE_CANDY",
+    "POTION",
+    "SUPER_POTION",
+    "ETHER",
+    "MAX_ETHER",
+    "LURE",
+    "TEMP_STAT_STAGE_BOOSTER",
+    "BERRY",
+    "TM_CASE",
 ];
 
 pub(crate) fn weights(context: &Context) -> Result<[u32; 10], RollError> {
@@ -43,24 +57,51 @@ pub(crate) fn weights(context: &Context) -> Result<[u32; 10], RollError> {
         // Source uses IEEE-754 division; preserve that evaluation rather than
         // replacing it with a threshold formula with different rounding.
         let ratio = f64::from(member.hp) / f64::from(member.max_hp);
-        if inverse >= 10 && ratio <= 0.875 && !member.fainted { potion += 1; }
-        if inverse >= 25 && ratio <= 0.75 && !member.fainted { super_potion += 1; }
+        if inverse >= 10 && ratio <= 0.875 && !member.fainted {
+            potion += 1;
+        }
+        if inverse >= 25 && ratio <= 0.75 && !member.fainted {
+            super_potion += 1;
+        }
         let mut needy = false;
         for movement in &member.moves {
-            if movement.used > movement.total { return Err(RollError::Invalid); }
-            if movement.used > 0 && movement.total - movement.used <= 5 && movement.used > movement.total / 2 {
+            if movement.used > movement.total {
+                return Err(RollError::Invalid);
+            }
+            if movement.used > 0
+                && movement.total - movement.used <= 5
+                && movement.used > movement.total / 2
+            {
                 needy = true;
             }
         }
-        if member.hp != 0 && !member.has_leppa && needy { ether += 1; }
+        if member.hp != 0 && !member.has_leppa && needy {
+            ether += 1;
+        }
     }
-    let lure_blocked = context.coop || context.forced_doubles || context.forced_triples
+    let lure_blocked = context.coop
+        || context.forced_doubles
+        || context.forced_triples
         || (context.classic && context.wave == 199)
-        || context.lures.iter().any(|lure| lure.max_battles == 10 && f64::from(lure.battles_left) >= f64::from(lure.max_battles) * 0.6);
+        || context.lures.iter().any(|lure| {
+            lure.max_battles == 10
+                && f64::from(lure.battles_left) >= f64::from(lure.max_battles) * 0.6
+        });
     Ok([
-        if context.classic && context.pokeballs >= context.maximum_pokeballs { 0 } else { 6 },
-        2, potion.min(3) * 3, super_potion.min(3), ether.min(3) * 3, ether.min(3),
-        if lure_blocked { 0 } else { 2 }, 4, 2, 2,
+        if context.classic && context.pokeballs >= context.maximum_pokeballs {
+            0
+        } else {
+            6
+        },
+        2,
+        potion.min(3) * 3,
+        super_potion.min(3),
+        ether.min(3) * 3,
+        ether.min(3),
+        if lure_blocked { 0 } else { 2 },
+        4,
+        2,
+        2,
     ])
 }
 
@@ -78,8 +119,15 @@ pub(crate) fn generate_argument(
         }),
         "BERRY" => {
             let first = bounded_draw(pool, 12, budget)?;
-            let kind = if first < 2 { 0 } else if first < 4 { 1 } else if first < 6 { 10 }
-                else { (bounded_draw(pool, 8, budget)? + 2) as u8 };
+            let kind = if first < 2 {
+                0
+            } else if first < 4 {
+                1
+            } else if first < 6 {
+                10
+            } else {
+                (bounded_draw(pool, 8, budget)? + 2) as u8
+            };
             Ok(PregenArgs::Berry { kind })
         }
         _ => Err(RollError::UnresolvedSource),

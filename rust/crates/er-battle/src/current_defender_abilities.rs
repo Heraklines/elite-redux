@@ -56,7 +56,8 @@ pub(crate) fn pre_hit_absorb(
     retained_command: bool,
 ) -> Result<Option<AbsorbPlan>, CurrentDefenderAbilityError> {
     if retained_command && definition.id.get().get() == 165 {
-        owner.validate_resolved_random_hit(run, attacker.id, defender.id, definition)
+        owner
+            .validate_resolved_random_hit(run, attacker.id, defender.id, definition)
             .map_err(|_| CurrentDefenderAbilityError)?;
         // Actual TypelessAttr bypasses type immunity. The retained command has
         // already consumed and retained its random target; never draw here.

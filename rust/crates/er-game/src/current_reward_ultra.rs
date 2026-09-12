@@ -90,66 +90,218 @@ pub(crate) const IDS: [&str; 53] = [
 pub(crate) fn weight(id: &str, context: &Context<'_>) -> Result<u32, RollError> {
     common::weights(context.common)?;
     let base = context.common;
-    if context.party.len() != base.party.len() { return Err(RollError::Invalid); }
+    if context.party.len() != base.party.len() {
+        return Err(RollError::Invalid);
+    }
     let late = base.classic && base.wave >= 199;
-    let value = match id {
-        "PP_MAX" => 3,
-        "MINT" => 4,
-        "RARE_SPECIES_STAT_BOOSTER" => 12,
-        "REVIVER_SEED" => 4,
-        "ATTACK_TYPE_BOOSTER" => 9,
-        "RARER_CANDY" => 4,
-        "QUICK_CLAW" => 3,
-        "WIDE_LENS" => 7,
-        "ER_CHILI_SAMPLE" => 4,
-        "ER_COPPER_ROD" => 4,
-        "ER_RUSTY_CLAW" => 4,
-        "ER_SPIKED_KNUCKLES" => 4,
-        "ER_LOADED_DICE" => 4,
-        "ER_LUCKY_HEART" => 4,
-        "ER_DEX_NAV" => 6,
-        "ER_POWER_HERB" => 4,
-        "ER_LEARNERS_SHROOM" => 4,
-        "ER_GREATER_ABILITY_CAPSULE" => 2,
-        "MOVE_RANDOMIZER" => 4,
-        "ER_EXPERT_BELT" => 3,
-        "ER_AIR_BALLOON" => 4,
-        "ER_SAFETY_GOGGLES" => 3,
-        "ER_CLEAR_AMULET" => 2,
-        "ER_ABILITY_SHIELD" => 2,
-        "ER_PUNCHING_GLOVE" => 3,
-        "ER_ZOOM_LENS" => 3,
-        "ER_IRON_BALL" => 2,
-        "ULTRA_BALL" => if base.classic && context.ultra_balls >= base.maximum_pokeballs { 0 } else { 15 },
-        "MAX_LURE" => if base.coop || base.forced_doubles || base.forced_triples || (base.classic && base.wave == 199)
-            || base.lures.iter().any(|lure| lure.max_battles == 30 && f64::from(lure.battles_left) >= f64::from(lure.max_battles) * 0.6) { 0 } else { 4 },
-        "BIG_NUGGET" => if late { 0 } else { 12 },
-        "AMULET_COIN" => if late { 0 } else { 3 },
-        "CANDY_JAR" => if late { 0 } else { 5 },
-        "GOLDEN_PUNCH" => if late { 0 } else { 2 },
-        "IV_SCANNER" => if late { 0 } else { 4 },
-        "EXP_CHARM" => if late { 0 } else { 8 },
-        "EXP_SHARE" => if late { 0 } else { 10 },
-        "RARE_EVOLUTION_ITEM" => (base.wave.div_ceil(15) * 4).min(32),
-        "FORM_CHANGE_ITEM" => if context.fun && context.fun_mega { (12 + (base.wave / 10) * 4).min(36) }
-            else { base.wave.div_ceil(50).min(4) * 6 },
-        "EVIOLITE" => if (context.daily || (!context.fresh_start_challenge && context.eviolite_unlocked))
-            && context.party.iter().any(|member| !member.gmax && member.species_or_fusion_can_evolve && !member.held_eviolite) { 10 } else { 0 },
-        "LEEK" => if context.party.iter().any(|member| !member.held_species_crit_booster && member.leek_species_or_fusion) { 12 } else { 0 },
-        "TOXIC_ORB" => if context.party.iter().any(|member| !member.held_orb && member.can_toxic
-            && (member.poison_specific_ability || (member.orb_general_ability && !member.flare_specific_ability) || member.status_moves)) { 10 } else { 0 },
-        "FLAME_ORB" => if context.party.iter().any(|member| !member.held_orb && member.can_burn
-            && (member.flare_specific_ability || (member.orb_general_ability && !member.poison_specific_ability) || member.status_moves)) { 10 } else { 0 },
-        "FROSTBITE_ORB" => if context.party.iter().any(|member| !member.held_orb && !member.ice_type
-            && (member.orb_general_ability || member.status_moves)) { 10 } else { 0 },
-        "MYSTICAL_ROCK" => if context.party.iter().any(|member| !member.mystical_rock_at_max
-            && (member.weather_terrain_ability || member.weather_terrain_move)) { 10 } else { 0 },
-        "TERA_ORB" => if base.classic { 0 } else { ((base.wave / 50) * 2).clamp(1, 4) },
-        "ER_HEAVY_DUTY_BOOTS" | "ER_MUSCLE_BAND" | "ER_WISE_GLASSES" | "ER_FLOAT_STONE" | "ER_UTILITY_UMBRELLA" =>
-            if context.held_ids.contains(id) { 0 } else { 3 },
-        "ER_COVERT_CLOAK" | "ER_SMOKE_BALL" => if context.held_ids.contains(id) { 0 } else { 2 },
-        "ER_THROAT_SPRAY" => if context.party.iter().any(|member| member.sound_move) { 3 } else { 0 },
-        _ => return Err(RollError::UnresolvedSource),
-    };
+    let value =
+        match id {
+            "PP_MAX" => 3,
+            "MINT" => 4,
+            "RARE_SPECIES_STAT_BOOSTER" => 12,
+            "REVIVER_SEED" => 4,
+            "ATTACK_TYPE_BOOSTER" => 9,
+            "RARER_CANDY" => 4,
+            "QUICK_CLAW" => 3,
+            "WIDE_LENS" => 7,
+            "ER_CHILI_SAMPLE" => 4,
+            "ER_COPPER_ROD" => 4,
+            "ER_RUSTY_CLAW" => 4,
+            "ER_SPIKED_KNUCKLES" => 4,
+            "ER_LOADED_DICE" => 4,
+            "ER_LUCKY_HEART" => 4,
+            "ER_DEX_NAV" => 6,
+            "ER_POWER_HERB" => 4,
+            "ER_LEARNERS_SHROOM" => 4,
+            "ER_GREATER_ABILITY_CAPSULE" => 2,
+            "MOVE_RANDOMIZER" => 4,
+            "ER_EXPERT_BELT" => 3,
+            "ER_AIR_BALLOON" => 4,
+            "ER_SAFETY_GOGGLES" => 3,
+            "ER_CLEAR_AMULET" => 2,
+            "ER_ABILITY_SHIELD" => 2,
+            "ER_PUNCHING_GLOVE" => 3,
+            "ER_ZOOM_LENS" => 3,
+            "ER_IRON_BALL" => 2,
+            "ULTRA_BALL" => {
+                if base.classic && context.ultra_balls >= base.maximum_pokeballs {
+                    0
+                } else {
+                    15
+                }
+            }
+            "MAX_LURE" => {
+                if base.coop
+                    || base.forced_doubles
+                    || base.forced_triples
+                    || (base.classic && base.wave == 199)
+                    || base.lures.iter().any(|lure| {
+                        lure.max_battles == 30
+                            && f64::from(lure.battles_left) >= f64::from(lure.max_battles) * 0.6
+                    })
+                {
+                    0
+                } else {
+                    4
+                }
+            }
+            "BIG_NUGGET" => {
+                if late {
+                    0
+                } else {
+                    12
+                }
+            }
+            "AMULET_COIN" => {
+                if late {
+                    0
+                } else {
+                    3
+                }
+            }
+            "CANDY_JAR" => {
+                if late {
+                    0
+                } else {
+                    5
+                }
+            }
+            "GOLDEN_PUNCH" => {
+                if late {
+                    0
+                } else {
+                    2
+                }
+            }
+            "IV_SCANNER" => {
+                if late {
+                    0
+                } else {
+                    4
+                }
+            }
+            "EXP_CHARM" => {
+                if late {
+                    0
+                } else {
+                    8
+                }
+            }
+            "EXP_SHARE" => {
+                if late {
+                    0
+                } else {
+                    10
+                }
+            }
+            "RARE_EVOLUTION_ITEM" => (base.wave.div_ceil(15) * 4).min(32),
+            "FORM_CHANGE_ITEM" => {
+                if context.fun && context.fun_mega {
+                    (12 + (base.wave / 10) * 4).min(36)
+                } else {
+                    base.wave.div_ceil(50).min(4) * 6
+                }
+            }
+            "EVIOLITE" => {
+                if (context.daily || (!context.fresh_start_challenge && context.eviolite_unlocked))
+                    && context.party.iter().any(|member| {
+                        !member.gmax && member.species_or_fusion_can_evolve && !member.held_eviolite
+                    })
+                {
+                    10
+                } else {
+                    0
+                }
+            }
+            "LEEK" => {
+                if context.party.iter().any(|member| {
+                    !member.held_species_crit_booster && member.leek_species_or_fusion
+                }) {
+                    12
+                } else {
+                    0
+                }
+            }
+            "TOXIC_ORB" => {
+                if context.party.iter().any(|member| {
+                    !member.held_orb
+                        && member.can_toxic
+                        && (member.poison_specific_ability
+                            || (member.orb_general_ability && !member.flare_specific_ability)
+                            || member.status_moves)
+                }) {
+                    10
+                } else {
+                    0
+                }
+            }
+            "FLAME_ORB" => {
+                if context.party.iter().any(|member| {
+                    !member.held_orb
+                        && member.can_burn
+                        && (member.flare_specific_ability
+                            || (member.orb_general_ability && !member.poison_specific_ability)
+                            || member.status_moves)
+                }) {
+                    10
+                } else {
+                    0
+                }
+            }
+            "FROSTBITE_ORB" => {
+                if context.party.iter().any(|member| {
+                    !member.held_orb
+                        && !member.ice_type
+                        && (member.orb_general_ability || member.status_moves)
+                }) {
+                    10
+                } else {
+                    0
+                }
+            }
+            "MYSTICAL_ROCK" => {
+                if context.party.iter().any(|member| {
+                    !member.mystical_rock_at_max
+                        && (member.weather_terrain_ability || member.weather_terrain_move)
+                }) {
+                    10
+                } else {
+                    0
+                }
+            }
+            "TERA_ORB" => {
+                if base.classic {
+                    0
+                } else {
+                    ((base.wave / 50) * 2).clamp(1, 4)
+                }
+            }
+            "ER_HEAVY_DUTY_BOOTS"
+            | "ER_MUSCLE_BAND"
+            | "ER_WISE_GLASSES"
+            | "ER_FLOAT_STONE"
+            | "ER_UTILITY_UMBRELLA" => {
+                if context.held_ids.contains(id) {
+                    0
+                } else {
+                    3
+                }
+            }
+            "ER_COVERT_CLOAK" | "ER_SMOKE_BALL" => {
+                if context.held_ids.contains(id) {
+                    0
+                } else {
+                    2
+                }
+            }
+            "ER_THROAT_SPRAY" => {
+                if context.party.iter().any(|member| member.sound_move) {
+                    3
+                } else {
+                    0
+                }
+            }
+            _ => return Err(RollError::UnresolvedSource),
+        };
     Ok(value)
 }

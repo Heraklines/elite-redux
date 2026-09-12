@@ -46,34 +46,61 @@ pub(crate) trait SourcePool {
     /// Actual type generator, preserving generated pregenArgs and display name.
     /// Every internal generator/gate draw must consume the same operation budget.
     /// None has the source generateType-null meaning and triggers a same-tier retry.
-    fn generate(&mut self, tier: u16, index: usize, budget: &mut usize) -> Result<Option<Offer>, RollError>;
+    fn generate(
+        &mut self,
+        tier: u16,
+        index: usize,
+        budget: &mut usize,
+    ) -> Result<Option<Offer>, RollError>;
     /// Actual mega-stone appearance gate, neutral true for other classes.
     fn appearance_gate(&mut self, offer: &Offer, budget: &mut usize) -> Result<bool, RollError>;
 }
 
-pub(super) fn bounded_draw(pool: &mut impl SourcePool, range: u32, budget: &mut usize) -> Result<u32, RollError> {
+pub(super) fn bounded_draw(
+    pool: &mut impl SourcePool,
+    range: u32,
+    budget: &mut usize,
+) -> Result<u32, RollError> {
     bounded_draw_from(pool, range, 0, budget)
 }
-pub(super) fn bounded_draw_from(pool: &mut impl SourcePool, range: u32, minimum: u32, budget: &mut usize) -> Result<u32, RollError> {
-    if range == 0 { return Err(RollError::Invalid); }
+pub(super) fn bounded_draw_from(
+    pool: &mut impl SourcePool,
+    range: u32,
+    minimum: u32,
+    budget: &mut usize,
+) -> Result<u32, RollError> {
+    if range == 0 {
+        return Err(RollError::Invalid);
+    }
     let end = minimum.checked_add(range - 1).ok_or(RollError::Invalid)?;
     *budget = budget.checked_sub(1).ok_or(RollError::Budget)?;
     // Source randSeedInt(1,min) returns min without touching Phaser.RND.
-    if range == 1 { return Ok(minimum); }
+    if range == 1 {
+        return Ok(minimum);
+    }
     let value = pool.draw(range, minimum)?;
-    if value < minimum || value > end { return Err(RollError::Invalid); }
+    if value < minimum || value > end {
+        return Err(RollError::Invalid);
+    }
     Ok(value)
 }
 fn upgrade_odds(pool: &impl SourcePool) -> Result<u32, RollError> {
     let luck = u32::from(pool.party_luck()?);
-    if luck > 18 { return Err(RollError::Invalid); }
+    if luck > 18 {
+        return Err(RollError::Invalid);
+    }
     Ok((512 / (luck.min(14) + 5 + luck.saturating_sub(14) * 2)).max(1))
 }
 
 /// Port of getNewModifierTypeOption for ordinary PLAYER rewards with source
 /// luck upgrades enabled. Recursion is represented by the retry loop; every
 /// generated-null/gate-miss preserves tier, upgrade count and the same stream.
-fn next(pool: &mut impl SourcePool, mut tier: Option<u16>, mut upgrades: Option<u16>, budget: &mut usize) -> Result<Offer, RollError> {
+fn next(
+    pool: &mut impl SourcePool,
+    mut tier: Option<u16>,
+    mut upgrades: Option<u16>,
+    budget: &mut usize,
+) -> Result<Offer, RollError> {
     let mut retries = 0_u16;
     loop {
         if tier.is_none() {
@@ -85,8 +112,17 @@ fn next(pool: &mut impl SourcePool, mut tier: Option<u16>, mut upgrades: Option<
                     count = count.checked_add(1).ok_or(RollError::Budget)?;
                 }
             }
-            let base = if tier_value > 255 { 0 } else if tier_value > 60 { 1 }
-                else if tier_value > 12 { 2 } else if tier_value != 0 { 3 } else { 4 };
+            let base = if tier_value > 255 {
+                0
+            } else if tier_value > 60 {
+                1
+            } else if tier_value > 12 {
+                2
+            } else if tier_value != 0 {
+                3
+            } else {
+                4
+            };
             let mut resolved = base + count;
             while resolved > 0 && !pool.has_tier(resolved) {
                 resolved -= 1;
@@ -100,7 +136,9 @@ fn next(pool: &mut impl SourcePool, mut tier: Option<u16>, mut upgrades: Option<
             if resolved < 4 {
                 let odds = upgrade_odds(pool)?;
                 while pool.has_tier(resolved + count + 1) {
-                    if bounded_draw(pool, odds, budget)? >= 4 { break; }
+                    if bounded_draw(pool, odds, budget)? >= 4 {
+                        break;
+                    }
                     count = count.checked_add(1).ok_or(RollError::Budget)?;
                 }
             }
@@ -115,11 +153,17 @@ fn next(pool: &mut impl SourcePool, mut tier: Option<u16>, mut upgrades: Option<
         let total = thresholds.last().ok_or(RollError::UnresolvedSource)?.0;
         let mut previous = 0;
         for &(threshold, _) in &thresholds {
-            if threshold <= previous { return Err(RollError::Invalid); }
+            if threshold <= previous {
+                return Err(RollError::Invalid);
+            }
             previous = threshold;
         }
         let value = bounded_draw(pool, total, budget)?;
-        let index = thresholds.iter().find(|row| value < row.0).ok_or(RollError::Invalid)?.1;
+        let index = thresholds
+            .iter()
+            .find(|row| value < row.0)
+            .ok_or(RollError::Invalid)?
+            .1;
         if let Some(mut offer) = pool.generate(resolved, index, budget)? {
             if pool.appearance_gate(&offer, budget)? {
                 offer.tier = resolved;
@@ -132,7 +176,11 @@ fn next(pool: &mut impl SourcePool, mut tier: Option<u16>, mut upgrades: Option<
 }
 
 fn conflicts(left: &Offer, right: &Offer) -> bool {
-    left.name == right.name || left.group.as_ref().is_some_and(|group| right.group.as_ref() == Some(group))
+    left.name == right.name
+        || left
+            .group
+            .as_ref()
+            .is_some_and(|group| right.group.as_ref() == Some(group))
 }
 
 /// Ordinary three-slot source path, without challenges/custom overrides/Moody
@@ -146,14 +194,23 @@ pub(crate) fn three_options(pool: &mut impl SourcePool) -> Result<Vec<Offer>, Ro
         let mut retry = 0;
         while !options.is_empty() {
             retry += 1;
-            if retry >= 15 || !options.iter().any(|offer| conflicts(offer, &candidate)) { break; }
-            candidate = next(pool, Some(candidate.tier), Some(candidate.upgrade_count), &mut budget)?;
+            if retry >= 15 || !options.iter().any(|offer| conflicts(offer, &candidate)) {
+                break;
+            }
+            candidate = next(
+                pool,
+                Some(candidate.tier),
+                Some(candidate.upgrade_count),
+                &mut budget,
+            )?;
         }
         options.push(candidate);
     }
     let mut unique = Vec::new();
     for option in options {
-        if !unique.iter().any(|existing| conflicts(existing, &option)) { unique.push(option); }
+        if !unique.iter().any(|existing| conflicts(existing, &option)) {
+            unique.push(option);
+        }
     }
     Ok(unique)
 }

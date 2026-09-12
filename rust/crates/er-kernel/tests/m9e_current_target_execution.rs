@@ -736,7 +736,9 @@ fn commands(
         let pokemon =
             er_battle::current_target_execution::find_pokemon(run, actor).ok_or("actor absent")?;
         let (definition, struggle) = er_battle::m7_resolver::effective_move_definition_v5(
-            &prepared.battle, pokemon, MoveSlotIndex::new(0)?,
+            &prepared.battle,
+            pokemon,
+            MoveSlotIndex::new(0)?,
         )?;
         // Struggle's source random target is resolved by command admission;
         // the test cannot choose an opponent or consume a separate RNG draw.
@@ -744,9 +746,13 @@ fn commands(
             BattleTargetSelection::implicit()
         } else {
             let plan = CurrentTargetExecution::from_state(state)?.plan(run, actor, definition)?;
-            plan.selections()?.into_iter().find(|selection| {
-                plan.retain(selection).is_ok_and(|targets| targets.contains(&target))
-            }).ok_or("requested controlled target is not a canonical legal choice")?
+            plan.selections()?
+                .into_iter()
+                .find(|selection| {
+                    plan.retain(selection)
+                        .is_ok_and(|targets| targets.contains(&target))
+                })
+                .ok_or("requested controlled target is not a canonical legal choice")?
         };
         let command = BattleCommand::fight(actor, MoveSlotIndex::new(0)?, selection)?;
         if row.slot.side == BattleSide::Player {
@@ -1679,16 +1685,25 @@ fn exhausted_pp_knockout_retains_actual_struggle_preimage() -> Result<()> {
         &targeting,
         safe(37),
     )?;
-    let draws = begin.transition.rng_audit.iter()
+    let draws = begin
+        .transition
+        .rng_audit
+        .iter()
         .filter(|draw| draw.reason == er_rng::audit::RngReason::RandomTarget)
         .collect::<Vec<_>>();
     assert_eq!(draws.len(), 1);
     assert_eq!(draws[0].cardinality, safe(2));
     assert_eq!(draws[0].minimum, SafeU53::ZERO);
     assert!(draws[0].consumed);
-    assert_eq!(draws[0].callsite_id, er_rng::audit::RngCallsiteId::current_move_target());
+    assert_eq!(
+        draws[0].callsite_id,
+        er_rng::audit::RngCallsiteId::current_move_target()
+    );
     let selected = begin.continuation.actions.clone();
-    let selected_slot = selected[0].current_targets.as_ref().ok_or("random target absent")?[0];
+    let selected_slot = selected[0]
+        .current_targets
+        .as_ref()
+        .ok_or("random target absent")?[0];
     assert_eq!(selected_slot.side, BattleSide::Enemy);
     assert_eq!(u64::from(selected_slot.position), draws[0].result.get());
     let defeated = enemy_ids[usize::from(selected_slot.position)];
@@ -1732,7 +1747,13 @@ fn exhausted_pp_knockout_retains_actual_struggle_preimage() -> Result<()> {
             .pp_used,
         0
     );
-    assert!(chunk.transition.rng_audit.iter().all(|draw| draw.reason != er_rng::audit::RngReason::RandomTarget));
+    assert!(
+        chunk
+            .transition
+            .rng_audit
+            .iter()
+            .all(|draw| draw.reason != er_rng::audit::RngReason::RandomTarget)
+    );
     assert_eq!(chunk.continuation.actions, selected);
     assert_eq!(chunk.continuation.accepted_commands, accepted);
     assert_eq!(chunk.continuation.next_action, 1);
@@ -1813,21 +1834,35 @@ fn assert_single_opponent_struggle_rng(
     let battle = run.battle.as_mut().ok_or("battle absent")?;
     battle.enemy_party[1].hp = 0;
     battle.enemy_party[1].fainted = true;
-    battle.field.slots.iter_mut()
+    battle
+        .field
+        .slots
+        .iter_mut()
         .find(|row| row.slot == slot(BattleSide::Enemy, 1))
-        .ok_or("second opponent field absent")?.occupant = None;
-    let accepted = commands(&single, &[
-        slot(BattleSide::Enemy, 0), slot(BattleSide::Player, 0),
-    ], content)?;
+        .ok_or("second opponent field absent")?
+        .occupant = None;
+    let accepted = commands(
+        &single,
+        &[slot(BattleSide::Enemy, 0), slot(BattleSide::Player, 0)],
+        content,
+    )?;
     let targeting = CurrentTargetExecution::from_state(&single)?;
     let authority = TurnAuthorityContextV1 {
         authority_seat: seat(),
         revision: active_run(&single)?.control.revision,
     };
     let begin = er_battle::m7_resolver::begin_current_turn(
-        &project(&single), &accepted, &content.battle, &authority, &targeting, safe(37),
+        &project(&single),
+        &accepted,
+        &content.battle,
+        &authority,
+        &targeting,
+        safe(37),
     )?;
-    let draws = begin.transition.rng_audit.iter()
+    let draws = begin
+        .transition
+        .rng_audit
+        .iter()
         .filter(|draw| draw.reason == er_rng::audit::RngReason::RandomTarget)
         .collect::<Vec<_>>();
     assert_eq!(draws.len(), 1);
@@ -1837,8 +1872,10 @@ fn assert_single_opponent_struggle_rng(
     assert_eq!(draws[0].primitive_draw_count, 0);
     assert_eq!(draws[0].before_state, draws[0].after_state);
     assert_eq!(draws[0].before_fingerprint, draws[0].after_fingerprint);
-    assert_eq!(begin.continuation.actions[0].current_targets,
-        Some(vec![slot(BattleSide::Enemy, 0)]));
+    assert_eq!(
+        begin.continuation.actions[0].current_targets,
+        Some(vec![slot(BattleSide::Enemy, 0)])
+    );
     Ok(())
 }
 
@@ -1854,19 +1891,30 @@ fn assert_typeless_struggle_damage(
     let enemy = &mut run.battle.as_mut().ok_or("battle absent")?.enemy_party[0];
     enemy.types.primary = PokemonType::Normal;
     enemy.types.secondary = None;
-    let neutral = er_battle::m7_resolver::query_simulated_move_damage(
-        &content.battle, run, slot(BattleSide::Player, 0),
-        MoveSlotIndex::new(0)?, slot(BattleSide::Enemy, 0),
+    let neutral = er_battle::m7_resolver::query_simulated_move_damage_v5(
+        &content.battle,
+        run,
+        slot(BattleSide::Player, 0),
+        MoveSlotIndex::new(0)?,
+        slot(BattleSide::Enemy, 0),
     )?;
     assert!(neutral > 0);
     run.party[0].types.primary = PokemonType::Normal;
-    run.battle.as_mut().ok_or("battle absent")?.enemy_party[0].types.primary = PokemonType::Ghost;
+    run.battle.as_mut().ok_or("battle absent")?.enemy_party[0]
+        .types
+        .primary = PokemonType::Ghost;
     let before = canonical_bytes(run)?;
-    let typeless = er_battle::m7_resolver::query_simulated_move_damage(
-        &content.battle, run, slot(BattleSide::Player, 0),
-        MoveSlotIndex::new(0)?, slot(BattleSide::Enemy, 0),
+    let typeless = er_battle::m7_resolver::query_simulated_move_damage_v5(
+        &content.battle,
+        run,
+        slot(BattleSide::Player, 0),
+        MoveSlotIndex::new(0)?,
+        slot(BattleSide::Enemy, 0),
     )?;
-    assert_eq!(typeless, neutral, "Struggle neither gains Normal STAB nor meets Ghost immunity");
+    assert_eq!(
+        typeless, neutral,
+        "Struggle neither gains Normal STAB nor meets Ghost immunity"
+    );
     assert_eq!(canonical_bytes(run)?, before);
     Ok(())
 }

@@ -451,14 +451,15 @@ impl GameActionDispatcherV1 {
         context: GameActionDispatchContextV1,
         retention: AppliedMaterialRetentionV1,
     ) -> Result<PreparedGameTransitionProof, GameRuntimeV6Error> {
-        let validated_ledger = if matches!(retention, AppliedMaterialRetentionV1::BoundedSuffix { .. }) {
-            Some(
-                crate::m9e_material_v6::ValidatedAppliedLedger::new(ledger, retention)
-                    .map_err(material_error)?,
-            )
-        } else {
-            None
-        };
+        let validated_ledger =
+            if matches!(retention, AppliedMaterialRetentionV1::BoundedSuffix { .. }) {
+                Some(
+                    crate::m9e_material_v6::ValidatedAppliedLedger::new(ledger, retention)
+                        .map_err(material_error)?,
+                )
+            } else {
+                None
+            };
         action.validate().map_err(|_| GameRuntimeV6Error::Action)?;
         if !context.authority
             || context.action.operation_id.as_str().is_empty()

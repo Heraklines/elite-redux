@@ -80,12 +80,15 @@ pub(crate) fn fold_current_achievement_action(
                 .map_err(|_| failure())?;
             if matches!(definition.category, MoveCategory::Status)
                 || matches!(definition.power, MovePower::None)
+                // Pinned ER Growl is a damaging move with StatStageChangeAttr.
+                // Category alone cannot prove its queued stat child executed.
+                || move_id.get().get() == 45
             {
                 // The current resolver records status hit checks but does not
                 // execute the owned source effect/callback. A complete history
                 // cannot certify this as a successful no-op move.
                 return Err(GameRuntimeV6Error::Domain(
-                    "current status move requires owned source effect execution".to_owned(),
+                    "current move requires owned source status or stat effect execution".to_owned(),
                 ));
             }
             targeting

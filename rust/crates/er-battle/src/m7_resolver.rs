@@ -536,7 +536,8 @@ fn build_actions(
                 },
                 Some(owner),
             ) => {
-                let (definition, struggle) = effective_move_definition_v5(content, actor, *move_slot)?;
+                let (definition, struggle) =
+                    effective_move_definition_v5(content, actor, *move_slot)?;
                 if definition.id.get().get() == 165 && !struggle {
                     return Err(BattleV5Error::UnsupportedContent);
                 }
@@ -1222,9 +1223,11 @@ fn query_simulated_move_damage_inner(
         return Err(BattleV5Error::Target);
     }
     if let Some(owner) = targeting
-        && crate::current_defender_abilities::pre_hit_absorb(owner, run, actor, target, definition, false)
-            .map_err(|_| BattleV5Error::UnsupportedContent)?
-            .is_some()
+        && crate::current_defender_abilities::pre_hit_absorb(
+            owner, run, actor, target, definition, false,
+        )
+        .map_err(|_| BattleV5Error::UnsupportedContent)?
+        .is_some()
     {
         return Ok(0);
     }
