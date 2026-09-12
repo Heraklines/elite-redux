@@ -92,7 +92,7 @@ test("observe actual initialized reward selection",async()=>{
     }
     expect(catalog.length).toBeGreaterThan(0);expect(catalog.length).toBeLessThanOrEqual(1024);
     const predicateDraws=draws.splice(0);
-    const data={schema_version:1,source_sha:PIN,seed:SEED,
+    const data={schema_version:1,source_sha:PIN,setup_seed:SEED,
       scope:"actual initialized pool predicates and direct SelectModifierPhase generation methods; not a post-victory state or applied reward",
       context,catalog,predicate_draws:predicateDraws,option_count:count,free_picks:freePicks,
       rng:{seed:seedRng,regenerated:regeneratedRng,generated:generatedRng},

@@ -9,15 +9,15 @@ const data=JSON.parse(raws[0]);
 const integer=(n,min,max)=>assert(Number.isSafeInteger(n)&&n>=min&&n<=max);
 const shape=(v,k)=>assert.deepEqual(Object.keys(v).sort(),[...k].sort());
 function validate(d){
-  shape(d,['schema_version','source_sha','seed','scope','context','catalog','predicate_draws','option_count','free_picks','rng','regeneration_draws','count_draws','option_draws','options','identities']);
+  shape(d,['schema_version','source_sha','setup_seed','scope','context','catalog','predicate_draws','option_count','free_picks','rng','regeneration_draws','count_draws','option_draws','options','identities']);
   assert.equal(d.schema_version,1);assert.equal(d.source_sha,'399d5d368f0b5642ebf8f45bd8a5e73350fa4de7');
-  assert.equal(d.seed,'m9e-reward-selection-source-v1');
+  assert.equal(d.setup_seed,'m9e-reward-selection-source-v1');
   assert.equal(d.scope,'actual initialized pool predicates and direct SelectModifierPhase generation methods; not a post-victory state or applied reward');
   assert.equal(d.context.wave,1);assert.equal(d.context.party.length,1);assert.equal(d.context.party[0].species,1);
   shape(d.context.constructor,['seed','wave_seed','battle_seed','enemy_levels','tuning']);
   shape(d.context.constructor.tuning,['wave_slope','quad_divisor','boss_mult']);
   for(const value of Object.values(d.context.constructor.tuning))assert(Number.isFinite(value)&&value>0&&value<=1000000);
-  assert.equal(d.context.constructor.seed,d.seed);
+  assert.equal(d.context.constructor.seed,'test'); // Pinned test/utils/game-manager-utils.ts:36
   assert(typeof d.context.constructor.wave_seed==='string'&&d.context.constructor.wave_seed.length<=128);
   assert(typeof d.context.constructor.battle_seed==='string'&&d.context.constructor.battle_seed.length===16);
   assert(Array.isArray(d.context.constructor.enemy_levels)&&d.context.constructor.enemy_levels.length===1);
@@ -61,6 +61,6 @@ for(const change of mutations){const m=structuredClone(data);change(m);assert.th
 const summary={schema_version:1,status:'passed',source_sha:data.source_sha,scope:data.scope,
  exports:raws.map(r=>({bytes:r.length,sha256:hash(r)})),identical_fresh_processes:2,negative_checks:mutations.length,
  catalog_rows:data.catalog.length,catalog_sha256:hash(Buffer.from(JSON.stringify(data.catalog))),
- context:data.context,option_count:data.option_count,free_picks:data.free_picks,options:data.options,identities:data.identities,
+ constructor_observation_passed:true,setup_seed:data.setup_seed,context:data.context,option_count:data.option_count,free_picks:data.free_picks,options:data.options,identities:data.identities,
  draw_counts:Object.fromEntries(['predicate_draws','regeneration_draws','count_draws','option_draws'].map(k=>[k,data[k].length])),rng:data.rng};
 const out=Buffer.from(JSON.stringify(summary)+'\n');assert(out.length<=8192);writeFileSync(process.argv[4],out,{flag:'wx'});
