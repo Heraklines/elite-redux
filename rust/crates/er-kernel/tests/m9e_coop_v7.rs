@@ -404,8 +404,11 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
     let host = SeatId::new(safe(1));
     let guest = SeatId::new(safe(2));
     let generation = ConnectionGeneration::new(safe(1));
-    let (mut authority, mut replica, initial_turn) =
-        coop_wait_bootstrap(content.clone(), host, guest, generation)?;
+    let CoopWaitKernels {
+        mut authority,
+        mut replica,
+        initial_turn,
+    } = coop_wait_bootstrap(content.clone(), host, guest, generation)?;
     coop_wait_private_navigation(&mut authority, &mut replica, host, guest)?;
     let retained_material =
         coop_wait_retain_host(&mut authority, &mut replica, guest, initial_turn)?;
@@ -428,6 +431,12 @@ fn coop_waits_for_all_human_commands() -> Result<(), Box<dyn Error>> {
     )
 }
 
+struct CoopWaitKernels {
+    authority: Box<GameKernelV7>,
+    replica: Box<GameKernelV7>,
+    initial_turn: er_types::battle_ids::TurnIndex,
+}
+
 // Keep independent snapshot rejection cases out of one unoptimized libtest
 // frame. Each helper returns before the next large kernel/snapshot is created;
 // all original state, atomicity, replay and control assertions are retained.
@@ -437,14 +446,7 @@ fn coop_wait_bootstrap(
     host: SeatId,
     guest: SeatId,
     generation: ConnectionGeneration,
-) -> Result<
-    (
-        Box<GameKernelV7>,
-        Box<GameKernelV7>,
-        er_types::battle_ids::TurnIndex,
-    ),
-    Box<dyn Error>,
-> {
+) -> Result<CoopWaitKernels, Box<dyn Error>> {
     let authority_protocol =
         initial_battle_protocol_snapshot_v2(&authority_protocol(host, guest, generation)?, host)?;
     let replica_protocol =
@@ -508,7 +510,11 @@ fn coop_wait_bootstrap(
         Some(replica_protocol),
     )?;
 
-    Ok((Box::new(authority), Box::new(replica), initial_turn))
+    Ok(CoopWaitKernels {
+        authority: Box::new(authority),
+        replica: Box::new(replica),
+        initial_turn,
+    })
 }
 
 #[inline(never)]

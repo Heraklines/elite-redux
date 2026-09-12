@@ -166,15 +166,14 @@ pub(crate) fn validate_current_experience_progress(
                 wave,
             )
             .map_err(|_| failure())?;
-            if let Some(level_up) = progress.level_up {
-                if level_up.award != *award
+            if let Some(level_up) = progress.level_up
+                && (level_up.award != *award
                     || level_up.previous_level != recipient.level
                     || level_up.new_level != position.level
                     || position.level <= recipient.level
-                    || level_up.previous_stats != captured.stats
-                {
-                    return Err(failure());
-                }
+                    || level_up.previous_stats != captured.stats)
+            {
+                return Err(failure());
             }
             if progress.check_optional_level_up
                 && (progress.level_up.is_some() != (position.level > recipient.level))

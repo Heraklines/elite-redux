@@ -1892,7 +1892,9 @@ impl GameKernelV7 {
                     .is_none_or(|mode| mode.cooperative)
                     || (run.control.owner_seat != Some(self.local_seat)
                         && !current_phase_restore_v7::owned_waiting_phase(
-                            &save.state, &self.content, self.local_seat,
+                            &save.state,
+                            &self.content,
+                            self.local_seat,
                         ))
                     || run
                         .control

@@ -765,74 +765,158 @@ fn assert_phase_title_read_reissues(
     event_id: er_types::PresentationEventId,
     content: Arc<PreparedGameContentV2>,
 ) -> Result<()> {
-    use er_kernel::game_kernel_v7::KernelStorageResultV2;
     use er_game::m9e_material_v6::GamePresentationEffectV2;
+    use er_kernel::game_kernel_v7::KernelStorageResultV2;
     let original = active(checkpoint)?;
-    let pending = checkpoint.pending_presentations.iter()
-        .find(|pending| pending.event_id == event_id).ok_or("phase prompt absent")?;
-    let expected = GamePresentationEffectV2 { event_id, semantic: pending.semantic,
-        blocking: pending.blocking, skip: pending.skip, payload: pending.payload.clone() };
+    let pending = checkpoint
+        .pending_presentations
+        .iter()
+        .find(|pending| pending.event_id == event_id)
+        .ok_or("phase prompt absent")?;
+    let expected = GamePresentationEffectV2 {
+        event_id,
+        semantic: pending.semantic,
+        blocking: pending.blocking,
+        skip: pending.skip,
+        payload: pending.payload.clone(),
+    };
     let saved = er_save::m9e_save_v2::GameSaveV2::new(
-        original.content_identity.clone(), safe(1)?, original.clone(),
-    )?.encode()?;
+        original.content_identity.clone(),
+        safe(1)?,
+        original.clone(),
+    )?
+    .encode()?;
     let mut reader = GameKernelV7::natural_start(
-        original.profile.clone(), "phase-title-read".to_owned(), seat()?,
-        vec!["phase-source-slot".to_owned()], true, content.clone(),
-        KernelSchedulerSnapshotV2 { next_timer_id: Some(SafeU53::ZERO),
-            timers: vec![], pauses: vec![], disposed: false }, None,
+        original.profile.clone(),
+        "phase-title-read".to_owned(),
+        seat()?,
+        vec!["phase-source-slot".to_owned()],
+        true,
+        content.clone(),
+        KernelSchedulerSnapshotV2 {
+            next_timer_id: Some(SafeU53::ZERO),
+            timers: vec![],
+            pauses: vec![],
+            disposed: false,
+        },
+        None,
     )?;
     navigate(&mut reader, "bootstrap/title/existing-saves")?;
     let listed = press(&mut reader, PhysicalKey::Space)?;
-    let list_request = listed.effects.iter().find_map(|effect| match effect {
-        GameKernelEffectV7::Platform(GamePlatformEffectV2::StorageList { request }) => Some(*request),
-        _ => None,
-    }).ok_or("Title LIST absent")?;
-    reader.apply_storage_result(list_request, KernelStorageResultV2::Slots {
-        slots: vec!["phase-source-slot".to_owned()],
-    })?;
+    let list_request = listed
+        .effects
+        .iter()
+        .find_map(|effect| match effect {
+            GameKernelEffectV7::Platform(GamePlatformEffectV2::StorageList { request }) => {
+                Some(*request)
+            }
+            _ => None,
+        })
+        .ok_or("Title LIST absent")?;
+    reader.apply_storage_result(
+        list_request,
+        KernelStorageResultV2::Slots {
+            slots: vec!["phase-source-slot".to_owned()],
+        },
+    )?;
     let reading = press(&mut reader, PhysicalKey::Space)?;
-    let request = reading.effects.iter().find_map(|effect| match effect {
-        GameKernelEffectV7::Platform(GamePlatformEffectV2::StorageRead { request, slot })
-            if slot == "phase-source-slot" => Some(*request),
-        _ => None,
-    }).ok_or("actual Title READ absent")?;
+    let request = reading
+        .effects
+        .iter()
+        .find_map(|effect| match effect {
+            GameKernelEffectV7::Platform(GamePlatformEffectV2::StorageRead { request, slot })
+                if slot == "phase-source-slot" =>
+            {
+                Some(*request)
+            }
+            _ => None,
+        })
+        .ok_or("actual Title READ absent")?;
     let before_read = reader.snapshot()?;
     let mut malformed = saved.clone();
     malformed.push(b' ');
-    assert!(reader.apply_storage_result(request, KernelStorageResultV2::Read {
-        bytes: Some(malformed),
-    }).is_err());
-    assert_eq!(reader.snapshot()?, before_read, "failed READ must preserve its request");
-    let loaded = reader.apply_storage_result(request, KernelStorageResultV2::Read {
-        bytes: Some(saved.clone()),
-    })?;
-    let presentations: Vec<_> = loaded.effects.iter().filter_map(|effect| match effect {
-        GameKernelEffectV7::Presentation(effect) => Some(effect), _ => None,
-    }).collect();
+    assert!(
+        reader
+            .apply_storage_result(
+                request,
+                KernelStorageResultV2::Read {
+                    bytes: Some(malformed),
+                }
+            )
+            .is_err()
+    );
+    assert_eq!(
+        reader.snapshot()?,
+        before_read,
+        "failed READ must preserve its request"
+    );
+    let loaded = reader.apply_storage_result(
+        request,
+        KernelStorageResultV2::Read {
+            bytes: Some(saved.clone()),
+        },
+    )?;
+    let presentations: Vec<_> = loaded
+        .effects
+        .iter()
+        .filter_map(|effect| match effect {
+            GameKernelEffectV7::Presentation(effect) => Some(effect),
+            _ => None,
+        })
+        .collect();
     assert_eq!(presentations, vec![&expected]);
     assert!(loaded.internal_events.is_empty());
-    assert!(!loaded.effects.iter().any(|effect| matches!(effect,
-        GameKernelEffectV7::AuthorityMaterial { .. } | GameKernelEffectV7::Platform(_))));
+    assert!(!loaded.effects.iter().any(|effect| matches!(
+        effect,
+        GameKernelEffectV7::AuthorityMaterial { .. } | GameKernelEffectV7::Platform(_)
+    )));
     let after_read = reader.snapshot()?;
     assert_eq!(after_read.pending_presentations, vec![pending.clone()]);
     assert!(after_read.pending_current_phase_ack.is_none());
-    assert_eq!(after_read.replay_sequence.get(), before_read.replay_sequence.get() + 1);
+    assert_eq!(
+        after_read.replay_sequence.get(),
+        before_read.replay_sequence.get() + 1
+    );
     let actual = active(&after_read)?;
     let mut rebound = original.clone();
-    rebound.active_run.as_mut().ok_or("saved run absent")?.control =
-        actual.active_run.as_ref().ok_or("loaded run absent")?.control.clone();
+    rebound
+        .active_run
+        .as_mut()
+        .ok_or("saved run absent")?
+        .control = actual
+        .active_run
+        .as_ref()
+        .ok_or("loaded run absent")?
+        .control
+        .clone();
     rebound.identities.next_platform_request_id = actual.identities.next_platform_request_id;
-    assert_eq!(&rebound, actual, "READ may rebind control/platform frontier, never payout or receipts");
-    assert!(reader.apply_storage_result(request, KernelStorageResultV2::Read {
-        bytes: Some(saved),
-    }).is_err());
+    assert_eq!(
+        &rebound, actual,
+        "READ may rebind control/platform frontier, never payout or receipts"
+    );
+    assert!(
+        reader
+            .apply_storage_result(request, KernelStorageResultV2::Read { bytes: Some(saved) })
+            .is_err()
+    );
     assert_eq!(reader.snapshot()?, after_read);
     let blocked = reader.advance_time(SafeU53::ZERO)?;
-    assert!(!blocked.effects.iter().any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. })));
+    assert!(
+        !blocked
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. }))
+    );
     reader.settle_presentation(event_id)?;
     let acknowledged = reader.snapshot()?;
     assert!(acknowledged.pending_presentations.is_empty());
-    assert_eq!(acknowledged.pending_current_phase_ack.ok_or("actual READ prompt ack absent")?.event_id, event_id);
+    assert_eq!(
+        acknowledged
+            .pending_current_phase_ack
+            .ok_or("actual READ prompt ack absent")?
+            .event_id,
+        event_id
+    );
     reader = restore(acknowledged, content.clone())?;
     let mut live = reader.state().cloned();
     let mut ledger = reader.snapshot()?.material_ledger;
