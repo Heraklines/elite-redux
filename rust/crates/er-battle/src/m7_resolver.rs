@@ -71,7 +71,9 @@ pub enum BattlePresentationCueV5 {
         ability: er_types::battle_ids::AbilityId,
         innate_slot: Option<u8>,
     },
-    RecoilMessage { pokemon: PokemonId },
+    RecoilMessage {
+        pokemon: PokemonId,
+    },
     MoveNoEffect {
         pokemon: PokemonId,
         move_id: MoveId,

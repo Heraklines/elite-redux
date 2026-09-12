@@ -9,11 +9,11 @@ mod current_battle_presentation;
 mod current_phase_runtime;
 #[path = "current_reward_runtime.rs"]
 mod current_reward_runtime;
-pub(crate) use current_reward_runtime::validate_transition as validate_current_reward_transition;
 pub use current_phase_runtime::GameOwnedPhaseV1;
 pub(crate) use current_phase_runtime::{
     validate_current_turn_transition, validate_owned_phase_transition,
 };
+pub(crate) use current_reward_runtime::validate_transition as validate_current_reward_transition;
 
 use std::sync::Arc;
 
@@ -612,16 +612,24 @@ fn execute_domain(
     context: &GameActionDispatchContextV1,
 ) -> Result<DomainExecutionV1, GameRuntimeV6Error> {
     let owned_reward = matches!(action, GameActionV1::Reward { .. })
-        && before.and_then(|state| state.current_battle_participation.as_ref())
+        && before
+            .and_then(|state| state.current_battle_participation.as_ref())
             .and_then(|owner| owner.experience.as_ref())
-            .is_some_and(|owner| owner.source_progression.is_some()
-                && owner.pending.iter().any(|pending| pending.victory_tail.as_ref()
-                    .is_some_and(|tail| tail.reward.is_some())));
+            .is_some_and(|owner| {
+                owner.source_progression.is_some()
+                    && owner.pending.iter().any(|pending| {
+                        pending
+                            .victory_tail
+                            .as_ref()
+                            .is_some_and(|tail| tail.reward.is_some())
+                    })
+            });
     if before
         .and_then(|state| state.current_battle_participation.as_ref())
         .and_then(|owner| owner.experience.as_ref())
         .is_some_and(|owner| owner.source_progression.is_some())
-        && !owned_reward && !matches!(
+        && !owned_reward
+        && !matches!(
             action,
             GameActionV1::Battle { .. }
                 | GameActionV1::Save { .. }
@@ -2235,9 +2243,13 @@ fn execute_reward(
     input: &GameDomainExecutionInputV1,
 ) -> Result<DomainExecutionV1, GameRuntimeV6Error> {
     require_none_input(input)?;
-    if let Some(state) = before.filter(|state| state.current_battle_participation.as_ref()
-        .and_then(|owner| owner.experience.as_ref())
-        .is_some_and(|owner| owner.source_progression.is_some())) {
+    if let Some(state) = before.filter(|state| {
+        state
+            .current_battle_participation
+            .as_ref()
+            .and_then(|owner| owner.experience.as_ref())
+            .is_some_and(|owner| owner.source_progression.is_some())
+    }) {
         return current_reward_runtime::execute(state, content, action, action_context);
     }
     let mut candidate = require_state(before)?.clone();

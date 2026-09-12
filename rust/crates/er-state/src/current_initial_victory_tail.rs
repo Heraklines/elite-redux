@@ -17,7 +17,8 @@ pub struct CurrentInitialVictoryTailV1 {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub original_rng: Option<Box<CurrentInitialTurnRngPreimageV1>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub original_turn_progress: Option<Box<crate::current_source_progression::CurrentSourceTurnProgressV1>>,
+    pub original_turn_progress:
+        Option<Box<crate::current_source_progression::CurrentSourceTurnProgressV1>>,
     pub cancelled_from: u8,
     pub cancelled_to: u8,
     pub phase: CurrentInitialVictoryTailPhaseV1,

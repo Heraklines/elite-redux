@@ -42,7 +42,10 @@ pub(crate) trait SourcePool {
     /// Each row is (exclusive upper bound, original source pool index).
     fn thresholds(&self, tier: u16) -> Result<Vec<(u32, usize)>, RollError>;
     fn party_luck(&self) -> Result<u8, RollError>;
-    fn singleton(&mut self, minimum: u32) -> Result<(), RollError> { let _ = minimum; Ok(()) }
+    fn singleton(&mut self, minimum: u32) -> Result<(), RollError> {
+        let _ = minimum;
+        Ok(())
+    }
     fn draw(&mut self, range: u32, minimum: u32) -> Result<u32, RollError>;
     /// Actual type generator, preserving generated pregenArgs and display name.
     /// Every internal generator/gate draw must consume the same operation budget.
@@ -195,7 +198,10 @@ pub(crate) fn three_options(pool: &mut impl SourcePool) -> Result<Vec<Offer>, Ro
     three_options_with_budget(pool, &mut 4096)
 }
 
-pub(crate) fn three_options_with_budget(pool: &mut impl SourcePool, budget: &mut usize) -> Result<Vec<Offer>, RollError> {
+pub(crate) fn three_options_with_budget(
+    pool: &mut impl SourcePool,
+    budget: &mut usize,
+) -> Result<Vec<Offer>, RollError> {
     let mut options = Vec::new();
     for _ in 0..3 {
         let mut candidate = next(pool, None, None, budget)?;

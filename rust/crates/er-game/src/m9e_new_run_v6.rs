@@ -444,10 +444,14 @@ fn install_source_progression(
         configuration: CurrentSourceConfigurationV1::FreshOrdinaryClassic399d,
         initial_battle: battle.battle_id,
         initial_wave: run.wave,
-        reward_run: Some(er_state::current_reward_run::CurrentRewardRunV1::fresh_ordinary_with_startup_map()),
+        reward_run: Some(
+            er_state::current_reward_run::CurrentRewardRunV1::fresh_ordinary_with_startup_map(),
+        ),
         initial_faint: er_state::current_faint_execution::CurrentInitialEnemyFaintV1::fresh(),
-        turn_progress: Some(er_state::current_source_progression::CurrentSourceTurnProgressV1::fresh(run)
-            .ok_or(NaturalRunV6Error::Invalid)?),
+        turn_progress: Some(
+            er_state::current_source_progression::CurrentSourceTurnProgressV1::fresh(run)
+                .ok_or(NaturalRunV6Error::Invalid)?,
+        ),
         party,
         initial_enemy: CurrentSourceInitialEnemyV1 {
             pokemon: battle.enemy_party[0].id,

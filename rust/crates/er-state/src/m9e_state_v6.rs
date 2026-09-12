@@ -215,11 +215,22 @@ impl GameStateV6 {
             return Err(GameStateV6Error::Invalid);
         }
         self.identities.validate_against(self.active_run.as_ref())?;
-        if let Some(experience)=self.current_battle_participation.as_ref().and_then(|owner|owner.experience.as_ref()) {
-            let inventory=experience.source_progression.as_ref().and_then(|source|source.reward_run.as_ref());
-            let receipts=experience.pending.iter().filter_map(|pending|pending.victory_tail.as_ref())
-                .filter_map(|tail|tail.reward.as_deref()).collect::<Vec<_>>();
-            if !crate::current_reward_selection::initial_inventory_valid(inventory,&receipts) {
+        if let Some(experience) = self
+            .current_battle_participation
+            .as_ref()
+            .and_then(|owner| owner.experience.as_ref())
+        {
+            let inventory = experience
+                .source_progression
+                .as_ref()
+                .and_then(|source| source.reward_run.as_ref());
+            let receipts = experience
+                .pending
+                .iter()
+                .filter_map(|pending| pending.victory_tail.as_ref())
+                .filter_map(|tail| tail.reward.as_deref())
+                .collect::<Vec<_>>();
+            if !crate::current_reward_selection::initial_inventory_valid(inventory, &receipts) {
                 return Err(GameStateV6Error::Invalid);
             }
         }

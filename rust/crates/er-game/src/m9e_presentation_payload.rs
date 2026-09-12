@@ -72,7 +72,9 @@ pub enum GamePresentationPayloadV1 {
         ability: AbilityId,
         innate_slot: Option<u8>,
     },
-    RecoilMessage { holder: PokemonId },
+    RecoilMessage {
+        holder: PokemonId,
+    },
     MoveNoEffect {
         holder: PokemonId,
         move_id: MoveId,
@@ -165,7 +167,9 @@ impl GamePresentationPayloadV1 {
                     && *requested_heal > 0
                     && after - before <= *requested_heal,
             ),
-            Self::RecoilMessage { holder } => (PresentationCueFamilyV1::Move, holder.get() != SafeU53::ZERO),
+            Self::RecoilMessage { holder } => {
+                (PresentationCueFamilyV1::Move, holder.get() != SafeU53::ZERO)
+            }
             Self::MoveNoEffect { holder, move_id } => (
                 PresentationCueFamilyV1::Move,
                 holder.get() != SafeU53::ZERO && move_id.get() != SafeU53::ZERO,

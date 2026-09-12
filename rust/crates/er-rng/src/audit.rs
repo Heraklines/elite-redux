@@ -109,7 +109,9 @@ impl RngCallsiteId {
         Self(BATTLE_SEED_CHARACTER_ID.to_owned())
     }
 
-    pub fn current_reward_generation() -> Self { Self(CURRENT_REWARD_ID.to_owned()) }
+    pub fn current_reward_generation() -> Self {
+        Self(CURRENT_REWARD_ID.to_owned())
+    }
 
     pub fn current_move_target() -> Self {
         Self(CURRENT_MOVE_TARGET_ID.to_owned())

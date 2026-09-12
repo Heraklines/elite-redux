@@ -196,8 +196,8 @@ impl CurrentReproCapsuleV1 {
         if self.attempts.len() > limits.maximum_events {
             return Err(invalid("capsule bounds"));
         }
-        let bytes = encoded_len(self, limits.maximum_bytes)
-            .ok_or_else(|| invalid("capsule bounds"))?;
+        let bytes =
+            encoded_len(self, limits.maximum_bytes).ok_or_else(|| invalid("capsule bounds"))?;
         let mut position = self.base_position;
         let mut browser_generation = self
             .browser_transport

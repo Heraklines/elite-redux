@@ -884,7 +884,8 @@ fn network_snapshot(
 }
 
 #[inline(never)]
-fn network_host_setup() -> Result<(Box<BrowserKernelHostV2>, GameProposalEnvelopeV2), Box<dyn Error>> {
+fn network_host_setup() -> Result<(Box<BrowserKernelHostV2>, GameProposalEnvelopeV2), Box<dyn Error>>
+{
     let prepared = shared_content()?;
     let (source, _) = active_host()?;
     let mut snapshot = source.kernel_ref().ok_or("kernel missing")?.snapshot()?;
@@ -1087,10 +1088,7 @@ fn network_transport_replay(
             },
         )?;
     }
-    assert_eq!(
-        network_snapshot(&imported)?,
-        network_snapshot(browser)?
-    );
+    assert_eq!(network_snapshot(&imported)?, network_snapshot(browser)?);
     Ok(())
 }
 

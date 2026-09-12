@@ -2136,11 +2136,28 @@ fn assert_actual_struggle_recoil_event(
     actor: PokemonId,
 ) -> Result<()> {
     use er_state::current_battle_source_events::CurrentBattleSourceEventV1 as Event;
-    let events = transition.source_events.as_ref().ok_or("source observations absent")?;
-    let [Event::MoveResolution { move_id, .. }, Event::MoveDamage { target, .. },
-        Event::StruggleRecoilDamage { user, source_slot, move_id: recoil_move,
-            requested_damage, damage, hp_before, hp_after, max_hp }] = events.as_slice() else {
-        return Err("Struggle must emit resolution, direct damage, then actual indirect recoil".into());
+    let events = transition
+        .source_events
+        .as_ref()
+        .ok_or("source observations absent")?;
+    let [
+        Event::MoveResolution { move_id, .. },
+        Event::MoveDamage { target, .. },
+        Event::StruggleRecoilDamage {
+            user,
+            source_slot,
+            move_id: recoil_move,
+            requested_damage,
+            damage,
+            hp_before,
+            hp_after,
+            max_hp,
+        },
+    ] = events.as_slice()
+    else {
+        return Err(
+            "Struggle must emit resolution, direct damage, then actual indirect recoil".into(),
+        );
     };
     assert_eq!(*user, actor);
     assert_ne!(*target, actor);

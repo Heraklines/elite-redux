@@ -335,7 +335,12 @@ fn phase_transition(
         .ok_or(GameRuntimeV6Error::Action)?;
     if matches!(phase, GameOwnedPhaseV1::RewardBegin { .. }) {
         return current_reward_transition::transition(
-            before, content, operation_id, authority_seat, revision, phase,
+            before,
+            content,
+            operation_id,
+            authority_seat,
+            revision,
+            phase,
         );
     }
     if matches!(phase, GameOwnedPhaseV1::VictoryTail { .. }) {
@@ -547,10 +552,10 @@ fn phase_transition(
 
 #[path = "current_faint_transition.rs"]
 mod current_faint_transition;
-#[path = "current_victory_transition.rs"]
-mod current_victory_transition;
 #[path = "current_reward_transition.rs"]
 mod current_reward_transition;
+#[path = "current_victory_transition.rs"]
+mod current_victory_transition;
 
 fn turn_step_transition(
     before: &GameStateV6,

@@ -109,7 +109,8 @@ fn navigate(session: &mut CurrentGameSession, option: &str) -> Result<()> {
     // Find a shortest route using only the actual control's Up/Down edges.
     // Every edge is still executed as a public physical key down/up pair.
     let route = {
-        let menu = session.kernel_ref()?
+        let menu = session
+            .kernel_ref()?
             .current_control()
             .and_then(|control| control.menu.as_ref())
             .ok_or("actual menu absent")?;
@@ -169,7 +170,8 @@ fn navigate(session: &mut CurrentGameSession, option: &str) -> Result<()> {
     };
     for (key, expected) in route {
         press(session, key)?;
-        if !session.kernel_ref()?
+        if !session
+            .kernel_ref()?
             .current_control()
             .and_then(|control| control.menu.as_ref())
             .is_some_and(|menu| menu.selected_option_id.as_str() == expected)
