@@ -300,8 +300,9 @@ test("observe actual initialized target capability registry", async () => {
   const tailPath=process.env.M9_VICTORY_TAIL_OUTPUT;
   if (!tailPath) throw new Error("M9_VICTORY_TAIL_OUTPUT required");
   const turnCounters=observeActualNeutralTurnEnd();
-  const tail=`${JSON.stringify({schema_version:2,source_sha:PIN,seed:SEED,legacy_sha256:legacySha,
-    scope:"initialized registry, initial-context consumers and actual direct neutral TurnEnd counter dispatch; not full battle-loop execution",...tailClosure,turn_counters:turnCounters})}\n`;
+  const battleScores=observeActualBattleEndScoreTurns();
+  const tail=`${JSON.stringify({schema_version:3,source_sha:PIN,seed:SEED,legacy_sha256:legacySha,
+    scope:"initialized registry, initial-context consumers and actual direct neutral TurnEnd counter dispatch; not full battle-loop execution",...tailClosure,turn_counters:turnCounters,battle_scores:battleScores})}\n`;
   expect(Buffer.byteLength(tail,"utf8")).toBeLessThanOrEqual(16384);
   writeFileSync(tailPath,tail,{encoding:"utf8",flag:"wx"});
 });
@@ -722,4 +723,35 @@ function observeActualNeutralTurnEnd() {
   expect(after.holders.map(p=>[p.id,p.hp,p.max_hp])).toEqual(before.holders.map(p=>[p.id,p.hp,p.max_hp]));
   expect(after.holders.every(p=>p.turn_count===2&&p.wave_turn_count===2)).toBe(true);
   return {scope:"actual initialized fresh holders and direct source TurnEndPhase.start; no selected turn or battle-loop witness",before,after};
+}
+
+function observeActualBattleEndScoreTurns() {
+  const scene=globalScene, battle=scene.currentBattle;
+  const enemy=scene.getEnemyParty()[0];
+  expect(scene.getEnemyParty()).toHaveLength(1);
+  expect(battle.double).toBe(false);expect(enemy.isBoss()).toBe(false);
+  expect(vi.isMockFunction(battle.addBattleScore)).toBe(false);
+  expect(vi.isMockFunction(scene.updateScoreText)).toBe(false);
+  const ease=Phaser.Tweens.Builders.GetEaseFunction("Sine.easeIn");
+  expect(vi.isMockFunction(ease)).toBe(false);
+  const original={turn:battle.turn,battle_score:battle.battleScore,scene_score:scene.score};
+  const rng=Phaser.Math.RND.state();
+  const cases:Array<{turn:number;input:number;multiplier:number;before:number;after:number}>=[];
+  try {
+    for(let turn=2;turn<=12;turn++)for(const input of [1,113,10000]) {
+      battle.turn=turn;battle.battleScore=input;scene.score=7;
+      const multiplier=ease(1-Math.min(turn-2,10)/10);
+      battle.addBattleScore();
+      cases.push({turn,input,multiplier,before:7,after:scene.score});
+      expect(battle.turn).toBe(turn);expect(battle.battleScore).toBe(input);
+      expect(Phaser.Math.RND.state()).toBe(rng);
+    }
+  } finally {
+    battle.turn=original.turn;battle.battleScore=original.battle_score;scene.score=original.scene_score;
+    scene.updateScoreText();
+  }
+  return {scope:"actual addBattleScore with controlled settled turns and score inputs; single ordinary enemy only, no BattleEnd phase execution",
+    enemy_count:scene.getEnemyParty().length,double:battle.double,is_boss:enemy.isBoss(),cases,
+    restored:battle.turn===original.turn&&battle.battleScore===original.battle_score&&scene.score===original.scene_score,
+    rng_restored:Phaser.Math.RND.state()===rng};
 }

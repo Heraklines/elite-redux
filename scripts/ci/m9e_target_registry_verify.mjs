@@ -608,12 +608,25 @@ const families = {post_faint:row.abilities.filter(a => a.post_faint).map(a => a.
   experience_meta:row.abilities.filter(a => a.meta_kinds.includes("experience-gain-multiplier")).map(a => a.id)};
 function validateVictoryTail(t) {
   keys(t,["schema_version","source_sha","seed","legacy_sha256","scope","abilities","raw_bulbasaur",
-    "modifiers","charge_steps","training_cache","money","rng_unchanged","turn_counters"]);
-  assert.equal(t.schema_version,2); assert.equal(t.source_sha,"399d5d368f0b5642ebf8f45bd8a5e73350fa4de7");
+    "modifiers","charge_steps","training_cache","money","rng_unchanged","turn_counters","battle_scores"]);
+  assert.equal(t.schema_version,3); assert.equal(t.source_sha,"399d5d368f0b5642ebf8f45bd8a5e73350fa4de7");
   assert.equal(t.seed,"m9e-target-registry-source-v1");
   assert.equal(t.legacy_sha256,"9b58691e1c5b3796e2b1bfe511483a445b7ab158e72e895fd15c86e5f9bc4576");
   assert.equal(t.scope,"initialized registry, initial-context consumers and actual direct neutral TurnEnd counter dispatch; not full battle-loop execution");
   assert.equal(t.rng_unchanged,true);
+  const scores=t.battle_scores;
+  keys(scores,["scope","enemy_count","double","is_boss","cases","restored","rng_restored"]);
+  assert.equal(scores.scope,"actual addBattleScore with controlled settled turns and score inputs; single ordinary enemy only, no BattleEnd phase execution");
+  assert.equal(scores.enemy_count,1);assert.equal(scores.double,false);assert.equal(scores.is_boss,false);
+  assert.equal(scores.restored,true);assert.equal(scores.rng_restored,true);assert.equal(scores.cases.length,33);
+  for(const [index,row]of scores.cases.entries()){
+    keys(row,["turn","input","multiplier","before","after"]);
+    assert.equal(row.turn,2+Math.floor(index/3));assert.equal(row.input,[1,113,10000][index%3]);
+    assert.equal(row.before,7);
+    const multiplier=1-Math.cos((1-Math.min(row.turn-2,10)/10)*Math.PI/2);
+    assert.equal(row.multiplier,multiplier);
+    assert.equal(row.after,7+Math.ceil(row.input*multiplier));
+  }
   const counters=t.turn_counters;
   keys(counters,["scope","before","after"]);
   assert.equal(counters.scope,"actual initialized fresh holders and direct source TurnEndPhase.start; no selected turn or battle-loop witness");
@@ -663,7 +676,7 @@ const tailRaws=[process.argv[9],process.argv[10]].map(path=>{
 assert(tailRaws[0].equals(tailRaws[1]));
 const tailObservation=JSON.parse(tailRaws[0]);validateVictoryTail(tailObservation);
 let tailNegatives=0;
-for(const change of [t=>t.abilities.pop(),t=>t.abilities[1].id=t.abilities[0].id,
+for(const change of [t=>{delete t.battle_scores;},t=>t.battle_scores.cases.pop(),t=>t.battle_scores.cases[0].turn=3,t=>t.battle_scores.cases[1].input=114,t=>t.battle_scores.cases[4].multiplier=1,t=>t.battle_scores.cases[4].after++,t=>t.battle_scores.double=true,t=>t.battle_scores.restored=false,t=>t.battle_scores.rng_restored=false,t=>t.abilities.pop(),t=>t.abilities[1].id=t.abilities[0].id,
   t=>t.abilities[0].post_turn=[false],t=>t.raw_bulbasaur.applicable_sources=[],
   t=>t.modifiers[0].lapsing=true,t=>t.rng_unchanged=false,t=>t.money.captured=-1,
   t=>{delete t.turn_counters;},t=>t.turn_counters.before.holders[0].turn_count=0,
@@ -672,7 +685,7 @@ for(const change of [t=>t.abilities.pop(),t=>t.abilities[1].id=t.abilities[0].id
   t=>t.charge_steps[0].after=[],t=>t.training_cache.after={},t=>t.legacy_sha256="bad",t=>t.source_sha="bad"]){
   const mutant=structuredClone(tailObservation);change(mutant);assert.throws(()=>validateVictoryTail(mutant));tailNegatives++;
 }
-const tailSummary={scope:tailObservation.scope,negative_cases:tailNegatives,turn_counters:tailObservation.turn_counters,
+const tailSummary={scope:tailObservation.scope,negative_cases:tailNegatives,battle_score_cases:tailObservation.battle_scores.cases.length,turn_counters:tailObservation.turn_counters,
   exports:tailRaws.map(raw=>({bytes:raw.length,sha256:digest(raw)})),
   empty_post_turn_and_battle_ids:tailObservation.abilities.filter(a=>a.post_turn.length===0&&a.post_battle.length===0).map(a=>a.id),
   nonempty_families:tailObservation.abilities.filter(a=>a.post_turn.length||a.post_battle.length),
