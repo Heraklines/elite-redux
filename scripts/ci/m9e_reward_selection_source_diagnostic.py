@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 BOUNDED_HELPER_BYTES = 38620
-EXPORTER_SHA256 = "52fd88fbeda3ae0f5d59b9e5f302a8a67fdefd05412af5a679fea5a94bb5556f"
+EXPORTER_SHA256 = "1c0c129e61ae297746b67031f49c591a20712de9937829f3f82367bb1f08cfb8"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -209,6 +209,38 @@ TAIL_SOURCE_PINS = {
     "src/phases/battle-end-phase.ts": ["47554da75c7a90bd973703cee5b6f56c208acf56e623c08d72cf31e2a4fed65a", 17741],
 }
 ORACLE_PINS.update(TAIL_SOURCE_PINS)
+
+TOWN_POOL_SOURCE_PINS = {
+  "src/field/arena.ts": [
+    "a0adbe764ee70cd80d506d9e7e3a147454645765b1c3e116db40d9b8e54f9ca5",
+    58935
+  ],
+  "src/data/elite-redux/er-biome-rules.ts": [
+    "d18a2fc78b4af83872acec16711525267560d34241333de1afce8d8e760ea195",
+    11597
+  ],
+  "src/data/daily-seed/daily-run.ts": [
+    "911a01306e3bef7347bde0292f8d0f8d2251f33475dec04e53dac3439c805ac7",
+    12835
+  ],
+  "src/data/elite-redux/er-run-difficulty.ts": [
+    "944ddde4b3b6fda355e2be1b0688472a0cb56dfc654042dc604d4200e8be1809",
+    6093
+  ],
+  "src/data/elite-redux/archetypes/ability-meta-consumers.ts": [
+    "87d53ff46ef2148debdd250827657180cefcbd187a7c494fd6b6f6973d522166",
+    5899
+  ],
+  "src/enums/biome-pool-tier.ts": [
+    "7eab07b9a2ea951a8297747cb53d4c2087834663bbd49168c27e140657d95d1d",
+    147
+  ],
+  "src/enums/time-of-day.ts": [
+    "6b1f7fa34e4f5323675ce120611dca76290159fc93c0b590dd0e18fc9a4d724b",
+    70
+  ]
+}
+ORACLE_PINS.update(TOWN_POOL_SOURCE_PINS)
 
 def require(condition, message):
     if not condition:

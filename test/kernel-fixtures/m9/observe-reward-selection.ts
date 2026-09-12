@@ -1,4 +1,11 @@
 import { createHash } from "node:crypto";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
+import { getEncounterSpeciesWeightMultiplier } from "#data/elite-redux/archetypes/ability-meta-consumers";
+import { getErDifficulty,isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
+import { getDailyForcedWaveBiomePoolTier } from "#data/daily-seed/daily-run";
+import { getPartyLuckValue } from "#modifiers/modifier-type";
+
 import { isErOmniformMon } from "#data/elite-redux/omniform-movesets";
 import { createArrangement } from "#data/battle-format";
 import { allMoves } from "#data/data-lists";
@@ -208,6 +215,35 @@ function observeDirectNextBattle(){
     return {scope:"direct actual scene.newBattle after initialized wave1; no victory or reward application and no queued phase execution",pre,post,trace,draws,queued,level_calls:levelCalls};
   }finally{for(const cleanup of cleanups.reverse())cleanup();}
 }
+
+// Complete current effective rarity pools before level-based substitution. No
+// species is sampled or constructed by this read-only prerequisite observation.
+function townSelectionFacts(wave:number,level:number){
+  const scene=globalScene,arena=scene.arena,before=Phaser.Math.RND.state();
+  expect(arena.biomeId).toBe(BiomeId.TOWN);expect(wave).toBe(2);
+  const descriptor=Object.getOwnPropertyDescriptor(arena,"pokemonPool");
+  expect(descriptor&&Object.hasOwn(descriptor,"value")).toBe(true);
+  const source=descriptor!.value as Record<string,number[]>;
+  const keys=Object.keys(source);expect(keys.length).toBeGreaterThan(0);expect(keys.length).toBeLessThanOrEqual(12);
+  const tiers=keys.map(key=>{expect(/^[0-9]+$/.test(key)).toBe(true);const ids=source[key];expect(Array.isArray(ids)).toBe(true);expect(ids.length).toBeLessThanOrEqual(128);return [Number(key),[...ids]] as const;});
+  const ids=[...new Set(tiers.flatMap(row=>row[1]))];expect(ids.length).toBeLessThanOrEqual(128);
+  const adjusted=scene.gameMode.getWaveForDifficulty(wave,true),difficulty=getErDifficulty();
+  const gate=Reflect.get(arena,"checkLegendBST");expect(typeof gate).toBe("function");expect(vi.isMockFunction(gate)).toBe(false);
+  const rows=ids.map(id=>{
+    expect(Number.isSafeInteger(id)&&id>0).toBe(true);const species=getPokemonSpecies(id);
+    const weight=getEncounterSpeciesWeightMultiplier(species);expect(Number.isFinite(weight)&&weight>0).toBe(true);
+    const gated=Reflect.apply(gate,arena,[species,adjusted]);expect(typeof gated).toBe("boolean");
+    const flags=Number(Boolean(species.legendary))+2*Number(Boolean(species.subLegendary))+4*Number(Boolean(species.mythical))+8*Number(species.isRegional());
+    return [id,weight,species.baseTotal,flags,gated] as const;
+  });
+  const result={scope:"complete effective Town rarity pools and pre-substitution weights/gates; no wild level-substitution or moveset closure",wave,level,
+    adjusted_wave:adjusted,difficulty,vanilla:isErVanillaDifficulty(difficulty),time_of_day:Reflect.get(arena,"lastTimeOfDay"),
+    luck:getPartyLuckValue(scene.getPlayerParty()),forced_tier:getDailyForcedWaveBiomePoolTier(wave),
+    regional_boost:getErBiomeRule(arena.biomeId)?.regionalBoost??null,tiers,rows};
+  expect(Buffer.byteLength(JSON.stringify(result))).toBeLessThanOrEqual(3000);
+  expect(Phaser.Math.RND.state()).toBe(before);return result;
+}
+
 async function observeDirectQueuedEncounter(){
   const scene=globalScene,pm=scene.phaseManager;
   const prior=pm.getCurrentPhase(),before=Phaser.Math.RND.state();
@@ -219,6 +255,16 @@ async function observeDirectQueuedEncounter(){
   expect(pm.hasPhaseOfType("NextEncounterPhase")).toBe(false);
   const draws:Array<[string,...number[]]>=[],trace:Array<{method:string,start:number,end:number,entry:string,exit:string}>=[];
   const constructed:Array<ReturnType<typeof pokemonFact>>=[];
+  let pool:ReturnType<typeof townSelectionFacts>|undefined,activeScopes=0,integerDepth=0;
+  const unwrapped:Array<{index:number,frames:string[]}>=[],bossCalls:Array<[number,number,number]>=[];
+  function callers(index:number){
+    const frames=(new Error().stack??"").split("\n").map(line=>line.trim().replace(/\\/g,"/"))
+      .filter(line=>line.includes("/src/")).slice(0,3)
+      .map(line=>{const at=line.indexOf("/src/");return line.slice(at+1).replace(/[?#].*?(?=:\d+:\d+)/,"").replace(/\)$/ ,"");});
+    expect(frames.length).toBeGreaterThan(0);expect(frames.every(f=>f.length<=192&&/^src\/.*:\d+:\d+$/.test(f))).toBe(true);
+    expect(unwrapped.length).toBeLessThan(16);unwrapped.push({index,frames});
+  }
+
   function pokemonFact(p:ReturnType<typeof scene.addEnemyPokemon>){
     const rng=Phaser.Math.RND.state();
     const fact={id:p.id,species:p.species.speciesId,form:p.formIndex,level:p.level,nature:p.nature,
@@ -230,18 +276,22 @@ async function observeDirectQueuedEncounter(){
   }
   const frac=Phaser.Math.RND.frac,integer=Phaser.Math.RND.integerInRange;
   expect(vi.isMockFunction(frac)).toBe(false);expect(vi.isMockFunction(integer)).toBe(false);
-  const fracSpy=vi.spyOn(Phaser.Math.RND,"frac").mockImplementation(function(){const value=frac.call(this);expect(draws.length).toBeLessThan(256);draws.push(["frac",value]);return value;});
-  const intSpy=vi.spyOn(Phaser.Math.RND,"integerInRange").mockImplementation(function(min,max){const value=integer.call(this,min,max);expect(draws.length).toBeLessThan(256);draws.push(["integerInRange",min,max,value]);return value;});
+  const fracSpy=vi.spyOn(Phaser.Math.RND,"frac").mockImplementation(function(){const value=frac.call(this);expect(draws.length).toBeLessThan(256);const index=draws.length;draws.push(["frac",value]);if(activeScopes===0&&integerDepth===0)callers(index);return value;});
+  const intSpy=vi.spyOn(Phaser.Math.RND,"integerInRange").mockImplementation(function(min,max){integerDepth++;let value:number;try{value=integer.call(this,min,max);}finally{integerDepth--;}expect(draws.length).toBeLessThan(256);const index=draws.length;draws.push(["integerInRange",min,max,value]);if(activeScopes===0)callers(index);return value;});
   const cleanups:Array<()=>void>=[()=>fracSpy.mockRestore(),()=>intSpy.mockRestore()];
   function wrap<K extends "randomSpecies"|"addEnemyPokemon"|"generateEnemyModifiers"|"resetSeed">(key:K){
     const actual=scene[key];expect(vi.isMockFunction(actual)).toBe(false);
     const spy=vi.spyOn(scene,key).mockImplementation(function(...args:Parameters<typeof actual>){
       expect(trace.length).toBeLessThan(16);const row={method:key,start:draws.length,end:0,entry:Phaser.Math.RND.state(),exit:""};trace.push(row);
-      const value=Reflect.apply(actual,scene,args);row.end=draws.length;row.exit=Phaser.Math.RND.state();
+      if(key==="randomSpecies"){expect(pool).toBeUndefined();expect(args[2]).toBe(true);pool=townSelectionFacts(args[0] as number,args[1] as number);}
+      activeScopes++;let value;try{value=Reflect.apply(actual,scene,args);}finally{activeScopes--;}
+      row.end=draws.length;row.exit=Phaser.Math.RND.state();
       if(key==="addEnemyPokemon")constructed.push(pokemonFact(value));return value;
     });cleanups.push(()=>spy.mockRestore());
   }
   for(const key of ["randomSpecies","addEnemyPokemon","generateEnemyModifiers","resetSeed"] as const)wrap(key);
+  const actualBoss=scene.getEncounterBossSegments;expect(vi.isMockFunction(actualBoss)).toBe(false);
+  const bossSpy=vi.spyOn(scene,"getEncounterBossSegments").mockImplementation(function(...args){const value=Reflect.apply(actualBoss,scene,args);if(args[2]===undefined){expect(bossCalls.length).toBeLessThan(8);bossCalls.push([args[0],args[1],value]);}return value;});cleanups.push(()=>bossSpy.mockRestore());
   try{
     expect(pm.overridePhase(phase)).toBe(true);expect(pm.getCurrentPhase()).toBe(phase);
     // Use the actual manager mutation boundary and exact queued phase.start.
@@ -251,7 +301,8 @@ async function observeDirectQueuedEncounter(){
     await vi.waitUntil(()=>pm.getCurrentPhase()===prior,{interval:10,timeout:10000});
     expect(pm.getCurrentPhase()).toBe(prior);expect(scene.currentBattle.turn).toBe(1);
     expect(constructed.length).toBe(1);expect(pm.hasPhaseOfType("InitEncounterPhase")).toBe(true);
-    const result={scope:"direct dispatch of exact queued NextEncounterPhase via overridePhase; original CommandPhase restored as standby; no natural victory or queued successor execution",
+    expect(pool).toBeDefined();expect(unwrapped.length).toBeGreaterThan(0);expect(Buffer.byteLength(JSON.stringify(unwrapped))).toBeLessThanOrEqual(1000);
+    const result={pool,unwrapped,boss_calls:bossCalls,scope:"direct dispatch of exact queued NextEncounterPhase via overridePhase; original CommandPhase restored as standby; no natural victory or queued successor execution",
       wave:scene.currentBattle.waveIndex,turn:scene.currentBattle.turn,prior:prior.phaseName,selected:phase.phaseName,restored_same_standby:true,
       before,after:Phaser.Math.RND.state(),draws,trace,constructed,prepared:scene.getEnemyParty().map(pokemonFact),
       modifiers:scene.enemyModifiers.map(m=>({id:m.type.id,class_name:m.constructor.name,stack:m.stackCount})),init_encounter_queued:true};

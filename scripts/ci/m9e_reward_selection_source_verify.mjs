@@ -66,8 +66,25 @@ function validateBinder(b){
     assert(Array.isArray(p.held)&&p.held.length<=64);for(const h of p.held){shape(h,['id','class_name','stack']);assert(typeof h.id==='string'&&h.id.length<=128);assert(typeof h.class_name==='string'&&h.class_name.length<=128);integer(h.stack,1,100000);}
   }
 }
+function validateTownPool(p,e){
+ shape(p,['scope','wave','level','adjusted_wave','difficulty','vanilla','time_of_day','luck','forced_tier','regional_boost','tiers','rows']);
+ assert.equal(p.scope,'complete effective Town rarity pools and pre-substitution weights/gates; no wild level-substitution or moveset closure');
+ assert.equal(p.wave,2);assert.equal(p.level,e.constructed[0].level);integer(p.adjusted_wave,1,100000);
+ assert(['youngster','ace','elite','hell','mystery'].includes(p.difficulty));assert.equal(p.vanilla,['youngster','ace'].includes(p.difficulty));
+ integer(p.time_of_day,0,12);assert(Number.isFinite(p.luck)&&p.luck>=0&&p.luck<=100);if(p.forced_tier!==null)integer(p.forced_tier,0,12);if(p.regional_boost!==null)assert.equal(typeof p.regional_boost,'boolean');
+ assert(Array.isArray(p.tiers)&&p.tiers.length>0&&p.tiers.length<=12);const ids=[];let previous=-1;
+ for(const row of p.tiers){assert(Array.isArray(row)&&row.length===2);integer(row[0],0,12);assert(row[0]>previous);previous=row[0];assert(Array.isArray(row[1])&&row[1].length<=128);for(const id of row[1]){integer(id,1,100000);if(!ids.includes(id))ids.push(id);}}
+ assert(Array.isArray(p.rows)&&p.rows.length>0&&p.rows.length<=128);assert.deepEqual(p.rows.map(r=>r[0]),ids);
+ for(const row of p.rows){assert(Array.isArray(row)&&row.length===5);const [id,weight,bst,flags,gated]=row;assert(Number.isFinite(weight)&&weight>0);integer(bst,0,10000);integer(flags,0,15);assert.equal(typeof gated,'boolean');
+ const expected=((p.vanilla||p.difficulty==='elite')&&p.adjusted_wave<55&&bst>=600)||(id===292&&p.adjusted_wave<55)||((flags&7)!==0&&p.adjusted_wave<Math.min(90,Math.max(55,Math.round(55+(bst-540)*0.25))));assert.equal(gated,expected);}
+ assert(Buffer.byteLength(JSON.stringify(p))<=3000);
+ assert(Array.isArray(e.unwrapped)&&e.unwrapped.length>0&&e.unwrapped.length<=16);previous=-1;
+ for(const r of e.unwrapped){shape(r,['index','frames']);integer(r.index,0,e.draws.length-1);assert(r.index>previous);previous=r.index;assert(!e.trace.some(t=>r.index>=t.start&&r.index<t.end));assert(Array.isArray(r.frames)&&r.frames.length>0&&r.frames.length<=3);for(const f of r.frames)assert(typeof f==='string'&&f.length<=192&&/^src\/[^\r\n]*:\d+:\d+$/.test(f)&&!f.includes('..'));}
+ for(let i=0;i<e.draws.length;i++)if(e.draws[i][0]==='integerInRange'&&!e.trace.some(t=>i>=t.start&&i<t.end))assert(e.unwrapped.some(r=>r.index===i));
+ assert(Buffer.byteLength(JSON.stringify(e.unwrapped))<=1000);assert(Array.isArray(e.boss_calls)&&e.boss_calls.length>0&&e.boss_calls.length<=8);for(const r of e.boss_calls){assert(Array.isArray(r)&&r.length===3);assert.equal(r[0],p.wave);assert.equal(r[1],p.level);integer(r[2],0,100);}
+}
 function validateEncounter(e){
- shape(e,['scope','wave','turn','prior','selected','restored_same_standby','before','after','draws','trace','constructed','prepared','modifiers','init_encounter_queued']);
+ shape(e,['pool','unwrapped','boss_calls','scope','wave','turn','prior','selected','restored_same_standby','before','after','draws','trace','constructed','prepared','modifiers','init_encounter_queued']);
  assert.equal(e.scope,'direct dispatch of exact queued NextEncounterPhase via overridePhase; original CommandPhase restored as standby; no natural victory or queued successor execution');
  assert.equal(e.wave,2);assert.equal(e.turn,1);assert.equal(e.prior,'CommandPhase');assert.equal(e.selected,'NextEncounterPhase');
  assert.equal(e.restored_same_standby,true);assert.equal(e.init_encounter_queued,true);
@@ -90,7 +107,7 @@ function validateEncounter(e){
  assert(Buffer.byteLength(JSON.stringify(e))<=7500);
 }
 function validate(d){
-  validateBinder(d.binder);validateEncounter(d.direct_queued_encounter);
+  validateBinder(d.binder);validateEncounter(d.direct_queued_encounter);validateTownPool(d.direct_queued_encounter.pool,d.direct_queued_encounter);
   assert.equal(d.direct_queued_encounter.before,d.direct_next_battle.post.rng);
   assert.deepEqual(d.direct_queued_encounter.constructed.map(p=>p.level),d.direct_next_battle.post.enemy_levels);
   shape(d,['schema_version','source_sha','setup_seed','scope','binder','context','catalog','predicate_draws','option_count','free_picks','rng','regeneration_draws','count_draws','option_draws','options','identities','generator_calls','direct_next_battle','direct_queued_encounter']);
@@ -202,7 +219,7 @@ function validate(d){
   }
 }
 validate(data);
-const mutations=[d=>d.binder.party[0].tm.max_moves=0,d=>d.binder.party[0].tm.omniform="false",d=>d.binder.party[0].tm.available.push(0),d=>d.binder.rare_candy_friendship=-1,d=>d.direct_queued_encounter.before="!rnd,wrong",d=>d.direct_queued_encounter.constructed[0].level+=1,d=>d.direct_queued_encounter.restored_same_standby=false,d=>d.direct_queued_encounter.constructed=[],d=>d.direct_queued_encounter.turn=2,d=>d.binder.party[0].evolutions.rows[0].item=-1,d=>d.binder.party[0].evolutions.rows[0].item="0",d=>d.binder.party[0].level_cap=11,d=>d.binder.party[0].move_closure.pop(),d=>d.option_count=2,d=>d.free_picks=2,d=>d.catalog[0][1]=99,d=>d.catalog[0][6]=-1,
+const mutations=[d=>d.direct_queued_encounter.pool.rows.pop(),d=>d.direct_queued_encounter.pool.rows[0][4]=!d.direct_queued_encounter.pool.rows[0][4],d=>d.direct_queued_encounter.pool.rows[0][1]=0,d=>d.direct_queued_encounter.pool.difficulty="unknown",d=>d.direct_queued_encounter.unwrapped=[],d=>d.direct_queued_encounter.unwrapped[0].frames=["C:/secret.ts:1:1"],d=>d.binder.party[0].tm.max_moves=0,d=>d.binder.party[0].tm.omniform="false",d=>d.binder.party[0].tm.available.push(0),d=>d.binder.rare_candy_friendship=-1,d=>d.direct_queued_encounter.before="!rnd,wrong",d=>d.direct_queued_encounter.constructed[0].level+=1,d=>d.direct_queued_encounter.restored_same_standby=false,d=>d.direct_queued_encounter.constructed=[],d=>d.direct_queued_encounter.turn=2,d=>d.binder.party[0].evolutions.rows[0].item=-1,d=>d.binder.party[0].evolutions.rows[0].item="0",d=>d.binder.party[0].level_cap=11,d=>d.binder.party[0].move_closure.pop(),d=>d.option_count=2,d=>d.free_picks=2,d=>d.catalog[0][1]=99,d=>d.catalog[0][6]=-1,
  d=>d.options.pop(),d=>d.count_draws=[[0,1,1]],d=>d.source_sha='bad',
  d=>d.direct_next_battle.post.wave=3,d=>d.direct_next_battle.trace=[],d=>d.direct_next_battle.queued=[],d=>d.direct_next_battle.level_calls[0].battle_seed='wrong',
  d=>d.direct_next_battle.post.format.adjacency={},d=>d.direct_next_battle.pre.format.adjacency.rows.pop(),
@@ -219,4 +236,5 @@ summary.direct_next_battle={scope:data.direct_next_battle.scope,pre:data.direct_
  draw_count:data.direct_next_battle.draws.length,draw_sha256:hash(Buffer.from(JSON.stringify(data.direct_next_battle.draws))),
  queued:data.direct_next_battle.queued,level_calls:data.direct_next_battle.level_calls};
 summary.direct_queued_encounter={sha256:hash(Buffer.from(JSON.stringify(data.direct_queued_encounter))),wave:data.direct_queued_encounter.wave,turn:data.direct_queued_encounter.turn,draws:data.direct_queued_encounter.draws.length,methods:data.direct_queued_encounter.trace.map(r=>r.method),species:data.direct_queued_encounter.prepared.map(p=>p.species),restored_same_standby:true,init_encounter_queued:true};
+summary.town_pool={sha256:hash(Buffer.from(JSON.stringify(data.direct_queued_encounter.pool))),rows:data.direct_queued_encounter.pool.rows.length,difficulty:data.direct_queued_encounter.pool.difficulty,callers_sha256:hash(Buffer.from(JSON.stringify(data.direct_queued_encounter.unwrapped)))};
 const out=Buffer.from(JSON.stringify(summary)+'\n');assert(out.length<=8192);writeFileSync(process.argv[4],out,{flag:'wx'});
