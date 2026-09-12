@@ -1,3 +1,4 @@
+import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { globalScene } from "#app/global-scene";
 import { BattleStyle } from "#enums/battle-style";
 import { BiomeId } from "#enums/biome-id";
@@ -53,6 +54,8 @@ test("observe actual initialized reward selection",async()=>{
   });
   try {
     const context={wave:scene.currentBattle.waveIndex,turn:scene.currentBattle.turn,biome:scene.arena.biomeId,
+      constructor:{seed:scene.seed,wave_seed:scene.waveSeed,battle_seed:scene.currentBattle.battleSeed,enemy_levels:scene.currentBattle.enemyLevels,
+        tuning:{wave_slope:erBalanceNum("vanilla.level.waveSlope"),quad_divisor:erBalanceNum("vanilla.level.quadDivisor"),boss_mult:erBalanceNum("vanilla.level.bossMult")}},
       party:party.map(p=>({species:p.species.speciesId,form:p.formIndex,level:p.level,hp:p.hp,max_hp:p.getMaxHp(),
         ability:p.getAbility().id,passives:p.getPassiveAbilities().map(a=>a?.id??null),shiny:p.shiny,variant:p.variant})),
       modifiers:scene.modifiers.map(m=>({id:m.type.id,class_name:m.constructor.name,stack:m.stackCount}))};
@@ -69,11 +72,12 @@ test("observe actual initialized reward selection",async()=>{
     const generatedRng=Phaser.Math.RND.state();
     const optionDraws=draws.splice(0);
     const serialized=serializeRewardOptions(options);
+    const identities=options.map(option=>({name:option.type.name,group:option.type.group??null}));
     expect(Phaser.Math.RND.state()).toBe(generatedRng);
     // Direct source predicate values are an input-conditioned catalog, not a
     // substitute for regenerate's saturation/generator filtering algorithm.
     const pool=getModifierPoolForType(ModifierPoolType.PLAYER);
-    const catalog:Array<[number,number,string,string,boolean,boolean,number,boolean,number]>=[];
+    const catalog:Array<[number,number,string,string,boolean,boolean,number,boolean,number,string,string|null]>=[];
     for(const [tier,entries] of Object.entries(pool))for(const [index,entry] of entries.entries()){
       const dynamic=typeof entry.weight==="function";
       if(dynamic)expect(vi.isMockFunction(entry.weight)).toBe(false);
@@ -84,7 +88,7 @@ test("observe actual initialized reward selection",async()=>{
       const maxWeight=maxDynamic?(entry.maxWeight as (value:typeof party,reroll:number)=>number)(party,0):entry.maxWeight as number;
       expect(Number.isFinite(maxWeight)&&maxWeight>=0).toBe(true);
       catalog.push([Number(tier),index,entry.modifierType.id,entry.modifierType.constructor.name,
-        entry.modifierType instanceof ModifierTypeGenerator,dynamic,weight,maxDynamic,maxWeight]);
+        entry.modifierType instanceof ModifierTypeGenerator,dynamic,weight,maxDynamic,maxWeight,entry.modifierType.name,entry.modifierType.group??null]);
     }
     expect(catalog.length).toBeGreaterThan(0);expect(catalog.length).toBeLessThanOrEqual(1024);
     const predicateDraws=draws.splice(0);
@@ -92,7 +96,7 @@ test("observe actual initialized reward selection",async()=>{
       scope:"actual initialized pool predicates and direct SelectModifierPhase generation methods; not a post-victory state or applied reward",
       context,catalog,predicate_draws:predicateDraws,option_count:count,free_picks:freePicks,
       rng:{seed:seedRng,regenerated:regeneratedRng,generated:generatedRng},
-      regeneration_draws:regenerationDraws,count_draws:countDraws,option_draws:optionDraws,options:serialized};
+      regeneration_draws:regenerationDraws,count_draws:countDraws,option_draws:optionDraws,options:serialized,identities};
     const bytes=Buffer.from(JSON.stringify(data)+"\n");expect(bytes.length).toBeLessThanOrEqual(32768);
     writeFileSync(output,bytes,{flag:"wx"});
   } finally {spy.mockRestore();Phaser.Math.RND.state(originalRng);}

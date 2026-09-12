@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 BOUNDED_HELPER_BYTES = 38620
-EXPORTER_SHA256 = "e9af1bce05a08418899f95f27ce90230c0cb14c9452d25c3f53d69659a4c5cfd"
+EXPORTER_SHA256 = "33e1c420eeb57e9e52c8fb42a6da111015e0c3e52f40d9b42d8da4d2947c4550"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -509,6 +509,7 @@ ORACLE_PINS.update({
 })
 
 ORACLE_PINS.update({
+    "src/data/elite-redux/er-balance-tuning.ts": ["a9d2f5e6e46422eeaf014b8881913eec0c5bc36377caadd2e09d8081c984c1c4", 6197],
     "src/phases/select-modifier-phase.ts": ["e5af52ef51c9d0dc27314c4ae51ac281d6b53269d21e5953a1e23e5ad1f5fb5b", 173752],
     "src/modifier/modifier-type.ts": ["264145c654c09aac83befb454ad8c9adb3f6992383fcdf73da121bc28a935a30", 145957],
     "src/utils/modifier-utils.ts": ["77fb8bad86c548e0c2bf59041a94802536742170776650018f0be5efcf2bd194", 1204],

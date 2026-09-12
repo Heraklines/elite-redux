@@ -9,16 +9,26 @@ const data=JSON.parse(raws[0]);
 const integer=(n,min,max)=>assert(Number.isSafeInteger(n)&&n>=min&&n<=max);
 const shape=(v,k)=>assert.deepEqual(Object.keys(v).sort(),[...k].sort());
 function validate(d){
-  shape(d,['schema_version','source_sha','seed','scope','context','catalog','predicate_draws','option_count','free_picks','rng','regeneration_draws','count_draws','option_draws','options']);
+  shape(d,['schema_version','source_sha','seed','scope','context','catalog','predicate_draws','option_count','free_picks','rng','regeneration_draws','count_draws','option_draws','options','identities']);
   assert.equal(d.schema_version,1);assert.equal(d.source_sha,'399d5d368f0b5642ebf8f45bd8a5e73350fa4de7');
   assert.equal(d.seed,'m9e-reward-selection-source-v1');
   assert.equal(d.scope,'actual initialized pool predicates and direct SelectModifierPhase generation methods; not a post-victory state or applied reward');
   assert.equal(d.context.wave,1);assert.equal(d.context.party.length,1);assert.equal(d.context.party[0].species,1);
+  shape(d.context.constructor,['seed','wave_seed','battle_seed','enemy_levels','tuning']);
+  shape(d.context.constructor.tuning,['wave_slope','quad_divisor','boss_mult']);
+  for(const value of Object.values(d.context.constructor.tuning))assert(Number.isFinite(value)&&value>0&&value<=1000000);
+  assert.equal(d.context.constructor.seed,d.seed);
+  assert(typeof d.context.constructor.wave_seed==='string'&&d.context.constructor.wave_seed.length<=128);
+  assert(typeof d.context.constructor.battle_seed==='string'&&d.context.constructor.battle_seed.length===16);
+  assert(Array.isArray(d.context.constructor.enemy_levels)&&d.context.constructor.enemy_levels.length===1);
+  for(const level of d.context.constructor.enemy_levels)integer(level,1,10000);
+  assert(Array.isArray(d.identities)&&d.identities.length===3);
+  for(const identity of d.identities){shape(identity,['name','group']);assert(typeof identity.name==='string'&&identity.name.length<=256);assert(identity.group===null||(typeof identity.group==='string'&&identity.group.length<=128));}
   assert.equal(d.option_count,3);assert.equal(d.free_picks,1);
   assert(Array.isArray(d.catalog)&&d.catalog.length>0&&d.catalog.length<=1024);
   const seen=new Set(),last=new Map();
   for(const r of d.catalog){
-    assert(Array.isArray(r)&&r.length===9);integer(r[0],0,4);integer(r[1],0,1023);
+    assert(Array.isArray(r)&&r.length===11);integer(r[0],0,4);integer(r[1],0,1023);
     assert.equal(r[1],(last.get(r[0])??-1)+1);last.set(r[0],r[1]);
     assert(!seen.has(`${r[0]}/${r[1]}`));seen.add(`${r[0]}/${r[1]}`);
     assert(typeof r[2]==='string'&&/^[A-Z0-9_]{1,128}$/.test(r[2]));
@@ -27,6 +37,8 @@ function validate(d){
     assert(Number.isFinite(r[6])&&r[6]>=0&&r[6]<=1000000000);
     assert.equal(typeof r[7],'boolean');
     assert(Number.isFinite(r[8])&&r[8]>=0&&r[8]<=1000000000);
+    assert(typeof r[9]==='string'&&r[9].length<=256);
+    assert(r[10]===null||(typeof r[10]==='string'&&r[10].length<=128));
   }
   for(const key of ['predicate_draws','regeneration_draws','count_draws','option_draws']){
     assert(Array.isArray(d[key])&&d[key].length<=1024);
@@ -49,6 +61,6 @@ for(const change of mutations){const m=structuredClone(data);change(m);assert.th
 const summary={schema_version:1,status:'passed',source_sha:data.source_sha,scope:data.scope,
  exports:raws.map(r=>({bytes:r.length,sha256:hash(r)})),identical_fresh_processes:2,negative_checks:mutations.length,
  catalog_rows:data.catalog.length,catalog_sha256:hash(Buffer.from(JSON.stringify(data.catalog))),
- context:data.context,option_count:data.option_count,free_picks:data.free_picks,options:data.options,
+ context:data.context,option_count:data.option_count,free_picks:data.free_picks,options:data.options,identities:data.identities,
  draw_counts:Object.fromEntries(['predicate_draws','regeneration_draws','count_draws','option_draws'].map(k=>[k,data[k].length])),rng:data.rng};
 const out=Buffer.from(JSON.stringify(summary)+'\n');assert(out.length<=8192);writeFileSync(process.argv[4],out,{flag:'wx'});
