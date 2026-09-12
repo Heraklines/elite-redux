@@ -359,6 +359,85 @@ fn admit_knockout(
     Ok((live, ledger))
 }
 
+#[inline(never)]
+fn assert_faint_timeline(
+    kernel: &mut GameKernelV7, content: Arc<PreparedGameContentV2>,
+    seen: &mut [Option<er_types::PresentationEventId>; 2],
+) -> Result<()> {
+    use er_state::current_faint_execution::CurrentFaintPhaseV1 as F;
+    use er_game::m9e_material_v6::GamePresentationPayloadV1 as P;
+    let checkpoint = kernel.snapshot()?;
+    let state = active(&checkpoint)?;
+    let owner = state.current_battle_participation.as_ref()
+        .and_then(|owner| owner.experience.as_ref()).ok_or("experience owner absent")?;
+    let faint = &owner.source_progression.as_ref().ok_or("source owner absent")?.initial_faint;
+    let Some(phase) = &faint.phase else { return Ok(()); };
+    let address = phase.address();
+    assert_eq!(faint.enemy_faints, 1);
+    assert_eq!(faint.history.len(), 1);
+    assert_eq!(faint.history[0].pokemon, address.pokemon);
+    assert_eq!(faint.history[0].turn, address.turn);
+    let battle = state.active_run.as_ref().and_then(|run| run.battle.as_ref()).ok_or("battle absent")?;
+    let slot = battle.field.slots.iter().find(|slot| slot.slot == address.slot).ok_or("faint slot absent")?;
+    let enemy = battle.enemy_party.iter().find(|enemy| enemy.id == address.pokemon).ok_or("faint enemy absent")?;
+    let tracker = state.current_achievement_tracker.as_ref().and_then(|tracker| tracker.battle.as_ref()).ok_or("tracker absent")?;
+    assert_eq!(tracker.enemy_ko_turns.get(&address.pokemon), Some(&address.turn));
+    assert!(tracker.enemy_field_faints.contains(&address.pokemon));
+    let (index, event_id, payload) = match phase {
+        F::Animation { event_id, .. } => {
+            assert_eq!(slot.occupant, Some(address.pokemon), "leaveField must wait for the animation callback");
+            assert_eq!(faint.battle_score, SafeU53::ZERO);
+            (0, *event_id, P::FaintAnimation { holder: address.pokemon, tween_milliseconds: 500 })
+        }
+        F::Message { event_id, .. } => {
+            assert!(seen[0].is_some(), "faint message cannot bypass animation");
+            assert_eq!(slot.occupant, None);
+            assert_eq!(faint.battle_score, address.score_increase);
+            assert_eq!(enemy.status.kind, er_types::battle_model::StatusKind::None);
+            assert_ne!(Some(*event_id), seen[0], "message owns a distinct presentation event");
+            (1, *event_id, P::FaintMessage { holder: address.pokemon })
+        }
+        F::ReadyForVictory { .. } => {
+            assert!(seen.iter().all(Option::is_some), "Victory must follow both actual faint callbacks");
+            assert_eq!(slot.occupant, None);
+            assert_eq!(faint.battle_score, address.score_increase);
+            return Ok(());
+        }
+        F::MessageReady { .. } => return Err("unpublished intermediate faint state escaped its transaction".into()),
+    };
+    assert!(seen[index].is_none(), "acknowledged faint phase repeated");
+    seen[index] = Some(event_id);
+    assert!(owner.pending.iter().all(|pending| pending.victory.is_none()), "Victory started before Faint finished");
+    let effect = checkpoint.pending_presentations.iter().find(|pending| pending.event_id == event_id).ok_or("owned faint presentation absent")?;
+    assert_eq!(effect.payload.as_ref(), Some(&payload));
+    let original = canonical_bytes(&checkpoint)?;
+    if index == 0 {
+        assert!(kernel.settle_presentation_outcome(event_id,
+            er_kernel::game_kernel_v7::KernelPresentationOutcomeV2::IntentionallySkipped).is_err());
+        assert_eq!(canonical_bytes(&kernel.snapshot()?)?, original);
+    }
+    let blocked = kernel.advance_time(SafeU53::ZERO)?;
+    assert!(!blocked.effects.iter().any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. })));
+    assert_eq!(kernel.state(), Some(state));
+    assert_missing_phase_wait_rejected(&checkpoint, event_id, content)?;
+    Ok(())
+}
+
+#[inline(never)]
+fn assert_missing_phase_wait_rejected(
+    checkpoint: &CoreGameKernelSnapshotV7, event_id: er_types::PresentationEventId,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<()> {
+    let mut missing = checkpoint.clone();
+    missing.pending_presentations.retain(|pending| pending.event_id != event_id);
+    assert!(restore(missing, content.clone()).is_err(), "removing a presentation is not acknowledgement");
+    let mut changed = checkpoint.clone();
+    changed.pending_presentations.iter_mut().find(|pending| pending.event_id == event_id)
+        .ok_or("owned presentation absent")?.payload = None;
+    assert!(restore(changed, content).is_err(), "presentation payload must match the exact phase receipt");
+    Ok(())
+}
+
 #[test]
 fn raw_knockout_waits_for_xp_prompt_then_level_stats_with_exact_material_restore() -> Result<()> {
     let content = content()?;
@@ -376,8 +455,10 @@ fn raw_knockout_waits_for_xp_prompt_then_level_stats_with_exact_material_restore
     let mut saw_award = false;
     let mut saw_level_start = false;
     let mut reached_stats = false;
+    let mut faint_events = [None, None];
     // Explicit test watchdog; reaching it is failure, never an implicit drain.
     for _ in 0..96 {
+        assert_faint_timeline(&mut kernel, content.clone(), &mut faint_events)?;
         let checkpoint = kernel.snapshot()?;
         let state = active(&checkpoint)?;
         let pokemon = &state.active_run.as_ref().ok_or("run absent")?.party[0];
@@ -502,6 +583,10 @@ fn raw_knockout_waits_for_xp_prompt_then_level_stats_with_exact_material_restore
         }
         for presentation in kernel.snapshot()?.pending_presentations {
             kernel.settle_presentation(presentation.event_id)?;
+            let settled = canonical_bytes(&kernel.snapshot()?)?;
+            assert!(kernel.settle_presentation(presentation.event_id).is_err());
+            assert_eq!(canonical_bytes(&kernel.snapshot()?)?, settled,
+                "duplicate presentation callback must be rejected atomically");
             assert_eq!(live.as_ref(), kernel.state());
         }
         let snapshot = kernel.snapshot()?;
@@ -531,6 +616,7 @@ fn raw_knockout_waits_for_xp_prompt_then_level_stats_with_exact_material_restore
         "actual XP and LevelUp presentation did not finish within the watchdog"
     );
     assert_eq!(live.as_ref(), kernel.state());
+    assert!(faint_events.iter().all(Option::is_some));
     let legitimate = kernel.snapshot()?;
     let original = canonical_bytes(&legitimate)?;
     let mut wrong_xp = legitimate.clone();

@@ -195,11 +195,11 @@ fn advance_current_turn(
     for mutation in &mutations {
         if let BattleMutation::HpChanged {
             pokemon,
-            before,
+            before: hp_before,
             after,
         } = mutation
         {
-            if *before == 0 || *after != 0 {
+            if *hp_before == 0 || *after != 0 {
                 continue;
             }
             let slot = battle
@@ -229,7 +229,7 @@ fn advance_current_turn(
                 {
                     if *target != *pokemon
                         || *target_slot != slot
-                        || *target_hp_before != *before
+                        || *target_hp_before != *hp_before
                         || *target_hp_after != 0
                         || *damage == 0
                     {
