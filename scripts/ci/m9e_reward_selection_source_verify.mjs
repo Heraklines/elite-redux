@@ -19,7 +19,7 @@ function exactJsonArg(value,depth=0){
   for(const key of keys){assert(typeof key==='string'&&key.length<=128);exactJsonArg(value[key],depth+1);}
 }
 function validateBinder(b){
-  shape(b,['party','mode','unlocks']);assert(Array.isArray(b.party)&&b.party.length===1);
+  shape(b,['party','mode','unlocks','rare_candy_friendship']);assert(Number.isFinite(b.rare_candy_friendship)&&b.rare_candy_friendship>=0&&b.rare_candy_friendship<=255);assert(Array.isArray(b.party)&&b.party.length===1);
   shape(b.mode,['classic','daily','fun','coop','spliced_only','fresh_start','challenges','fun_mega']);
   for(const [key,value] of Object.entries(b.mode))if(key!=='challenges')assert.equal(typeof value,'boolean');
   assert.equal(b.mode.classic,true);for(const key of ['daily','fun','coop','spliced_only','fresh_start'])assert.equal(b.mode[key],false);
@@ -28,12 +28,19 @@ function validateBinder(b){
   shape(b.unlocks,['eviolite','mini_black_hole']);for(const v of Object.values(b.unlocks))assert.equal(typeof v,'boolean');
   const functionFact=v=>{if(v===null)return;shape(v,['bytes','sha256']);integer(v.bytes,1,16384);assert(/^[0-9a-f]{64}$/.test(v.sha256));};
   for(const p of b.party){
-    shape(p,['species','form','form_key','level_cap','level_rows','all_level_rows_count','all_level_rows_sha256','live_move_ids','move_closure','evolutions','forms','held','learnable_now']);
+    shape(p,['species','form','form_key','level_cap','level_rows','all_level_rows_count','all_level_rows_sha256','live_move_ids','move_closure','evolutions','forms','held','learnable_now','tm']);
     assert.equal(p.species,1);integer(p.form,0,255);assert(typeof p.form_key==='string'&&p.form_key.length<=128);assert.equal(p.level_cap,10);
     integer(p.all_level_rows_count,0,256);assert(/^[0-9a-f]{64}$/.test(p.all_level_rows_sha256));
     assert(Array.isArray(p.level_rows)&&p.level_rows.length<=64&&p.level_rows.length<=p.all_level_rows_count);
     for(const row of p.level_rows){assert(Array.isArray(row)&&row.length===2);integer(row[0],1,10);integer(row[1],1,100000);}
     for(const key of ['live_move_ids','learnable_now']){assert(Array.isArray(p[key])&&p[key].length<=(key==='live_move_ids'?4:256));for(const id of p[key])integer(id,1,100000);}
+        shape(p.tm,['compatible','available','used','omniform','max_moves']);assert.equal(typeof p.tm.omniform,'boolean');integer(p.tm.max_moves,1,32);
+    for(const k of ['compatible','available']){assert(Array.isArray(p.tm[k])&&p.tm[k].length<=512);for(const id of p.tm[k])integer(id,0,100000);}
+    const expectedTm=[...new Set(p.tm.compatible.filter(id=>id!==0&&!p.live_move_ids.includes(id)))];assert.deepEqual(p.tm.available,expectedTm);
+    shape(p.tm.used,['own','defined','value']);assert.equal(typeof p.tm.used.own,'boolean');assert.equal(typeof p.tm.used.defined,'boolean');
+    if(!p.tm.used.defined)assert.equal(p.tm.used.value,null);
+    if(p.tm.used.value!==null){assert(Array.isArray(p.tm.used.value)&&p.tm.used.value.length<=512);for(const id of p.tm.used.value)integer(id,1,100000);}
+    assert(Buffer.byteLength(JSON.stringify(p.tm))<=4000);
     const expected=[...new Set([...p.live_move_ids,...p.level_rows.map(r=>r[1])])];
     assert(Array.isArray(p.move_closure)&&p.move_closure.length<=32);assert.deepEqual(p.move_closure.map(m=>m.id),expected);
     for(const m of p.move_closure){
@@ -195,7 +202,7 @@ function validate(d){
   }
 }
 validate(data);
-const mutations=[d=>d.direct_queued_encounter.before="!rnd,wrong",d=>d.direct_queued_encounter.constructed[0].level+=1,d=>d.direct_queued_encounter.restored_same_standby=false,d=>d.direct_queued_encounter.constructed=[],d=>d.direct_queued_encounter.turn=2,d=>d.binder.party[0].evolutions.rows[0].item=-1,d=>d.binder.party[0].evolutions.rows[0].item="0",d=>d.binder.party[0].level_cap=11,d=>d.binder.party[0].move_closure.pop(),d=>d.option_count=2,d=>d.free_picks=2,d=>d.catalog[0][1]=99,d=>d.catalog[0][6]=-1,
+const mutations=[d=>d.binder.party[0].tm.max_moves=0,d=>d.binder.party[0].tm.omniform="false",d=>d.binder.party[0].tm.available.push(0),d=>d.binder.rare_candy_friendship=-1,d=>d.direct_queued_encounter.before="!rnd,wrong",d=>d.direct_queued_encounter.constructed[0].level+=1,d=>d.direct_queued_encounter.restored_same_standby=false,d=>d.direct_queued_encounter.constructed=[],d=>d.direct_queued_encounter.turn=2,d=>d.binder.party[0].evolutions.rows[0].item=-1,d=>d.binder.party[0].evolutions.rows[0].item="0",d=>d.binder.party[0].level_cap=11,d=>d.binder.party[0].move_closure.pop(),d=>d.option_count=2,d=>d.free_picks=2,d=>d.catalog[0][1]=99,d=>d.catalog[0][6]=-1,
  d=>d.options.pop(),d=>d.count_draws=[[0,1,1]],d=>d.source_sha='bad',
  d=>d.direct_next_battle.post.wave=3,d=>d.direct_next_battle.trace=[],d=>d.direct_next_battle.queued=[],d=>d.direct_next_battle.level_calls[0].battle_seed='wrong',
  d=>d.direct_next_battle.post.format.adjacency={},d=>d.direct_next_battle.pre.format.adjacency.rows.pop(),

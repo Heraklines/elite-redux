@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { isErOmniformMon } from "#data/elite-redux/omniform-movesets";
 import { createArrangement } from "#data/battle-format";
 import { allMoves } from "#data/data-lists";
 import { pokemonEvolutions } from "#balance/pokemon-evolutions";
@@ -19,6 +20,10 @@ function binderFacts(scene:typeof globalScene){
   };
   const facts=scene.getPlayerParty().map(p=>{
     const species=p.species.speciesId;
+    const tmBefore=Phaser.Math.RND.state();expect(vi.isMockFunction(p.getErTmCaseMoves)).toBe(false);
+    const tm={omniform:isErOmniformMon(p),max_moves:p.getMaxMoveCount(),compatible:[...p.compatibleTms],available:p.getErTmCaseMoves(),used:{own:Object.hasOwn(p,"usedTMs"),defined:p.usedTMs!==undefined,value:p.usedTMs===undefined?null:p.usedTMs}};
+    expect(tm.compatible.length).toBeLessThanOrEqual(512);expect(tm.available.length).toBeLessThanOrEqual(512);
+    expect(Buffer.byteLength(JSON.stringify(tm))).toBeLessThanOrEqual(4000);expect(Phaser.Math.RND.state()).toBe(tmBefore);
     const evolutionPresent=Object.hasOwn(pokemonEvolutions,species);
     const evolutions=evolutionPresent?pokemonEvolutions[species]:[];
     const formPresent=Object.hasOwn(pokemonFormChanges,species);
@@ -37,7 +42,7 @@ function binderFacts(scene:typeof globalScene){
         attack:move.is("AttackMove"),attrs:move.attrs.map(a=>a.constructor.name),
         variable_types:variables.map(a=>({class_name:a.constructor.name,types:a.getTypesForItemSpawn(p,move)}))};
     };
-    return {species,form:p.formIndex,form_key:p.getFormKey(),level_cap:10,level_rows:levelRows,
+    return {species,form:p.formIndex,form_key:p.getFormKey(),level_cap:10,level_rows:levelRows,tm,
       all_level_rows_count:allLevelRows.length,all_level_rows_sha256:createHash("sha256").update(JSON.stringify(allLevelRows)).digest("hex"),
       live_move_ids:p.getMoveset().map(pm=>pm.getMove().id),move_closure:moveIds.map(moveFact),
       evolutions:{present:evolutionPresent,rows:evolutions.map(e=>{
@@ -58,7 +63,7 @@ function binderFacts(scene:typeof globalScene){
       held:p.getHeldItems().map(m=>({id:m.type.id,class_name:m.constructor.name,stack:m.stackCount})),
       learnable_now:p.getLearnableLevelMoves()};
   });
-  const result={party:facts,mode:{classic:Boolean(scene.gameMode.isClassic),daily:Boolean(scene.gameMode.isDaily),
+  const result={party:facts,rare_candy_friendship:erBalanceNum("vanilla.friendship.gainRareCandy"),mode:{classic:Boolean(scene.gameMode.isClassic),daily:Boolean(scene.gameMode.isDaily),
     fun:Boolean(scene.gameMode.isFun),coop:Boolean(scene.gameMode.isCoop),spliced_only:Boolean(scene.gameMode.isSplicedOnly),
     fresh_start:scene.gameMode.isFreshStartChallenge(),challenges:scene.gameMode.challenges.map(c=>({id:c.id,value:c.value})),
     fun_mega:getFunModeConfig().megaMode},
