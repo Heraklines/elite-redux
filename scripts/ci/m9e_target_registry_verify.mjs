@@ -615,7 +615,7 @@ function validateVictoryTail(t) {
   assert.equal(t.scope,"initialized registry, initial-context consumers and actual direct neutral TurnEnd counter dispatch; not full battle-loop execution");
   assert.equal(t.rng_unchanged,true);
   const growl=t.growl;
-  keys(growl,["scope","move","families","abilities","cases","battle_rng_unchanged","rng_restored"]);
+  keys(growl,["scope","move","effective_stat_families","families","abilities","cases","battle_rng_unchanged","rng_restored"]);
   assert.equal(growl.scope,"actual Growl attr and captured stat child; controlled Attack stages, visual tween disabled; not a selected move or full battle loop");
   keys(growl.move,["id","category","power","attack_class","status_class","effective_category","effective_power","pacing","wave","power_multiplier","simulated_damage","chance","stats","stages","self_target"]);
   assert.equal(growl.move.attack_class,false);assert.equal(growl.move.status_class,true);assert.equal(growl.move.effective_category,1);assert.equal(growl.move.effective_power,24);assert.equal(growl.move.pacing,"normal");assert.equal(growl.move.wave,1);assert.equal(growl.move.power_multiplier,0.4);integer(growl.move.simulated_damage,1,1000000);
@@ -638,6 +638,14 @@ function validateVictoryTail(t) {
   for(const [index,row]of growl.cases.entries()){keys(row,["before","queued","after","decreased","applied","chance","message"]);
     assert.equal(row.before,[0,6,-6][index]);assert.equal(row.queued,row.before);assert.equal(row.after,[-1,5,-6][index]);
     assert.equal(row.decreased,index!==2);assert.equal(row.applied,true);assert.equal(row.chance,growl.move.chance);assert.equal(row.message,true);}
+  assert.deepEqual(growl.effective_stat_families.map(row=>row.id),abilityIds);
+  for(const row of growl.effective_stat_families){keys(row,["id","conditions","attrs"]);for(const value of row.conditions)bool(value);
+    for(const attr of row.attrs){keys(attr,["name","stat","condition"]);assert.equal(typeof attr.name,"string");if(attr.stat!==null)integer(attr.stat,1,7);if(attr.condition!==null)bool(attr.condition);}
+    if(row.id===51){assert.equal(row.attrs.length,1);assert.equal(row.attrs[0].stat,6);}
+    else if(row.id===62){assert.equal(row.attrs.length,1);assert.equal(row.attrs[0].condition,false);}
+    else if(row.id===94){assert(row.conditions.includes(false));}
+    else assert.equal(row.attrs.length,0);
+  }
   const dispatch=t.growl_dispatch;
   keys(dispatch,["scope","before","check","queued","after","hit_rng_changed","damage_rng_changed","child_rng_unchanged","global_rng_restored"]);
   assert.equal(dispatch.scope,"actual hitCheck and applyMoveEffects dispatch with explicit single-hit context, then captured stat child; excludes menu, PP and move animation");
@@ -710,7 +718,7 @@ const tailRaws=[process.argv[9],process.argv[10]].map(path=>{
 assert(tailRaws[0].equals(tailRaws[1]));
 const tailObservation=JSON.parse(tailRaws[0]);validateVictoryTail(tailObservation);
 let tailNegatives=0;
-for(const change of [t=>{delete t.growl_dispatch;},t=>t.growl_dispatch.queued.stage--,t=>t.growl_dispatch.after.hp--,t=>t.growl_dispatch.child_rng_unchanged=false,t=>t.growl.move.power_multiplier=1,t=>{delete t.growl;},t=>t.growl.move.stages=1,t=>t.growl.move.chance=30,t=>t.growl.cases[0].queued=-1,t=>t.growl.cases[0].after=0,t=>t.growl.cases[2].decreased=true,t=>t.growl.abilities[0].families.pop(),t=>t.growl.rng_restored=false,t=>t.growl.battle_rng_unchanged=false,t=>{delete t.battle_scores;},t=>t.battle_scores.cases.pop(),t=>t.battle_scores.cases[0].turn=3,t=>t.battle_scores.cases[1].input=114,t=>t.battle_scores.cases[4].multiplier=1,t=>t.battle_scores.cases[4].after++,t=>t.battle_scores.double=true,t=>t.battle_scores.restored=false,t=>t.battle_scores.rng_restored=false,t=>t.abilities.pop(),t=>t.abilities[1].id=t.abilities[0].id,
+for(const change of [t=>{delete t.growl.effective_stat_families;},t=>t.growl.effective_stat_families.pop(),t=>t.growl.effective_stat_families.find(row=>row.id===51).attrs[0].stat=1,t=>t.growl.effective_stat_families.find(row=>row.id===62).attrs[0].condition=true,t=>{delete t.growl_dispatch;},t=>t.growl_dispatch.queued.stage--,t=>t.growl_dispatch.after.hp--,t=>t.growl_dispatch.child_rng_unchanged=false,t=>t.growl.move.power_multiplier=1,t=>{delete t.growl;},t=>t.growl.move.stages=1,t=>t.growl.move.chance=30,t=>t.growl.cases[0].queued=-1,t=>t.growl.cases[0].after=0,t=>t.growl.cases[2].decreased=true,t=>t.growl.abilities[0].families.pop(),t=>t.growl.rng_restored=false,t=>t.growl.battle_rng_unchanged=false,t=>{delete t.battle_scores;},t=>t.battle_scores.cases.pop(),t=>t.battle_scores.cases[0].turn=3,t=>t.battle_scores.cases[1].input=114,t=>t.battle_scores.cases[4].multiplier=1,t=>t.battle_scores.cases[4].after++,t=>t.battle_scores.double=true,t=>t.battle_scores.restored=false,t=>t.battle_scores.rng_restored=false,t=>t.abilities.pop(),t=>t.abilities[1].id=t.abilities[0].id,
   t=>t.abilities[0].post_turn=[false],t=>t.raw_bulbasaur.applicable_sources=[],
   t=>t.modifiers[0].lapsing=true,t=>t.rng_unchanged=false,t=>t.money.captured=-1,
   t=>{delete t.turn_counters;},t=>t.turn_counters.before.holders[0].turn_count=0,

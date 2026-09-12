@@ -808,6 +808,7 @@ function observeActualGrowlChild() {
   }
   return {scope:"actual Growl attr and captured stat child; controlled Attack stages, visual tween disabled; not a selected move or full battle loop",
     move:{id:move.id,category:move.category,power:move.power,attack_class:move.is("AttackMove"),status_class:move.is("StatusMove"),effective_category:category,effective_power:power,pacing:getErRunPacing(),wave:scene.currentBattle.waveIndex,power_multiplier:getErEarlyWaveMovePowerMultiplier(scene.currentBattle.waveIndex),simulated_damage:query.damage,chance:move.chance,stats:attr.stats,stages:attr.stages,self_target:attr.selfTarget},
+    effective_stat_families:ABILITIES.map(id=>({id,conditions:allAbilities[id].conditions.map(c=>c(user)),attrs:allAbilities[id].getAttrs("StatMultiplierAbAttr").map(a=>({name:a.constructor.name,stat:(a as unknown as {stat?:number}).stat??null,condition:a.getCondition()?.(user)??null}))})),
     families,abilities,cases,battle_rng_unchanged:scene.currentBattle.captureDeterministicRngState()===battleRng,rng_restored:Phaser.Math.RND.state()===rng};
 }
 
