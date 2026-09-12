@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 BOUNDED_HELPER_BYTES = 38620
-EXPORTER_SHA256 = "4653cc54847ef8cd977ddb2ba20dc497bd62e6a69eaa9f870354644104345ab9"
+EXPORTER_SHA256 = "aff0e0fdd936d1bf28f2121a23d4ce37eea9b168463c7f536d6bab4d8005f856"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -201,6 +201,12 @@ EGG_DEFAULT_SOURCE_PINS = {
   "src/enums/gacha-types.ts": ["434afc14cddcc0e39b30989c0305bff42e06b78607c17b81c6683365102a8d7a", 294],
 }
 ORACLE_PINS.update(EGG_DEFAULT_SOURCE_PINS)
+ORACLE_PINS.update({
+  "src/data/balance/pokemon-evolutions.ts": ["12ef6b798fed0592591ff6a7d65aab5fa22b5cd6e358356fc689ff3aea6fb87f",75818],
+  "src/data/elite-redux/init-elite-redux-egg-tiers.ts": ["1e39d3c2d1827e43adb806412cb27ce56905023196a95c5921dbd910aea1ba25",21945],
+  "src/utils/pokemon-utils.ts": ["69347ffc750d55d17279e7efd35ed6fdb26cdf0caefdf36a6f56bc1bdb70e456",9032],
+  "src/data/balance/species-egg-tiers.ts": ["2bad8d6209b3bea01060a8021217683554759d02c4abbd6de43810f337816453",22471],
+})
 
 def require(condition, message):
     if not condition:

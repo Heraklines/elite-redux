@@ -18,6 +18,23 @@ const expectedNames = ['level-99', 'level-100', 'level-250', 'level-1000', 'leve
   'flash-first', 'flash-repeat', 'max-first-at-zero', 'max-repeat-after-zero'];
 const integer = value => Number.isSafeInteger(value);
 function verify(data) {
+  assert.deepEqual(data.fresh_egg_selection,{unlock_pity:[0,0,0,0],same_species_counters:{}});
+  assert(Array.isArray(data.rare_pool) && data.rare_pool.length > 0);
+  let total = 0, previousSpecies = 0;
+  const boundaries = data.rare_pool.map(row => {
+    assert.deepEqual(Object.keys(row).sort(),['species','cost','divisor','caught'].sort());
+    assert(integer(row.species) && row.species > previousSpecies && row.species !== 489 && row.species !== 490);
+    previousSpecies = row.species;
+    assert(Number.isFinite(row.cost) && row.cost > 0 && Number.isFinite(row.divisor) && row.divisor >= 1);
+    assert.equal(typeof row.caught,'boolean');
+    const clamped = Math.min(5, Math.max(4, row.cost));
+    let weight = Math.floor((((5-clamped)/2)*1.5+1)*100);
+    if(row.species === 201) weight=Math.max(1,Math.floor(weight*0.1));
+    weight=Math.max(1,Math.floor(weight/row.divisor));
+    total+=weight;
+    return {species:row.species,upper:total,caught:row.caught};
+  });
+  assert(integer(total) && total > 0 && integer(data.rare_move_rate) && data.rare_move_rate > 0);
   const egg=data.fresh_egg_account;
   assert.deepEqual(Object.keys(egg).sort(),['eggs','settings','vouchers','maximum','plan','rng_unchanged'].sort());
   assert.deepEqual(egg.eggs,[]);
@@ -51,6 +68,8 @@ function verify(data) {
     if (previous) assert.deepEqual(row.before, previous);
     previous = row.after;
     assert.equal(row.battle_rng_unchanged, true);
+    assert.deepEqual(row.after.same_species_counters,row.before.same_species_counters);
+    if(index !== 5) assert.deepEqual(row.after.unlock_pity,row.before.unlock_pity);
     assert.deepEqual(row.after.voucher_unlocks, row.before.voucher_unlocks);
     assert.deepEqual(row.after.voucher_counts, row.before.voucher_counts);
     assert(row.random_values.every(value => Number.isFinite(value) && value >= 0 && value < 1));
@@ -90,6 +109,26 @@ function verify(data) {
       assert.deepEqual(row.after.eggs.slice(0, -1), row.before.eggs);
       const egg = row.after.eggs.at(-1);
       assert.equal(egg.tier, 1);
+      assert.deepEqual(row.before.unlock_pity,[0,0,0,0]);
+      assert.equal(row.seeded_draws[0].min,0);
+      assert.equal(row.seeded_draws[0].max,total-1);
+      const selected=boundaries.find(entry => row.seeded_draws[0].result < entry.upper);
+      assert.equal(egg.species,selected.species);
+      const pity=[...row.before.unlock_pity];
+      pity[1]=selected.caught || row.before.eggs.some(prior => prior.species === selected.species) ? 1 : 0;
+      assert.deepEqual(row.after.unlock_pity,pity);
+      const rare=row.seeded_draws[1];
+      assert.equal(rare.min,0);
+      assert.equal(rare.max,data.rare_move_rate-1);
+      if(rare.result === 0) {
+        assert.equal(row.seeded_draws.length,2);
+        assert.equal(egg.egg_move,3);
+      } else {
+        assert.equal(row.seeded_draws.length,3);
+        assert.equal(row.seeded_draws[2].min,0);
+        assert.equal(row.seeded_draws[2].max,2);
+        assert.equal(egg.egg_move,row.seeded_draws[2].result);
+      }
       assert.equal(egg.source, 4);
       assert.equal(egg.shiny, false);
       assert.equal(egg.variant, 0);
@@ -117,6 +156,10 @@ function verify(data) {
 }
 verify(a.data);
 const mutations = [
+  data => data.fresh_egg_selection.unlock_pity[1] = 9,
+  data => data.rare_pool[0].divisor = 0,
+  data => data.rare_pool.reverse(),
+  data => data.rare_move_rate += 1,
   data => data.fresh_egg_account.settings.enabled = true,
   data => data.fresh_egg_account.eggs = [{}],
   data => data.fresh_egg_account.plan.eggsAfter = 1,
@@ -139,6 +182,7 @@ const result = { schema_version: 1, status: 'passed', source_sha: a.data.source_
   exports: [a.fact, b.fact], identical_fresh_processes: 2, cases: expectedNames,
   negative_checks: mutations.length, zero_timestamp_repeat_is_noop: true,
   fresh_egg_account:a.data.fresh_egg_account,
+  fresh_egg_selection:a.data.fresh_egg_selection, rare_pool_rows:a.data.rare_pool.length, rare_move_rate:a.data.rare_move_rate,
   flash: { egg: a.data.cases[5].after.eggs.at(-1), clock_values: a.data.cases[5].clock_values,
     random_values: a.data.cases[5].random_values, seeded_draws: a.data.cases[5].seeded_draws,
     seed_scopes: a.data.cases[5].seed_scopes, grant_calls: a.data.cases[5].grant_calls },

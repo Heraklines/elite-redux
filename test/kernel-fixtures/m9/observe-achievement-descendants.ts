@@ -1,3 +1,9 @@
+import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
+import { speciesEggTiers } from "#balance/species-egg-tiers";
+import { speciesStarterCosts } from "#balance/starters";
+import { erBalanceArr } from "#data/elite-redux/er-balance-tuning";
+import { getErEggWeightDivisor } from "#data/elite-redux/init-elite-redux-egg-tiers";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { ER_ACHIEVEMENT_REWARDS, resolveAchievementRewardTeam } from "#data/elite-redux/er-achievement-rewards";
@@ -75,6 +81,20 @@ test("observe actual level and Flash achievement descendants", async () => {
   expect({eggs:account.eggs,settings:account.autoEggRestock,vouchers:account.voucherCounts}).toEqual(eggDefaults);
   expect(Phaser.Math.RND.state()).toBe(eggRng);
   const freshEggAccount = {...eggDefaults,maximum:MAX_EGG_COUNT,plan:autoRestockPlan,rng_unchanged:true};
+  const freshEggSelection = { unlock_pity: structuredClone(account.unlockPity),
+    same_species_counters: structuredClone(account.sameSpeciesEggCounters) };
+  expect(freshEggSelection.unlock_pity).toEqual([0, 0, 0, 0]);
+  expect(freshEggSelection.same_species_counters).toEqual({});
+  // The initialized source registry supplies the complete Rare EVENT pool.
+  // Independent verification checks weights against the actual constructor draw.
+  const rarePool = Object.keys(speciesEggTiers).filter(key => speciesEggTiers[key] === 1)
+    .map(key => Number.parseInt(key)).filter(species => !Object.hasOwn(pokemonPrevolutions, species)
+      && species !== 489 && species !== 490 && Boolean(getPokemonSpecies(species)))
+    .map(species => ({ species, cost: speciesStarterCosts[species],
+      divisor: getErEggWeightDivisor(species), caught: Boolean(account.dexData[species].caughtAttr) }));
+  const rareMoveRate = erBalanceArr("vanilla.eggs.rareEggMoveRates")[1];
+  expect(rarePool.length).toBeGreaterThan(0);
+  expect(Phaser.Math.RND.state()).toBe(eggRng);
   const rng = Phaser.Math.RND.state();
   const randomValues: number[] = [];
   const clockValues: number[] = [];
@@ -120,6 +140,7 @@ test("observe actual level and Flash achievement descendants", async () => {
   const team = resolveAchievementRewardTeam(scene.getPlayerParty(), undefined);
   const roots = [...new Set(team.map(mon => account.getRootStarterSpeciesId(mon.species.speciesId)))];
   const snapshot = () => ({
+    unlock_pity: [...account.unlockPity], same_species_counters: { ...account.sameSpeciesEggCounters },
     unlocks: { ...account.achvUnlocks }, voucher_unlocks: { ...account.voucherUnlocks },
     voucher_counts: { ...account.voucherCounts },
     candy: roots.map(root => ({ root, count: account.starterData[root].candyCount })),
@@ -158,7 +179,7 @@ test("observe actual level and Flash achievement descendants", async () => {
     expect(cases.every(row => row.battle_rng_unchanged)).toBe(true);
     const bytes = Buffer.from(JSON.stringify({ schema_version: 1, source_sha: PIN,
       scope: "actual initialized validateAchv/validateAchvs and Egg/reward descendants; no battle win or hatching claim",
-      fresh_egg_account:freshEggAccount,
+      fresh_egg_account:freshEggAccount, fresh_egg_selection:freshEggSelection, rare_pool:rarePool, rare_move_rate:rareMoveRate,
       difficulty: getErDifficulty(), team: team.map(mon => ({ species: mon.species.speciesId,
         root: account.getRootStarterSpeciesId(mon.species.speciesId) })),
       definitions: KEYS.map(key => ({ key, id: achvs[key].id, recipe: ER_ACHIEVEMENT_REWARDS[key],
