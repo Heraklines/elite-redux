@@ -18,14 +18,15 @@ function validate(d){
   assert(Array.isArray(d.catalog)&&d.catalog.length>0&&d.catalog.length<=1024);
   const seen=new Set(),last=new Map();
   for(const r of d.catalog){
-    assert(Array.isArray(r)&&r.length===8);integer(r[0],0,4);integer(r[1],0,1023);
+    assert(Array.isArray(r)&&r.length===9);integer(r[0],0,4);integer(r[1],0,1023);
     assert.equal(r[1],(last.get(r[0])??-1)+1);last.set(r[0],r[1]);
     assert(!seen.has(`${r[0]}/${r[1]}`));seen.add(`${r[0]}/${r[1]}`);
     assert(typeof r[2]==='string'&&/^[A-Z0-9_]{1,128}$/.test(r[2]));
     assert(typeof r[3]==='string'&&/^[A-Za-z_$][A-Za-z0-9_$]{0,127}$/.test(r[3]));
     assert.equal(typeof r[4],'boolean');assert.equal(typeof r[5],'boolean');
     assert(Number.isFinite(r[6])&&r[6]>=0&&r[6]<=1000000000);
-    if(r[7]!==null)assert(Number.isFinite(r[7])&&r[7]>=0&&r[7]<=1000000000);
+    assert.equal(typeof r[7],'boolean');
+    assert(Number.isFinite(r[8])&&r[8]>=0&&r[8]<=1000000000);
   }
   for(const key of ['predicate_draws','regeneration_draws','count_draws','option_draws']){
     assert(Array.isArray(d[key])&&d[key].length<=1024);

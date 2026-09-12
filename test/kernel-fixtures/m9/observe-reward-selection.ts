@@ -73,14 +73,18 @@ test("observe actual initialized reward selection",async()=>{
     // Direct source predicate values are an input-conditioned catalog, not a
     // substitute for regenerate's saturation/generator filtering algorithm.
     const pool=getModifierPoolForType(ModifierPoolType.PLAYER);
-    const catalog:Array<[number,number,string,string,boolean,boolean,number,number|null]>=[];
+    const catalog:Array<[number,number,string,string,boolean,boolean,number,boolean,number]>=[];
     for(const [tier,entries] of Object.entries(pool))for(const [index,entry] of entries.entries()){
       const dynamic=typeof entry.weight==="function";
       if(dynamic)expect(vi.isMockFunction(entry.weight)).toBe(false);
       const weight=dynamic?(entry.weight as (value:typeof party,reroll:number)=>number)(party,0):entry.weight as number;
       expect(Number.isFinite(weight)&&weight>=0).toBe(true);
+      const maxDynamic=typeof entry.maxWeight==="function";
+      if(maxDynamic)expect(vi.isMockFunction(entry.maxWeight)).toBe(false);
+      const maxWeight=maxDynamic?(entry.maxWeight as (value:typeof party,reroll:number)=>number)(party,0):entry.maxWeight as number;
+      expect(Number.isFinite(maxWeight)&&maxWeight>=0).toBe(true);
       catalog.push([Number(tier),index,entry.modifierType.id,entry.modifierType.constructor.name,
-        entry.modifierType instanceof ModifierTypeGenerator,dynamic,weight,entry.maxWeight??null]);
+        entry.modifierType instanceof ModifierTypeGenerator,dynamic,weight,maxDynamic,maxWeight]);
     }
     expect(catalog.length).toBeGreaterThan(0);expect(catalog.length).toBeLessThanOrEqual(1024);
     const predicateDraws=draws.splice(0);
