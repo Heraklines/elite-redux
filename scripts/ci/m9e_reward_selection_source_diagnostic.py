@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 BOUNDED_HELPER_BYTES = 38620
-EXPORTER_SHA256 = "677a26f50bccd71f5c9cb189bf0df975decf5f4012d09045781b931a02a9df78"
+EXPORTER_SHA256 = "b6f3e86aac145129c6bdadae94b1110013c3679cba960bf986b4ed13d5e88d32"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -261,6 +261,26 @@ MOVE_INPUT_SOURCE_PINS = {
   ]
 }
 ORACLE_PINS.update(MOVE_INPUT_SOURCE_PINS)
+
+MOVE_CLOSURE_SOURCE_PINS = {
+  "src/data/balance/moves/signature-moves.ts": [
+    "94237921e92069feb85ed73cdc5c1971c87daf363809af84fb9f94a5beb0f7d2",
+    11141
+  ],
+  "src/data/moves/move-condition.ts": [
+    "281e3d248f87f593695cdc51f4b53edfe77031c6494dd356d8326af182eba9d0",
+    13413
+  ],
+  "src/enums/status-effect.ts": [
+    "0a1cf3a43c13fd1e82b639e47726edd0c440b3e04d40f90b3f3bd62017afa79e",
+    198
+  ],
+  "src/enums/battler-tag-type.ts": [
+    "2deb3a8649c6ea4c42cde77c38f97e316defcf286b09e25351837cf55421bf18",
+    10101
+  ]
+}
+ORACLE_PINS.update(MOVE_CLOSURE_SOURCE_PINS)
 
 def require(condition, message):
     if not condition:

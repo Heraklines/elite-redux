@@ -1,7 +1,12 @@
+import { FORCED_SIGNATURE_MOVES } from "#balance/moves/signature-moves";
+import { STAB_BLACKLIST,FORCED_SIGNATURE_MOVE_CHANCE } from "#balance/moves/moveset-generation";
+import { targetSleptOrComatoseCondition,userSleptOrComatoseCondition } from "#moves/move-condition";
+import { StatusEffect } from "#enums/status-effect";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { Pokemon,EnemyPokemon } from "#field/pokemon";
 import { Move } from "#data/moves/move";
 import { BASE_LEVEL_WEIGHT_OFFSET,BASE_WEIGHT_MULTIPLIER,EVOLUTION_MOVE_WEIGHT,RELEARN_MOVE_WEIGHT,EVO_MOVE_BP_THRESHOLD,MOVE_POWER_CEILING } from "#balance/moves/moveset-generation";
-const originalMoveMethods=[Pokemon.prototype.getLevelMoves,Move.prototype.calculateEffectivePower,Pokemon.prototype.getStat,EnemyPokemon.prototype.generateAndPopulateMoveset];
+const originalMoveMethods=[Pokemon.prototype.getLevelMoves,Move.prototype.calculateEffectivePower,Pokemon.prototype.getStat,EnemyPokemon.prototype.generateAndPopulateMoveset,Pokemon.prototype.getTypes];
 import { createHash } from "node:crypto";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { getEncounterSpeciesWeightMultiplier } from "#data/elite-redux/archetypes/ability-meta-consumers";
@@ -295,9 +300,12 @@ async function observeDirectQueuedEncounter(){
   }
   for(const key of ["randomSpecies","addEnemyPokemon","generateEnemyModifiers","resetSeed"] as const)wrap(key);
   // Observe actual generator calls only; never regenerate an enemy or draw for a probe.
+  expect([Pokemon.prototype.getLevelMoves,Move.prototype.calculateEffectivePower,Pokemon.prototype.getStat,EnemyPokemon.prototype.generateAndPopulateMoveset,Pokemon.prototype.getTypes]).toEqual(originalMoveMethods);
   let activeEnemy:EnemyPokemon|undefined;
+  const moveClosure:Array<{species:number,signature:{own:boolean,value:number|number[]|null},chance:number,types:number[][],rows:Array<[number,number,number,number,number[],number]>}>=[];
+  const typesActual=Pokemon.prototype.getTypes;
+  const typesSpy=vi.spyOn(Pokemon.prototype,"getTypes").mockImplementation(function(...args){const result=Reflect.apply(typesActual,this,args);if(this===activeEnemy){expect(moveClosure.at(-1)!.types.length).toBeLessThan(32);moveClosure.at(-1)!.types.push([...result]);}return result;});cleanups.push(()=>typesSpy.mockRestore());
   const moveInputs:Array<{species:number,form:number,level:number,boss:boolean,trainer:boolean,rival:boolean,entry:string,exit:string,start:number,end:number,level_rows:Array<[number,number]>,registry:Array<[number,number,number,boolean,number]>,powers:Array<[number,number]>,stats:Array<[number,number]>,moves:number[]}>=[];
-  expect([Pokemon.prototype.getLevelMoves,Move.prototype.calculateEffectivePower,Pokemon.prototype.getStat,EnemyPokemon.prototype.generateAndPopulateMoveset]).toEqual(originalMoveMethods);
   const levelActual=Pokemon.prototype.getLevelMoves,powerActual=Move.prototype.calculateEffectivePower,statActual=Pokemon.prototype.getStat;
   const levelsSpy=vi.spyOn(Pokemon.prototype,"getLevelMoves").mockImplementation(function(...args){const rows=Reflect.apply(levelActual,this,args);if(this===activeEnemy){expect(args).toEqual([1,true,true,false]);expect(moveInputs.at(-1)!.level_rows.length).toBe(0);expect(rows.length).toBeLessThanOrEqual(64);moveInputs.at(-1)!.level_rows=rows.map(row=>[row[0],row[1]]);}return rows;});cleanups.push(()=>levelsSpy.mockRestore());
   const powersSpy=vi.spyOn(Move.prototype,"calculateEffectivePower").mockImplementation(function(...args){const result=Reflect.apply(powerActual,this,args);if(activeEnemy&&args[0]===activeEnemy){expect(moveInputs.at(-1)!.powers.length).toBeLessThan(64);moveInputs.at(-1)!.powers.push([this.id,result]);}return result;});cleanups.push(()=>powersSpy.mockRestore());
@@ -307,11 +315,17 @@ async function observeDirectQueuedEncounter(){
   const generateActual=EnemyPokemon.prototype.generateAndPopulateMoveset;
   const generatorSpy=vi.spyOn(EnemyPokemon.prototype,"generateAndPopulateMoveset").mockImplementation(function(...args){
     expect(activeEnemy).toBeUndefined();expect(moveInputs.length).toBe(0);
+    const signature=FORCED_SIGNATURE_MOVES[this.species.speciesId];
+    moveClosure.push({species:this.species.speciesId,signature:{own:Object.hasOwn(FORCED_SIGNATURE_MOVES,this.species.speciesId),value:signature===undefined?null:Array.isArray(signature)?[...signature]:signature},chance:FORCED_SIGNATURE_MOVE_CHANCE,types:[],rows:[]});
     const row:typeof moveInputs[number]={species:this.species.speciesId,form:this.formIndex,level:this.level,boss:this.isBoss(),trainer:this.hasTrainer(),rival:args[0]??false,entry:Phaser.Math.RND.state(),exit:"",start:draws.length,end:0,level_rows:[],registry:[],powers:[],stats:[],moves:[]};moveInputs.push(row);activeEnemy=this;
     try{return Reflect.apply(generateActual,this,args);}finally{
       activeEnemy=undefined;row.exit=Phaser.Math.RND.state();row.end=draws.length;row.moves=this.getMoveset().map(m=>m.moveId);
       const attrs=["SacrificialAttrOnHit","DefAtkAttr","PhotonGeyserCategoryAttr","ShellSideArmCategoryAttr","TeraMoveCategoryAttr"] as const;
       row.registry=[...new Set(row.level_rows.map(r=>r[1]))].map(id=>{const m=allMoves[id];expect(m).toBeDefined();return [id,m.category,m.power,m.name.endsWith(" (N)"),attrs.reduce((flags,name,i)=>flags+(m.hasAttr(name)?2**i:0),0)];});
+      moveClosure.at(-1)!.rows=row.registry.map(([id])=>{const m=allMoves[id];
+        const predicates=[STAB_BLACKLIST.has(id),m.hasAttr("SacrificialAttr"),m.hasAttr("FixedDamageAttr"),m.hasAttr("WeatherChangeAttr"),m.is("SelfStatusMove"),m.is("StatusMove"),m.hasCondition(targetSleptOrComatoseCondition),m.hasCondition(userSleptOrComatoseCondition),m.attrs.some(a=>a.is("StatusEffectAttr")&&a.effect===StatusEffect.SLEEP),m.attrs.some(a=>a.is("AddBattlerTagAttr")&&a.tagType===BattlerTagType.DROWSY)];
+        const boost=m.getAttrs("StatStageChangeAttr")[0];expect(m.attrs.length).toBeLessThanOrEqual(64);expect(boost?.stats.length??0).toBeLessThanOrEqual(8);
+        return [id,m.type,predicates.reduce((flags,predicate,i)=>flags+(predicate?2**i:0),0),m.attrs.length,boost?[...boost.stats]:[],m.getAttrs("VariableMoveTypeAttr").length];});
       expect(Phaser.Math.RND.state()).toBe(row.exit);
     }
   });cleanups.push(()=>generatorSpy.mockRestore());
@@ -327,7 +341,8 @@ async function observeDirectQueuedEncounter(){
     expect(pm.getCurrentPhase()).toBe(prior);expect(scene.currentBattle.turn).toBe(1);
     expect(constructed.length).toBe(1);expect(pm.hasPhaseOfType("InitEncounterPhase")).toBe(true);
     expect(pool).toBeDefined();expect(unwrapped.length).toBeGreaterThan(0);expect(Buffer.byteLength(JSON.stringify(unwrapped))).toBeLessThanOrEqual(1000);
-    const move_inputs={scope:"actual single wild enemy generator calls and complete returned level registry; no all-species or natural encounter closure",battle_rng_calls:moveBattleRngCalls,calls:moveInputs,tuning:[BASE_LEVEL_WEIGHT_OFFSET,BASE_WEIGHT_MULTIPLIER,EVOLUTION_MOVE_WEIGHT,RELEARN_MOVE_WEIGHT,EVO_MOVE_BP_THRESHOLD,MOVE_POWER_CEILING]};expect(moveInputs.length).toBe(1);expect(moveBattleRngCalls).toBe(0);expect(Buffer.byteLength(JSON.stringify(move_inputs))).toBeLessThanOrEqual(2400);
+    expect(moveClosure.length).toBe(1);expect(Buffer.byteLength(JSON.stringify(moveClosure))).toBeLessThanOrEqual(1800);
+    const move_inputs={closure:moveClosure,scope:"actual single wild enemy generator calls and complete returned level registry; no all-species or natural encounter closure",battle_rng_calls:moveBattleRngCalls,calls:moveInputs,tuning:[BASE_LEVEL_WEIGHT_OFFSET,BASE_WEIGHT_MULTIPLIER,EVOLUTION_MOVE_WEIGHT,RELEARN_MOVE_WEIGHT,EVO_MOVE_BP_THRESHOLD,MOVE_POWER_CEILING]};expect(moveInputs.length).toBe(1);expect(moveBattleRngCalls).toBe(0);expect(Buffer.byteLength(JSON.stringify(move_inputs))).toBeLessThanOrEqual(2400);
     const result={move_inputs,pool,unwrapped,boss_calls:bossCalls,scope:"direct dispatch of exact queued NextEncounterPhase via overridePhase; original CommandPhase restored as standby; no natural victory or queued successor execution",
       wave:scene.currentBattle.waveIndex,turn:scene.currentBattle.turn,prior:prior.phaseName,selected:phase.phaseName,restored_same_standby:true,
       before,after:Phaser.Math.RND.state(),draws,trace,constructed,prepared:scene.getEnemyParty().map(pokemonFact),
