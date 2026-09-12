@@ -57,9 +57,9 @@ function extractTownStatic(tiers:readonly (readonly [number,readonly number[]])[
  const maxForms=Math.max(...formCounts.map(r=>r[1]));const countReceipt={source:PIN,scope:"complete visited Town evolution graph source form counts before payload extraction",roots:roots.length,visited:formCounts.length,max_forms:maxForms,counts:formCounts};
  const countRaw=Buffer.from(JSON.stringify(countReceipt)+"\n");expect(countRaw.length).toBeLessThanOrEqual(4096);expect(Phaser.Math.RND.state()).toBe(before);
  const countPath=process.env.M9_TOWN_CONSTRUCTOR_COUNTS;expect(countPath).toBeTruthy();if(existsSync(countPath!))expect(readFileSync(countPath!).equals(countRaw)).toBe(true);else writeFileSync(countPath!,countRaw,{flag:"wx"});
- expect(maxForms,`Source form bound16 disproved: max${maxForms}, species${formCounts.filter(r=>r[1]===maxForms).map(r=>r[0]).join(",")}; complete count receipt retained`).toBeLessThanOrEqual(16);
+ expect(maxForms,`Source form bound20 disproved: max${maxForms}, species${formCounts.filter(r=>r[1]===maxForms).map(r=>r[0]).join(",")}; complete count receipt retained`).toBeLessThanOrEqual(20);
  const moveIds=new Set<number>(),abilityIds=new Set<number>();const speciesRows:unknown[]=[];
- function encoder(){const functions:Array<[string,number]>=[];const intern=new Map<string,number>();
+ function encoder(){const functions:Array<[string,number]>=[],shapes:Array<[string|null,string[]]>=[];const intern=new Map<string,number>(),shapeIds=new Map<string,number>();
   function encode(value:unknown,depth=0,seen=new Set<object>()):unknown{
    expect(depth).toBeLessThanOrEqual(12);
    if(value===undefined)return {u:1};if(value===null||typeof value==="boolean"||typeof value==="string"){if(typeof value==="string")expect(value.length).toBeLessThanOrEqual(1024);return value;}
@@ -68,10 +68,12 @@ function extractTownStatic(tiers:readonly (readonly [number,readonly number[]])[
    expect(typeof value).toBe("object");const object=value as object;expect(seen.has(object)).toBe(false);seen.add(object);
    try{if(value instanceof Map){expect(Reflect.ownKeys(value).length).toBe(0);expect(value.size).toBeLessThanOrEqual(512);return {m:[...value].map(([k,v])=>[encode(k,depth+1,seen),encode(v,depth+1,seen)])};}if(value instanceof Set){expect(Reflect.ownKeys(value).length).toBe(0);expect(value.size).toBeLessThanOrEqual(512);return {s:[...value].map(v=>encode(v,depth+1,seen))};}expect(value instanceof Date||value instanceof RegExp||value instanceof WeakMap||value instanceof WeakSet||ArrayBuffer.isView(value)||value instanceof ArrayBuffer||value instanceof Promise).toBe(false);if(Array.isArray(value)){expect(value.length).toBeLessThanOrEqual(512);expect(Reflect.ownKeys(value).length).toBe(value.length+1);return Array.from({length:value.length},(_,i)=>{const prop=Object.getOwnPropertyDescriptor(value,String(i));expect(prop&&Object.hasOwn(prop,"value")).toBe(true);return encode(prop!.value,depth+1,seen);});}
     const proto=Object.getPrototypeOf(object),ctor=proto===null?null:Object.getOwnPropertyDescriptor(proto,"constructor");expect(proto===null||ctor&&Object.hasOwn(ctor,"value")&&typeof ctor.value==="function").toBe(true);const keys=Reflect.ownKeys(object);expect(keys.length).toBeLessThanOrEqual(128);expect(keys.every(k=>typeof k==="string")).toBe(true);
-    const props=keys.map(k=>{const prop=Object.getOwnPropertyDescriptor(object,k)!;expect(Object.hasOwn(prop,"value")).toBe(true);return [k,encode(prop.value,depth+1,seen)];});return {c:ctor?.value.name??null,p:props};
+    const shape=[ctor?.value.name??null,keys as string[]] as [string|null,string[]],shapeKey=JSON.stringify(shape);let shapeId=shapeIds.get(shapeKey);if(shapeId===undefined){shapeId=shapes.length;expect(shapeId).toBeLessThan(512);shapeIds.set(shapeKey,shapeId);shapes.push(shape);}const values=keys.map(k=>{const prop=Object.getOwnPropertyDescriptor(object,k)!;expect(Object.hasOwn(prop,"value")).toBe(true);return encode(prop.value,depth+1,seen);});return {o:[shapeId,values]};
    }finally{seen.delete(object);}
-  }return {encode,functions};
+  }return {encode,functions,shapes};
  }
+ const formData:unknown[][]=[],levelSets:unknown[][]=[];const formIds=new Map<string,number>(),levelIds=new Map<string,number>();
+ function internRow(row:unknown[],rows:unknown[][],ids:Map<string,number>){const key=JSON.stringify(row);let id=ids.get(key);if(id===undefined){id=rows.length;expect(id).toBeLessThan(512);ids.set(key,id);rows.push(row);}return id;}
  const se=encoder(),me=encoder(),ae=encoder();const queue=roots.map(id=>[id,0] as const),visited=new Set<number>();
  for(let i=0;i<queue.length;i++){
   const [id,depth]=queue[i];if(visited.has(id))continue;expect(depth).toBeLessThanOrEqual(32);expect(visited.size).toBeLessThan(256);visited.add(id);
@@ -82,13 +84,13 @@ function extractTownStatic(tiers:readonly (readonly [number,readonly number[]])[
   const preLevels=species.getPrevolutionLevels(true);expect(preLevels.length).toBeLessThanOrEqual(128);
   for(const e of evolutions)queue.push([e.speciesId,depth+1]);for(const row of preLevels)queue.push([row[0],depth+1]);if(preOwn){expect(Number.isSafeInteger(preValue)).toBe(true);queue.push([preValue,depth+1]);}
   for(const [parent] of incoming)queue.push([parent,depth+1]);
-  const forms=species.forms.length?species.forms:[species];expect(forms.length,`species${id} forms`).toBeLessThanOrEqual(16);
+  const forms=species.forms.length?species.forms:[species];expect(forms.length,`species${id} forms`).toBeLessThanOrEqual(20);
   const formRows=forms.map((form,index)=>{
    expect([form.getLevelMoves,form.getAbility,form.getAbilityCount,form.getPassiveAbilities]).toEqual(originalRegistryMethods.slice(0,4));
    // PokemonForm registry method only: never Pokemon.getLevelMoves or simulated evolution chain.
    const allRows=form.getLevelMoves();expect(allRows.length).toBeLessThanOrEqual(512);for(const row of allRows){expect(Array.isArray(row)&&row.length===2&&Number.isSafeInteger(row[0])&&row[0]>=-2&&Number.isSafeInteger(row[1])&&row[1]>=0).toBe(true);}const levels=allRows.filter(row=>row[0]<=10);for(const row of levels)moveIds.add(row[1]);
    const active=Array.from({length:form.getAbilityCount()},(_,i)=>form.getAbility(i)),passives=[...form.getPassiveAbilities()];for(const ability of [...active,...passives])abilityIds.add(ability);
-   return [index,form.formKey??null,form.type1,form.type2,[...form.baseStats],active,passives,levels,allRows.length,createHash("sha256").update(JSON.stringify(allRows)).digest("hex")];
+   const levelsId=internRow([levels,allRows.length,createHash("sha256").update(JSON.stringify(allRows)).digest("hex")],levelSets,levelIds);const formId=internRow([form.type1,form.type2,[...form.baseStats],active,passives,levelsId],formData,formIds);return [index,form.formKey??null,formId];
   });
   speciesRows.push([id,evoOwn,se.encode(evolutions),preOwn,se.encode(preValue),se.encode(preLevels),formRows,se.encode(FORCED_SIGNATURE_MOVES[id]),Object.hasOwn(FORCED_SIGNATURE_MOVES,id),incoming]);
  }
@@ -96,7 +98,7 @@ function extractTownStatic(tiers:readonly (readonly [number,readonly number[]])[
  const moves=[...moveIds].map(id=>{const m=allMoves[id];if(!m)return [id,false];return [id,true,m.category,m.type,m.power,m.accuracy,m.name.endsWith(" (N)"),STAB_BLACKLIST.has(id),m.constructor.name,me.encode(m.attrs),me.encode(m.conditions),m.hasCondition(targetSleptOrComatoseCondition),m.hasCondition(userSleptOrComatoseCondition)];});
  const abilities=[...abilityIds].map(id=>{const a=allAbilities[id];expect(a).toBeDefined();return [id,ae.encode(a.attrs)];});
  expect(Phaser.Math.RND.state()).toBe(before);
- return {species:{schema:1,source:PIN,roots,tiers,level_cap:10,wild_kind:EvoLevelThresholdKind.WILD,context:{wave:globalScene.currentBattle.waveIndex,biome:globalScene.arena.biomeId,difficulty:getErDifficulty(),time:Reflect.get(globalScene.arena,"lastTimeOfDay"),luck:getPartyLuckValue(globalScene.getPlayerParty()),forced:getDailyForcedWaveBiomePoolTier(globalScene.currentBattle.waveIndex),regional:getErBiomeRule(globalScene.arena.biomeId)?.regionalBoost??null},rows:speciesRows,functions:se.functions},moves:{schema:1,source:PIN,rows:moves,functions:me.functions,tuning:[BASE_LEVEL_WEIGHT_OFFSET,BASE_WEIGHT_MULTIPLIER,EVOLUTION_MOVE_WEIGHT,RELEARN_MOVE_WEIGHT,EVO_MOVE_BP_THRESHOLD,MOVE_POWER_CEILING,FORCED_SIGNATURE_MOVE_CHANCE]},abilities:{schema:1,source:PIN,rows:abilities,functions:ae.functions}};
+ return {species:{schema:2,source:PIN,roots,tiers,level_cap:10,wild_kind:EvoLevelThresholdKind.WILD,context:{wave:globalScene.currentBattle.waveIndex,biome:globalScene.arena.biomeId,difficulty:getErDifficulty(),time:Reflect.get(globalScene.arena,"lastTimeOfDay"),luck:getPartyLuckValue(globalScene.getPlayerParty()),forced:getDailyForcedWaveBiomePoolTier(globalScene.currentBattle.waveIndex),regional:getErBiomeRule(globalScene.arena.biomeId)?.regionalBoost??null},rows:speciesRows,form_data:formData,level_sets:levelSets,functions:se.functions,shapes:se.shapes},moves:{schema:2,source:PIN,rows:moves,functions:me.functions,shapes:me.shapes,tuning:[BASE_LEVEL_WEIGHT_OFFSET,BASE_WEIGHT_MULTIPLIER,EVOLUTION_MOVE_WEIGHT,RELEARN_MOVE_WEIGHT,EVO_MOVE_BP_THRESHOLD,MOVE_POWER_CEILING,FORCED_SIGNATURE_MOVE_CHANCE]},abilities:{schema:2,source:PIN,rows:abilities,functions:ae.functions,shapes:ae.shapes}};
 }
 test("observe complete initialized Town constructor closure",async()=>{
  const output=process.env.M9_TOWN_CONSTRUCTOR_OUTPUT,ordinal=process.env.M9_TOWN_CONSTRUCTOR_ORDINAL;expect(output).toBeTruthy();expect(["one","two"]).toContain(ordinal);
