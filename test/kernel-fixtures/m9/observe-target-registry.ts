@@ -628,7 +628,7 @@ function observeTownBossPool() {
 function observeInitialVictoryTailClosure() {
   const scene = globalScene;
   const battle = scene.currentBattle;
-  const party = scene.getParty();
+  const party = scene.getPlayerParty();
   expect(battle.waveIndex).toBe(1);
   expect(party.length).toBe(1);
   const pokemon = party[0];
