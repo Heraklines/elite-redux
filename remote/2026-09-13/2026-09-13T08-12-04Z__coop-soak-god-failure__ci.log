@@ -1,0 +1,347 @@
+{
+  "invariant": "lockstep",
+  "seed": 20260913,
+  "wave": 4,
+  "detail": "reward shop did not advance both counters once (before=3 host=3 guest=3)",
+  "replay": "SOAK_SEED=20260913",
+  "phaseState": {
+    "hostPhase": "ErDexNavPhase",
+    "guestPhase": "ErDexNavPhase",
+    "hostInteractionCounter": 3,
+    "guestInteractionCounter": 3,
+    "hostWave": 4,
+    "hostBattleType": 0,
+    "hostPlayerField": [
+      {
+        "id": 2621348636,
+        "battlerIndex": 0,
+        "speciesId": 493,
+        "speciesName": "Arceus",
+        "hp": 1865,
+        "maxHp": 1865,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          -1,
+          0,
+          -1,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 182611136,
+        "battlerIndex": 1,
+        "speciesId": 150,
+        "speciesName": "Mewtwo",
+        "hp": 1725,
+        "maxHp": 1725,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "hostEnemyField": [
+      {
+        "id": 607852149,
+        "battlerIndex": 2,
+        "speciesId": 543,
+        "speciesName": "Venipede",
+        "hp": 0,
+        "maxHp": 17,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 806,
+            "ppUsed": 0
+          },
+          {
+            "id": 40,
+            "ppUsed": 0
+          },
+          {
+            "id": 111,
+            "ppUsed": 0
+          },
+          {
+            "id": 205,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 1853369867,
+        "battlerIndex": 3,
+        "speciesId": 187,
+        "speciesName": "Hoppip",
+        "hp": 0,
+        "maxHp": 16,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 72,
+            "ppUsed": 0
+          },
+          {
+            "id": 77,
+            "ppUsed": 0
+          },
+          {
+            "id": 511,
+            "ppUsed": 0
+          },
+          {
+            "id": 78,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ],
+    "guestPlayerField": [
+      {
+        "id": 2621348636,
+        "battlerIndex": -1,
+        "speciesId": 493,
+        "speciesName": "Arceus",
+        "hp": 1865,
+        "maxHp": 1865,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          -1,
+          0,
+          -1,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 182611136,
+        "battlerIndex": -1,
+        "speciesId": 150,
+        "speciesName": "Mewtwo",
+        "hp": 1725,
+        "maxHp": 1725,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "guestEnemyField": [
+      {
+        "id": 607852149,
+        "battlerIndex": -1,
+        "speciesId": 543,
+        "speciesName": "Venipede",
+        "hp": 0,
+        "maxHp": 17,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 806,
+            "ppUsed": 0
+          },
+          {
+            "id": 40,
+            "ppUsed": 0
+          },
+          {
+            "id": 111,
+            "ppUsed": 0
+          },
+          {
+            "id": 205,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 1853369867,
+        "battlerIndex": -1,
+        "speciesId": 187,
+        "speciesName": "Hoppip",
+        "hp": 0,
+        "maxHp": 16,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 72,
+            "ppUsed": 0
+          },
+          {
+            "id": 77,
+            "ppUsed": 0
+          },
+          {
+            "id": 511,
+            "ppUsed": 0
+          },
+          {
+            "id": 78,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ]
+  },
+  "actionScript": [
+    "SKIP mysteryEncounterDisabledV1",
+    "content seed=coop-soak-20260913 preseeded=false",
+    "wave 1 turn 1: committed frontier omitted seat 1; guest remained a replay spectator until host action",
+    "wave 1: host slot move=53 guest slot move=0",
+    "wave 1 turn 1: progress enemyHp=[16:0/14] playerHp=[890:2065/2065]",
+    "wave 1: reward shop owner=host leave",
+    "wave 2 turn 1: replay guest crossed cmd:2:1 through real public COMMAND=opened",
+    "wave 2: host slot move=85 guest slot move=34",
+    "wave 2 turn 1: progress enemyHp=[161:0/14,32:0/16] playerHp=[890:2065/2065,384:1715/1715]",
+    "wave 2: reward shop owner=guest leave",
+    "wave 3 turn 1: replay guest crossed cmd:3:1 through real public COMMAND=opened",
+    "wave 3 turn 1: host SWITCH -> party[2]",
+    "wave 3: host slot move=53 guest slot move=247",
+    "wave 3 turn 1: progress enemyHp=[519:18/18,191:0/17] playerHp=[493:1865/1865,384:1715/1715]",
+    "wave 3 turn 2: replay guest crossed cmd:3:2 through real public COMMAND=opened",
+    "wave 3: reward shop owner=host take-nonparty",
+    "wave 4 turn 1: replay guest crossed cmd:4:1 through real public COMMAND=opened",
+    "wave 4: host slot move=34 guest slot move=53",
+    "wave 4 turn 1: guest SWITCH -> party[3]",
+    "wave 4 turn 1: progress enemyHp=[543:0/17,187:16/16] playerHp=[493:1865/1865,150:1725/1725]",
+    "wave 4 turn 2: replay guest crossed cmd:4:2 through real public COMMAND=opened",
+    "wave 4: reward shop owner=guest take-nonparty"
+  ]
+}
