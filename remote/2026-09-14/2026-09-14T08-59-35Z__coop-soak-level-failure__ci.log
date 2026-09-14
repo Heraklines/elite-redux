@@ -1,0 +1,347 @@
+{
+  "invariant": "no-park",
+  "seed": 20260914,
+  "wave": 4,
+  "detail": "wave driving threw (strand/stall): guest reward WATCH HANG: watcher neither left nor advanced past interaction 3 after 32 drains (owner terminal never arrived) - see dev-logs/coop-duo/",
+  "replay": "SOAK_SEED=20260914",
+  "phaseState": {
+    "hostPhase": "SelectModifierPhase",
+    "guestPhase": "SelectModifierPhase",
+    "hostInteractionCounter": 3,
+    "guestInteractionCounter": 3,
+    "hostWave": 4,
+    "hostBattleType": 0,
+    "hostPlayerField": [
+      {
+        "id": 1493361553,
+        "battlerIndex": 0,
+        "speciesId": 149,
+        "speciesName": "Dragonite",
+        "hp": 211,
+        "maxHp": 213,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 3832146916,
+        "battlerIndex": 1,
+        "speciesId": 248,
+        "speciesName": "Tyranitar",
+        "hp": 219,
+        "maxHp": 225,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "hostEnemyField": [
+      {
+        "id": 4187292115,
+        "battlerIndex": 2,
+        "speciesId": 165,
+        "speciesName": "Ledyba",
+        "hp": 0,
+        "maxHp": 18,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 5152,
+            "ppUsed": 0
+          },
+          {
+            "id": 98,
+            "ppUsed": 1
+          },
+          {
+            "id": 814,
+            "ppUsed": 0
+          },
+          {
+            "id": 146,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 1509885292,
+        "battlerIndex": 3,
+        "speciesId": 293,
+        "speciesName": "Whismur",
+        "hp": 0,
+        "maxHp": 21,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 45,
+            "ppUsed": 0
+          },
+          {
+            "id": 336,
+            "ppUsed": 0
+          },
+          {
+            "id": 103,
+            "ppUsed": 0
+          },
+          {
+            "id": 310,
+            "ppUsed": 1
+          }
+        ]
+      }
+    ],
+    "guestPlayerField": [
+      {
+        "id": 1493361553,
+        "battlerIndex": -1,
+        "speciesId": 149,
+        "speciesName": "Dragonite",
+        "hp": 211,
+        "maxHp": 213,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 3832146916,
+        "battlerIndex": -1,
+        "speciesId": 248,
+        "speciesName": "Tyranitar",
+        "hp": 219,
+        "maxHp": 225,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          3,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "guestEnemyField": [
+      {
+        "id": 4187292115,
+        "battlerIndex": -1,
+        "speciesId": 165,
+        "speciesName": "Ledyba",
+        "hp": 0,
+        "maxHp": 18,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 5152,
+            "ppUsed": 0
+          },
+          {
+            "id": 98,
+            "ppUsed": 1
+          },
+          {
+            "id": 814,
+            "ppUsed": 0
+          },
+          {
+            "id": 146,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 1509885292,
+        "battlerIndex": -1,
+        "speciesId": 293,
+        "speciesName": "Whismur",
+        "hp": 0,
+        "maxHp": 21,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 45,
+            "ppUsed": 0
+          },
+          {
+            "id": 336,
+            "ppUsed": 0
+          },
+          {
+            "id": 103,
+            "ppUsed": 0
+          },
+          {
+            "id": 310,
+            "ppUsed": 1
+          }
+        ]
+      }
+    ]
+  },
+  "actionScript": [
+    "SKIP mysteryEncounterDisabledV1",
+    "content seed=coop-soak-20260914 preseeded=false",
+    "wave 1 turn 1: committed frontier omitted seat 1; guest remained a replay spectator until host action",
+    "wave 1: host slot move=53 guest slot move=0",
+    "wave 1 turn 1: progress enemyHp=[16:0/14] playerHp=[143:303/303]",
+    "wave 1: reward shop owner=host take-nonparty",
+    "wave 2 turn 1: replay guest crossed cmd:2:1 through real public COMMAND=opened",
+    "wave 2 turn 1: staged guest-owned lead at 1 HP on both engines",
+    "wave 2: host slot move=85 guest slot move=85",
+    "wave 2 turn 1: forced-faint guest MEMENTO self-KO",
+    "wave 2 turn 1: progress enemyHp=[270:0/14,734:14/14] playerHp=[143:301/303,94:0/179]",
+    "wave 2 turn 2: replay guest crossed cmd:2:2 through real public COMMAND=opened",
+    "wave 2: reward shop owner=guest take-nonparty",
+    "wave 3 turn 1: replay guest crossed cmd:3:1 through real public COMMAND=opened",
+    "wave 3: host slot move=53 guest slot move=53",
+    "wave 3 turn 1: progress enemyHp=[831:0/16,924:0/16] playerHp=[143:301/303,248:225/225]",
+    "wave 3: reward shop owner=host take-nonparty",
+    "wave 4 turn 1: replay guest crossed cmd:4:1 through real public COMMAND=opened",
+    "wave 4 turn 1: host SWITCH -> party[2]",
+    "wave 4: host slot move=85 guest slot move=85",
+    "wave 4 turn 1: progress enemyHp=[165:18/18,293:0/21] playerHp=[149:211/213,248:219/225]",
+    "wave 4 turn 2: replay guest crossed cmd:4:2 through real public COMMAND=opened"
+  ]
+}
