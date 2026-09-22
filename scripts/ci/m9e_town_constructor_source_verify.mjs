@@ -4,7 +4,7 @@ import {join} from 'node:path';
 import {createHash} from 'node:crypto';
 assert.equal(process.argv.length,4);const dir=process.argv[2],hash=b=>createHash('sha256').update(b).digest('hex');
 const shape=(v,keys)=>assert.deepEqual(Object.keys(v).sort(),[...keys].sort());const int=(n,a,b)=>assert(Number.isSafeInteger(n)&&n>=a&&n<=b);
-const inputs={};const facts={};for(const [name,cap] of [['species',32768],['moves',32768],['abilities',16384]]){const raws=['one','two'].map(n=>{const p=join(dir,`${name}-${n}.json`),s=lstatSync(p);assert(s.isFile()&&!s.isSymbolicLink()&&s.size<=cap);return readFileSync(p);});assert(raws[0].equals(raws[1]));inputs[name]=JSON.parse(raws[0]);facts[name]={bytes:raws[0].length,sha256:hash(raws[0])};}
+const inputs={};const facts={};for(const [name,cap] of [['species',32768],['moves',32768],['abilities',16384],['forms',16384]]){const raws=['one','two'].map(n=>{const p=join(dir,`${name}-${n}.json`),s=lstatSync(p);assert(s.isFile()&&!s.isSymbolicLink()&&s.size<=cap);return readFileSync(p);});assert(raws[0].equals(raws[1]));inputs[name]=JSON.parse(raws[0]);facts[name]={bytes:raws[0].length,sha256:hash(raws[0])};}
 function unpackColumns(table,width){
  assert(Array.isArray(table)&&table.length===2);const [count,columns]=table;int(count,1,512);assert(Array.isArray(columns)&&columns.length===width);const rows=Array.from({length:count},()=>[]);
  for(const column of columns){assert(Array.isArray(column)&&(column.length===2||column.length===3));const values=column[0];assert(Array.isArray(values)&&values.length>0&&values.length<=count);assert.equal(new Set(values.map(value=>JSON.stringify(value))).size,values.length);let indices;
@@ -12,16 +12,18 @@ function unpackColumns(table,width){
   const seen=new Set();for(let i=0;i<count;i++){const id=indices[i];int(id,0,values.length-1);if(!seen.has(id)){assert.equal(id,seen.size);seen.add(id);}rows[i].push(values[id]);}assert.equal(seen.size,values.length);
  }return rows;
 }
-function unpackSpecies(part){
- shape(part,['schema','source','roots','tiers','level_cap','wild_kind','context','functions','shapes','rows_columns','form_columns','level_columns','level_rows']);assert.equal(part.schema,3);
+function unpackSpecies(part,forms){
+ shape(part,['schema','source','roots','tiers','level_cap','wild_kind','context','rows_columns','level_columns','level_rows']);assert.equal(part.schema,4);
+ shape(forms,['schema','source','form_columns','functions','shapes']);assert.equal(forms.schema,1);assert.equal(forms.source,part.source);
  assert(Array.isArray(part.level_rows)&&part.level_rows.length<=512*13);assert.equal(new Set(part.level_rows.map(row=>JSON.stringify(row))).size,part.level_rows.length);for(const row of part.level_rows){assert(Array.isArray(row)&&row.length===2);int(row[0],-2,10);int(row[1],0,100000);}
  const usedLevels=new Set();const levels=unpackColumns(part.level_columns,3).map(([refs,count,digest])=>{assert(Array.isArray(refs)&&refs.length<=512);assert(typeof digest==='string'&&/^[A-Za-z0-9_-]{43}$/.test(digest));const bytes=Buffer.from(digest,'base64url');assert.equal(bytes.length,32);assert.equal(bytes.toString('base64url'),digest);return [refs.map(id=>{int(id,0,part.level_rows.length-1);if(!usedLevels.has(id)){assert.equal(id,usedLevels.size);usedLevels.add(id);}return part.level_rows[id];}),count,bytes.toString('hex')];});assert.equal(usedLevels.size,part.level_rows.length);
  const rows=unpackColumns(part.rows_columns,10).map(row=>{assert(Array.isArray(row[6])&&row[6].length>0&&row[6].length<=20);const result=[...row];result[6]=row[6].map((binding,index)=>{assert(Array.isArray(binding)&&binding.length===2);return [index,...binding];});return result;});
- const {rows_columns,form_columns,level_columns,level_rows,...metadata}=part;return {...metadata,schema:2,rows,form_data:unpackColumns(form_columns,6),level_sets:levels};
+ const {rows_columns,level_columns,level_rows,...metadata}=part;return {...metadata,schema:2,functions:forms.functions,shapes:forms.shapes,rows,form_data:unpackColumns(forms.form_columns,6),level_sets:levels};
 }
-const packedSpecies=inputs.species;
-const packedMutations=[s=>s.unexpected=true,s=>s.rows_columns[0]=0,s=>s.rows_columns[1][0][0].push(s.rows_columns[1][0][0][0]),s=>s.rows_columns[1][0]=[s.rows_columns[1][0][0],0,[[s.rows_columns[0],0]]],s=>s.level_columns[1][2][0][0]='A'.repeat(42),s=>s.level_rows.push(s.level_rows[0])];for(const mutate of packedMutations){const s=structuredClone(packedSpecies);mutate(s);assert.throws(()=>unpackSpecies(s));}
-inputs.species=unpackSpecies(packedSpecies);
+const packedSpecies=inputs.species,packedForms=inputs.forms;
+const packedMutations=[s=>s.unexpected=true,s=>s.rows_columns[0]=0,s=>s.rows_columns[1][0][0].push(s.rows_columns[1][0][0][0]),s=>s.rows_columns[1][0]=[s.rows_columns[1][0][0],0,[[s.rows_columns[0],0]]],s=>s.level_columns[1][2][0][0]='A'.repeat(42),s=>s.level_rows.push(s.level_rows[0])];for(const mutate of packedMutations){const s=structuredClone(packedSpecies);mutate(s);assert.throws(()=>unpackSpecies(s,packedForms));}
+const formsMutations=[f=>f.source='other',f=>f.form_columns[0]=0,f=>f.form_columns[1][0][0].push(f.form_columns[1][0][0][0])];for(const mutate of formsMutations){const f=structuredClone(packedForms);mutate(f);assert.throws(()=>unpackSpecies(packedSpecies,f));}
+inputs.species=unpackSpecies(packedSpecies,packedForms);delete inputs.forms;
 function decode(value,part,depth=0){
  const {functions,shapes}=part;
  assert(depth<=12);if(value===null||typeof value==='boolean'||typeof value==='string'){if(typeof value==='string')assert(value.length<=1024);return value;}
@@ -65,4 +67,4 @@ function validate(d){
  return {roots:s.roots.length,species:s.rows.length,moves:m.rows.length,abilities:a.rows.length,eligibility_sha256:hash(JSON.stringify(eligibility)),level2_forced:eligibility.filter(r=>r[1]===2&&r[2]!==null).map(r=>[r[0],r[2]]),level2_upward_roots:eligibility.filter(r=>r[1]===2&&r[3].length>0).map(r=>r[0])};
 }
 const result=validate(inputs);const ownUndefined=structuredClone(inputs);ownUndefined.species.rows[0][8]=true;ownUndefined.species.rows[0][7]={u:1};assert.deepEqual(validate(ownUndefined),result);const mutations=[d=>d.abilities.runtime_slots[0]=1,d=>d.abilities.runtime_slots[1]=1,d=>{d.species.rows[0][8]=true;d.species.rows[0][7]=null;},d=>{d.species.rows[0][8]=true;d.species.rows[0][7]='33';},d=>d.species.form_data[0][5]=512,d=>d.species.form_data.push(d.species.form_data[0]),d=>d.species.shapes.push(d.species.shapes[0]),d=>d.species.roots.pop(),d=>d.species.rows.pop(),d=>d.moves.rows.pop(),d=>d.abilities.rows.pop(),d=>d.species.wild_kind=1,d=>d.species.context.wave=1,d=>d.species.level_sets[0][0].push([11,33]),d=>d.species.rows[0][0]=0];for(const mutate of mutations){const d=structuredClone(inputs);mutate(d);assert.throws(()=>validate(d));}
-const output=Buffer.from(JSON.stringify({schema:1,status:'passed',scope:'complete static registry closure for all effective Town roots; no executable compiler or natural encounter qualification',facts,form_count_receipt:{bytes:countRaw.length,sha256:hash(countRaw)},identical_fresh_processes:2,negative_checks:mutations.length+packedMutations.length,...result})+'\n');assert(output.length<=8192);writeFileSync(process.argv[3],output,{flag:'wx'});
+const output=Buffer.from(JSON.stringify({schema:1,status:'passed',scope:'complete static registry closure for all effective Town roots; no executable compiler or natural encounter qualification',facts,form_count_receipt:{bytes:countRaw.length,sha256:hash(countRaw)},identical_fresh_processes:2,negative_checks:mutations.length+packedMutations.length+formsMutations.length,...result})+'\n');assert(output.length<=8192);writeFileSync(process.argv[3],output,{flag:'wx'});

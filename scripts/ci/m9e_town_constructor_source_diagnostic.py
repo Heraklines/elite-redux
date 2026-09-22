@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 BOUNDED_HELPER_BYTES = 38620
-EXPORTER_SHA256 = "55f3ccda38ef1ec873ca365cda9a91614de780b349a377aa9075249061890feb"
+EXPORTER_SHA256 = "3e22e8914a7811898ee9518403f0245531d19bc0b4c24d1279c8ee0f68ba7b9c"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -727,15 +727,15 @@ def main(summary):
     summary["fresh_process_exports"] = []
     for ordinal in ("one", "two"):
         report = FULL / f"vitest-{ordinal}.json"
-        require(not report.exists() and all(not (OUTPUT / f"{kind}-{ordinal}.json").exists() for kind in ("species", "moves", "abilities")), "fresh outputs required")
+        require(not report.exists() and all(not (OUTPUT / f"{kind}-{ordinal}.json").exists() for kind in ("species", "moves", "abilities", "forms")), "fresh outputs required")
         require(file_fact(ORACLE / INJECTED) == injected, "exporter changed before execution")
         run(["pnpm", "exec", "vitest", "run", INJECTED, "--pool=forks", "--isolate", "--no-file-parallelism",
              "--reporter=json", "--outputFile=" + str(report)], "fresh-town-" + ordinal,
             cwd=ORACLE, extra={"M9_TOWN_CONSTRUCTOR_OUTPUT": str(OUTPUT), "M9_TOWN_CONSTRUCTOR_ORDINAL": ordinal, "M9_TOWN_CONSTRUCTOR_COUNTS": str(OUTPUT / "form-counts.json")})
         summary["fresh_process_exports"].append({"ordinal": ordinal, "report": validate_vitest(report),
-            "exports": {kind: file_fact(OUTPUT / f"{kind}-{ordinal}.json", 16384 if kind == "abilities" else 32768) for kind in ("species", "moves", "abilities")}, "helper_sha256": injected["sha256"]})
+            "exports": {kind: file_fact(OUTPUT / f"{kind}-{ordinal}.json", 16384 if kind in {"abilities", "forms"} else 32768) for kind in ("species", "moves", "abilities", "forms")}, "helper_sha256": injected["sha256"]})
         require(inventory(ORACLE, PIN, "oracle-after-" + ordinal) == pinned, "export changed pinned source")
-    for kind in ("species", "moves", "abilities"):
+    for kind in ("species", "moves", "abilities", "forms"):
         require((OUTPUT / f"{kind}-one.json").read_bytes() == (OUTPUT / f"{kind}-two.json").read_bytes(), "fresh paired outputs differ: " + kind)
     run(["node", str(ROOT / VERIFIER), str(OUTPUT), str(OUTPUT / "validation.json")],
         "independent-town-verification", seconds=60, bound=65536)
@@ -751,8 +751,8 @@ def main(summary):
             "tackle asset changed")
     summary["conservation"] = {"candidate": True, "oracle_after_install": True,
                                "oracle_after_each_export": True, "oracle_after_reward_verification": True, "injected_exporter": True, "asset": True}
-    summary["generated"] = {path.name: file_fact(path, 4096 if path.name == "form-counts.json" else 8192 if path.name == "validation.json" else 16384 if path.name in {"source-methods.txt", "abilities-one.json", "abilities-two.json"} else 32768) for path in sorted(OUTPUT.iterdir())}
-    require(set(summary["generated"]) == {"form-counts.json", "species-one.json", "species-two.json", "moves-one.json", "moves-two.json", "abilities-one.json", "abilities-two.json", "source-methods.txt", "validation.json"}, "exact output inventory")
+    summary["generated"] = {path.name: file_fact(path, 4096 if path.name == "form-counts.json" else 8192 if path.name == "validation.json" else 16384 if path.name in {"source-methods.txt", "abilities-one.json", "abilities-two.json", "forms-one.json", "forms-two.json"} else 32768) for path in sorted(OUTPUT.iterdir())}
+    require(set(summary["generated"]) == {"form-counts.json", "species-one.json", "species-two.json", "moves-one.json", "moves-two.json", "abilities-one.json", "abilities-two.json", "forms-one.json", "forms-two.json", "source-methods.txt", "validation.json"}, "exact output inventory")
     require(sum(row["bytes"] for row in summary["generated"].values()) <= 6 * 32768, "aggregate generated bound")
     require(time.monotonic() < WORK_DEADLINE, "work deadline exceeded before reserved cleanup")
 
@@ -767,7 +767,7 @@ def bound_partial_outputs():
     removed = []
     for path in sorted(OUTPUT.iterdir()):
         require(path.parent == OUTPUT and path.is_file() and not path.is_symlink(), "unexpected generated output type")
-        if path.name not in {"form-counts.json", "species-one.json", "species-two.json", "moves-one.json", "moves-two.json", "abilities-one.json", "abilities-two.json", "source-methods.txt", "validation.json"} or path.stat().st_size > (4096 if path.name == "form-counts.json" else 8192 if path.name == "validation.json" else 16384 if path.name in {"source-methods.txt", "abilities-one.json", "abilities-two.json"} else 32768):
+        if path.name not in {"form-counts.json", "species-one.json", "species-two.json", "moves-one.json", "moves-two.json", "abilities-one.json", "abilities-two.json", "forms-one.json", "forms-two.json", "source-methods.txt", "validation.json"} or path.stat().st_size > (4096 if path.name == "form-counts.json" else 8192 if path.name == "validation.json" else 16384 if path.name in {"source-methods.txt", "abilities-one.json", "abilities-two.json", "forms-one.json", "forms-two.json"} else 32768):
             removed.append({"name": path.name[:128], "bytes": path.stat().st_size})
             path.unlink()
     return removed
