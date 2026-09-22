@@ -34,7 +34,10 @@ pub enum GameOwnedPhaseV1 {
         pending: SafeU53,
         menu_instance: MenuInstanceId,
     },
-    RewardCandy { pending: SafeU53, callback: Option<PresentationEventId> },
+    RewardCandy {
+        pending: SafeU53,
+        callback: Option<PresentationEventId>,
+    },
     RewardTmLearn {
         pending: SafeU53,
     },
@@ -371,12 +374,23 @@ fn phase_transition(
             phase,
         );
     }
-    let candy_phase=match &phase{
-        GameOwnedPhaseV1::RewardCandy{..}=>true,
-        GameOwnedPhaseV1::FriendshipClock{request,..}=>crate::current_reward_candy::owner(before,request.pending).is_ok(),
-        _=>false,
+    let candy_phase = match &phase {
+        GameOwnedPhaseV1::RewardCandy { .. } => true,
+        GameOwnedPhaseV1::FriendshipClock { request, .. } => {
+            crate::current_reward_candy::owner(before, request.pending).is_ok()
+        }
+        _ => false,
     };
-    if candy_phase{return current_reward_candy_transition::transition(before,content,operation_id,authority_seat,revision,phase);}
+    if candy_phase {
+        return current_reward_candy_transition::transition(
+            before,
+            content,
+            operation_id,
+            authority_seat,
+            revision,
+            phase,
+        );
+    }
     if matches!(
         phase,
         GameOwnedPhaseV1::StatStageBegin | GameOwnedPhaseV1::StatStagePresentation { .. }

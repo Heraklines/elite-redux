@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { BrowserEffectBatchV2, BrowserRequestV2 } from "../../../../src/rust-browser/contracts/browser-contracts-v2";
+import type { BrowserEffectBatchV2, BrowserRequestV2, GamePresentationEffectV2Wire } from "../../../../src/rust-browser/contracts/browser-contracts-v2";
 import {
   type BrowserEffectAdaptersV2,
   BrowserEffectRouterV2,
@@ -46,12 +46,16 @@ describe("BrowserEffectRouterV2", () => {
   });
   it("routes every typed effect once and fences stale or disposed batches", async () => {
     const calls: string[] = [];
+    const presented: GamePresentationEffectV2Wire[] = [];
+    const external: BrowserRequestV2[] = [];
     const capsuleBytes = [123, 34, 120, 34, 58, 34, 195, 169, 34, 125];
     const adapters: BrowserEffectAdaptersV2 = {
       renderUi: () => {
         calls.push("UI_CHANGED");
       },
-      present: () => {
+      completeExternalRequest: request => { external.push(request); },
+      present: effect => {
+        presented.push(effect);
         calls.push("PRESENTATION");
       },
       changePresentationScene: () => {
@@ -152,8 +156,35 @@ describe("BrowserEffectRouterV2", () => {
       "REPRO_READY",
       "CURRENT_REPRO_READY",
     ]);
+    // Exact current Rust field names, not a TypeScript validator or DOM renderer.
+    // Transport must keep the queued Growl and Candy/LevelUp parameters intact.
+    const payloadEffects: GamePresentationEffectV2Wire[] = [
+      { event_id: 2, semantic: { kind: "CUE", value: "MOVE" }, blocking: "BLOCKS_HUMAN_INPUT", skip: "FORBIDDEN",
+        payload: { kind: "STAT_STAGE_ANIMATION", holder: 2, stat: 1, before: 0, after: -1, tween_milliseconds: 1750 } },
+      { event_id: 3, semantic: { kind: "CUE", value: "MOVE" }, blocking: "BLOCKS_HUMAN_INPUT", skip: "FORBIDDEN",
+        payload: { kind: "STAT_STAGE_MESSAGE", holder: 2, stat: 1, before: 0, after: -1 } },
+      { event_id: 4, semantic: { kind: "CUE", value: "PROGRESSION" }, blocking: "BLOCKS_HUMAN_INPUT", skip: "FORBIDDEN",
+        payload: { kind: "CANDY_LEVEL_MESSAGE", holder: 1, level: 7 } },
+      { event_id: 5, semantic: { kind: "CUE", value: "PROGRESSION" }, blocking: "BLOCKS_HUMAN_INPUT", skip: "FORBIDDEN",
+        payload: { kind: "LEVEL_STATS", holder: 1, previous_level: 6, level: 7,
+          previous_stats: { hp: 23, attack: 11, defense: 12, special_attack: 13, special_defense: 13, speed: 10 },
+          stats: { hp: 25, attack: 12, defense: 13, special_attack: 14, special_defense: 14, speed: 11 } } },
+    ];
+    const frozenPayloads = JSON.stringify(payloadEffects);
+    await router.dispatch({ external_sequence: 2,
+      effects: payloadEffects.map(effect => ({ kind: "PRESENTATION" as const, effect })),
+    });
+    expect(presented.slice(1)).toEqual(payloadEffects);
+    for (const [index, effect] of payloadEffects.entries()) {
+      expect(presented[index + 1]).toBe(effect);
+      expect(presented[index + 1]?.payload).toBe(effect.payload);
+    }
+    expect(JSON.stringify(payloadEffects)).toBe(frozenPayloads);
+    expect(external).toEqual([]); // Resolving present() must not fabricate a settlement request.
     await expect(router.dispatch(batch)).rejects.toThrow("stale, duplicated");
     expect(calls.filter(call => call === "CURRENT_REPRO_READY")).toHaveLength(1);
+    expect(presented).toHaveLength(5);
+    expect(external).toEqual([]);
     await router.dispose();
     await router.dispose();
     expect(calls.at(-1)).toBe("DISPOSE");

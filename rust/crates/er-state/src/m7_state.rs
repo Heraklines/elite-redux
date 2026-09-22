@@ -42,7 +42,7 @@ pub const INVENTORY_STATE_SCHEMA_VERSION_V1: u32 = 1;
 pub const WORLD_STATE_SCHEMA_VERSION_V1: u32 = 1;
 pub const SCENARIO_RUNTIME_SCHEMA_VERSION_V2: u32 = 2;
 
-mod ordered_map_serde {
+pub(crate) mod ordered_map_serde {
     use std::collections::BTreeMap;
 
     use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};

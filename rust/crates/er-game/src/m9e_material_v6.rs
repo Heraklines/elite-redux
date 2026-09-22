@@ -284,8 +284,8 @@ impl GameMaterialV6 {
         if bytes.len() > MAX_GAME_MATERIAL_BYTES_V6 {
             return Err(GameMaterialV6Error::Invalid);
         }
-        let value: Self =
-            serde_json::from_slice(bytes).map_err(|error| GameMaterialV6Error::Decode(error.to_string()))?;
+        let value: Self = serde_json::from_slice(bytes)
+            .map_err(|error| GameMaterialV6Error::Decode(error.to_string()))?;
         if value.canonical_bytes()? != bytes {
             return Err(GameMaterialV6Error::NonCanonical);
         }
@@ -526,8 +526,7 @@ fn apply_to_validated_ledger(
         .is_some_and(|owner| owner.source_progression.is_some());
     if owned_reward {
         crate::m9e_runtime_v6::validate_current_reward_transition(
-            live.as_ref()
-                .ok_or_else(|| GameMaterialV6Error::Invalid)?,
+            live.as_ref().ok_or(GameMaterialV6Error::Invalid)?,
             content,
             transition,
         )
@@ -539,8 +538,7 @@ fn apply_to_validated_ledger(
     );
     if owned_learning {
         crate::m9e_runtime_v6::validate_current_learning_transition(
-            live.as_ref()
-                .ok_or_else(|| GameMaterialV6Error::Invalid)?,
+            live.as_ref().ok_or(GameMaterialV6Error::Invalid)?,
             content,
             transition,
         )
@@ -631,8 +629,7 @@ fn apply_to_validated_ledger(
     }
     if transition.owned_phase.is_some() {
         crate::m9e_runtime_v6::validate_owned_phase_transition(
-            live.as_ref()
-                .ok_or_else(|| GameMaterialV6Error::Invalid)?,
+            live.as_ref().ok_or(GameMaterialV6Error::Invalid)?,
             content,
             transition,
         )
@@ -648,7 +645,7 @@ fn apply_to_validated_ledger(
             .current_battle_participation
             .as_ref()
             .and_then(|owner| owner.experience.as_ref())
-            .ok_or_else(|| GameMaterialV6Error::Invalid)?;
+            .ok_or(GameMaterialV6Error::Invalid)?;
         if transition.owned_phase.is_none()
             && !owned_learning
             && !owned_reward
@@ -961,7 +958,7 @@ fn validate_presentation_frontier(
         next = SafeU53::new(
             next.get()
                 .checked_add(1)
-                .ok_or_else(|| GameMaterialV6Error::Invalid)?,
+                .ok_or(GameMaterialV6Error::Invalid)?,
         )
         .map_err(|_| GameMaterialV6Error::Invalid)?;
     }

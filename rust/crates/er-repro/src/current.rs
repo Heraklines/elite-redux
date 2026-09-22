@@ -658,7 +658,10 @@ impl CurrentReproRecorderV1 {
         // Keep all other lifecycles/owners on the independent encoding path.
         let initial_checkpoint_digest = self.capsule.as_ref().and_then(|capsule| {
             (capsule.attempts.is_empty()
-                && matches!(&before.lifecycle, er_kernel::snapshot_v7::GameKernelLifecycleSnapshotV7::Bootstrap(_))
+                && matches!(
+                    &before.lifecycle,
+                    er_kernel::snapshot_v7::GameKernelLifecycleSnapshotV7::Bootstrap(_)
+                )
                 && before.protocol.is_none()
                 && before.current_proposal.is_none()
                 && before.current_coop_setup.is_none()

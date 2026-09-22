@@ -142,7 +142,9 @@ export class CurrentStorageWorker {
         const detached = JSON.parse(new TextDecoder().decode(encoded)) as GamePresentationEffectV2Wire;
         encoded.fill(0);
         this.#presentationBytes += size;
-        const task = this.#bounded(Promise.resolve().then(() => {
+        // Human prompts may wait indefinitely; disposal still aborts ownership.
+        // Only physical completion may submit the retained settlement callback.
+        const task = this.#untilAbort(Promise.resolve().then(() => {
           this.#usable();
           return present(detached, this.#abort.signal);
         }))

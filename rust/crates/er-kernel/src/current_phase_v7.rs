@@ -264,22 +264,33 @@ impl GameKernelV7 {
                     output.internal_events.extend(step.internal_events);
                     return Ok(());
                 }
-                if let Some(candy)=tail.reward.as_ref().and_then(|r|r.candy.as_ref()) {
+                if let Some(candy) = tail.reward.as_ref().and_then(|r| r.candy.as_ref()) {
                     use er_state::current_reward_candy::CurrentRewardCandyPhaseV1 as C;
-                    let callback=match candy.phase {
-                        C::Queued|C::LevelStart=>{
-                            if self.pending_current_phase_ack.is_some(){return Err(GameKernelV7Error::Invalid);}None
+                    let callback = match candy.phase {
+                        C::Queued | C::LevelStart => {
+                            if self.pending_current_phase_ack.is_some() {
+                                return Err(GameKernelV7Error::Invalid);
+                            }
+                            None
                         }
-                        C::Message{event_id}|C::Stats{event_id}=>{
-                            let Some(ack)=self.pending_current_phase_ack else{return Ok(());};
+                        C::Message { event_id } | C::Stats { event_id } => {
+                            let Some(ack) = self.pending_current_phase_ack else {
+                                return Ok(());
+                            };
                             if ack.pending!=pending.id||ack.event_id!=event_id||ack.kind!=crate::snapshot_v7::CurrentPhasePresentationKindV1::RewardCandy
                                 ||!current_phase_receipt_v7::receipt_matches(state,&self.content,ack){return Err(GameKernelV7Error::Invalid);}
-                            self.pending_current_phase_ack=None;Some(event_id)
+                            self.pending_current_phase_ack = None;
+                            Some(event_id)
                         }
-                        C::Friendship|C::Complete=>return Ok(()),
+                        C::Friendship | C::Complete => return Ok(()),
                     };
-                    let step=self.execute_owned_phase(GameOwnedPhaseV1::RewardCandy{pending:pending.id,callback})?;
-                    output.effects.extend(step.effects);output.internal_events.extend(step.internal_events);return Ok(());
+                    let step = self.execute_owned_phase(GameOwnedPhaseV1::RewardCandy {
+                        pending: pending.id,
+                        callback,
+                    })?;
+                    output.effects.extend(step.effects);
+                    output.internal_events.extend(step.internal_events);
+                    return Ok(());
                 }
                 if let Some(tm) = tail.reward.as_ref().and_then(|r| r.tm.as_ref()) {
                     let phase = if tm.phase.queued() {

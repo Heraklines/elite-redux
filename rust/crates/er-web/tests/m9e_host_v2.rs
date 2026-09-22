@@ -896,7 +896,8 @@ fn network_marker(stage: &str) -> std::io::Result<()> {
 }
 
 #[inline(never)]
-fn network_host_setup() -> Result<(Box<BrowserKernelHostV2>, GameProposalEnvelopeV2), Box<dyn Error>> {
+fn network_host_setup() -> Result<(Box<BrowserKernelHostV2>, GameProposalEnvelopeV2), Box<dyn Error>>
+{
     let (save, proposal) = network_save_setup()?;
     network_marker("save_ready")?;
     let browser = network_initialize_save(save)?;
@@ -905,7 +906,8 @@ fn network_host_setup() -> Result<(Box<BrowserKernelHostV2>, GameProposalEnvelop
 }
 
 #[inline(never)]
-fn network_source_snapshot() -> Result<Box<er_kernel::snapshot_v7::CoreGameKernelSnapshotV7>, Box<dyn Error>> {
+fn network_source_snapshot()
+-> Result<Box<er_kernel::snapshot_v7::CoreGameKernelSnapshotV7>, Box<dyn Error>> {
     let (source, _) = active_host()?;
     network_marker("active_host_ready")?;
     network_snapshot(&source)
@@ -963,7 +965,9 @@ fn network_save_setup() -> Result<(Box<GameSaveV2>, GameProposalEnvelopeV2), Box
 }
 
 #[inline(never)]
-fn network_initialize_save(save: Box<GameSaveV2>) -> Result<Box<BrowserKernelHostV2>, Box<dyn Error>> {
+fn network_initialize_save(
+    save: Box<GameSaveV2>,
+) -> Result<Box<BrowserKernelHostV2>, Box<dyn Error>> {
     let host = SeatId::new(safe(1));
     let guest = SeatId::new(safe(2));
     let generation = ConnectionGeneration::new(safe(9));
@@ -1076,7 +1080,9 @@ fn network_transport_replay(
     staged: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7,
 ) -> Result<(), Box<dyn Error>> {
     let mut sequence = 5;
+    network_marker("replay_export")?;
     let (capsule_bytes, capsule) = export_current_capsule(browser, &mut sequence)?;
+    network_marker("replay_export_done")?;
     let transport = capsule
         .browser_transport
         .as_ref()
@@ -1088,6 +1094,7 @@ fn network_transport_replay(
         CurrentExternalEvent::TransportChanged { generation, connected: true } if generation == ConnectionGeneration::new(safe(10)))
     );
     let mut imported = Box::new(BrowserKernelHostV2::from_content(shared_content()?));
+    network_marker("replay_import")?;
     send(
         &mut imported,
         0,
@@ -1097,10 +1104,12 @@ fn network_transport_replay(
             }),
         },
     )?;
+    network_marker("replay_import_done")?;
     assert_eq!(network_snapshot(&imported)?.as_ref(), staged);
     // An older transport generation must remain an adapter rejection after
     // import even while the newer generation is only staged in the kernel.
     for (host, sequence) in [(&mut *browser, sequence), (imported.as_mut(), 1)] {
+        network_marker("replay_old_generation")?;
         assert!(
             send(
                 host,
@@ -1125,6 +1134,7 @@ fn network_transport_replay(
             },
         )?;
     }
+    network_marker("replay_final_compare")?;
     assert_eq!(network_snapshot(&imported)?, network_snapshot(browser)?);
     Ok(())
 }
@@ -1449,7 +1459,9 @@ fn export_current_capsule(
     host: &mut BrowserKernelHostV2,
     sequence: &mut u64,
 ) -> Result<(Vec<u8>, CurrentReproCapsuleV1), Box<dyn Error>> {
+    network_marker("capsule_send")?;
     let response = send(host, *sequence, BrowserRequestV2::ExportRepro)?;
+    network_marker("capsule_response")?;
     *sequence += 1;
     let BrowserResponseV2::Effects { batch } = response else {
         return Err("repro export returned no effects".into());
@@ -1457,8 +1469,11 @@ fn export_current_capsule(
     let [BrowserEffectV2::CurrentReproReady { capsule_bytes }] = batch.effects.as_slice() else {
         return Err("current repro capsule missing".into());
     };
+    network_marker("capsule_decode")?;
     let capsule: CurrentReproCapsuleV1 = serde_json::from_slice(capsule_bytes)?;
+    network_marker("capsule_canonical")?;
     assert_eq!(er_canonical::canonical_bytes(&capsule)?, *capsule_bytes);
+    network_marker("capsule_return")?;
     Ok((capsule_bytes.clone(), capsule))
 }
 

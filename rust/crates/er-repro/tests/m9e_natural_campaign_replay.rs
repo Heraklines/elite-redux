@@ -115,9 +115,15 @@ impl CampaignRecorder {
         let step = result?;
         // The first segment ends with Space still held, proving that decoding
         // and importing a capsule preserves input state before the key-up.
-        // Starter catalogs make each bootstrap observation large. Export each
-        // bootstrap event before the bounded recorder could rotate it away.
-        if self.session.kernel_ref()?.state().is_none() || self.position - self.base == 32 {
+        // Preserve the first held-key checkpoint. The bootstrap catalog makes
+        // those attempts larger, so keep its capsule segment short without
+        // replaying a whole capsule for every navigation input.
+        let segment_limit = if self.session.kernel_ref()?.state().is_none() {
+            4
+        } else {
+            32
+        };
+        if self.position == 1 || self.position - self.base == segment_limit {
             self.flush()?;
         }
         Ok(step)

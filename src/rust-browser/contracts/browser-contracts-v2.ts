@@ -141,6 +141,8 @@ export interface GameControlPlanV2Wire {
 }
 
 export interface GamePresentationEffectV2Wire {
+  /** Rust-owned presentation parameters, forwarded without interpreting their evolving schema. */
+  payload?: CurrentJsonObject;
   event_id: number;
   semantic: unknown;
   blocking: "NON_BLOCKING" | "BLOCKS_HUMAN_INPUT";

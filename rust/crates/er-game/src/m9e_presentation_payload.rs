@@ -23,7 +23,10 @@ pub enum GamePresentationAchievementV1 {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", deny_unknown_fields)]
 pub enum GamePresentationPayloadV1 {
-    CandyLevelMessage { holder: PokemonId, level: u16 },
+    CandyLevelMessage {
+        holder: PokemonId,
+        level: u16,
+    },
     MoveLearning {
         holder: PokemonId,
         move_id: MoveId,
@@ -116,7 +119,10 @@ pub enum GamePresentationPayloadV1 {
 impl GamePresentationPayloadV1 {
     pub fn validate(&self, semantic: PresentationSemanticIdV1) -> Result<(), GameMaterialV6Error> {
         let (family, valid) = match self {
-            Self::CandyLevelMessage { holder, level } => (PresentationCueFamilyV1::Progression, holder.get()!=SafeU53::ZERO && (2..=11).contains(level)),
+            Self::CandyLevelMessage { holder, level } => (
+                PresentationCueFamilyV1::Progression,
+                holder.get() != SafeU53::ZERO && (2..=11).contains(level),
+            ),
             Self::MoveLearning {
                 holder,
                 move_id,

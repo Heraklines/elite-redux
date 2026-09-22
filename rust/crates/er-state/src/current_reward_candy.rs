@@ -2,8 +2,8 @@
 use crate::current_experience_owner::CurrentFriendshipClockRequestV1;
 use crate::current_friendship_profile::CurrentFriendshipProfileV1;
 use crate::m7_state::PokemonStateV5;
-use er_types::{PresentationEventId, SafeU53};
 use er_types::battle_ids::PokemonId;
+use er_types::{PresentationEventId, SafeU53};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -26,7 +26,7 @@ pub struct CurrentRewardCandyV1 {
     pub stats_event: Option<PresentationEventId>,
 }
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(tag="kind", rename_all="SCREAMING_SNAKE_CASE", deny_unknown_fields)]
+#[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub enum CurrentRewardCandyPhaseV1 {
     Queued,
     Friendship,

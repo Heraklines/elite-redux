@@ -55,8 +55,19 @@ pub(crate) fn expected_presentations(state: &GameStateV6) -> Vec<PendingCurrentP
         }
     }
     for pending in &owner.pending {
-        if let Some(candy)=pending.victory_tail.as_ref().and_then(|t|t.reward.as_ref()).and_then(|r|r.candy.as_ref()) {
-            if let Some(event_id)=candy_event(candy){expected.push(PendingCurrentPhaseAckV1{pending:pending.id,event_id,kind:K::RewardCandy});}
+        if let Some(candy) = pending
+            .victory_tail
+            .as_ref()
+            .and_then(|t| t.reward.as_ref())
+            .and_then(|r| r.candy.as_ref())
+        {
+            if let Some(event_id) = candy_event(candy) {
+                expected.push(PendingCurrentPhaseAckV1 {
+                    pending: pending.id,
+                    event_id,
+                    kind: K::RewardCandy,
+                });
+            }
         }
         if let Some(tm) = pending
             .victory_tail
@@ -172,16 +183,48 @@ pub(crate) fn receipt_matches(
         return super::current_phase_v7::victory_presentation(state, ack.event_id) == Some(victory)
             && super::current_phase_v7::victory_receipt_matches(state, content, victory);
     }
-    if ack.kind==K::RewardCandy {
-        if state.current_battle_participation.as_ref().and_then(|p|p.experience.as_ref())
-            .and_then(|o|o.pending.iter().find(|p|p.id==ack.pending)).and_then(|p|p.victory_tail.as_ref())
-            .and_then(|t|t.reward.as_ref()).and_then(|r|r.candy.as_deref()).and_then(candy_event)!=Some(ack.event_id){return false;}
-        let Some(payload)=candy_payload(state,ack.event_id)else{return false;};
-        let semantic=er_game::m9e_content_v2::PresentationSemanticIdV1::Cue(er_game::m9e_content_v2::PresentationCueFamilyV1::Progression);
-        let Some(mapping)=content.presentation(semantic)else{return false;};
-        let effect=GamePresentationEffectV2{event_id:ack.event_id,semantic,blocking:mapping.blocking,skip:mapping.skip,payload:Some(payload)};
-        return mapping.blocking==er_types::battle_ui::PresentationBlockingPolicy::BlocksHumanInput&&er_canonical::fixture_digest(&effect).ok().is_some_and(|hash|
-            state.current_presentation.as_ref().is_some_and(|owner|owner.receipts.iter().any(|r|r.event_id==ack.event_id&&r.effect_sha256==hash)));
+    if ack.kind == K::RewardCandy {
+        if state
+            .current_battle_participation
+            .as_ref()
+            .and_then(|p| p.experience.as_ref())
+            .and_then(|o| o.pending.iter().find(|p| p.id == ack.pending))
+            .and_then(|p| p.victory_tail.as_ref())
+            .and_then(|t| t.reward.as_ref())
+            .and_then(|r| r.candy.as_deref())
+            .and_then(candy_event)
+            != Some(ack.event_id)
+        {
+            return false;
+        }
+        let Some(payload) = candy_payload(state, ack.event_id) else {
+            return false;
+        };
+        let semantic = er_game::m9e_content_v2::PresentationSemanticIdV1::Cue(
+            er_game::m9e_content_v2::PresentationCueFamilyV1::Progression,
+        );
+        let Some(mapping) = content.presentation(semantic) else {
+            return false;
+        };
+        let effect = GamePresentationEffectV2 {
+            event_id: ack.event_id,
+            semantic,
+            blocking: mapping.blocking,
+            skip: mapping.skip,
+            payload: Some(payload),
+        };
+        return mapping.blocking
+            == er_types::battle_ui::PresentationBlockingPolicy::BlocksHumanInput
+            && er_canonical::fixture_digest(&effect)
+                .ok()
+                .is_some_and(|hash| {
+                    state.current_presentation.as_ref().is_some_and(|owner| {
+                        owner
+                            .receipts
+                            .iter()
+                            .any(|r| r.event_id == ack.event_id && r.effect_sha256 == hash)
+                    })
+                });
     }
     if ack.kind == K::RewardTm {
         let Some(payload) = reward_tm_payload(state, ack.event_id) else {
@@ -229,7 +272,9 @@ pub(crate) fn receipt_matches(
             tween_milliseconds: 500,
         },
         K::FaintMessage => P::FaintMessage { holder },
-        K::Victory | K::RewardTm | K::RewardCandy | K::StatAnimation | K::StatMessage => return false,
+        K::Victory | K::RewardTm | K::RewardCandy | K::StatAnimation | K::StatMessage => {
+            return false;
+        }
     };
     let semantic = er_game::m9e_content_v2::PresentationSemanticIdV1::Cue(
         er_game::m9e_content_v2::PresentationCueFamilyV1::Faint,
@@ -303,24 +348,54 @@ pub(crate) fn reward_tm_payload(state: &GameStateV6, event_id: PresentationEvent
     })
 }
 
-pub(crate) fn candy_clock(candy:&er_state::current_reward_candy::CurrentRewardCandyV1)->Option<&er_state::current_experience_owner::CurrentFriendshipClockRequestV1>{
+pub(crate) fn candy_clock(
+    candy: &er_state::current_reward_candy::CurrentRewardCandyV1,
+) -> Option<&er_state::current_experience_owner::CurrentFriendshipClockRequestV1> {
     use er_state::current_reward_candy::CurrentRewardCandyPhaseV1 as C;
-    if !matches!(candy.phase,C::Friendship){return None;}
-    if candy.max_clock.is_some()&&candy.max_utc.is_none(){candy.max_clock.as_ref()}
-    else if candy.event_utc.is_none(){candy.event_clock.as_ref()}else{None}
+    if !matches!(candy.phase, C::Friendship) {
+        return None;
+    }
+    if candy.max_clock.is_some() && candy.max_utc.is_none() {
+        candy.max_clock.as_ref()
+    } else if candy.event_utc.is_none() {
+        candy.event_clock.as_ref()
+    } else {
+        None
+    }
 }
-pub(crate) fn candy_event(candy:&er_state::current_reward_candy::CurrentRewardCandyV1)->Option<PresentationEventId>{
+pub(crate) fn candy_event(
+    candy: &er_state::current_reward_candy::CurrentRewardCandyV1,
+) -> Option<PresentationEventId> {
     use er_state::current_reward_candy::CurrentRewardCandyPhaseV1 as C;
-    match candy.phase{C::Message{event_id}|C::Stats{event_id}=>Some(event_id),_=>None}
+    match candy.phase {
+        C::Message { event_id } | C::Stats { event_id } => Some(event_id),
+        _ => None,
+    }
 }
-pub(crate) fn candy_payload(state:&GameStateV6,event:PresentationEventId)->Option<P>{
+pub(crate) fn candy_payload(state: &GameStateV6, event: PresentationEventId) -> Option<P> {
     use er_state::current_reward_candy::CurrentRewardCandyPhaseV1 as C;
-    let candy=state.current_battle_participation.as_ref()?.experience.as_ref()?.pending.iter()
-        .filter_map(|p|p.victory_tail.as_ref()?.reward.as_ref()?.candy.as_deref()).find(|c|candy_event(c)==Some(event))?;
-    let after=candy.pokemon_after.as_ref()?;
-    Some(match candy.phase{
-        C::Message{..}=>P::CandyLevelMessage{holder:candy.holder,level:after.level},
-        C::Stats{..}=>P::LevelStats{holder:candy.holder,previous_level:candy.pokemon_before.level,level:after.level,
-            previous_stats:candy.pokemon_before.stats,stats:after.stats},_=>return None,
+    let candy = state
+        .current_battle_participation
+        .as_ref()?
+        .experience
+        .as_ref()?
+        .pending
+        .iter()
+        .filter_map(|p| p.victory_tail.as_ref()?.reward.as_ref()?.candy.as_deref())
+        .find(|c| candy_event(c) == Some(event))?;
+    let after = candy.pokemon_after.as_ref()?;
+    Some(match candy.phase {
+        C::Message { .. } => P::CandyLevelMessage {
+            holder: candy.holder,
+            level: after.level,
+        },
+        C::Stats { .. } => P::LevelStats {
+            holder: candy.holder,
+            previous_level: candy.pokemon_before.level,
+            level: after.level,
+            previous_stats: candy.pokemon_before.stats,
+            stats: after.stats,
+        },
+        _ => return None,
     })
 }

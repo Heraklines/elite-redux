@@ -35,6 +35,7 @@ pub struct CurrentAchievementRunV1 {
     pub bargain_accepted: bool,
     pub bargain_refused_pending_boss: bool,
     pub black_market_credited: bool,
+    #[serde(with = "crate::m7_state::ordered_map_serde")]
     pub learned_move_stamps: BTreeMap<MoveId, WaveIndex>,
     pub parallel_play_ko_ids: BTreeSet<PokemonId>,
     /// Actual source fresh sentinel is -1, not wave zero.
@@ -51,6 +52,7 @@ pub struct CurrentAchievementBattleV1 {
     pub switched_in_player_ids: BTreeSet<PokemonId>,
     pub turn_one_charged_moves: BTreeSet<String>,
     pub damage_source_turn: TurnIndex,
+    #[serde(with = "crate::m7_state::ordered_map_serde")]
     pub damage_sources_by_target: BTreeMap<PokemonId, BTreeSet<String>>,
     pub last_spread_move: Option<CurrentAchievementSpreadMoveV1>,
     pub faint_ledger_turn: Option<TurnIndex>,
@@ -61,14 +63,18 @@ pub struct CurrentAchievementBattleV1 {
     pub player_ever_acted: bool,
     pub flash_failed: bool,
     pub player_fainted_this_battle: bool,
+    #[serde(with = "crate::m7_state::ordered_map_serde")]
     pub enemy_ko_turns: BTreeMap<PokemonId, TurnIndex>,
+    #[serde(with = "crate::m7_state::ordered_map_serde")]
     pub enemy_ko_killers: BTreeMap<PokemonId, CurrentAchievementKillerV1>,
     pub player_dealt_direct_damage: bool,
     pub relic_saved_mon_ids: BTreeSet<PokemonId>,
     pub last_enemy_killer_id: Option<PokemonId>,
+    #[serde(with = "crate::m7_state::ordered_map_serde")]
     pub ko_stints: BTreeMap<PokemonId, CurrentAchievementKoStintV1>,
     pub no_sell_token: Option<CurrentAchievementNoSellV1>,
     pub charge_low_hp_user_ids: BTreeSet<PokemonId>,
+    #[serde(with = "crate::m7_state::ordered_map_serde")]
     pub boss_damage_tracking: BTreeMap<PokemonId, CurrentAchievementBossDamageV1>,
     pub longest_turn_number: Option<TurnIndex>,
     pub longest_turn_effects: Option<BTreeSet<String>>,

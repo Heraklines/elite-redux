@@ -268,8 +268,10 @@ pub(crate) fn validate_live(state: &GameStateV6, id: SafeU53) -> Result<(), Erro
         }
     }
     if selection.candy.is_some() {
-        crate::current_reward_candy::validate_live(state,id)?;
-        if owned_run(state)? != &selection.run_before {return Err(invalid());}
+        crate::current_reward_candy::validate_live(state, id)?;
+        if owned_run(state)? != &selection.run_before {
+            return Err(invalid());
+        }
         return Ok(());
     }
     if let Some(tm) = selection.tm.as_deref() {
@@ -323,7 +325,8 @@ pub(crate) fn validate_live(state: &GameStateV6, id: SafeU53) -> Result<(), Erro
                 .get(usize::from(offer))
                 .ok_or_else(invalid)?;
             if option.args.is_some()
-                || (healing(&option.source_id).is_none() && !matches!(option.source_id.as_str(), "TM_CASE" | "RARE_CANDY"))
+                || (healing(&option.source_id).is_none()
+                    && !matches!(option.source_id.as_str(), "TM_CASE" | "RARE_CANDY"))
             {
                 return Err(invalid());
             }
@@ -362,9 +365,9 @@ pub(crate) fn validate(
     let mut before = state.clone();
     before.active_run.as_mut().ok_or_else(invalid)?.party = selection.party_before.clone();
     set_run(&mut before, selection.run_before.clone())?;
-    if let Some(candy)=selection.candy.as_deref(){
-        crate::current_reward_candy::validate(state,content,id)?;
-        before.current_friendship_profile=Some((*candy.profile_before).clone());
+    if let Some(candy) = selection.candy.as_deref() {
+        crate::current_reward_candy::validate(state, content, id)?;
+        before.current_friendship_profile = Some((*candy.profile_before).clone());
     }
     if let Some(tm) = selection.tm.as_deref() {
         crate::current_reward_tm::set_history(&mut before, tm.holder, tm.history_before.clone())?;
@@ -477,7 +480,9 @@ pub(crate) fn select(
             let index = usize::try_from(ordinal).map_err(|_| invalid())?;
             let option = selection.offers.get(index).ok_or_else(invalid)?;
             let offer = u8::try_from(index).map_err(|_| invalid())?;
-            if healing(&option.source_id).is_some() || matches!(option.source_id.as_str(), "TM_CASE" | "RARE_CANDY") {
+            if healing(&option.source_id).is_some()
+                || matches!(option.source_id.as_str(), "TM_CASE" | "RARE_CANDY")
+            {
                 selection.stage = Stage::Holder { offer };
                 let mut state = before.clone();
                 set_selection(&mut state, id, selection)?;
@@ -504,8 +509,8 @@ pub(crate) fn select(
                 validate(&state, content, id)?;
                 return Ok(state);
             }
-            if selection.offers[usize::from(offer)].source_id=="RARE_CANDY" {
-                return crate::current_reward_candy::prepare(before,content,id,offer,p.id);
+            if selection.offers[usize::from(offer)].source_id == "RARE_CANDY" {
+                return crate::current_reward_candy::prepare(before, content, id, offer, p.id);
             }
             (offer, Some(p.id))
         }

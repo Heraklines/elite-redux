@@ -15,6 +15,7 @@ START = int(os.environ["M9E_JS_STARTED_AT"])
 DEADLINE = START + 580  # 600 seconds including checkout/setup, 20 reserved for cleanup.
 LIMIT = 262144
 FILES = {
+    "test/node/rust-browser/engineering/current-presentation-lifetime.test.ts": 1,
     "test/node/rust-browser/engineering/browser-effects-v2.test.ts": 2,
     "test/node/rust-browser/engineering/current-worker-codec.test.ts": 5,
     "test/node/rust-browser/engineering/current-storage-owner.test.ts": 11,

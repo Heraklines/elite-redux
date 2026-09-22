@@ -69,7 +69,10 @@ pub enum CurrentRewardStageV1 {
     Holder {
         offer: u8,
     },
-    CandyPending { offer: u8, holder: PokemonId },
+    CandyPending {
+        offer: u8,
+        holder: PokemonId,
+    },
     TmMove {
         offer: u8,
         holder: PokemonId,

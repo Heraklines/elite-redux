@@ -77,5 +77,5 @@ pub(crate) mod current_reward_ultra;
 mod current_stat_stage_execution;
 
 mod current_reward_candy;
-mod current_reward_candy_source;
 mod current_reward_candy_account;
+mod current_reward_candy_source;

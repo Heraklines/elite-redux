@@ -1643,9 +1643,12 @@ fn assert_current_reward_choice_and_pick(
         "full-slot preimage must be exercised"
     );
     assert_actual_tm_reward(&checkpoint, content.clone(), live, ledger, tm_index)?;
-    let candy_index=selected.offers.iter().position(|offer|offer.source_id=="RARE_CANDY"&&offer.args.is_none())
+    let candy_index = selected
+        .offers
+        .iter()
+        .position(|offer| offer.source_id == "RARE_CANDY" && offer.args.is_none())
         .ok_or("actual Rare Candy reward absent")?;
-    assert_actual_candy_reward(&checkpoint,content.clone(),live,ledger,candy_index)?;
+    assert_actual_candy_reward(&checkpoint, content.clone(), live, ledger, candy_index)?;
     let pokemon = &selected.party_before[0];
     let index = selected.offers.iter().position(|offer| {
         offer.args.is_none()
@@ -2725,115 +2728,239 @@ fn assert_growl_title_read_reissues(
     assert_phase_title_read_reissues(&checkpoint, event_id, content)
 }
 #[inline(never)]
-fn candy_restore(checkpoint:&CoreGameKernelSnapshotV7,content:Arc<PreparedGameContentV2>)->Result<Box<GameKernelV7>>{
-    Ok(Box::new(restore(checkpoint.clone(),content)?))
+fn candy_restore(
+    checkpoint: &CoreGameKernelSnapshotV7,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<Box<GameKernelV7>> {
+    Ok(Box::new(restore(checkpoint.clone(), content)?))
 }
 #[inline(never)]
-fn candy_accept(live:&mut Option<GameStateV6>,ledger:&mut AppliedGameMaterialLedgerV1,kernel:&GameKernelV7,
-    content:&PreparedGameContentV2,step:&GameKernelStepV7)->Result<()>{
-    accept_material(live,ledger,kernel,content,step)?;Ok(())
+fn candy_accept(
+    live: &mut Option<GameStateV6>,
+    ledger: &mut AppliedGameMaterialLedgerV1,
+    kernel: &GameKernelV7,
+    content: &PreparedGameContentV2,
+    step: &GameKernelStepV7,
+) -> Result<()> {
+    accept_material(live, ledger, kernel, content, step)?;
+    Ok(())
 }
 #[inline(never)]
-fn candy_title_request(kernel:&GameKernelV7,effect:&GamePlatformEffectV2,content:Arc<PreparedGameContentV2>)->Result<()>{
-    let checkpoint=Box::new(kernel.snapshot()?);assert_request_title_read_reissues(&checkpoint,effect,content)
+fn candy_title_request(
+    kernel: &GameKernelV7,
+    effect: &GamePlatformEffectV2,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<()> {
+    let checkpoint = Box::new(kernel.snapshot()?);
+    assert_request_title_read_reissues(&checkpoint, effect, content)
 }
 #[inline(never)]
-fn candy_title_presentation(kernel:&GameKernelV7,event:er_types::PresentationEventId,content:Arc<PreparedGameContentV2>)->Result<()>{
-    let checkpoint=Box::new(kernel.snapshot()?);assert_phase_title_read_reissues(&checkpoint,event,content)
+fn candy_title_presentation(
+    kernel: &GameKernelV7,
+    event: er_types::PresentationEventId,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<()> {
+    let checkpoint = Box::new(kernel.snapshot()?);
+    assert_phase_title_read_reissues(&checkpoint, event, content)
 }
-fn candy_owner(kernel:&GameKernelV7)->Result<&er_state::current_reward_candy::CurrentRewardCandyV1>{
-    current_reward(kernel.state().ok_or("Candy state absent")?)?.candy.as_deref().ok_or("Candy owner absent".into())
+fn candy_owner(
+    kernel: &GameKernelV7,
+) -> Result<&er_state::current_reward_candy::CurrentRewardCandyV1> {
+    current_reward(kernel.state().ok_or("Candy state absent")?)?
+        .candy
+        .as_deref()
+        .ok_or("Candy owner absent".into())
 }
 #[inline(never)]
-fn candy_choose(kernel:&mut GameKernelV7,ordinal:u32)->Result<GameKernelStepV7>{
+fn candy_choose(kernel: &mut GameKernelV7, ordinal: u32) -> Result<GameKernelStepV7> {
     let option=kernel.current_control().and_then(|c|c.menu.as_ref()).and_then(|menu|menu.options.iter().find(|row|
         matches!(&row.action,er_types::GameActionV1::Reward{action:er_types::RewardActionV1::Select{option_ordinal}} if *option_ordinal==ordinal)))
         .ok_or("actual Candy reward choice absent")?.option_id.as_str().to_owned();
-    navigate(kernel,&option)?;press(kernel,PhysicalKey::Space)
+    navigate(kernel, &option)?;
+    press(kernel, PhysicalKey::Space)
 }
 #[inline(never)]
-fn assert_candy_forgery_rejects(kernel:&GameKernelV7,content:Arc<PreparedGameContentV2>)->Result<()>{
-    let mut checkpoint=Box::new(kernel.snapshot()?);
-    let GameKernelLifecycleSnapshotV7::Active(state)=&mut checkpoint.lifecycle else{return Err("active state absent".into());};
-    let candy=state.current_battle_participation.as_mut().and_then(|p|p.experience.as_mut()).and_then(|p|p.pending.first_mut())
-        .and_then(|p|p.victory_tail.as_mut()).and_then(|p|p.reward.as_mut()).and_then(|p|p.candy.as_mut()).ok_or("Candy absent")?;
-    candy.pokemon_head.level=candy.pokemon_head.level.checked_add(1).ok_or("level overflow")?;
-    assert!(restore(*checkpoint,content).is_err(),"fabricated Candy level must reject restore");Ok(())
+fn assert_candy_forgery_rejects(
+    kernel: &GameKernelV7,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<()> {
+    let mut checkpoint = Box::new(kernel.snapshot()?);
+    let GameKernelLifecycleSnapshotV7::Active(state) = &mut checkpoint.lifecycle else {
+        return Err("active state absent".into());
+    };
+    let candy = state
+        .current_battle_participation
+        .as_mut()
+        .and_then(|p| p.experience.as_mut())
+        .and_then(|p| p.pending.first_mut())
+        .and_then(|p| p.victory_tail.as_mut())
+        .and_then(|p| p.reward.as_mut())
+        .and_then(|p| p.candy.as_mut())
+        .ok_or("Candy absent")?;
+    candy.pokemon_head.level = candy
+        .pokemon_head
+        .level
+        .checked_add(1)
+        .ok_or("level overflow")?;
+    assert!(
+        restore(*checkpoint, content).is_err(),
+        "fabricated Candy level must reject restore"
+    );
+    Ok(())
 }
 #[inline(never)]
-fn assert_actual_candy_reward(checkpoint:&CoreGameKernelSnapshotV7,content:Arc<PreparedGameContentV2>,
-    source_live:&Option<GameStateV6>,source_ledger:&AppliedGameMaterialLedgerV1,index:usize)->Result<()>{
+fn assert_actual_candy_reward(
+    checkpoint: &CoreGameKernelSnapshotV7,
+    content: Arc<PreparedGameContentV2>,
+    source_live: &Option<GameStateV6>,
+    source_ledger: &AppliedGameMaterialLedgerV1,
+    index: usize,
+) -> Result<()> {
     use er_state::current_reward_candy::CurrentRewardCandyPhaseV1 as C;
-    let mut kernel=candy_restore(checkpoint,content.clone())?;
-    let mut live=source_live.clone();let mut ledger=source_ledger.clone();
+    let mut kernel = candy_restore(checkpoint, content.clone())?;
+    let mut live = source_live.clone();
+    let mut ledger = source_ledger.clone();
     settle_growl_ordinary_presentations(&mut kernel)?;
-    let step=candy_choose(&mut kernel,index as u32)?;
-    candy_accept(&mut live,&mut ledger,&kernel,content.as_ref(),&step)?;
-    assert!(matches!(current_reward(kernel.state().ok_or("state absent")?)?.stage,
-        er_state::current_reward_selection::CurrentRewardStageV1::Holder{..}));
+    let step = candy_choose(&mut kernel, index as u32)?;
+    candy_accept(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
+    assert!(matches!(
+        current_reward(kernel.state().ok_or("state absent")?)?.stage,
+        er_state::current_reward_selection::CurrentRewardStageV1::Holder { .. }
+    ));
     settle_growl_ordinary_presentations(&mut kernel)?;
-    let step=candy_choose(&mut kernel,0)?;
-    candy_accept(&mut live,&mut ledger,&kernel,content.as_ref(),&step)?;
-    assert!(matches!(candy_owner(&kernel)?.phase,C::Queued));
-    assert_eq!(kernel.state().and_then(|s|s.active_run.as_ref()).ok_or("run absent")?.party[0],*candy_owner(&kernel)?.pokemon_before);
-    assert_candy_forgery_rejects(&kernel,content.clone())?;
-    let mut clock_seen=false;let mut message_seen=false;let mut stats_seen=false;
+    let step = candy_choose(&mut kernel, 0)?;
+    candy_accept(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
+    assert!(matches!(candy_owner(&kernel)?.phase, C::Queued));
+    assert_eq!(
+        kernel
+            .state()
+            .and_then(|s| s.active_run.as_ref())
+            .ok_or("run absent")?
+            .party[0],
+        *candy_owner(&kernel)?.pokemon_before
+    );
+    assert_candy_forgery_rejects(&kernel, content.clone())?;
+    let mut clock_seen = false;
+    let mut message_seen = false;
+    let mut stats_seen = false;
     for _ in 0..10 {
-        match candy_owner(&kernel)?.phase.clone(){
-            C::Queued|C::LevelStart=>{
+        match candy_owner(&kernel)?.phase.clone() {
+            C::Queued | C::LevelStart => {
                 settle_growl_ordinary_presentations(&mut kernel)?;
-                let step=kernel.advance_time(SafeU53::ZERO)?;
-                candy_accept(&mut live,&mut ledger,&kernel,content.as_ref(),&step)?;
+                let step = kernel.advance_time(SafeU53::ZERO)?;
+                candy_accept(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
             }
-            C::Friendship=>{
-                let candy=candy_owner(&kernel)?;
-                let request=if candy.max_clock.is_some()&&candy.max_utc.is_none(){candy.max_clock.clone()}
-                    else{candy.event_clock.clone()}.ok_or("actual Candy UTC request absent")?;
-                let effect=GamePlatformEffectV2::CurrentFriendshipClock{request:request.clone()};
-                candy_title_request(&kernel,&effect,content.clone())?;
-                let before=growl_checkpoint_bytes(&kernel)?;
-                assert!(kernel.apply_current_utc_clock_result(request.request,8_640_000_000_000_001).is_err());
-                assert_eq!(growl_checkpoint_bytes(&kernel)?,before);
-                let step=kernel.apply_current_utc_clock_result(request.request,0)?;
-                candy_accept(&mut live,&mut ledger,&kernel,content.as_ref(),&step)?;
-                let completed=growl_checkpoint_bytes(&kernel)?;
-                assert!(kernel.apply_current_utc_clock_result(request.request,0).is_err());
-                assert_eq!(growl_checkpoint_bytes(&kernel)?,completed);clock_seen=true;
+            C::Friendship => {
+                let candy = candy_owner(&kernel)?;
+                let request = if candy.max_clock.is_some() && candy.max_utc.is_none() {
+                    candy.max_clock.clone()
+                } else {
+                    candy.event_clock.clone()
+                }
+                .ok_or("actual Candy UTC request absent")?;
+                let effect = GamePlatformEffectV2::CurrentFriendshipClock {
+                    request: request.clone(),
+                };
+                candy_title_request(&kernel, &effect, content.clone())?;
+                let before = growl_checkpoint_bytes(&kernel)?;
+                assert!(
+                    kernel
+                        .apply_current_utc_clock_result(request.request, 8_640_000_000_000_001)
+                        .is_err()
+                );
+                assert_eq!(growl_checkpoint_bytes(&kernel)?, before);
+                let step = kernel.apply_current_utc_clock_result(request.request, 0)?;
+                candy_accept(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
+                let completed = growl_checkpoint_bytes(&kernel)?;
+                assert!(
+                    kernel
+                        .apply_current_utc_clock_result(request.request, 0)
+                        .is_err()
+                );
+                assert_eq!(growl_checkpoint_bytes(&kernel)?, completed);
+                clock_seen = true;
             }
-            phase@ (C::Message{..}|C::Stats{..})=>{
-                let event_id=match phase{C::Message{event_id}=>{message_seen=true;event_id},
-                    C::Stats{event_id}=>{stats_seen=true;event_id},_=>return Err("phase absent".into())};
-                candy_title_presentation(&kernel,event_id,content.clone())?;
-                let before=growl_checkpoint_bytes(&kernel)?;
+            phase @ (C::Message { .. } | C::Stats { .. }) => {
+                let event_id = match phase {
+                    C::Message { event_id } => {
+                        message_seen = true;
+                        event_id
+                    }
+                    C::Stats { event_id } => {
+                        stats_seen = true;
+                        event_id
+                    }
+                    _ => return Err("phase absent".into()),
+                };
+                candy_title_presentation(&kernel, event_id, content.clone())?;
+                let before = growl_checkpoint_bytes(&kernel)?;
                 assert!(kernel.settle_presentation_outcome(event_id,
                     er_kernel::game_kernel_v7::KernelPresentationOutcomeV2::IntentionallySkipped).is_err());
-                assert_eq!(growl_checkpoint_bytes(&kernel)?,before);
-                let waiting=kernel.advance_time(SafeU53::ZERO)?;
-                assert!(!waiting.effects.iter().any(|e|matches!(e,GameKernelEffectV7::AuthorityMaterial{..})),"receipt must not imply Candy callback");
+                assert_eq!(growl_checkpoint_bytes(&kernel)?, before);
+                let waiting = kernel.advance_time(SafeU53::ZERO)?;
+                assert!(
+                    !waiting
+                        .effects
+                        .iter()
+                        .any(|e| matches!(e, GameKernelEffectV7::AuthorityMaterial { .. })),
+                    "receipt must not imply Candy callback"
+                );
                 kernel.settle_presentation(event_id)?;
-                let acknowledged=growl_checkpoint_bytes(&kernel)?;
+                let acknowledged = growl_checkpoint_bytes(&kernel)?;
                 assert!(kernel.settle_presentation(event_id).is_err());
-                assert_eq!(growl_checkpoint_bytes(&kernel)?,acknowledged);
-                kernel=restore_exact_raw_checkpoint(&kernel,content.clone())?;
-                let step=kernel.advance_time(SafeU53::ZERO)?;
-                candy_accept(&mut live,&mut ledger,&kernel,content.as_ref(),&step)?;
+                assert_eq!(growl_checkpoint_bytes(&kernel)?, acknowledged);
+                kernel = restore_exact_raw_checkpoint(&kernel, content.clone())?;
+                let step = kernel.advance_time(SafeU53::ZERO)?;
+                candy_accept(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
             }
-            C::Complete=>{
-                assert!(clock_seen&&message_seen&&stats_seen);
-                let candy=candy_owner(&kernel)?;let after=candy.pokemon_after.as_ref().ok_or("frozen postStats absent")?;
-                assert_eq!(after.level,candy.pokemon_before.level+1);
-                let old=candy.pokemon_before.friendship;
-                assert_eq!(after.friendship,if old+6>200{old.max(200)}else{old+6});
-                let species=content.progression.species(after.species_id,after.form_index).ok_or("species absent")?;
-                let growth=content.progression.growth_rate(species.growth_rate).ok_or("growth absent")?;
-                assert_eq!(after.experience,er_progression::progression::current_growth_experience_for_level(growth,after.level)?);
-                assert_ne!(after.stats,candy.pokemon_before.stats,"Candy must retain a real frozen stat change");
-                assert_eq!(kernel.state().and_then(|s|s.active_run.as_ref()).ok_or("run absent")?.party[0],**after);
-                assert!(matches!(current_reward(kernel.state().ok_or("state absent")?)?.stage,er_state::current_reward_selection::CurrentRewardStageV1::Applied{..}));
+            C::Complete => {
+                assert!(clock_seen && message_seen && stats_seen);
+                let candy = candy_owner(&kernel)?;
+                let after = candy
+                    .pokemon_after
+                    .as_ref()
+                    .ok_or("frozen postStats absent")?;
+                assert_eq!(after.level, candy.pokemon_before.level + 1);
+                let old = candy.pokemon_before.friendship;
+                assert_eq!(
+                    after.friendship,
+                    if old + 6 > 200 { old.max(200) } else { old + 6 }
+                );
+                let species = content
+                    .progression
+                    .species(after.species_id, after.form_index)
+                    .ok_or("species absent")?;
+                let growth = content
+                    .progression
+                    .growth_rate(species.growth_rate)
+                    .ok_or("growth absent")?;
+                assert_eq!(
+                    after.experience,
+                    er_progression::progression::current_growth_experience_for_level(
+                        growth,
+                        after.level
+                    )?
+                );
+                assert_ne!(
+                    after.stats, candy.pokemon_before.stats,
+                    "Candy must retain a real frozen stat change"
+                );
+                assert_eq!(
+                    kernel
+                        .state()
+                        .and_then(|s| s.active_run.as_ref())
+                        .ok_or("run absent")?
+                        .party[0],
+                    **after
+                );
+                assert!(matches!(
+                    current_reward(kernel.state().ok_or("state absent")?)?.stage,
+                    er_state::current_reward_selection::CurrentRewardStageV1::Applied { .. }
+                ));
                 return Ok(());
             }
         }
-        kernel=restore_exact_raw_checkpoint(&kernel,content.clone())?;
+        kernel = restore_exact_raw_checkpoint(&kernel, content.clone())?;
     }
     Err("Candy descendants exceeded bounded callback watchdog".into())
 }
