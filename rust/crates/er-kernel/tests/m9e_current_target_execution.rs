@@ -1358,9 +1358,8 @@ fn unsupported_selection_and_owner_stripping_fail_atomically() -> Result<()> {
     let GameMaterialV6::BattleTurn(transition) = &mut stripped else {
         return Err("actual turn material required".into());
     };
-    // The forged after-state must stay self-valid to reach the ownership guard:
-    // the turn, dispatch, tracker and experience owners all depend on the
-    // stripped target owner, so they leave with it.
+    // Keep the forged after-state structurally valid. Independent turn replay
+    // must reject the lost owners before target conservation is reached.
     transition.after_state.current_targeting = None;
     transition.after_state.current_turn_execution = None;
     transition.after_state.current_defender_dispatch = None;
@@ -1374,7 +1373,7 @@ fn unsupported_selection_and_owner_stripping_fail_atomically() -> Result<()> {
     }
     stripped.validate()?;
     // The live prior keeps its participation shell but drops the experience
-    // owner, so the successor check yields to the target-ownership guard.
+    // owner. Recomputed turn material still forbids stripping its owners.
     let mut live_state = active(&before)?.clone();
     if let Some(participation) = live_state.current_battle_participation.as_mut() {
         participation.experience = None;
@@ -1389,7 +1388,7 @@ fn unsupported_selection_and_owner_stripping_fail_atomically() -> Result<()> {
             content.as_ref(),
             &stripped.canonical_bytes()?
         ),
-        Err(er_game::m9e_material_v6::GameMaterialV6Error::CurrentTargetOwnership)
+        Err(er_game::m9e_material_v6::GameMaterialV6Error::Invalid)
     );
     assert_eq!(canonical_bytes(&(live.clone(), ledger.clone()))?, unchanged);
     let mut unknown = two_enemies(content.clone())?;

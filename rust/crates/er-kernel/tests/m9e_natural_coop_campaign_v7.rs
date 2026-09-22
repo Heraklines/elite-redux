@@ -62,28 +62,62 @@ fn press(kernel: &mut GameKernelV7, code: PhysicalKey) -> Result<(), Box<dyn Err
 }
 
 fn navigate(kernel: &mut GameKernelV7, id: &str) -> Result<(), Box<dyn Error>> {
-    let bound = kernel
-        .current_control()
-        .and_then(|control| control.menu.as_ref())
-        .ok_or("missing natural menu")?
-        .options
-        .len()
-        + 1;
-    for _ in 0..bound {
-        if kernel
+    let route = {
+        let menu = kernel
             .current_control()
             .and_then(|control| control.menu.as_ref())
-            .is_some_and(|menu| menu.selected_option_id.as_str() == id)
-        {
-            return Ok(());
+            .ok_or("missing natural menu")?;
+        if !menu.options.iter().any(|option| option.option_id.as_str() == id) {
+            return Err(format!("natural option {id} is absent").into());
         }
-        press(kernel, PhysicalKey::ArrowDown)?;
+        let start = menu.selected_option_id.as_str();
+        let mut adjacent = std::collections::BTreeMap::<&str, Vec<_>>::new();
+        for edge in &menu.navigation {
+            adjacent.entry(edge.from.as_str()).or_default().push(edge);
+        }
+        let mut queue = std::collections::VecDeque::from([start]);
+        let mut seen = std::collections::BTreeSet::from([start]);
+        let mut previous = std::collections::BTreeMap::new();
+        while let Some(node) = queue.pop_front() {
+            if node == id {
+                break;
+            }
+            for edge in adjacent.get(node).into_iter().flatten() {
+                if seen.insert(edge.to.as_str()) {
+                    let key = match edge.direction {
+                        er_types::NavigationDirection::Up => PhysicalKey::ArrowUp,
+                        er_types::NavigationDirection::Down => PhysicalKey::ArrowDown,
+                        er_types::NavigationDirection::Left => PhysicalKey::ArrowLeft,
+                        er_types::NavigationDirection::Right => PhysicalKey::ArrowRight,
+                    };
+                    previous.insert(edge.to.as_str(), (node, key));
+                    queue.push_back(edge.to.as_str());
+                }
+            }
+        }
+        let mut keys = Vec::new();
+        let mut cursor = id;
+        while cursor != start {
+            let (parent, key) = previous
+                .get(cursor)
+                .ok_or("offered natural option is unreachable")?;
+            keys.push(key.clone());
+            cursor = parent;
+        }
+        keys.reverse();
+        keys
+    };
+    for key in route {
+        press(kernel, key)?;
     }
-    let selected = kernel
+    if !kernel
         .current_control()
         .and_then(|control| control.menu.as_ref())
-        .map_or("<no-menu>", |menu| menu.selected_option_id.as_str());
-    Err(format!("raw option {id} is unreachable from {selected}").into())
+        .is_some_and(|menu| menu.selected_option_id.as_str() == id)
+    {
+        return Err("raw natural navigation did not reach its offered option".into());
+    }
+    Ok(())
 }
 
 fn frame(
@@ -599,10 +633,13 @@ fn natural_owned_cooperative_campaign_reaches_wave_200_victory() -> Result<(), B
     let mut guest = owned_title(content.clone(), false)?;
     let choose = choose_combat_party;
     let (guest_choices, frames) = choose(&mut guest, &content, false)?;
+    println!("M9E_COOP_BOOTSTRAP guest_choices={}", guest_choices.len());
     let (host_choices, waiting) = choose(&mut host, &content, true)?;
+    println!("M9E_COOP_BOOTSTRAP host_choices={}", host_choices.len());
     assert!(waiting.is_empty() && host.state().is_none());
     let started = wire(&host.ingest_network_frame(generation, &frames[0])?)?;
     guest.ingest_network_frame(generation, &started)?;
+    println!("M9E_COOP_BOOTSTRAP shared_run_started");
     assert_eq!(host.state(), guest.state());
     let initial_party = host
         .state()

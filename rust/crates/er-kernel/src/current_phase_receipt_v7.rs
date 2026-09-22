@@ -60,28 +60,26 @@ pub(crate) fn expected_presentations(state: &GameStateV6) -> Vec<PendingCurrentP
             .as_ref()
             .and_then(|t| t.reward.as_ref())
             .and_then(|r| r.candy.as_ref())
+            && let Some(event_id) = candy_event(candy)
         {
-            if let Some(event_id) = candy_event(candy) {
-                expected.push(PendingCurrentPhaseAckV1 {
-                    pending: pending.id,
-                    event_id,
-                    kind: K::RewardCandy,
-                });
-            }
+            expected.push(PendingCurrentPhaseAckV1 {
+                pending: pending.id,
+                event_id,
+                kind: K::RewardCandy,
+            });
         }
         if let Some(tm) = pending
             .victory_tail
             .as_ref()
             .and_then(|t| t.reward.as_ref())
             .and_then(|r| r.tm.as_ref())
+            && let Some(event_id) = tm.phase.event()
         {
-            if let Some(event_id) = tm.phase.event() {
-                expected.push(PendingCurrentPhaseAckV1 {
-                    pending: pending.id,
-                    event_id,
-                    kind: K::RewardTm,
-                });
-            }
+            expected.push(PendingCurrentPhaseAckV1 {
+                pending: pending.id,
+                event_id,
+                kind: K::RewardTm,
+            });
         }
         let Some(victory) = &pending.victory else {
             continue;

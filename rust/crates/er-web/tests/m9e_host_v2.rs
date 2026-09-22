@@ -126,6 +126,14 @@ fn send(
     sequence: u64,
     request: BrowserRequestV2,
 ) -> Result<BrowserResponseV2, Box<dyn Error>> {
+    let importing_current_repro = matches!(
+        &request,
+        BrowserRequestV2::Initialize { initialization }
+            if matches!(initialization.as_ref(), BrowserSessionInitializationV2::CurrentReproCapsule { .. })
+    );
+    if importing_current_repro {
+        network_marker("import_encode_request")?;
+    }
     let envelope = BrowserRequestEnvelopeV2 {
         version: BROWSER_WORKER_PROTOCOL_VERSION_V2,
         request_id: safe(sequence + 1),
@@ -137,9 +145,15 @@ fn send(
     if er_canonical::canonical_bytes(&decoded)? != bytes {
         return Err("browser request is not canonically idempotent".into());
     }
+    if importing_current_repro {
+        network_marker("import_host_process")?;
+    }
     let response = host
         .process_bytes(&bytes)
         .map_err(|error| format!("request of {} bytes failed: {error}", bytes.len()))?;
+    if importing_current_repro {
+        network_marker("import_decode_response")?;
+    }
     let response: BrowserResponseEnvelopeV2 = serde_json::from_slice(&response)?;
     Ok(response.response)
 }
@@ -1093,19 +1107,12 @@ fn network_transport_replay(
         matches!(capsule.attempts.last().ok_or("transport attempt missing")?.event,
         CurrentExternalEvent::TransportChanged { generation, connected: true } if generation == ConnectionGeneration::new(safe(10)))
     );
-    let mut imported = Box::new(BrowserKernelHostV2::from_content(shared_content()?));
     network_marker("replay_import")?;
-    send(
-        &mut imported,
-        0,
-        BrowserRequestV2::Initialize {
-            initialization: Box::new(BrowserSessionInitializationV2::CurrentReproCapsule {
-                capsule_bytes,
-            }),
-        },
-    )?;
+    let mut imported = network_import_capsule(capsule_bytes)?;
     network_marker("replay_import_done")?;
+    network_marker("replay_snapshot_compare")?;
     assert_eq!(network_snapshot(&imported)?.as_ref(), staged);
+    network_marker("replay_snapshot_compare_done")?;
     // An older transport generation must remain an adapter rejection after
     // import even while the newer generation is only staged in the kernel.
     for (host, sequence) in [(&mut *browser, sequence), (imported.as_mut(), 1)] {
@@ -1137,6 +1144,23 @@ fn network_transport_replay(
     network_marker("replay_final_compare")?;
     assert_eq!(network_snapshot(&imported)?, network_snapshot(browser)?);
     Ok(())
+}
+
+#[inline(never)]
+fn network_import_capsule(
+    capsule_bytes: Vec<u8>,
+) -> Result<Box<BrowserKernelHostV2>, Box<dyn Error>> {
+    let mut imported = Box::new(BrowserKernelHostV2::from_content(shared_content()?));
+    send(
+        &mut imported,
+        0,
+        BrowserRequestV2::Initialize {
+            initialization: Box::new(BrowserSessionInitializationV2::CurrentReproCapsule {
+                capsule_bytes,
+            }),
+        },
+    )?;
+    Ok(imported)
 }
 
 #[test]

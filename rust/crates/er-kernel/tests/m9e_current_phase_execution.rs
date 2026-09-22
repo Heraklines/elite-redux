@@ -70,7 +70,11 @@ fn navigate(kernel: &mut GameKernelV7, option: &str) -> Result<()> {
             .iter()
             .any(|row| row.option_id.as_str() == option)
         {
-            return Err("actual requested row absent".into());
+            return Err(format!(
+                "actual requested row absent: {option}; control={:?}",
+                kernel.current_control().map(|control| control.kind)
+            )
+            .into());
         }
         let start = menu.selected_option_id.as_str();
         let mut adjacent = std::collections::BTreeMap::<&str, Vec<_>>::new();

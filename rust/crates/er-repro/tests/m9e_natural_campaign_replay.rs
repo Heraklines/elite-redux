@@ -119,7 +119,7 @@ impl CampaignRecorder {
         // those attempts larger, so keep its capsule segment short without
         // replaying a whole capsule for every navigation input.
         let segment_limit = if self.session.kernel_ref()?.state().is_none() {
-            4
+            2
         } else {
             32
         };
