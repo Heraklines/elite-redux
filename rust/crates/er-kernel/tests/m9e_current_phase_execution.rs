@@ -1388,9 +1388,17 @@ fn controlled_before_early_knockout(content: Arc<PreparedGameContentV2>) -> Resu
 
 #[test]
 fn controlled_early_ko_flash_owns_clock_egg_candy_and_canceled_suffix() -> Result<()> {
+    let content = content()?;
+    let (mut kernel, mut live, mut ledger) = controlled_early_reward_frontier(content.clone())?;
+    assert_current_reward_choice_and_pick(&mut kernel, content, &mut live, &mut ledger)
+}
+
+#[inline(never)]
+fn controlled_early_reward_frontier(
+    content: Arc<PreparedGameContentV2>,
+) -> Result<(Box<GameKernelV7>, Option<GameStateV6>, AppliedGameMaterialLedgerV1)> {
     use er_state::current_achievement_execution::CurrentAchievementKeyV1 as K;
     use er_state::current_initial_victory_tail::CurrentInitialVictoryTailPhaseV1 as T;
-    let content = content()?;
     let mut kernel = Box::new(controlled_before_early_knockout(content.clone())?);
     let (mut live, mut ledger) = admit_knockout(&mut kernel, content.as_ref())?;
     let mut clock_seen = false;
@@ -1425,13 +1433,7 @@ fn controlled_early_ko_flash_owns_clock_egg_candy_and_canceled_suffix() -> Resul
                 "qualified actual source seed projection"
             );
             writeln!(std::io::stderr().lock(), "M9E_REWARD_STAGE before_choice")?;
-            assert_current_reward_choice_and_pick(
-                &mut kernel,
-                content.clone(),
-                &mut live,
-                &mut ledger,
-            )?;
-            return Ok(());
+            return Ok((kernel, live, ledger));
         }
         if !snapshot.pending_presentations.is_empty() {
             for pending in &snapshot.pending_presentations {
