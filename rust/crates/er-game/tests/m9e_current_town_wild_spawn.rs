@@ -5,13 +5,13 @@ use er_game::current_town_wild_spawn::{
     CurrentTownDayWaveTwoContextV1, CurrentTownGenderV1, CurrentTownWildErrorV1,
     select_current_town_day_wave_two_constructor_prefix, select_current_town_day_wave_two_core,
     select_current_town_day_wave_two_root, select_current_town_day_wave_two_shell,
-    source_town_ability_id, source_town_day_pools,
-    source_town_form_base_stats, source_town_form_types, source_town_initial_level_move_pool,
-    source_town_is_shiny, source_town_ivs_from_id, source_town_level_two_form_rows,
-    source_town_level_two_species, source_town_male_half_percent, source_town_moveset,
-    source_town_neutral_moveset, source_town_neutral_weighted_level_move_pool,
-    source_town_shiny_xor, source_town_unmodified_level_two_stats,
-    source_town_unmodified_stats_at_level, source_town_weighted_level_move_pool,
+    source_town_ability_id, source_town_day_pools, source_town_form_base_stats,
+    source_town_form_types, source_town_initial_level_move_pool, source_town_is_shiny,
+    source_town_ivs_from_id, source_town_level_two_form_rows, source_town_level_two_species,
+    source_town_male_half_percent, source_town_moveset, source_town_neutral_moveset,
+    source_town_neutral_weighted_level_move_pool, source_town_shiny_xor,
+    source_town_unmodified_level_two_stats, source_town_unmodified_stats_at_level,
+    source_town_weighted_level_move_pool,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_rng::audit::{RngCallsiteId, RngPublicApi, RngReason};
@@ -582,10 +582,13 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     assert!(!shell.pokemon.shiny);
     assert_eq!(shell.pokemon.variant, 0);
     assert_eq!(
-        shell.pokemon
+        shell
+            .pokemon
             .moves
             .iter()
-            .map(|slot| slot.as_ref().map(|slot| (slot.move_id.get().get(), slot.pp_used)))
+            .map(|slot| slot
+                .as_ref()
+                .map(|slot| (slot.move_id.get().get(), slot.pp_used)))
             .collect::<Vec<_>>(),
         vec![Some((158, 0)), Some((95, 0)), Some((116, 0)), Some((43, 0))]
     );
