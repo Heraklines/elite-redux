@@ -16,7 +16,6 @@ pub mod current_coop_setup_v7;
 use current_coop_setup_v7::CurrentCoopSetupSnapshotV1;
 
 use std::collections::BTreeMap;
-use std::io::Write;
 use std::sync::Arc;
 
 use er_ai::authority_v2::AuthorityAiV2;
@@ -1706,6 +1705,7 @@ impl GameKernelV7 {
             .cloned()
             .ok_or(GameKernelV7Error::Invalid)?;
         let mut step = GameKernelStepV7::default();
+        let mut read_retired = false;
         match (&pending.effect, result) {
             (
                 GamePlatformEffectV2::StorageWrite {
@@ -1784,6 +1784,12 @@ impl GameKernelV7 {
                     MATERIAL_RETENTION_V7,
                 )
                 .map_err(runtime_error)?;
+                // The loaded phase may retain the same request ID as the READ
+                // being completed. Retire the old owner before reissuing it.
+                self.pending_platform
+                    .remove(&request_id)
+                    .ok_or(GameKernelV7Error::Invalid)?;
+                read_retired = true;
                 self.lifecycle = GameKernelLifecycleV7::Active(runtime);
                 self.install_step_effects(&reissued)?;
                 step.effects.extend(reissued);
@@ -1829,7 +1835,9 @@ impl GameKernelV7 {
                 ));
             }
         }
-        self.pending_platform.remove(&request_id);
+        if !read_retired {
+            self.pending_platform.remove(&request_id);
+        }
         self.advance_replay_sequence()?;
         Ok(step)
     }
@@ -1860,6 +1868,7 @@ impl GameKernelV7 {
         let floor = storage.next_platform_request_id;
         let mut restored_effects = Vec::new();
         let bootstrap_revision = bootstrap.control.revision;
+        let mut read_retired = false;
         match (effect, result) {
             (GamePlatformEffectV2::StorageList { .. }, KernelStorageResultV2::Slots { slots }) => {
                 let GameKernelLifecycleV7::Bootstrap(bootstrap) = &mut self.lifecycle else {
@@ -1914,7 +1923,6 @@ impl GameKernelV7 {
                     self.role,
                     self.protocol.is_some(),
                 )?;
-                let _ = writeln!(std::io::stderr().lock(), "M9E_BOOT_READ reissued");
                 save.state
                     .validate_with(self.content.as_ref())
                     .map_err(|error| GameKernelV7Error::Storage(error.to_string()))?;
@@ -1957,7 +1965,6 @@ impl GameKernelV7 {
                 }
                 let revision =
                     increment_safe(bootstrap_revision)?.max(increment_safe(run.control.revision)?);
-                let _ = writeln!(std::io::stderr().lock(), "M9E_BOOT_READ owned");
                 save.state.identities.next_platform_request_id =
                     save.state.identities.next_platform_request_id.max(floor);
                 let next_menu = rebind_loaded_control_v7(
@@ -1965,7 +1972,6 @@ impl GameKernelV7 {
                     revision,
                     self.next_menu_instance_id,
                 )?;
-                let _ = writeln!(std::io::stderr().lock(), "M9E_BOOT_READ rebound");
                 let runtime = GameRuntimeV6::new_with_retention(
                     Some(save.state),
                     self.content.clone(),
@@ -1973,16 +1979,19 @@ impl GameKernelV7 {
                     MATERIAL_RETENTION_V7,
                 )
                 .map_err(runtime_error)?;
-                let _ = writeln!(std::io::stderr().lock(), "M9E_BOOT_READ runtime");
+                // A loaded pending request can reuse the just-completed Title
+                // READ ID. The cloned transaction keeps this replacement atomic.
+                self.pending_platform
+                    .remove(&request_id)
+                    .ok_or(GameKernelV7Error::Invalid)?;
+                read_retired = true;
                 self.lifecycle = GameKernelLifecycleV7::Active(runtime);
                 self.install_step_effects(&reissued)?;
-                let _ = writeln!(std::io::stderr().lock(), "M9E_BOOT_READ installed");
                 restored_effects.extend(reissued);
                 self.next_menu_instance_id = next_menu;
                 self.private_battle_control = None;
                 self.private_learning_control = None;
                 self.clear_input()?;
-                let _ = writeln!(std::io::stderr().lock(), "M9E_BOOT_READ cleared");
                 self.storage_frontiers.insert(slot, save.generation);
             }
             _ => {
@@ -1991,9 +2000,11 @@ impl GameKernelV7 {
                 ));
             }
         }
-        self.pending_platform
-            .remove(&request_id)
-            .ok_or(GameKernelV7Error::Invalid)?;
+        if !read_retired {
+            self.pending_platform
+                .remove(&request_id)
+                .ok_or(GameKernelV7Error::Invalid)?;
+        }
         self.advance_replay_sequence()?;
         let control = self
             .current_control()
