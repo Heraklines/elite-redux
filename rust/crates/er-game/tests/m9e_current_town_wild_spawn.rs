@@ -903,7 +903,8 @@ fn naturally_admitted_day_seed_matches_pinned_postreward_enemy() -> Result<(), B
         },
         None,
     )?;
-    let shell = select_current_town_day_wave_two_shell(&content, context, 12_345, 23_456, &mut rng)?;
+    let shell =
+        select_current_town_day_wave_two_shell(&content, context, 12_345, 23_456, &mut rng)?;
     let enemy = &shell.pokemon;
     assert_eq!(enemy.id.get().get(), 2_632_721_102);
     assert_eq!(enemy.species_id.get().get(), 504);
@@ -937,9 +938,16 @@ fn naturally_admitted_day_seed_matches_pinned_postreward_enemy() -> Result<(), B
         enemy
             .moves
             .iter()
-            .map(|slot| slot.as_ref().map(|slot| (slot.move_id.get().get(), slot.pp_used)))
+            .map(|slot| slot
+                .as_ref()
+                .map(|slot| (slot.move_id.get().get(), slot.pp_used)))
             .collect::<Vec<_>>(),
-        vec![Some((158, 0)), Some((95, 0)), Some((747, 0)), Some((116, 0))]
+        vec![
+            Some((158, 0)),
+            Some((95, 0)),
+            Some((747, 0)),
+            Some((116, 0))
+        ]
     );
     Ok(())
 }
