@@ -324,8 +324,8 @@ fn source_level_two_meta() -> Result<&'static SourceTownLevelTwoMetaV1, CurrentT
         .map_err(|_| CurrentTownWildErrorV1::SourceContent)
 }
 
-fn source_level_two_movegen(
-) -> Result<&'static SourceTownLevelTwoMovegenV1, CurrentTownWildErrorV1> {
+fn source_level_two_movegen() -> Result<&'static SourceTownLevelTwoMovegenV1, CurrentTownWildErrorV1>
+{
     SOURCE_LEVEL_TWO_MOVEGEN
         .get_or_init(|| {
             let parsed: SourceTownLevelTwoMovegenV1 =
@@ -335,15 +335,12 @@ fn source_level_two_movegen(
             if parsed.schema != 1
                 || parsed.source != ORACLE
                 || parsed.rows.len() != 131
+                || parsed.rows.iter().map(|row| row.0).collect::<Vec<_>>()
+                    != meta.rows.iter().map(|row| row.0).collect::<Vec<_>>()
                 || parsed
                     .rows
                     .iter()
-                    .map(|row| row.0)
-                    .collect::<Vec<_>>()
-                    != meta.rows.iter().map(|row| row.0).collect::<Vec<_>>()
-                || parsed.rows.iter().any(|row| {
-                    !row.1.is_finite() || !(0.0..=10_000.0).contains(&row.1)
-                })
+                    .any(|row| !row.1.is_finite() || !(0.0..=10_000.0).contains(&row.1))
             {
                 return Err(());
             }

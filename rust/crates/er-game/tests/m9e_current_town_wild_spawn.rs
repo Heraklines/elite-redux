@@ -418,12 +418,33 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         .ok_or("source weighted pool")?;
     assert_eq!(weighted.len(), observed_weighted.len());
     for (index, row) in weighted.iter().enumerate() {
-        assert_eq!(row.id.get().get(), observed_initial[index][0].as_u64().ok_or("move ID")?);
-        assert_eq!(u64::from(row.initial_weight), observed_initial[index][1].as_u64().ok_or("initial weight")?);
-        assert_eq!(row.adjusted_weight, observed_adjusted[index][1].as_f64().ok_or("adjusted weight")?);
-        assert_eq!(row.weighted_weight, observed_weighted[index][1].as_u64().ok_or("weighted weight")?);
+        assert_eq!(
+            row.id.get().get(),
+            observed_initial[index][0].as_u64().ok_or("move ID")?
+        );
+        assert_eq!(
+            u64::from(row.initial_weight),
+            observed_initial[index][1]
+                .as_u64()
+                .ok_or("initial weight")?
+        );
+        assert_eq!(
+            row.adjusted_weight,
+            observed_adjusted[index][1]
+                .as_f64()
+                .ok_or("adjusted weight")?
+        );
+        assert_eq!(
+            row.weighted_weight,
+            observed_weighted[index][1]
+                .as_u64()
+                .ok_or("weighted weight")?
+        );
     }
-    assert_eq!(weighted[0].weighted_weight + weighted[1].weighted_weight, 74_296);
+    assert_eq!(
+        weighted[0].weighted_weight + weighted[1].weighted_weight,
+        74_296
+    );
     assert_eq!(prefix.audit.len(), 7);
     assert_eq!(prefix.audit[5].public_api, RngPublicApi::RandSeedFloat);
     assert_eq!(
