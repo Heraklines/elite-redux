@@ -1364,18 +1364,18 @@ fn assert_request_title_read_reissues(
 #[inline(never)]
 fn controlled_before_early_knockout(content: Arc<PreparedGameContentV2>) -> Result<GameKernelV7> {
     // Explicit controlled combat preimage: four source-qualified level-one moves.
-    // This keeps the original seed and Tackle command while exercising full TM replacement.
+    // Keep the Tackle command while exercising full TM replacement.
     let mut checkpoint =
         controlled_before_knockout(content.clone(), 5, &[33, 74, 77, 78])?.snapshot()?;
     let GameKernelLifecycleSnapshotV7::Active(state) = &mut checkpoint.lifecycle else {
         return Err("active absent".into());
     };
     let run = state.active_run.as_mut().ok_or("run absent")?;
-    // The source reward observation used this exact seed. The qualified
-    // bootstrap seed still supplies the supported wave-zero encounter; this
-    // controlled combat preimage binds the later reward draw to its observed
-    // source stream without rewriting RNG state or filtering offers.
-    run.seed = "m9e-reward-selection-source-v1".to_owned();
+    // The actual full-slot generator probe 941cdceb6/run35810588435 found
+    // TM_CASE, RARE_CANDY and GREAT_BALL at this controlled seed. The
+    // qualified bootstrap still supplies the supported encounter; no RNG
+    // state or offers are rewritten, and every descendant checks the live menu.
+    run.seed = "m9e-reward-fullslot-53".to_owned();
     run.party[0].stats.speed = 500;
     run.battle.as_mut().ok_or("battle absent")?.enemy_party[0]
         .stats
@@ -1577,8 +1577,8 @@ fn current_reward(
         .ok_or_else(|| "actual reward receipt absent".into())
 }
 
-// Same controlled combat and source-observed reward seed. The test consumes the
-// actual generated menu without rewriting RNG state or filtering offers.
+// Same controlled combat and generator-probed reward seed. The test consumes
+// the actual generated menu without rewriting RNG state or filtering offers.
 #[inline(never)]
 fn assert_current_reward_choice_and_pick(
     kernel: &mut GameKernelV7,
