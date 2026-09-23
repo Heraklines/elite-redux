@@ -58,6 +58,15 @@ def evidence(platform: str, output: str) -> dict:
     return {"passed": 2, "failed": 0, "ignored": 0, "test_ids": sorted(expected), "report_digests": digests}
 
 
+def wasm_single_evidence(output: str, test_id: str, marker: str) -> str:
+    names = re.findall(r"\btest (?:[A-Za-z0-9_]+::)*(wasm_replays_v7_[A-Za-z0-9_]+)", output)
+    counts = re.findall(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored;", output)
+    digests = re.findall(rf"M9E_{marker}_PARITY_DIGEST=([^\s]+)", output)
+    if names != [test_id] or counts != [("1", "0", "0")] or len(digests) != 1 or not re.fullmatch(r"[0-9a-f]{64}", digests[0]):
+        raise RuntimeError(f"Wasm {test_id} identity, count or full-record digest disagrees")
+    return digests[0]
+
+
 def main() -> None:
     COMPACT.mkdir(parents=True, exist_ok=True)
     DIAGNOSTICS.mkdir(parents=True, exist_ok=True)
@@ -88,10 +97,16 @@ def main() -> None:
                                    "0.2.127", "--locked", "--force"], env, 900)
         env["CARGO_TARGET_DIR"] = str(Path(os.environ["RUNNER_TEMP"]) / "m9e-wasm-target")
         env["CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER"] = "wasm-bindgen-test-runner"
-        wasm = execute("wasm", ["cargo", "test", "--locked", "-p", "er-wasm", "--test",
-                                "m9e_parity", "--target", "wasm32-unknown-unknown", "--",
-                                "--nocapture"], env, 1500)
-        summary["wasm"] = evidence("wasm", wasm)
+        command = ["cargo", "test", "--locked", "-p", "er-wasm", "--test", "m9e_parity",
+                   "--target", "wasm32-unknown-unknown", "--"]
+        held = execute("wasm-held", command + ["wasm_replays_v7_held_timers_eventwise", "--nocapture"], env, 1500)
+        held_digest = wasm_single_evidence(held, "wasm_replays_v7_held_timers_eventwise", "TIMER")
+        summary["wasm_held_digest"] = held_digest
+        raw = execute("wasm-raw", command + ["wasm_replays_v7_raw_inputs_eventwise", "--nocapture"], env, 1500)
+        raw_digest = wasm_single_evidence(raw, "wasm_replays_v7_raw_inputs_eventwise", "RAW")
+        summary["wasm"] = {"passed": 2, "failed": 0, "ignored": 0,
+                           "test_ids": sorted(EXPECTED["wasm"]),
+                           "report_digests": {"timer": held_digest, "raw": raw_digest}}
         if summary["native"]["report_digests"] != summary["wasm"]["report_digests"]:
             raise RuntimeError("native/Wasm full-record report digests disagree")
         summary["status"] = "passed"

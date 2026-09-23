@@ -169,8 +169,12 @@ fn strongest_move_option(
 }
 
 fn request() -> Result<M9EParityRequestV1, Box<dyn Error>> {
+    #[cfg(target_arch = "wasm32")]
+    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=request-start");
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle.clone()))?);
+    #[cfg(target_arch = "wasm32")]
+    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=content-prepared");
     let seat = SeatId::new(safe(1));
     let mut bootstrap = GameKernelV7::natural_start(
         profile(),
@@ -182,6 +186,8 @@ fn request() -> Result<M9EParityRequestV1, Box<dyn Error>> {
         scheduler(),
         None,
     )?;
+    #[cfg(target_arch = "wasm32")]
+    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=natural-start");
     let mut ignored = Vec::new();
     press(&mut bootstrap, &mut ignored, PhysicalKey::Space)?;
     press(&mut bootstrap, &mut ignored, PhysicalKey::Space)?;
@@ -192,6 +198,8 @@ fn request() -> Result<M9EParityRequestV1, Box<dyn Error>> {
     press(&mut bootstrap, &mut ignored, PhysicalKey::Space)?;
     press(&mut bootstrap, &mut ignored, PhysicalKey::Space)?;
 
+    #[cfg(target_arch = "wasm32")]
+    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=bootstrap-pressed");
     let mut snapshot = bootstrap.snapshot()?;
     let GameKernelLifecycleSnapshotV7::Active(state) = &mut snapshot.lifecycle else {
         return Err("bootstrap snapshot is not active".into());
@@ -233,6 +241,8 @@ fn request() -> Result<M9EParityRequestV1, Box<dyn Error>> {
         snapshot.scheduler,
         snapshot.protocol,
     )?;
+    #[cfg(target_arch = "wasm32")]
+    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=driver-active");
     let initial_snapshot = driver.snapshot()?;
     let mut events = Vec::new();
     for _ in 0..300 {
@@ -269,6 +279,8 @@ fn request() -> Result<M9EParityRequestV1, Box<dyn Error>> {
             other => return Err(format!("longitudinal trace stalled at {other:?}").into()),
         }
     }
+    #[cfg(target_arch = "wasm32")]
+    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=trace-built");
     assert!(
         driver
             .state()
@@ -355,7 +367,11 @@ fn cohort_report_golden(bundle: &str, progression: &str, bytes: usize) -> Option
 fn assert_eventwise_parity_contract(
     replay: impl FnOnce(M9EParityRequestV1) -> Result<M9EParityReportV1, Box<dyn Error>>,
 ) -> Result<String, Box<dyn Error>> {
+    #[cfg(target_arch = "wasm32")]
+    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=contract-start");
     let request = request()?;
+    #[cfg(target_arch = "wasm32")]
+    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=request-ready");
     let event_count = request.events.len();
     let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(
         request.bundle.clone(),
@@ -399,6 +415,8 @@ fn assert_eventwise_parity_contract(
         request.role,
         content.clone(),
     )?;
+    #[cfg(target_arch = "wasm32")]
+    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=driver-restored");
     let mut expected_observations = Vec::new();
     let mut material_count = 0;
     let mut canonical_control_material_count = 0;
@@ -470,6 +488,8 @@ fn assert_eventwise_parity_contract(
                 .map(|run| run.wave),
         });
     }
+    #[cfg(target_arch = "wasm32")]
+    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=expected-built");
     assert_eq!(event_count, 30);
     assert_eq!(material_count, 6);
     assert!(canonical_control_material_count > 0);
@@ -480,6 +500,8 @@ fn assert_eventwise_parity_contract(
         final_snapshot_digest: er_canonical::content_digest(&driver.snapshot()?)?,
     };
     let report = replay(request)?;
+    #[cfg(target_arch = "wasm32")]
+    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=replay-returned");
     assert_eq!(report, expected);
     assert_eq!(report.observations.len(), event_count);
     assert!(
