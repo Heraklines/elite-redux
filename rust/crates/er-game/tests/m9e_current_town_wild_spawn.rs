@@ -4,7 +4,8 @@ use std::sync::Arc;
 use er_game::current_town_wild_spawn::{
     CurrentTownDayWaveTwoContextV1, CurrentTownGenderV1, CurrentTownWildErrorV1,
     select_current_town_day_wave_two_constructor_prefix, select_current_town_day_wave_two_core,
-    select_current_town_day_wave_two_root, source_town_ability_id, source_town_day_pools,
+    select_current_town_day_wave_two_root, select_current_town_day_wave_two_shell,
+    source_town_ability_id, source_town_day_pools,
     source_town_form_base_stats, source_town_form_types, source_town_initial_level_move_pool,
     source_town_is_shiny, source_town_ivs_from_id, source_town_level_two_form_rows,
     source_town_level_two_species, source_town_male_half_percent, source_town_moveset,
@@ -539,6 +540,77 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
             .collect::<Vec<_>>(),
         vec![158, 95, 116, 43]
     );
+    let mut shell_rng = RngRuntime::from_states(
+        RunRngState {
+            rdg: PhaserRdgState::from_state_string(SOURCE_NAMED_BEFORE)?,
+        },
+        None,
+    )?;
+    let shell = select_current_town_day_wave_two_shell(
+        &content,
+        CurrentTownDayWaveTwoContextV1 {
+            level: 3,
+            ..context
+        },
+        12_345,
+        23_456,
+        &mut shell_rng,
+    )?;
+    assert_eq!(shell.core, named_core);
+    assert_eq!(shell_rng, named_rng);
+    assert_eq!(shell.pokemon.id.get().get(), 1_776_451_493);
+    assert_eq!(shell.pokemon.species_id.get().get(), 504);
+    assert_eq!(shell.pokemon.level, 3);
+    assert_eq!(shell.pokemon.experience.get().get(), 27);
+    assert_eq!(shell.pokemon.friendship, 70);
+    assert_eq!(shell.pokemon.abilities.active.get().get(), 5165);
+    assert_eq!(shell.pokemon.abilities.passives, [None; 3]);
+    assert_eq!(shell.pokemon.ivs.map(|iv| iv.get()), [20, 30, 4, 31, 29, 5]);
+    assert_eq!(shell.pokemon.nature.get(), 18);
+    assert_eq!(shell.pokemon.stats.hp, 16);
+    assert_eq!(shell.pokemon.stats.attack, 9);
+    assert_eq!(shell.pokemon.stats.defense, 7);
+    assert_eq!(shell.pokemon.stats.special_attack, 8);
+    assert_eq!(shell.pokemon.stats.special_defense, 8);
+    assert_eq!(shell.pokemon.stats.speed, 9);
+    assert_eq!(shell.pokemon.hp, 16);
+    assert_eq!(shell.pokemon.gender, Some(0));
+    assert_eq!(shell.pokemon.pokerus, Some(false));
+    assert_eq!(shell.pokemon.types.primary, PokemonType::Normal);
+    assert_eq!(shell.pokemon.types.secondary, None);
+    assert_eq!(shell.pokemon.tera_type, Some(PokemonType::Normal));
+    assert!(!shell.pokemon.shiny);
+    assert_eq!(shell.pokemon.variant, 0);
+    assert_eq!(
+        shell.pokemon
+            .moves
+            .iter()
+            .map(|slot| slot.as_ref().map(|slot| (slot.move_id.get().get(), slot.pp_used)))
+            .collect::<Vec<_>>(),
+        vec![Some((158, 0)), Some((95, 0)), Some((116, 0)), Some((43, 0))]
+    );
+    let mut shiny_rng = RngRuntime::from_states(
+        RunRngState {
+            rdg: PhaserRdgState::from_state_string(SOURCE_NAMED_BEFORE)?,
+        },
+        None,
+    )?;
+    let before_shiny = shiny_rng.clone();
+    let source_id = 1_776_451_493_u32;
+    assert_eq!(
+        select_current_town_day_wave_two_shell(
+            &content,
+            CurrentTownDayWaveTwoContextV1 {
+                level: 3,
+                ..context
+            },
+            ((source_id >> 16) as u16) ^ (source_id as u16),
+            0,
+            &mut shiny_rng,
+        ),
+        Err(CurrentTownWildErrorV1::UnsupportedContext)
+    );
+    assert_eq!(shiny_rng, before_shiny);
     let mut unsupported_level_three = RngRuntime::from_states(
         RunRngState {
             rdg: PhaserRdgState::from_state_string(SOURCE_BEFORE)?,
