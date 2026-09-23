@@ -2112,8 +2112,10 @@ fn assert_actual_tm_reward(
 ) -> Result<()> {
     use er_state::current_reward_selection::CurrentRewardStageV1 as S;
     use er_state::current_reward_tm::{CurrentRewardTmPhaseV1 as T, CurrentUsedTmsV1 as H};
+    writeln!(std::io::stderr().lock(), "M9E_TM_STAGE enter")?;
     let selected = current_reward(active(checkpoint)?)?.clone();
     let mut kernel = restore(checkpoint.clone(), content.clone())?;
+    writeln!(std::io::stderr().lock(), "M9E_TM_STAGE restored")?;
     let mut live = initial_live.clone();
     let mut ledger = initial_ledger.clone();
     for presentation in kernel.snapshot()?.pending_presentations {
@@ -2125,6 +2127,7 @@ fn assert_actual_tm_reward(
     navigate(&mut kernel, &option)?;
     let step = press(&mut kernel, PhysicalKey::Space)?;
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
+    writeln!(std::io::stderr().lock(), "M9E_TM_STAGE holder")?;
     assert!(matches!(
         current_reward(kernel.state().ok_or("TM state absent")?)?.stage,
         S::Holder { .. }
@@ -2134,6 +2137,7 @@ fn assert_actual_tm_reward(
     }
     let step = press(&mut kernel, PhysicalKey::Space)?;
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
+    writeln!(std::io::stderr().lock(), "M9E_TM_STAGE move")?;
     assert!(matches!(
         current_reward(kernel.state().ok_or("TM state absent")?)?.stage,
         S::TmMove { .. }
@@ -2146,6 +2150,7 @@ fn assert_actual_tm_reward(
     assert_eq!(kernel.snapshot()?, *menu_checkpoint);
     let step = press(&mut kernel, PhysicalKey::Space)?;
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
+    writeln!(std::io::stderr().lock(), "M9E_TM_STAGE queued")?;
     let queued = Box::new(kernel.snapshot()?);
     let mut tm = current_reward(active(&queued)?)?
         .tm
@@ -2163,11 +2168,13 @@ fn assert_actual_tm_reward(
         selected.party_before
     );
     kernel = restore(*queued, content.clone())?;
+    writeln!(std::io::stderr().lock(), "M9E_TM_STAGE queued_restored")?;
     for presentation in kernel.snapshot()?.pending_presentations {
         kernel.settle_presentation(presentation.event_id)?;
     }
     let step = kernel.advance_time(SafeU53::ZERO)?;
     let mut learned = accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
+    writeln!(std::io::stderr().lock(), "M9E_TM_STAGE intro")?;
     if tm.slot == 4 {
         assert!(matches!(
             current_reward(kernel.state().ok_or("TM state absent")?)?
@@ -2187,12 +2194,14 @@ fn assert_actual_tm_reward(
             .ok_or("Intro absent")?;
         assert_phase_title_read_reissues(&intro, event, content.clone())?;
         acknowledge_tm_message(&mut kernel, content.as_ref(), &mut live, &mut ledger)?;
+        writeln!(std::io::stderr().lock(), "M9E_TM_STAGE before_decline")?;
         assert_tm_decline_returns_same_offers(
             &kernel.snapshot()?,
             content.clone(),
             &live,
             &ledger,
         )?;
+        writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_decline")?;
         // Source Replace Yes -> which-move message -> actual first old slot.
         let step = press(&mut kernel, PhysicalKey::Space)?;
         accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
@@ -2237,6 +2246,7 @@ fn assert_actual_tm_reward(
         );
         assert_invalid_full_tm_slot(&forgotten, content.clone())?;
         learned = acknowledge_tm_message(&mut kernel, content.as_ref(), &mut live, &mut ledger)?;
+        writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_forgotten")?;
         tm = current_reward(kernel.state().ok_or("TM state absent")?)?
             .tm
             .as_ref()
@@ -2244,6 +2254,7 @@ fn assert_actual_tm_reward(
             .clone();
     }
     let present = Box::new(kernel.snapshot()?);
+    writeln!(std::io::stderr().lock(), "M9E_TM_STAGE present")?;
     assert_tm_menu_allocator_bound(&present, content.clone())?;
     let state = active(&present)?;
     let retained = current_reward(state)?;
@@ -2305,6 +2316,7 @@ fn assert_actual_tm_reward(
     );
     let step = kernel.advance_time(SafeU53::ZERO)?;
     let complete = accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
+    writeln!(std::io::stderr().lock(), "M9E_TM_STAGE complete")?;
     assert!(matches!(
         current_reward(kernel.state().ok_or("TM state absent")?)?.stage,
         S::Applied { .. }
