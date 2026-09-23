@@ -323,10 +323,16 @@ fn natural_with_seed(content: Arc<PreparedGameContentV2>, seed: &str) -> Result<
 #[test]
 fn bounded_town_candidates_admit_natural_first_battle() -> Result<()> {
     let content = content()?;
+    let path = std::env::var("M9E_TOWN_SEED_CANDIDATES")?;
+    let candidates = std::fs::read_to_string(path)?;
     let mut admitted = 0;
-    for index in [9, 91, 146, 157, 179, 241, 264, 280] {
-        let seed = format!("m9e-town-handoff-{index}");
-        match natural_with_seed(content.clone(), &seed) {
+    for line in candidates.lines() {
+        let seed = line
+            .split_whitespace()
+            .next()
+            .and_then(|part| part.strip_prefix("candidate="))
+            .ok_or("source DAY candidate missing")?;
+        match natural_with_seed(content.clone(), seed) {
             Ok(kernel) => {
                 let enemy = kernel
                     .state()
@@ -339,6 +345,7 @@ fn bounded_town_candidates_admit_natural_first_battle() -> Result<()> {
                     enemy.species_id.get().get()
                 );
                 admitted += 1;
+                break;
             }
             Err(error) => println!("rejected={seed} reason={error}"),
         }

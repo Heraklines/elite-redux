@@ -62,8 +62,8 @@ jobs:
         run: |
           set -euo pipefail
           cargo test --manifest-path rust/Cargo.toml --locked -p er-game --test m9e_town_seed_search -- --nocapture 2>&1 | tee "$RUNNER_TEMP/m9e-town-seed.log"
-          grep -o 'candidate=m9e-town-handoff-[0-9]* before=!rnd,[^[:space:]]*' "$RUNNER_TEMP/m9e-town-seed.log" > "$RUNNER_TEMP/m9e-town-seed-candidates.txt"
-          test "$(wc -l < "$RUNNER_TEMP/m9e-town-seed-candidates.txt")" -eq 8
+          grep -o 'candidate=m9e-town-handoff-[0-9]* before=!rnd,[^[:space:]]* time_offset=[0-9]*' "$RUNNER_TEMP/m9e-town-seed.log" > "$RUNNER_TEMP/m9e-town-seed-candidates.txt"
+          test "$(wc -l < "$RUNNER_TEMP/m9e-town-seed-candidates.txt")" -eq 24
       - name: Publish bounded seed candidates
         if: always()
         uses: actions/upload-artifact@v6
@@ -75,7 +75,7 @@ jobs:
       - name: Admit candidate seeds through natural raw bootstrap
         run: |
           set -uo pipefail
-          cargo test --manifest-path rust/Cargo.toml --locked -p er-kernel --test m9e_current_phase_execution bounded_town_candidates_admit_natural_first_battle -- --exact --nocapture 2>&1 | tee "$RUNNER_TEMP/m9e-town-natural.log"
+          M9E_TOWN_SEED_CANDIDATES="$RUNNER_TEMP/m9e-town-seed-candidates.txt" cargo test --manifest-path rust/Cargo.toml --locked -p er-kernel --test m9e_current_phase_execution bounded_town_candidates_admit_natural_first_battle -- --exact --nocapture 2>&1 | tee "$RUNNER_TEMP/m9e-town-natural.log"
           result=${PIPESTATUS[0]}
           grep -E 'admitted=m9e-town-handoff-|rejected=m9e-town-handoff-' "$RUNNER_TEMP/m9e-town-natural.log" > "$RUNNER_TEMP/m9e-town-natural-candidates.txt" || true
           exit "$result"

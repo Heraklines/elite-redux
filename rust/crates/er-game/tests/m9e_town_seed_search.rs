@@ -7,7 +7,7 @@ use er_game::current_town_wild_spawn::{
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_rng::battle::RngRuntime;
 use er_rng::phaser::{PhaserRdg, RunRngState, shift_char_codes};
-use er_types::RunDifficultyV1;
+use er_types::{RunDifficultyV1, SafeU53};
 
 const BUNDLE: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/game-content-bundle-v2.json");
@@ -46,6 +46,17 @@ fn bounded_source_wave_two_seed_candidates() -> Result<(), Box<dyn Error>> {
     let mut found = 0;
     for index in 0..4096 {
         let seed = format!("m9e-town-handoff-{index}");
+        // Source BattleScene.setSeed computes a stable time-cycle offset from
+        // randSeedInt(8) * 5 before the first encounter. Retain only seeds
+        // whose wave-one and wave-two Town pools are both actually DAY.
+        let mut time_rng = PhaserRdg::from_seed(&seed);
+        let time_offset = time_rng
+            .rand_seed_int(SafeU53::new(8)?, SafeU53::ZERO)?
+            .get()
+            * 5;
+        if (1 + time_offset) % 40 >= 15 || (2 + time_offset) % 40 >= 15 {
+            continue;
+        }
         let mut wave_rng = PhaserRdg::from_seed(&shift_char_codes(&seed, 2)?);
         wave_rng.rnd();
         wave_rng.rnd();
@@ -57,16 +68,19 @@ fn bounded_source_wave_two_seed_candidates() -> Result<(), Box<dyn Error>> {
         )?;
         if let Ok(root) = select_current_town_day_wave_two_root(&content, context, &mut rng) {
             assert_eq!(root.source_root.get().get(), 504);
-            println!("candidate={seed} before={}", wave_rng.state().state_string);
+            println!(
+                "candidate={seed} before={} time_offset={time_offset}",
+                wave_rng.state().state_string
+            );
             found += 1;
-            if found == 8 {
+            if found == 24 {
                 break;
             }
         }
     }
     assert_eq!(
-        found, 8,
-        "bounded search did not find eight Town candidates"
+        found, 24,
+        "bounded search did not find twenty-four source DAY Town candidates"
     );
     Ok(())
 }
