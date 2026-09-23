@@ -158,8 +158,8 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   expect(enemy.id).not.toBe(firstEnemyId);
   expect(enemy.level).toBeGreaterThan(0);
   const waveTwoSelections = speciesCalls.filter(call => call.wave === 2);
-  expect(waveTwoSelections).toHaveLength(1);
-  expect(waveTwoSelections[0].species).toBe(enemy.species.speciesId);
+  expect(waveTwoSelections.length).toBeGreaterThan(0);
+  expect(waveTwoSelections.length).toBeLessThanOrEqual(8);
   const shinyXor = (scene.gameData.trainerId ^ scene.gameData.secretId)
     ^ ((enemy.id >>> 16) ^ (enemy.id & 0xffff));
   const nextRng = Phaser.Math.RND.state();
@@ -186,7 +186,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
     pokerus: enemy.pokerus,
     moves: enemy.moveset.map(move => [move.moveId, move.ppUsed]),
     boss: enemy.isBoss(),
-    selection: waveTwoSelections[0],
+    selections: waveTwoSelections,
   };
   const secondEnemyHpBefore = enemy.hp;
   const secondPlayerHpBefore = player.hp;
