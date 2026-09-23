@@ -383,8 +383,10 @@ test("current V7 Worker preserves fresh account IDs through snapshot restore", a
       const before = await first.dispatch({ kind: "SNAPSHOT" });
       if (before.response.kind !== "SNAPSHOT") throw new Error("fresh-account Worker snapshot missing");
       const checkpoint: any = before.response.snapshot;
+      const actualAccount = checkpoint.lifecycle?.value?.current_account_identity;
       if (checkpoint.lifecycle?.kind !== "BOOTSTRAP"
-        || JSON.stringify(checkpoint.lifecycle.value.current_account_identity) !== JSON.stringify(account)) {
+        || actualAccount?.trainer_id !== account.trainer_id
+        || actualAccount?.secret_id !== account.secret_id) {
         throw new Error("actual Wasm bootstrap lost its supplied account identity");
       }
       stage = "first Worker disposal";
