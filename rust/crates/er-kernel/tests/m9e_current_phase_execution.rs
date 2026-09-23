@@ -2221,14 +2221,36 @@ fn assert_actual_tm_reward_after_queued(
 
 #[inline(never)]
 fn assert_actual_tm_reward_after_intro(
-    mut kernel: Box<GameKernelV7>,
+    kernel: Box<GameKernelV7>,
     content: Arc<PreparedGameContentV2>,
     selected: er_state::current_reward_selection::CurrentRewardSelectionV1,
+    live: Option<GameStateV6>,
+    ledger: AppliedGameMaterialLedgerV1,
+    tm: Box<er_state::current_reward_tm::CurrentRewardTmV1>,
+    learned: GameMaterialV6,
+) -> Result<()> {
+    let (kernel, live, ledger, tm, learned) = assert_actual_tm_fullslot_replace(
+        kernel, content.clone(), &selected, live, ledger, tm, learned,
+    )?;
+    assert_actual_tm_reward_present(kernel, content, selected, live, ledger, tm, learned)
+}
+
+#[inline(never)]
+fn assert_actual_tm_fullslot_replace(
+    mut kernel: Box<GameKernelV7>,
+    content: Arc<PreparedGameContentV2>,
+    selected: &er_state::current_reward_selection::CurrentRewardSelectionV1,
     mut live: Option<GameStateV6>,
     mut ledger: AppliedGameMaterialLedgerV1,
     mut tm: Box<er_state::current_reward_tm::CurrentRewardTmV1>,
     mut learned: GameMaterialV6,
-) -> Result<()> {
+) -> Result<(
+    Box<GameKernelV7>,
+    Option<GameStateV6>,
+    AppliedGameMaterialLedgerV1,
+    Box<er_state::current_reward_tm::CurrentRewardTmV1>,
+    GameMaterialV6,
+)> {
     use er_state::current_reward_tm::CurrentRewardTmPhaseV1 as T;
     if tm.slot == 4 {
         assert!(matches!(
@@ -2308,6 +2330,19 @@ fn assert_actual_tm_reward_after_intro(
             .ok_or("TM absent")?
             .clone();
     }
+    Ok((kernel, live, ledger, tm, learned))
+}
+
+#[inline(never)]
+fn assert_actual_tm_reward_present(
+    kernel: Box<GameKernelV7>,
+    content: Arc<PreparedGameContentV2>,
+    selected: er_state::current_reward_selection::CurrentRewardSelectionV1,
+    live: Option<GameStateV6>,
+    ledger: AppliedGameMaterialLedgerV1,
+    tm: Box<er_state::current_reward_tm::CurrentRewardTmV1>,
+    learned: GameMaterialV6,
+) -> Result<()> {
     let present = Box::new(kernel.snapshot()?);
     writeln!(std::io::stderr().lock(), "M9E_TM_STAGE present")?;
     assert_actual_tm_reward_after_present(
