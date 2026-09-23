@@ -88,7 +88,7 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         * 5;
     eprintln!(
         "town context oracle={} mode={} supported={} cooperative={} challenge={} wave_offset={} time_remainder={}",
-        content.identity().oracle_sha,
+        content.identity().oracle_sha.as_str(),
         mode.key,
         mode.supported,
         mode.cooperative,
