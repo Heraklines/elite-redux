@@ -20,7 +20,7 @@ use er_types::battle_ids::{MoveId, WaveIndex};
 use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
 use er_types::run_ids::Experience;
 use er_types::{GameControlKindV2, SafeU53, SeatId};
-use std::{error::Error, io::Write, sync::Arc};
+use std::{error::Error, sync::Arc};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 const BUNDLE: &[u8] =
@@ -2166,11 +2166,8 @@ fn assert_actual_tm_reward(
     }
     let (state, tm, learned) =
         assert_actual_tm_fullslot_sequence(state, content.clone(), tm, learned)?;
-    let (kernel, selected, live, ledger) = state;
-    let present = Box::new(kernel.snapshot()?);
-    assert_actual_tm_reward_after_present(
-        kernel, content, selected, live, ledger, tm, learned, present,
-    )
+    let present = Box::new(state.0.snapshot()?);
+    assert_actual_tm_reward_after_present(state, content, tm.as_ref(), learned, present)
 }
 
 #[inline(never)]
@@ -2189,10 +2186,10 @@ fn assert_actual_tm_fullslot_sequence(
         let replacement = std::thread::Builder::new()
             .name("m9e-tm-replacement".to_owned())
             .spawn_scoped(scope, move || {
-                let (state, tm, learned) =
+                let (state, _, _) =
                     assert_actual_tm_replace_yes(state, content.clone(), tm, learned)
                         .map_err(|error| error.to_string())?;
-                assert_actual_tm_choose_slot(state, content, tm, learned)
+                assert_actual_tm_choose_slot(state, content)
                     .map_err(|error| error.to_string())
             })?;
         Ok(replacement
@@ -2389,8 +2386,6 @@ fn assert_actual_tm_replace_yes(
 fn assert_actual_tm_choose_slot(
     state: TmWitnessState,
     content: Arc<PreparedGameContentV2>,
-    _tm: Box<er_state::current_reward_tm::CurrentRewardTmV1>,
-    _learned: GameMaterialV6,
 ) -> Result<TmWitnessWithMove> {
     let (mut kernel, selected, mut live, mut ledger) = state;
     use er_state::current_reward_tm::CurrentRewardTmPhaseV1 as T;
@@ -2432,15 +2427,13 @@ fn assert_actual_tm_choose_slot(
 
 #[inline(never)]
 fn assert_actual_tm_reward_after_present(
-    mut kernel: Box<GameKernelV7>,
+    state: TmWitnessState,
     content: Arc<PreparedGameContentV2>,
-    selected: er_state::current_reward_selection::CurrentRewardSelectionV1,
-    mut live: Option<GameStateV6>,
-    mut ledger: AppliedGameMaterialLedgerV1,
-    tm: Box<er_state::current_reward_tm::CurrentRewardTmV1>,
+    tm: &er_state::current_reward_tm::CurrentRewardTmV1,
     learned: GameMaterialV6,
     present: Box<CoreGameKernelSnapshotV7>,
 ) -> Result<()> {
+    let (mut kernel, selected, mut live, mut ledger) = state;
     use er_state::current_reward_selection::CurrentRewardStageV1 as S;
     use er_state::current_reward_tm::{CurrentRewardTmPhaseV1 as T, CurrentUsedTmsV1 as H};
     assert_tm_menu_allocator_bound(&present, content.clone())?;
