@@ -371,13 +371,15 @@ test("current V7 Worker preserves fresh account IDs through snapshot restore", a
     const account = { trainer_id: 12345, secret_id: 23456 };
     const first = module.createCurrentDevelopmentWorkerV2({ assets });
     let second: typeof first | undefined;
+    let stage = "first Worker initialization";
     try {
       const started = await first.dispatch({ kind: "INITIALIZE", initialization: {
         kind: "FRESH_ACCOUNT_START", context: template.context, profile: template.profile,
         seed: "m9e-fresh-friendship-v6", save_slots: ["browser-account"],
-        account_identity: account, existing_saves: false,
+        account_identity: account,
       } });
       if (started.response.kind !== "READY") throw new Error("fresh-account Worker did not initialize");
+      stage = "first Worker snapshot";
       const before = await first.dispatch({ kind: "SNAPSHOT" });
       if (before.response.kind !== "SNAPSHOT") throw new Error("fresh-account Worker snapshot missing");
       const checkpoint: any = before.response.snapshot;
@@ -385,12 +387,15 @@ test("current V7 Worker preserves fresh account IDs through snapshot restore", a
         || JSON.stringify(checkpoint.lifecycle.value.current_account_identity) !== JSON.stringify(account)) {
         throw new Error("actual Wasm bootstrap lost its supplied account identity");
       }
+      stage = "first Worker disposal";
       await first.dispose();
       second = module.createCurrentDevelopmentWorkerV2({ assets });
+      stage = "fresh Worker snapshot restore";
       const restored = await second.dispatch({ kind: "INITIALIZE", initialization: {
         kind: "SNAPSHOT", context: template.context, snapshot: checkpoint,
       } });
       if (restored.response.kind !== "READY") throw new Error("account snapshot did not restore in a fresh Worker");
+      stage = "restored Worker snapshot";
       const after = await second.dispatch({ kind: "SNAPSHOT" });
       if (after.response.kind !== "SNAPSHOT" || JSON.stringify(after.response.snapshot) !== JSON.stringify(checkpoint)) {
         throw new Error("fresh Worker account checkpoint changed on restore");
@@ -398,9 +403,12 @@ test("current V7 Worker preserves fresh account IDs through snapshot restore", a
       const checkpointHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",
         new TextEncoder().encode(JSON.stringify(checkpoint)))))
         .map(byte => byte.toString(16).padStart(2, "0")).join("");
+      stage = "restored Worker disposal";
       await second.dispose();
       return { account, exact_snapshot_restore: true, disposed_workers: 2,
         first_closed: first.status.closed, second_closed: second.status.closed, checkpoint_sha256: checkpointHash };
+    } catch (error) {
+      throw new Error(`fresh-account ${stage}: ${String(error)}`);
     } finally { first.terminate(); second?.terminate(); }
   }, { entry: `${address}/m9e-assets/${manifest.entry}`, assets: assets(), initialization });
   expect(observed).toHaveLength(2);

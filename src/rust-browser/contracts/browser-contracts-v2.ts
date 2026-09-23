@@ -18,14 +18,15 @@ export interface BrowserSessionContextV2 {
   protocol: CurrentJsonObject | null;
 }
 
+// Rust's canonical wire form omits the false default for existing_saves.
 export type BrowserSessionInitializationV2 =
   | { kind: "NATURAL_COOP"; context: BrowserSessionContextV2; profile: CurrentJsonObject;
       seed: string; save_slots: string[]; local_is_host: boolean }
   | { kind: "NATURAL_START"; context: BrowserSessionContextV2; profile: CurrentJsonObject;
-      seed: string; save_slots: string[]; local_is_host: boolean; existing_saves?: boolean }
+      seed: string; save_slots: string[]; local_is_host: boolean; existing_saves?: true }
   | { kind: "FRESH_ACCOUNT_START"; context: BrowserSessionContextV2; profile: CurrentJsonObject;
       seed: string; save_slots: string[]; account_identity: { trainer_id: number; secret_id: number };
-      existing_saves?: boolean }
+      existing_saves?: true }
   | { kind: "EXISTING_SAVE"; context: BrowserSessionContextV2; save: CurrentJsonObject }
   | { kind: "SNAPSHOT"; context: BrowserSessionContextV2; snapshot: CurrentJsonObject }
   | { kind: "SCENARIO"; context: BrowserSessionContextV2; snapshot: CurrentJsonObject; scenario: number }
