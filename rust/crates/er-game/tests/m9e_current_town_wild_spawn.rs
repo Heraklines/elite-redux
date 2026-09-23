@@ -7,9 +7,8 @@ use er_game::current_town_wild_spawn::{
     source_town_ability_id, source_town_day_pools, source_town_form_base_stats,
     source_town_form_types, source_town_initial_level_move_pool, source_town_ivs_from_id,
     source_town_level_two_form_rows, source_town_level_two_species, source_town_male_half_percent,
-    source_town_moveset, source_town_neutral_moveset,
-    source_town_neutral_weighted_level_move_pool, source_town_weighted_level_move_pool,
-    source_town_unmodified_level_two_stats,
+    source_town_moveset, source_town_neutral_moveset, source_town_neutral_weighted_level_move_pool,
+    source_town_unmodified_level_two_stats, source_town_weighted_level_move_pool,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_rng::audit::{RngCallsiteId, RngPublicApi, RngReason};

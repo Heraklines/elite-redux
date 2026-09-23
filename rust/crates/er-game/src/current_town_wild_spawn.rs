@@ -1101,13 +1101,8 @@ pub fn source_town_moveset(
 ) -> Result<CurrentTownNeutralMovesetV1, CurrentTownWildErrorV1> {
     source_level_two_signatures()?;
     source_level_two_useless()?;
-    let mut pool = source_town_weighted_level_move_pool(
-        content,
-        root,
-        form_index,
-        ability_index,
-        stats,
-    )?;
+    let mut pool =
+        source_town_weighted_level_move_pool(content, root, form_index, ability_index, stats)?;
     let types = source_town_form_types(root, form_index)?;
     let mut staged = rng.clone();
     let first_audit = staged.audit_entries().len();
