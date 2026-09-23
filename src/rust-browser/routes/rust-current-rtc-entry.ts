@@ -285,6 +285,10 @@ export class CurrentDevelopmentRtcPeerV1 {
   #attach(channel: RTCDataChannel): void {
     if (this.#transport != null || this.#closed) { channel.close(); throw new Error("current RTC pair already owns its single channel"); }
     this.#transport = new CurrentRtcTransportV1({ channel, identity: this.#options.identity,
+      // The full Worker pair can finish ICE/SDP exchange after this channel is
+      // attached on a loaded CI runner. Keep a finite handshake bound while
+      // allowing the adapter's documented maximum for this development route.
+      deadlineMs: 30_000,
       negotiatedMaximumMessageBytes: () => this.#pc.sctp?.maxMessageSize,
       connected: async () => { await this.#enqueue({ kind: "TRANSPORT_CHANGED", generation: 1, connected: true }); this.#connectedEvents++; },
       receive: async (generation, bytes) => {
