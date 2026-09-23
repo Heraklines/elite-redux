@@ -7,7 +7,7 @@ use er_game::current_town_wild_spawn::{
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_rng::battle::RngRuntime;
-use er_rng::phaser::{PhaserRdgState, RunRngState};
+use er_rng::phaser::{PhaserRdg, PhaserRdgState, RunRngState};
 use er_types::battle_ids::SpeciesId;
 use er_types::run_ids::BiomeId;
 use er_types::{RunDifficultyV1, SafeU53};
@@ -81,6 +81,18 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         golden_bug_net: false,
         excluded_species: &[],
     };
+    let mut offset_probe = PhaserRdg::from_seed(context.run_seed);
+    let offset = offset_probe.rand_seed_int(SafeU53::new(8)?, SafeU53::ZERO)?.get() * 5;
+    eprintln!(
+        "town context oracle={} mode={} supported={} cooperative={} challenge={} wave_offset={} time_remainder={}",
+        content.identity().oracle_sha,
+        mode.key,
+        mode.supported,
+        mode.cooperative,
+        mode.challenge_selection,
+        offset,
+        (u64::from(context.wave) + offset) % 40
+    );
     let mut rng = RngRuntime::from_states(
         RunRngState {
             rdg: PhaserRdgState::from_state_string(SOURCE_BEFORE)?,
