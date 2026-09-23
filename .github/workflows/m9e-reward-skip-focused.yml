@@ -27,7 +27,9 @@ jobs:
           submodules: false
           lfs: false
       - name: Install pinned Rust toolchain
-        run: rustup toolchain install 1.97.1 --profile minimal
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal
+          rustup component add --toolchain 1.97.1 rustfmt clippy
       - uses: actions/cache/restore@v5
         with:
           path: |
