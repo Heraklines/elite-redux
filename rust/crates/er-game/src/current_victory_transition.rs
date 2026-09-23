@@ -359,6 +359,42 @@ pub(super) fn transition(
     }
     let before_digest = game_state_digest(before).map_err(material_error)?;
     let after_digest = game_state_digest(&candidate).map_err(material_error)?;
+    let mut mutations = vec![GameMutationEvidenceV2 {
+        ordinal: 0,
+        domain: GameActionDomainV2::Progression,
+        kind: GameMutationKindV2::StateChanged,
+        before_digest: before_digest.clone(),
+        after_digest: after_digest.clone(),
+    }];
+    let mut allocated = platform_effects
+        .iter()
+        .map(|effect| match effect {
+            GamePlatformEffectV2::CurrentAchievementClock { request } => Ok(request.request.get()),
+            GamePlatformEffectV2::CurrentFlashEgg { request } => Ok(request.request.get()),
+            _ => Err(failure()),
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    allocated.sort_unstable();
+    let mut next_request = before.identities.next_platform_request_id;
+    for request in allocated {
+        if request != next_request {
+            return Err(GameRuntimeV6Error::Invalid);
+        }
+        mutations.push(GameMutationEvidenceV2 {
+            ordinal: u32::try_from(mutations.len()).map_err(|_| GameRuntimeV6Error::Invalid)?,
+            domain: GameActionDomainV2::Progression,
+            kind: GameMutationKindV2::IdentityAllocated {
+                domain: GameIdentityDomainV1::PlatformRequest,
+                identity: request,
+            },
+            before_digest: before_digest.clone(),
+            after_digest: after_digest.clone(),
+        });
+        next_request = safe_increment(next_request)?;
+    }
+    if candidate.identities.next_platform_request_id != next_request {
+        return Err(GameRuntimeV6Error::Invalid);
+    }
     Ok(GameTransitionMaterialV6 {
         schema_version: crate::m9e_material_v6::GAME_MATERIAL_SCHEMA_VERSION_V6,
         domain: GameActionDomainV2::Progression,
@@ -368,13 +404,7 @@ pub(super) fn transition(
         content_identity: before.content_identity.clone(),
         accepted_action: None,
         owned_phase: Some(phase),
-        mutations: vec![GameMutationEvidenceV2 {
-            ordinal: 0,
-            domain: GameActionDomainV2::Progression,
-            kind: GameMutationKindV2::StateChanged,
-            before_digest: before_digest.clone(),
-            after_digest: after_digest.clone(),
-        }],
+        mutations,
         before_digest,
         after_digest,
         after_state: candidate,
