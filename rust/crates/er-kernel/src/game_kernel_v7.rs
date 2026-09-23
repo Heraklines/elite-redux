@@ -228,6 +228,23 @@ impl GameKernelV7 {
     pub fn natural_start_with_fresh_friendship(
         start: FreshFriendshipStartV7,
     ) -> Result<Self, GameKernelV7Error> {
+        Self::natural_start_with_fresh_friendship_account(start, None)
+    }
+
+    /// Admit account identifiers supplied at ordinary fresh-profile creation.
+    /// The source creates these once at the account boundary; they are not
+    /// reconstructed from a run seed or added while restoring a historical save.
+    pub fn natural_start_with_fresh_account(
+        start: FreshFriendshipStartV7,
+        account: er_state::m9e_state_v6::CurrentAccountIdentityV1,
+    ) -> Result<Self, GameKernelV7Error> {
+        Self::natural_start_with_fresh_friendship_account(start, Some(account))
+    }
+
+    fn natural_start_with_fresh_friendship_account(
+        start: FreshFriendshipStartV7,
+        account: Option<er_state::m9e_state_v6::CurrentAccountIdentityV1>,
+    ) -> Result<Self, GameKernelV7Error> {
         let profile = &start.profile;
         if profile.schema_version != er_state::m7_state::PROFILE_STATE_SCHEMA_VERSION_V1
             || !profile.unlocks.is_empty()
@@ -260,6 +277,7 @@ impl GameKernelV7 {
         let GameKernelLifecycleV7::Bootstrap(bootstrap) = &mut value.lifecycle else {
             return Err(GameKernelV7Error::Invalid);
         };
+        bootstrap.current_account_identity = account;
         bootstrap.current_friendship_profile = Some(owner);
         bootstrap
             .enable_current_starter_pokerus()
