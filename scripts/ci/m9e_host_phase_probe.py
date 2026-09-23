@@ -10,12 +10,14 @@ import sys
 import time
 
 BASE = "2f124b450b5c118191bf0d0775ac42a7d27c00cc"
-PROBE_PARENT = "45612e28c78aaedf1b47382b84b5e1c7bfe018cf"
+PROBE_PARENT = "8f62e82ed2592eda0888a970c5b479b0a142f194"
 BRANCH = "codex/m9e-host-phase-probe-20260923"
 OWNED = {
     ".github/workflows/m9e-host-phase-probe.yml",
     "scripts/ci/m9e_host_phase_probe.py",
     "rust/crates/er-kernel/tests/m9e_current_phase_execution.rs",
+    "rust/crates/er-kernel/src/current_phase_restore_v7.rs",
+    "rust/crates/er-kernel/src/game_kernel_v7.rs",
     "rust/crates/er-state/src/current_source_progression.rs",
     "rust/crates/er-web/src/host_v2.rs",
 }

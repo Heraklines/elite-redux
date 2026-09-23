@@ -16,6 +16,7 @@ pub mod current_coop_setup_v7;
 use current_coop_setup_v7::CurrentCoopSetupSnapshotV1;
 
 use std::collections::BTreeMap;
+use std::io::Write;
 use std::sync::Arc;
 
 use er_ai::authority_v2::AuthorityAiV2;
@@ -1913,6 +1914,7 @@ impl GameKernelV7 {
                     self.role,
                     self.protocol.is_some(),
                 )?;
+                let _ = writeln!(std::io::stderr().lock(), "M9E_BOOT_READ reissued");
                 save.state
                     .validate_with(self.content.as_ref())
                     .map_err(|error| GameKernelV7Error::Storage(error.to_string()))?;
@@ -1955,6 +1957,7 @@ impl GameKernelV7 {
                 }
                 let revision =
                     increment_safe(bootstrap_revision)?.max(increment_safe(run.control.revision)?);
+                let _ = writeln!(std::io::stderr().lock(), "M9E_BOOT_READ owned");
                 save.state.identities.next_platform_request_id =
                     save.state.identities.next_platform_request_id.max(floor);
                 let next_menu = rebind_loaded_control_v7(
@@ -1962,6 +1965,7 @@ impl GameKernelV7 {
                     revision,
                     self.next_menu_instance_id,
                 )?;
+                let _ = writeln!(std::io::stderr().lock(), "M9E_BOOT_READ rebound");
                 let runtime = GameRuntimeV6::new_with_retention(
                     Some(save.state),
                     self.content.clone(),
@@ -1969,13 +1973,16 @@ impl GameKernelV7 {
                     MATERIAL_RETENTION_V7,
                 )
                 .map_err(runtime_error)?;
+                let _ = writeln!(std::io::stderr().lock(), "M9E_BOOT_READ runtime");
                 self.lifecycle = GameKernelLifecycleV7::Active(runtime);
                 self.install_step_effects(&reissued)?;
+                let _ = writeln!(std::io::stderr().lock(), "M9E_BOOT_READ installed");
                 restored_effects.extend(reissued);
                 self.next_menu_instance_id = next_menu;
                 self.private_battle_control = None;
                 self.private_learning_control = None;
                 self.clear_input()?;
+                let _ = writeln!(std::io::stderr().lock(), "M9E_BOOT_READ cleared");
                 self.storage_frontiers.insert(slot, save.generation);
             }
             _ => {

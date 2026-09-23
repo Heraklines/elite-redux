@@ -1,5 +1,6 @@
 //! GameSave lacks kernel acknowledgements: reissue its exact retained phase prompt.
 use super::*;
+use std::io::Write;
 use crate::snapshot_v7::{CurrentPhasePresentationKindV1 as K, PendingCurrentPhaseAckV1};
 use er_game::m9e_content_v2::{PresentationCueFamilyV1, PresentationSemanticIdV1};
 use er_game::m9e_material_v6::GamePresentationPayloadV1 as P;
@@ -332,9 +333,23 @@ pub(super) fn reissue_effects(
     if expected.is_empty() && requests.is_empty() {
         return Ok(Vec::new());
     }
+    let owned = owned_waiting_phase(state, content, local_seat);
+    let _ = writeln!(
+        std::io::stderr().lock(),
+        "M9E_REISSUE expected={} requests={} owned={} role={role:?} protocol={has_protocol} control={:?} turn={:?} faint={:?}",
+        expected.len(),
+        requests.len(),
+        owned,
+        state.active_run.as_ref().map(|run| &run.control),
+        state.current_turn_execution.as_ref().map(|turn| &turn.stage),
+        state.current_battle_participation.as_ref()
+            .and_then(|participation| participation.experience.as_ref())
+            .and_then(|owner| owner.source_progression.as_ref())
+            .and_then(|source| source.initial_faint.phase.as_ref())
+    );
     if role != GameKernelRoleV7::Authority
         || has_protocol
-        || !owned_waiting_phase(state, content, local_seat)
+        || !owned
     {
         return Err(GameKernelV7Error::Invalid);
     }
