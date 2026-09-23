@@ -2131,17 +2131,7 @@ fn assert_actual_tm_reward(
     let state = assert_actual_tm_reward_after_move(state, content.clone())?;
     let (state, tm, learned) = assert_actual_tm_reward_after_queued(state, content.clone())?;
     if tm.slot == 4 {
-        let intro = Box::new(state.0.snapshot()?);
-        let event = current_reward(active(&intro)?)?
-            .tm
-            .as_ref()
-            .ok_or("TM absent")?
-            .phase
-            .event()
-            .ok_or("Intro absent")?;
-        writeln!(std::io::stderr().lock(), "M9E_TM_STAGE before_intro_reissue")?;
-        assert_phase_title_read_reissues(&intro, event, content.clone())?;
-        writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_intro_reissue")?;
+        assert_actual_tm_intro_reissue(&state.0, content.clone())?;
     }
     let (state, tm, learned) = assert_actual_tm_fullslot_replace(state, content.clone(), tm, learned)?;
     let (kernel, selected, live, ledger) = state;
@@ -2150,6 +2140,25 @@ fn assert_actual_tm_reward(
     assert_actual_tm_reward_after_present(
         kernel, content, selected, live, ledger, tm, learned, present,
     )
+}
+
+#[inline(never)]
+fn assert_actual_tm_intro_reissue(
+    kernel: &GameKernelV7,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<()> {
+    let intro = Box::new(kernel.snapshot()?);
+    let event = current_reward(active(&intro)?)?
+        .tm
+        .as_ref()
+        .ok_or("TM absent")?
+        .phase
+        .event()
+        .ok_or("Intro absent")?;
+    writeln!(std::io::stderr().lock(), "M9E_TM_STAGE before_intro_reissue")?;
+    assert_phase_title_read_reissues(&intro, event, content)?;
+    writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_intro_reissue")?;
+    Ok(())
 }
 
 #[inline(never)]
