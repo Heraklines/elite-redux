@@ -59,7 +59,19 @@ jobs:
       - name: Qualify exact source-bound Town root selector
         run: python3 scripts/ci/m9e_town_selector_diagnostic.py
       - name: Search bounded natural wave-two Town seeds remotely
-        run: cargo test --manifest-path rust/Cargo.toml --locked -p er-game --test m9e_town_seed_search -- --nocapture
+        run: |
+          set -euo pipefail
+          cargo test --manifest-path rust/Cargo.toml --locked -p er-game --test m9e_town_seed_search -- --nocapture 2>&1 | tee "$RUNNER_TEMP/m9e-town-seed.log"
+          grep -o 'candidate=m9e-town-handoff-[0-9]* before=!rnd,[^[:space:]]*' "$RUNNER_TEMP/m9e-town-seed.log" > "$RUNNER_TEMP/m9e-town-seed-candidates.txt"
+          test "$(wc -l < "$RUNNER_TEMP/m9e-town-seed-candidates.txt")" -eq 8
+      - name: Publish bounded seed candidates
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-town-seed-candidates-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-town-seed-candidates.txt
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Compact source-bound selector result
         if: always()
         uses: actions/upload-artifact@v6
