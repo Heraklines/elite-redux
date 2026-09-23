@@ -1,0 +1,57 @@
+name: M9E Current Release Cost Probe
+on:
+  push:
+    branches: [codex/m9e-current-phase-focused-20260910]
+permissions:
+  contents: read
+concurrency:
+  group: m9e-release-cost-probe-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  release-cost:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: never
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - name: Start shared release deadline before checkout
+        run: echo "M9E_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Install pinned Rust toolchain
+        timeout-minutes: 5
+        run: rustup toolchain install 1.97.1 --profile minimal
+      - name: Measure complete optimized native cost witness
+        run: python3 scripts/ci/m9e_current_release_probe.py
+      - name: Compact release result
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-current-release-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-current-release-probe/compact/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Named remote measurement logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-current-release-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-current-release-probe/diagnostics/
+          if-no-files-found: error
+          retention-days: 14

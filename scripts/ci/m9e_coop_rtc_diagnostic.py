@@ -22,6 +22,7 @@ IDS = [f"natural cooperative Title through two Workers and RTC {seat} ready firs
 PUBLIC_RETRY_ID = "owned natural co-op public retry recovers a pending proposal after disconnected snapshot restore through six Workers"
 IDS.append(PUBLIC_RETRY_ID)
 SOURCES = [EXAMPLE, SPEC, "scripts/ci/m9e_coop_rtc_diagnostic.py", ".github/workflows/m9e-coop-rtc-focused.yml",
+           ".github/workflows/m9e-current-browser-rtc-probe.yml",
            "src/rust-browser/contracts/browser-contracts-v2.ts", "src/rust-browser/contracts/browser-contracts.ts",
            "src/rust-browser/routes/rust-current-rtc-entry.ts", "src/rust-browser/adapters/current-rtc-transport.ts",
            "src/rust-browser/routes/rust-current-worker-entry.ts", "src/rust-browser/routes/browser-effects-v2.ts",
@@ -313,7 +314,7 @@ if __name__ == "__main__":
     FULL.mkdir(parents=True, exist_ok=False)
     COMPACT.mkdir(parents=True, exist_ok=False)
     summary = {"status": "failed", "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
-               "qualification": "focused natural RTC startup, complete capsule replay and public pending retry after disconnected restore in fresh Workers; not integration or M9 qualification"}
+               "qualification": "same-SHA focused natural RTC startup, complete capsule replay and public pending retry after disconnected restore in fresh Workers; not aggregate M9 qualification"}
     try:
         main(summary)
         if time.monotonic() > DEADLINE:
