@@ -601,6 +601,10 @@ test("owned natural co-op public retry recovers a pending proposal after disconn
       retained.same(current.evidence.presentations, retained.afterRetryPresentations, "settled retry repeated presentations");
       if (current.evidence.frames.length !== 2) throw new Error("settled guest retry emitted another frame");
     })));
+    // Dispatch resolves its response before the RTC operation pump retires the
+    // active slot. Disposal must wait for that same operation to finish.
+    await Promise.all([peers.left, peers.right].map(page =>
+      expect.poll(async () => (await status(page)).pending, { timeout: 30_000 }).toBe(0)));
     expect(peers.workers).toHaveLength(6);
     for (const url of peers.workers) { expect(new URL(url).origin).toBe(address); expect(new URL(url).pathname).toBe(`/assets/${manifest.worker}`); }
     await Promise.all([peers.left, peers.right].map(page => page.evaluate(async () => {
