@@ -15,7 +15,7 @@ use er_game::current_town_wild_spawn::{
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_rng::audit::{RngCallsiteId, RngPublicApi, RngReason};
 use er_rng::battle::RngRuntime;
-use er_rng::phaser::{PhaserRdgState, RunRngState};
+use er_rng::phaser::{PhaserRdg, PhaserRdgState, RunRngState, shift_char_codes};
 use er_types::battle_ids::SpeciesId;
 use er_types::battle_model::PokemonType;
 use er_types::run_ids::BiomeId;
@@ -68,11 +68,22 @@ const SOURCE_TYPE_ORDER: [PokemonType; 19] = [
     PokemonType::Stellar,
 ];
 const SOURCE_BEFORE: &str = "!rnd,789153,0.5761283298488706,0.7223087239544839,0.22977968817576766";
+const SOURCE_AFTER_WAVE_RESET: &str =
+    "!rnd,1,0.3782209656201303,0.3772894029971212,0.5761283298488706";
 const SOURCE_AFTER_SELECTION: &str =
     "!rnd,1012145,0.09734400571323931,0.1575480371247977,0.15997060341760516";
 
 #[test]
 fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Box<dyn Error>> {
+    // Source run35892149923 established that the starter helper silently
+    // replaced the requested run seed with "test". BattleScene reset wave 2
+    // from this actual seed before battle setup advanced to SOURCE_BEFORE.
+    let wave_seed = shift_char_codes("test", 2)?;
+    assert_eq!(wave_seed, "vguv");
+    assert_eq!(
+        PhaserRdg::from_seed(&wave_seed).state().state_string,
+        SOURCE_AFTER_WAVE_RESET
+    );
     // Source399d direct queued NextEncounter observation in run34704520605:
     // tier integer 247/512, common pool index 3/24, root263. That probe's
     // retained run stream and its effective DAY pool are directly observed;
