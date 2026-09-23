@@ -160,14 +160,14 @@ function observeLevelTwoAbilityPowers(){
  const scene=globalScene,enemy=scene.currentBattle.enemyParty[0];expect(enemy).toBeDefined();expect(captured).toBeDefined();
  const before=Phaser.Math.RND.state(),oldFlag=scene.movesetGenInProgress;
  const old={species:enemy.species,form:enemy.formIndex,ability:enemy.abilityIndex,stats:[...enemy.stats],hp:enemy.hp,ivs:[...enemy.ivs],nature:enemy.nature};
- const rows:Array<[number,Array<[number,Array<[number,Array<[number,number]>]>]>]>]=[];
+ const rows:unknown[]=[];
  try{
   scene.movesetGenInProgress=true;
   for(const [id,forms] of captured!.level_two_forms.rows){
-   enemy.species=getPokemonSpecies(id);const formRows:Array<[number,Array<[number,Array<[number,number]>]>]>]=[];
+   enemy.species=getPokemonSpecies(id);const formRows:unknown[]=[];
    for(const [formIndex,levelRows] of forms.entries()){
     enemy.formIndex=formIndex;const form=enemy.getSpeciesForm();const moveIds=[...new Set(levelRows.map(row=>row[1]))];expect(moveIds.length).toBeGreaterThan(0);expect(moveIds.length).toBeLessThanOrEqual(32);
-    const abilityRows:Array<[number,Array<[number,number]>]>=[];
+    const abilityRows:unknown[]=[];
     for(let abilityIndex=0;abilityIndex<form.getAbilityCount();abilityIndex++){
      enemy.abilityIndex=abilityIndex;enemy.calculateStats();enemy.hp=enemy.getMaxHp();const abilityId=enemy.getAbility().id;expect(abilityId).toBe(form.getAbility(abilityIndex));
      const powers=moveIds.map(moveId=>{const power=allMoves[moveId].calculateEffectivePower(enemy);expect(Number.isFinite(power)&&power>=0&&power<=10000).toBe(true);return [moveId,power] as [number,number];});
