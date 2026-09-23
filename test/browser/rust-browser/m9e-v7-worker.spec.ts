@@ -360,3 +360,50 @@ test("current V7 Worker rejects wrong ABI and settles pending work on terminatio
   expect(bytes.length).toBeLessThanOrEqual(4096);
   await testInfo.attach("m9e-current-worker-negative", { body: bytes, contentType: "application/json" });
 });
+
+test("current V7 Worker preserves fresh account IDs through snapshot restore", async ({ page }, testInfo) => {
+  const observed: string[] = [];
+  page.on("worker", worker => { observed.push(worker.url()); });
+  await page.goto(address);
+  const evidence = await page.evaluate(async ({ entry, assets, initialization }) => {
+    const module = await import(entry);
+    const template = initialization.initialization;
+    const account = { trainer_id: 12345, secret_id: 23456 };
+    const first = module.createCurrentDevelopmentWorkerV2({ assets });
+    let second: typeof first | undefined;
+    try {
+      const started = await first.dispatch({ kind: "INITIALIZE", initialization: {
+        kind: "FRESH_ACCOUNT_START", context: template.context, profile: template.profile,
+        seed: "m9e-fresh-friendship-v6", save_slots: ["browser-account"],
+        account_identity: account, existing_saves: false,
+      } });
+      if (started.response.kind !== "READY") throw new Error("fresh-account Worker did not initialize");
+      const before = await first.dispatch({ kind: "SNAPSHOT" });
+      if (before.response.kind !== "SNAPSHOT") throw new Error("fresh-account Worker snapshot missing");
+      const checkpoint: any = before.response.snapshot;
+      if (checkpoint.lifecycle?.kind !== "BOOTSTRAP"
+        || JSON.stringify(checkpoint.lifecycle.value.current_account_identity) !== JSON.stringify(account)) {
+        throw new Error("actual Wasm bootstrap lost its supplied account identity");
+      }
+      await first.dispose();
+      second = module.createCurrentDevelopmentWorkerV2({ assets });
+      const restored = await second.dispatch({ kind: "INITIALIZE", initialization: {
+        kind: "SNAPSHOT", context: template.context, snapshot: checkpoint,
+      } });
+      if (restored.response.kind !== "READY") throw new Error("account snapshot did not restore in a fresh Worker");
+      const after = await second.dispatch({ kind: "SNAPSHOT" });
+      if (after.response.kind !== "SNAPSHOT" || JSON.stringify(after.response.snapshot) !== JSON.stringify(checkpoint)) {
+        throw new Error("fresh Worker account checkpoint changed on restore");
+      }
+      await second.dispose();
+      return { account, exact_snapshot_restore: true, disposed_workers: 2,
+        first_closed: first.status.closed, second_closed: second.status.closed };
+    } finally { first.terminate(); second?.terminate(); }
+  }, { entry: `${address}/m9e-assets/${manifest.entry}`, assets: assets(), initialization });
+  expect(observed).toHaveLength(2);
+  expect(evidence).toEqual({ account: { trainer_id: 12345, secret_id: 23456 },
+    exact_snapshot_restore: true, disposed_workers: 2, first_closed: true, second_closed: true });
+  const bytes = Buffer.from(JSON.stringify({ ...binding(observed), ...evidence }));
+  expect(bytes.length).toBeLessThanOrEqual(4096);
+  await testInfo.attach("m9e-fresh-account-worker", { body: bytes, contentType: "application/json" });
+});

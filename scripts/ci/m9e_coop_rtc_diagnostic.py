@@ -18,10 +18,12 @@ OUTPUT = REPORT / "web"
 DEADLINE = time.monotonic() + 1800
 EXAMPLE = "rust/crates/er-web/examples/m9e_v7_coop_startup.rs"
 SPEC = "test/browser/rust-browser/m9e-v7-coop-startup.spec.ts"
+WORKER_SPEC = "test/browser/rust-browser/m9e-v7-worker.spec.ts"
+WORKER_ID = "current V7 Worker preserves fresh account IDs through snapshot restore"
 IDS = [f"natural cooperative Title through two Workers and RTC {seat} ready first" for seat in ("host", "guest")]
 PUBLIC_RETRY_ID = "owned natural co-op public retry recovers a pending proposal after disconnected snapshot restore through six Workers"
 IDS.append(PUBLIC_RETRY_ID)
-SOURCES = [EXAMPLE, SPEC, "scripts/ci/m9e_coop_rtc_diagnostic.py", ".github/workflows/m9e-coop-rtc-focused.yml",
+SOURCES = [EXAMPLE, SPEC, WORKER_SPEC, "scripts/ci/m9e_coop_rtc_diagnostic.py", ".github/workflows/m9e-coop-rtc-focused.yml",
            ".github/workflows/m9e-current-browser-rtc-probe.yml",
            "src/rust-browser/contracts/browser-contracts-v2.ts", "src/rust-browser/contracts/browser-contracts.ts",
            "src/rust-browser/routes/rust-current-rtc-entry.ts", "src/rust-browser/adapters/current-rtc-transport.ts",
@@ -87,7 +89,7 @@ def main(summary):
     run(["pnpm", "install", "--frozen-lockfile"], "dependencies")
     run(["pnpm", "exec", "tsc", "--ignoreConfig", "--noEmit", "--skipLibCheck", "--strict", "--target", "ESNext", "--module", "ESNext",
          "--moduleResolution", "bundler", "--lib", "ESNext,DOM", "--types", "node,vite/client",
-         "src/rust-browser/routes/rust-current-rtc-entry.ts", SPEC], "typecheck", 120)
+         "src/rust-browser/routes/rust-current-rtc-entry.ts", SPEC, WORKER_SPEC], "typecheck", 120)
     if shutil.which("wasm-bindgen") is None:
         run(["cargo", "install", "wasm-bindgen-cli", "--version", "0.2.127", "--locked"], "wasm-tools")
     if run(["wasm-bindgen", "--version"], "wasm-version", 30, 16384).read_text().strip() != "wasm-bindgen 0.2.127":
@@ -240,6 +242,7 @@ def execute_prepared(summary, *, install_chromium=True):
         manifests[name] = value
         shutil.copyfile(OUTPUT / name, FULL / name)
     rtc = manifests["m9e-v7-rtc-assets.json"]
+    worker = manifests["m9e-v7-worker-assets.json"]
     summary["platform"] = {"manifest_sha256": digest(OUTPUT / "m9e-v7-rtc-assets.json"), "worker": rtc["worker"],
                             "assets": rtc["assets"], "cohort": rtc["cohort"], "source_sha": sha}
     retained = {path.name: digest(path) for path in OUTPUT.iterdir() if path.is_file()}
@@ -307,14 +310,73 @@ def execute_prepared(summary, *, install_chromium=True):
     if any(digest(OUTPUT / path) != expected for path, expected in retained.items()):
         raise RuntimeError("actual platform inputs changed during execution")
     summary["browser_evidence"] = evidence
-    summary["tests"] = {"passed": 3, "failed": 0, "skipped": 0, "ids": IDS}
+    os.environ["PLAYWRIGHT_JSON_OUTPUT_FILE"] = str(FULL / "fresh-account-results.json")
+    run(["pnpm", "exec", "playwright", "test", "--config", "playwright.rust-browser.config.ts", "--project=chromium",
+         WORKER_SPEC, "--grep", WORKER_ID, "--workers=1", "--reporter=line,json"], "account-browser", 180)
+    account_report = json.loads((FULL / "fresh-account-results.json").read_text())
+    account_specs = []
+    def collect_account(suite):
+        account_specs.extend(suite.get("specs", []))
+        for child in suite.get("suites", []):
+            collect_account(child)
+    for suite in account_report.get("suites", []):
+        collect_account(suite)
+    if account_report.get("errors") or len(account_specs) != 1 or account_specs[0].get("title") != WORKER_ID:
+        raise RuntimeError("sole actual fresh-account Worker journey required")
+    account_spec = account_specs[0]
+    if account_spec.get("file") not in (WORKER_SPEC, Path(WORKER_SPEC).name) or len(account_spec.get("tests", [])) != 1:
+        raise RuntimeError("fresh-account Worker source/project mismatch")
+    account_test = account_spec["tests"][0]
+    account_results = account_test.get("results", [])
+    if (account_test.get("projectName") != "chromium" or account_test.get("status") != "expected"
+            or len(account_results) != 1 or account_results[0].get("status") != "passed"
+            or account_results[0].get("retry") != 0):
+        raise RuntimeError("fresh-account Worker journey failed, retried or skipped")
+    attachments = [item for item in account_results[0].get("attachments", [])
+                   if item.get("name") == "m9e-fresh-account-worker"]
+    if len(attachments) != 1 or attachments[0].get("contentType") != "application/json":
+        raise RuntimeError("sole bounded fresh-account Worker evidence required")
+    attachment = attachments[0]
+    if "body" in attachment:
+        if not isinstance(attachment["body"], str) or not 0 < len(attachment["body"]) <= 5500:
+            raise RuntimeError("fresh-account Worker encoded evidence bound exceeded")
+        raw = base64.b64decode(attachment["body"], validate=True)
+    else:
+        original = Path(attachment["path"])
+        if not original.is_absolute():
+            original = ROOT / original
+        if original.is_symlink():
+            raise RuntimeError("fresh-account Worker evidence symlink forbidden")
+        path = original.resolve(strict=True)
+        if not path.is_relative_to((ROOT / "test-results/rust-browser").resolve(strict=True)) or not 0 < path.stat().st_size <= 4096:
+            raise RuntimeError("fresh-account Worker evidence path invalid")
+        raw = path.read_bytes()
+    if not 0 < len(raw) <= 4096:
+        raise RuntimeError("fresh-account Worker evidence bound exceeded")
+    account = json.loads(raw)
+    if (account.get("source_sha") != sha or account.get("manifest_sha256") != digest(OUTPUT / "m9e-v7-worker-assets.json")
+            or account.get("entry_sha256") != worker["assets"][worker["entry"]]["sha256"]
+            or account.get("worker_sha256") != worker["assets"][worker["worker"]]["sha256"]
+            or account.get("worker_path") != worker["worker"]
+            or any(account.get(key) != expected for key, expected in worker["cohort"].items())
+            or account.get("account") != {"trainer_id": 12345, "secret_id": 23456}
+            or account.get("observed_worker_count") != 2 or account.get("disposed_workers") != 2
+            or account.get("exact_snapshot_restore") is not True
+            or account.get("first_closed") is not True or account.get("second_closed") is not True):
+        raise RuntimeError("fresh-account Worker evidence differs from actual source/assets or restored identity")
+    if any(digest(ROOT / path) != expected for path, expected in summary["source_hashes"].items()):
+        raise RuntimeError("bound source changed during fresh-account Worker execution")
+    if any(digest(OUTPUT / path) != expected for path, expected in retained.items()):
+        raise RuntimeError("actual platform inputs changed during fresh-account Worker execution")
+    summary["fresh_account_worker_evidence"] = account
+    summary["tests"] = {"passed": 4, "failed": 0, "skipped": 0, "ids": IDS + [WORKER_ID]}
 
 
 if __name__ == "__main__":
     FULL.mkdir(parents=True, exist_ok=False)
     COMPACT.mkdir(parents=True, exist_ok=False)
     summary = {"status": "failed", "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
-               "qualification": "same-SHA focused natural RTC startup, complete capsule replay and public pending retry after disconnected restore in fresh Workers; not aggregate M9 qualification"}
+               "qualification": "same-SHA focused natural RTC startup, complete capsule replay, public pending retry and actual fresh-account Worker snapshot restore; not aggregate M9 qualification"}
     try:
         main(summary)
         if time.monotonic() > DEADLINE:
