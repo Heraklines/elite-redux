@@ -33,6 +33,8 @@ const SOURCE_LEVEL_TWO_FORMS: &[u8] = include_bytes!("../src/current_town_level_
 const SOURCE_LEVEL_TWO_META: &[u8] = include_bytes!("../src/current_town_level_two_meta.json");
 const SOURCE_LEVEL_TWO_MOVEGEN: &[u8] =
     include_bytes!("../src/current_town_level_two_movegen.json");
+const SOURCE_LEVEL_TWO_ABILITIES: &[u8] =
+    include_bytes!("../src/current_town_level_two_abilities.json");
 const SOURCE_MOVEGEN_STAGE: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/town-movegen-stage-v1.json");
 const SOURCE_TYPE_ORDER: [PokemonType; 19] = [
@@ -98,6 +100,8 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     let level_two_forms: serde_json::Value = serde_json::from_slice(SOURCE_LEVEL_TWO_FORMS)?;
     let level_two_meta: serde_json::Value = serde_json::from_slice(SOURCE_LEVEL_TWO_META)?;
     let level_two_movegen: serde_json::Value = serde_json::from_slice(SOURCE_LEVEL_TWO_MOVEGEN)?;
+    let level_two_abilities: serde_json::Value =
+        serde_json::from_slice(SOURCE_LEVEL_TWO_ABILITIES)?;
     let movegen_stage: serde_json::Value = serde_json::from_slice(SOURCE_MOVEGEN_STAGE)?;
     assert_eq!(gender["source"], "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7");
     assert_eq!(form_flags["source"], gender["source"]);
@@ -107,6 +111,7 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     assert_eq!(level_two_forms["source"], gender["source"]);
     assert_eq!(level_two_meta["source"], gender["source"]);
     assert_eq!(level_two_movegen["source"], gender["source"]);
+    assert_eq!(level_two_abilities["source"], gender["source"]);
     assert_eq!(movegen_stage["source"], gender["source"]);
     assert_eq!(gender["rows"].as_array().ok_or("gender rows")?.len(), 163);
     assert_eq!(form_flags["rows"].as_array().ok_or("form rows")?.len(), 163);
@@ -145,6 +150,20 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
             .ok_or("level-two movegen")?
             .len(),
         131
+    );
+    assert_eq!(
+        level_two_abilities["rows"]
+            .as_array()
+            .ok_or("level-two abilities")?
+            .len(),
+        53
+    );
+    assert_eq!(
+        level_two_abilities["movegen_modifiers"]
+            .as_array()
+            .ok_or("movegen modifiers")?
+            .len(),
+        98
     );
     assert!(
         level_two_meta["rows"]
@@ -271,16 +290,38 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
             assert!(
                 source_town_initial_level_move_pool(&content, *root, form as u16)?.len() <= 512
             );
-            assert!(
-                source_town_neutral_weighted_level_move_pool(
+            let source_profiles = level_two_abilities["rows"]
+                .as_array()
+                .ok_or("ability profiles")?
+                .iter()
+                .find(|row| row[0].as_u64() == Some(effective))
+                .ok_or("ability species")?;
+            let source_profile = &source_profiles[1][form];
+            let modifiers = level_two_abilities["movegen_modifiers"]
+                .as_array()
+                .ok_or("movegen modifier IDs")?;
+            for ability_index in 0..3 {
+                let active = source_profile[0][ability_index]
+                    .as_u64()
+                    .ok_or("active ability")?;
+                let passive = source_profile[1].as_array().ok_or("passive abilities")?;
+                let has_effect = modifiers.iter().any(|id| id.as_u64() == Some(active))
+                    || passive.iter().any(|passive| {
+                        modifiers.iter().any(|id| id == passive)
+                    });
+                let result = source_town_neutral_weighted_level_move_pool(
                     &content,
                     *root,
                     form as u16,
+                    ability_index as u8,
                     [13, 7, 6, 6, 6, 8],
-                )?
-                .len()
-                    <= 512
-            );
+                );
+                if has_effect {
+                    assert_eq!(result.unwrap_err(), CurrentTownWildErrorV1::UnsupportedContext);
+                } else {
+                    assert!(result?.len() <= 512);
+                }
+            }
         }
     }
     assert_eq!(
@@ -405,6 +446,7 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         &content,
         prefix.root.source_root,
         prefix.form_index,
+        prefix.ability_index,
         [13, 7, 6, 6, 6, 8],
     )?;
     let observed_initial = movegen_stage["initial"]

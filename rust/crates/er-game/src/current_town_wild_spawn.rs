@@ -220,6 +220,8 @@ static SOURCE_LEVEL_TWO_FORMS: OnceLock<Result<SourceTownLevelTwoFormsV1, ()>> =
 type SourceTownSpeciesLevelTwoRows = (u64, Vec<Vec<(i16, u64)>>);
 type SourceTownMoveMetaRow = (u64, u8, u8, i16, i16, bool, bool);
 type SourceTownMovegenRow = (u64, f64, u8);
+type SourceTownAbilityProfile = (Vec<u64>, Vec<u64>);
+type SourceTownSpeciesAbilityRows = (u64, Vec<SourceTownAbilityProfile>);
 
 // Source run 35854351965, SHA256
 // 86b764e17e26ec5db4bd201cc7f95950975aa134960eae2a0570a8b5a7201a80.
@@ -248,6 +250,22 @@ struct SourceTownLevelTwoMovegenV1 {
 }
 
 static SOURCE_LEVEL_TWO_MOVEGEN: OnceLock<Result<SourceTownLevelTwoMovegenV1, ()>> =
+    OnceLock::new();
+
+// Source run 35858565756, SHA256
+// 69c24f1b15c8888fd2ae7ec9c1565562135d8f9dc0eefb56774f1a919ca1e013.
+// The modifier set uses source AbilityAttr.is, including inherited movegen
+// attributes, over the complete 395-ability Town evolution closure.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SourceTownLevelTwoAbilitiesV1 {
+    schema: u8,
+    source: String,
+    rows: Vec<SourceTownSpeciesAbilityRows>,
+    movegen_modifiers: Vec<u64>,
+}
+
+static SOURCE_LEVEL_TWO_ABILITIES: OnceLock<Result<SourceTownLevelTwoAbilitiesV1, ()>> =
     OnceLock::new();
 
 fn source_level_two_forms() -> Result<&'static SourceTownLevelTwoFormsV1, CurrentTownWildErrorV1> {
@@ -341,6 +359,38 @@ fn source_level_two_movegen() -> Result<&'static SourceTownLevelTwoMovegenV1, Cu
                     .rows
                     .iter()
                     .any(|row| !row.1.is_finite() || !(0.0..=10_000.0).contains(&row.1))
+            {
+                return Err(());
+            }
+            Ok(parsed)
+        })
+        .as_ref()
+        .map_err(|_| CurrentTownWildErrorV1::SourceContent)
+}
+
+fn source_level_two_abilities(
+) -> Result<&'static SourceTownLevelTwoAbilitiesV1, CurrentTownWildErrorV1> {
+    SOURCE_LEVEL_TWO_ABILITIES
+        .get_or_init(|| {
+            let parsed: SourceTownLevelTwoAbilitiesV1 =
+                serde_json::from_str(include_str!("current_town_level_two_abilities.json"))
+                    .map_err(|_| ())?;
+            let forms = source_level_two_forms().map_err(|_| ())?;
+            if parsed.schema != 1
+                || parsed.source != ORACLE
+                || parsed.rows.len() != 53
+                || parsed.movegen_modifiers.len() != 98
+                || parsed.movegen_modifiers.iter().any(|id| *id == 0)
+                || parsed.movegen_modifiers.iter().collect::<BTreeSet<_>>().len() != 98
+                || parsed.rows.iter().zip(&forms.rows).any(|(row, source)| {
+                    row.0 != source.0
+                        || row.1.len() != source.1.len()
+                        || row.1.iter().any(|(active, passive)| {
+                            active.len() != 3
+                                || passive.len() > 3
+                                || active.iter().chain(passive).any(|id| *id == 0)
+                        })
+                })
             {
                 return Err(());
             }
@@ -682,10 +732,34 @@ pub fn source_town_neutral_weighted_level_move_pool(
     content: &PreparedGameContentV2,
     root: SpeciesId,
     form_index: u16,
+    ability_index: u8,
     stats: [u32; 6],
 ) -> Result<Vec<CurrentTownNeutralLevelMoveWeightV1>, CurrentTownWildErrorV1> {
     if stats.iter().any(|stat| *stat == 0 || *stat > 10_000) {
         return Err(CurrentTownWildErrorV1::SourceContent);
+    }
+    let abilities = source_level_two_abilities()?;
+    let effective = source_town_level_two_species(root)?.get().get();
+    let profile = abilities
+        .rows
+        .iter()
+        .find(|row| row.0 == effective)
+        .and_then(|row| row.1.get(usize::from(form_index)))
+        .ok_or(CurrentTownWildErrorV1::SourceContent)?;
+    let active = profile
+        .0
+        .get(usize::from(ability_index))
+        .ok_or(CurrentTownWildErrorV1::SourceContent)?;
+    if *active != source_town_ability_id(root, form_index, ability_index)?.get().get() {
+        return Err(CurrentTownWildErrorV1::SourceContent);
+    }
+    if abilities.movegen_modifiers.contains(active)
+        || profile
+            .1
+            .iter()
+            .any(|id| abilities.movegen_modifiers.contains(id))
+    {
+        return Err(CurrentTownWildErrorV1::UnsupportedContext);
     }
     let initial = source_town_initial_level_move_pool(content, root, form_index)?;
     let effects = source_level_two_movegen()?;
