@@ -1,4 +1,5 @@
 import { NullifyFirstNHitsAbAttr } from "#data/elite-redux/archetypes/nullify-first-n-hits";
+import { __INTERNAL_TEST_EXPORTS as movegen } from "#app/ai/ai-moveset-gen";
 import { PokemonForm,PokemonSpecies } from "#data/pokemon-species";
 import { allMoves,allAbilities } from "#data/data-lists";
 import { pokemonEvolutions,pokemonPrevolutions } from "#balance/pokemon-evolutions";
@@ -135,6 +136,17 @@ function pageAbilities(section:"rows"|"functions"|"shapes",values:unknown[]){
  const groups:unknown[][]=[[]];for(const value of values){let group=groups.at(-1)!;const candidate={schema:1,section,index:groups.length-1,items:[...group,value]};if(Buffer.byteLength(JSON.stringify(candidate)+"\n")>16384){expect(group.length).toBeGreaterThan(0);groups.push([value]);group=groups.at(-1)!;}else group.push(value);}
  expect(groups.length).toBeLessThanOrEqual(16);return groups.map((items,index)=>({name:`abilities-${section}-${String(index).padStart(2,"0")}`,value:{schema:1,section,index,items}}));
 }
+function observeConstructedMovePool(){
+ const enemy=globalScene.currentBattle.enemyParty[0];expect(enemy).toBeDefined();
+ expect(enemy.species.speciesId).toBe(263);expect(enemy.level).toBe(2);expect(enemy.hasTrainer()).toBe(false);expect(enemy.isBoss()).toBe(false);
+ const before=Phaser.Math.RND.state(),moves=enemy.moveset.map(move=>move.moveId);
+ const initial=movegen.getAndWeightLevelMoves(enemy),filtered=new Map(initial);movegen.filterMovePool(filtered,false,false,enemy);
+ const adjusted=new Map(filtered);movegen.adjustDamageMoveWeights(adjusted,enemy,false);
+ const weighted=[...adjusted].map(([id,weight])=>[id,Math.ceil(Math.pow(weight,BASE_WEIGHT_MULTIPLIER)*100)]);
+ expect(Phaser.Math.RND.state()).toBe(before);expect(enemy.moveset.map(move=>move.moveId)).toEqual(moves);
+ expect(initial.size).toBeLessThanOrEqual(512);expect(filtered.size).toBeLessThanOrEqual(initial.size);expect(adjusted.size).toBe(filtered.size);
+ return {schema:1,source:PIN,entry:"direct queued NextEncounterPhase, Ace Town day wave two",species:enemy.species.speciesId,level:enemy.level,form:enemy.formIndex,ability:enemy.getAbility().id,stats:[...enemy.stats],types:[...enemy.getTypes()],initial:[...initial],filtered:[...filtered],adjusted:[...adjusted],weighted,moves};
+}
 test("observe complete initialized Town constructor closure",async()=>{
  const output=process.env.M9_TOWN_CONSTRUCTOR_OUTPUT,ordinal=process.env.M9_TOWN_CONSTRUCTOR_ORDINAL;expect(output).toBeTruthy();expect(["one","two"]).toContain(ordinal);
  expect(execFileSync("git",["rev-parse","HEAD"],{encoding:"utf8"}).trim()).toBe(PIN);
@@ -142,7 +154,8 @@ test("observe complete initialized Town constructor closure",async()=>{
  manager.override.disableShinies=false;manager.override.normalizeIVs=false;manager.override.normalizeNatures=false;
  manager.override.shiny(null).enemyShiny(null).playerIVs(null).enemyIVs(null).nature(null).enemyNature(null).battleStyle(BattleStyle.SET).startingBiome(BiomeId.TOWN).startingWave(1).seed(SEED);
  await manager.classicMode.startBattle(SpeciesId.BULBASAUR);await observeTownAtActualEntry();expect(captured).toBeDefined();assertFreshNullifyRegistry();expect(usageMethodCalls,"No runtime-slot accesses through complete observation").toBe(0);
- const packed=packSpecies(captured!.species);const outputs:Array<{name:string,value:unknown,cap:number}>=[{name:"species",value:packed.species,cap:32768},{name:"moves",value:captured!.moves,cap:32768},{name:"forms",value:packed.forms,cap:16384},{name:"abilities-meta",value:{schema:2,source:PIN,runtime_slots:captured!.abilities.runtime_slots},cap:16384},{name:"gender",value:captured!.gender,cap:4096},{name:"form-flags",value:captured!.form_flags,cap:4096},{name:"ability-slots",value:captured!.ability_slots,cap:8192},{name:"form-types",value:captured!.form_types,cap:8192},{name:"form-stats",value:captured!.form_stats,cap:16384},{name:"level-two-forms",value:captured!.level_two_forms,cap:8192},{name:"level-two-meta",value:captured!.level_two_meta,cap:8192}];
+ const movegenStage=observeConstructedMovePool();
+ const packed=packSpecies(captured!.species);const outputs:Array<{name:string,value:unknown,cap:number}>=[{name:"species",value:packed.species,cap:32768},{name:"moves",value:captured!.moves,cap:32768},{name:"forms",value:packed.forms,cap:16384},{name:"abilities-meta",value:{schema:2,source:PIN,runtime_slots:captured!.abilities.runtime_slots},cap:16384},{name:"gender",value:captured!.gender,cap:4096},{name:"form-flags",value:captured!.form_flags,cap:4096},{name:"ability-slots",value:captured!.ability_slots,cap:8192},{name:"form-types",value:captured!.form_types,cap:8192},{name:"form-stats",value:captured!.form_stats,cap:16384},{name:"level-two-forms",value:captured!.level_two_forms,cap:8192},{name:"level-two-meta",value:captured!.level_two_meta,cap:8192},{name:"movegen-stage",value:movegenStage,cap:4096}];
  for(const section of ["rows","functions","shapes"] as const)for(const page of pageAbilities(section,captured!.abilities[section]))outputs.push({...page,cap:16384});
  const proofs:Array<[string,number,string]>=[];
  for(const {name,value,cap} of outputs){const raw=Buffer.from(JSON.stringify(value)+"\n");const sizes=Object.entries(value as object).map(([key,part])=>[key,Buffer.byteLength(JSON.stringify(part)),Array.isArray(part)?part.length:null]);const rowColumns=name==="species"?Array.from({length:10},(_,i)=>[i,Buffer.byteLength(JSON.stringify(captured!.species.rows.map((row:unknown)=>Array.isArray(row)?row[i]:null)))]):[];const sizing=JSON.stringify({part:name,bytes:raw.length,fields:sizes,row_columns:rowColumns});expect(Buffer.byteLength(sizing)).toBeLessThanOrEqual(2048);expect(raw.length,`Complete payload byte bound: ${sizing}`).toBeLessThanOrEqual(cap);proofs.push([name,raw.length,createHash("sha256").update(raw).digest("hex")]);if(ordinal==="one")writeFileSync(join(output!,`${name}-one.json`),raw,{flag:"wx"});}
