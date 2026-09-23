@@ -87,6 +87,8 @@ function validateAbilityPowers(part){
  const forms=pieces['level-two-forms'].rows,abilities=pieces['level-two-abilities'].rows;
  const base=new Map(pieces['level-two-movegen'].rows.map(row=>[row[0],row[1]]));
  const modifierIds=new Set(pieces['level-two-abilities'].movegen_modifiers);
+ const multiHitIds=new Set(pieces.moves.rows.filter(row=>row[1]&&row[9].some(attr=>pieces.moves.shapes[attr.o[0]][0]==='MultiHitAttr')).map(row=>row[0]));
+ const neutralDifferences=new Set();
  assert.deepEqual(part.rows.map(row=>row[0]),forms.map(row=>row[0]));let profiles=0;
  for(let i=0;i<forms.length;i++){
   const [id,formRows]=forms[i],abilityRows=abilities[i][1],observed=part.rows[i][1];
@@ -99,11 +101,12 @@ function validateAbilityPowers(part){
     const [active,powers]=slots[slot];assert.equal(active,expected[0][slot]);
     assert.deepEqual(powers.map(row=>row[0]),moves);
     const neutral=![active,...expected[1]].some(id=>modifierIds.has(id));
-    for(const [move,power] of powers){int(move,1,100000);assert(typeof power==='number'&&Number.isFinite(power)&&power>=0&&power<=10000);if(neutral)assert.equal(power,base.get(move));}
+    for(const [move,power] of powers){int(move,1,100000);assert(typeof power==='number'&&Number.isFinite(power)&&power>=0&&power<=10000);if(neutral&&power!==base.get(move)){assert(multiHitIds.has(move));neutralDifferences.add(move);}}
     profiles++;
    }
   }
  }
+ assert.deepEqual([...neutralDifferences].sort((a,b)=>a-b),[3,24,154,331,440,541]);
  assert(profiles>200&&profiles<500);return profiles;
 }
 const abilityPowerProfiles=validateAbilityPowers(pieces['level-two-ability-powers']);
