@@ -1500,16 +1500,9 @@ pub fn select_current_town_day_wave_two_core(
 ) -> Result<CurrentTownWildCoreV1, CurrentTownWildErrorV1> {
     let mut staged = rng.clone();
     let first_audit = staged.audit_entries().len();
-    let prefix = select_current_town_day_wave_two_constructor_prefix(
-        content,
-        context,
-        &mut staged,
-    )?;
-    let base = source_town_form_base_stats(
-        content,
-        prefix.root.source_root,
-        prefix.form_index,
-    )?;
+    let prefix =
+        select_current_town_day_wave_two_constructor_prefix(content, context, &mut staged)?;
+    let base = source_town_form_base_stats(content, prefix.root.source_root, prefix.form_index)?;
     let stats = source_town_unmodified_level_two_stats(base, prefix.ivs, prefix.nature_index)?;
     let moveset = source_town_moveset(
         content,
