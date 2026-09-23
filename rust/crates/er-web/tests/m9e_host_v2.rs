@@ -22,6 +22,7 @@ use er_state::m7_state::{
     DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
     SCENARIO_RUNTIME_SCHEMA_VERSION_V2, ScenarioRuntimeStageV2, ScenarioRuntimeStateV2,
 };
+use er_state::m9e_state_v6::CurrentAccountIdentityV1;
 use er_types::battle_ids::{MenuInstanceId, WaveIndex};
 use er_types::battle_model::BattleOutcome;
 use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
@@ -210,6 +211,61 @@ fn natural_host() -> Result<(BrowserKernelHostV2, u64), Box<dyn Error>> {
     .map_err(|error| format!("natural session initialization failed: {error}"))?;
     assert!(matches!(response, BrowserResponseV2::Ready));
     Ok((host, 1))
+}
+
+#[test]
+fn fresh_account_browser_entry_preserves_source_ids_across_wire_restore()
+-> Result<(), Box<dyn Error>> {
+    let account = CurrentAccountIdentityV1 {
+        trainer_id: 12345,
+        secret_id: 23456,
+    };
+    let mut host = BrowserKernelHostV2::from_bundle_bytes(BUNDLE)?;
+    let initialized = send(
+        &mut host,
+        0,
+        BrowserRequestV2::Initialize {
+            initialization: Box::new(BrowserSessionInitializationV2::FreshAccountStart {
+                context: context(),
+                profile: profile()?,
+                seed: "m9e-fresh-friendship-v6".to_owned(),
+                save_slots: vec!["fresh-account".to_owned()],
+                account_identity: account,
+                existing_saves: false,
+            }),
+        },
+    )?;
+    assert!(matches!(initialized, BrowserResponseV2::Ready));
+    let BrowserResponseV2::Snapshot { snapshot } =
+        send(&mut host, 1, BrowserRequestV2::Snapshot)?
+    else {
+        return Err("fresh account browser snapshot missing".into());
+    };
+    let GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) = &snapshot.lifecycle else {
+        return Err("fresh account browser bootstrap missing".into());
+    };
+    assert_eq!(bootstrap.current_account_identity, Some(account));
+    let mut restored = BrowserKernelHostV2::from_bundle_bytes(BUNDLE)?;
+    assert!(matches!(
+        send(
+            &mut restored,
+            0,
+            BrowserRequestV2::Initialize {
+                initialization: Box::new(BrowserSessionInitializationV2::Snapshot {
+                    context: context(),
+                    snapshot: *snapshot.clone(),
+                }),
+            },
+        )?,
+        BrowserResponseV2::Ready
+    ));
+    let BrowserResponseV2::Snapshot { snapshot: after } =
+        send(&mut restored, 1, BrowserRequestV2::Snapshot)?
+    else {
+        return Err("restored account browser snapshot missing".into());
+    };
+    assert_eq!(after, snapshot);
+    Ok(())
 }
 
 fn navigate_down_to(

@@ -624,6 +624,33 @@ impl BrowserKernelHostV2 {
                 }
                 session
             }
+            BrowserSessionInitializationV2::FreshAccountStart {
+                context,
+                profile,
+                seed,
+                save_slots,
+                account_identity,
+                existing_saves,
+            } => {
+                if context.role != GameKernelRoleV7::Authority || context.protocol.is_some() {
+                    return Err(BrowserWebErrorV2::Invalid);
+                }
+                let mut session = CurrentGameSession::natural_start_with_fresh_account(
+                    er_kernel::game_kernel_v7::FreshFriendshipStartV7 {
+                        profile,
+                        seed,
+                        local_seat: context.local_seat,
+                        save_slots,
+                        content: self.content.clone(),
+                        scheduler: context.scheduler,
+                    },
+                    account_identity,
+                )?;
+                if existing_saves {
+                    session.enable_current_title_storage()?;
+                }
+                session
+            }
             BrowserSessionInitializationV2::ExistingSave { context, save } => {
                 save.validate().map_err(|_| BrowserWebErrorV2::Invalid)?;
                 if &save.content_identity != self.content.identity() {

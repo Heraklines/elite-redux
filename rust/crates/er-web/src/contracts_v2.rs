@@ -13,6 +13,7 @@ use er_kernel::snapshot_v7::CoreGameKernelSnapshotV7;
 use er_protocol::ProtocolRuntimeSnapshotV2;
 use er_save::m9e_save_v2::GameSaveV2;
 use er_state::m7_state::ProfileStateV1;
+use er_state::m9e_state_v6::CurrentAccountIdentityV1;
 use er_types::{
     GameControlPlanV2, PlatformRequestId, PresentationEventId, RawInputEvent, SafeU53, ScenarioId,
     SeatId, TerminalState,
@@ -49,6 +50,16 @@ pub enum BrowserSessionInitializationV2 {
         seed: String,
         save_slots: Vec<String>,
         local_is_host: bool,
+        #[serde(default, skip_serializing_if = "is_false")]
+        existing_saves: bool,
+    },
+    /// Ordinary fresh solo account creation with source-generated trainer IDs.
+    FreshAccountStart {
+        context: BrowserSessionContextV2,
+        profile: ProfileStateV1,
+        seed: String,
+        save_slots: Vec<String>,
+        account_identity: CurrentAccountIdentityV1,
         #[serde(default, skip_serializing_if = "is_false")]
         existing_saves: bool,
     },
