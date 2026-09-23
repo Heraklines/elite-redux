@@ -13,7 +13,10 @@ use er_kernel::kernel::{BattleProtocolConfig, BattleProtocolRoleConfig};
 use er_kernel::snapshot::KernelSchedulerSnapshotV2;
 use er_kernel::snapshot_v7::GameKernelLifecycleSnapshotV7;
 use er_protocol::authority_log::{AuthorityLogConfig, BackoffPolicy, PeerBinding};
-use er_repro::current::{CurrentCaptureStatusV1, CurrentReproCapsuleV1, CurrentReproOutcomeV1};
+use er_repro::current::{
+    CurrentCaptureStatusV1, CurrentReproCapsuleV1, CurrentReproLimitsV1,
+    CurrentReproOutcomeV1, CurrentReproRecorderV1,
+};
 use er_save::m9e_save_v2::GameSaveV2;
 use er_state::m7_state::{
     DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
@@ -1107,6 +1110,7 @@ fn network_transport_replay(
         matches!(capsule.attempts.last().ok_or("transport attempt missing")?.event,
         CurrentExternalEvent::TransportChanged { generation, connected: true } if generation == ConnectionGeneration::new(safe(10)))
     );
+    network_direct_capsule_probe(capsule.clone(), staged)?;
     network_marker("replay_import")?;
     let mut imported = network_import_capsule(capsule_bytes)?;
     network_marker("replay_import_done")?;
@@ -1143,6 +1147,22 @@ fn network_transport_replay(
     }
     network_marker("replay_final_compare")?;
     assert_eq!(network_snapshot(&imported)?, network_snapshot(browser)?);
+    Ok(())
+}
+
+#[inline(never)]
+fn network_direct_capsule_probe(
+    capsule: CurrentReproCapsuleV1,
+    staged: &er_kernel::snapshot_v7::CoreGameKernelSnapshotV7,
+) -> Result<(), Box<dyn Error>> {
+    network_marker("direct_replay_start")?;
+    let (_, session) = CurrentReproRecorderV1::from_capsule(
+        capsule,
+        shared_content()?,
+        CurrentReproLimitsV1::default(),
+    )?;
+    network_marker("direct_replay_done")?;
+    assert_eq!(&session.snapshot()?, staged);
     Ok(())
 }
 

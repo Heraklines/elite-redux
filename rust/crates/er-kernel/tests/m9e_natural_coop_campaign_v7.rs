@@ -1,6 +1,7 @@
 //! Natural owned co-op campaign from independent Title journeys.
 //! All decisions, deliveries and restored states use the current runtime.
 use std::error::Error;
+use std::io::Write;
 use std::sync::Arc;
 
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
@@ -67,7 +68,11 @@ fn navigate(kernel: &mut GameKernelV7, id: &str) -> Result<(), Box<dyn Error>> {
             .current_control()
             .and_then(|control| control.menu.as_ref())
             .ok_or("missing natural menu")?;
-        if !menu.options.iter().any(|option| option.option_id.as_str() == id) {
+        if !menu
+            .options
+            .iter()
+            .any(|option| option.option_id.as_str() == id)
+        {
             return Err(format!("natural option {id} is absent").into());
         }
         let start = menu.selected_option_id.as_str();
@@ -107,8 +112,23 @@ fn navigate(kernel: &mut GameKernelV7, id: &str) -> Result<(), Box<dyn Error>> {
         keys.reverse();
         keys
     };
-    for key in route {
+    let bootstrap = id.starts_with("bootstrap/");
+    let total = route.len();
+    if bootstrap {
+        writeln!(
+            std::io::stderr().lock(),
+            "M9E_COOP_NAV target={id} distance={total}"
+        )?;
+    }
+    for (index, key) in route.into_iter().enumerate() {
         press(kernel, key)?;
+        if bootstrap && ((index + 1).is_multiple_of(64) || index + 1 == total) {
+            writeln!(
+                std::io::stderr().lock(),
+                "M9E_COOP_NAV_PROGRESS target={id} step={} total={total}",
+                index + 1
+            )?;
+        }
     }
     if !kernel
         .current_control()
@@ -474,6 +494,7 @@ fn choose_combat_party(
     content: &PreparedGameContentV2,
     host: bool,
 ) -> Result<OwnedChoicePublication, Box<dyn Error>> {
+    writeln!(std::io::stderr().lock(), "M9E_COOP_BOOTSTRAP choose_start host={host}")?;
     let mode = content
         .bundle()
         .bootstrap
@@ -483,8 +504,10 @@ fn choose_combat_party(
         .ok_or("co-op mode missing")?;
     let mut frames = Vec::new();
     capture_press(kernel, &mut frames)?;
+    writeln!(std::io::stderr().lock(), "M9E_COOP_BOOTSTRAP title_open host={host}")?;
     navigate(kernel, &format!("bootstrap/mode/{}", mode.mode.get()))?;
     capture_press(kernel, &mut frames)?;
+    writeln!(std::io::stderr().lock(), "M9E_COOP_BOOTSTRAP mode_open host={host}")?;
     if mode.challenge_selection && host {
         navigate(kernel, "bootstrap/challenge/done")?;
         capture_press(kernel, &mut frames)?;
@@ -588,6 +611,11 @@ fn choose_combat_party(
                 .ok_or("selected starter disappeared")
         })
         .collect::<Result<Vec<_>, _>>()?;
+    writeln!(
+        std::io::stderr().lock(),
+        "M9E_COOP_BOOTSTRAP starters_selected host={host} count={}",
+        selected.len()
+    )?;
     for starter in &selected {
         navigate(
             kernel,
@@ -633,13 +661,21 @@ fn natural_owned_cooperative_campaign_reaches_wave_200_victory() -> Result<(), B
     let mut guest = owned_title(content.clone(), false)?;
     let choose = choose_combat_party;
     let (guest_choices, frames) = choose(&mut guest, &content, false)?;
-    println!("M9E_COOP_BOOTSTRAP guest_choices={}", guest_choices.len());
+    writeln!(
+        std::io::stderr().lock(),
+        "M9E_COOP_BOOTSTRAP guest_choices={}",
+        guest_choices.len()
+    )?;
     let (host_choices, waiting) = choose(&mut host, &content, true)?;
-    println!("M9E_COOP_BOOTSTRAP host_choices={}", host_choices.len());
+    writeln!(
+        std::io::stderr().lock(),
+        "M9E_COOP_BOOTSTRAP host_choices={}",
+        host_choices.len()
+    )?;
     assert!(waiting.is_empty() && host.state().is_none());
     let started = wire(&host.ingest_network_frame(generation, &frames[0])?)?;
     guest.ingest_network_frame(generation, &started)?;
-    println!("M9E_COOP_BOOTSTRAP shared_run_started");
+    writeln!(std::io::stderr().lock(), "M9E_COOP_BOOTSTRAP shared_run_started")?;
     assert_eq!(host.state(), guest.state());
     let initial_party = host
         .state()

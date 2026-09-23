@@ -20,7 +20,7 @@ use er_types::battle_ids::{MoveId, WaveIndex};
 use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
 use er_types::run_ids::Experience;
 use er_types::{GameControlKindV2, SafeU53, SeatId};
-use std::{error::Error, sync::Arc};
+use std::{error::Error, io::Write, sync::Arc};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 const BUNDLE: &[u8] =
@@ -903,6 +903,7 @@ fn assert_phase_title_read_reissues(
         },
         None,
     )?);
+    reader.enable_current_title_storage()?;
     navigate(&mut reader, "bootstrap/title/existing-saves")?;
     let listed = press(&mut reader, PhysicalKey::Space)?;
     let list_request = listed
@@ -1270,6 +1271,7 @@ fn assert_request_title_read_reissues(
         },
         None,
     )?);
+    reader.enable_current_title_storage()?;
     navigate(&mut reader, "bootstrap/title/existing-saves")?;
     let list = press(&mut reader, PhysicalKey::Space)?;
     let list_id = list
@@ -1666,14 +1668,15 @@ fn assert_current_reward_choice_and_pick(
             }
     });
     let Some(index) = index else {
-        eprintln!(
+        writeln!(
+            std::io::stderr().lock(),
             "M9_REWARD_CHOICE_ONLY: fixed controlled seed produced {:?}; selected descendants remain unsupported",
             selected
                 .offers
                 .iter()
                 .map(|offer| offer.source_id.as_str())
                 .collect::<Vec<_>>()
-        );
+        )?;
         return Ok(());
     };
     let option=kernel.current_control().and_then(|c|c.menu.as_ref()).and_then(|menu|menu.options.iter().find(|row|
