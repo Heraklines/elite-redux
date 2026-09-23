@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 BOUNDED_HELPER_BYTES = 38620
-EXPORTER_SHA256 = "c6cfc3241a44735b0fea7c9e924b216aca5b488ec1095ad5e7b88524441f5287"
+EXPORTER_SHA256 = "dd2726242b13734babf3d469cf9d5f8079c6a4e713bfde78648a9e14407567fc"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -657,6 +657,7 @@ def source_method_closure(summary):
         "src/ai/ai-species-gen.ts": [("calcEvoChance", 0), ("getRequiredPrevo", 0), ("determineEnemySpecies", 0)],
         "src/ai/ai-moveset-gen.ts": [("generateMoveset", 0)],
         "src/data/pokemon-species.ts": [("generateGender", 2)],
+        "src/battle-scene.ts": [("getRandomObtainableFormIndex", 2)],
     }
     excerpts = []
     methods = []
@@ -741,13 +742,13 @@ def main(summary):
     require(digest_raw == (json.dumps(digest_receipt, separators=(",", ":")) + "\n").encode()
             and digest_receipt.get("schema") == 1 and digest_receipt.get("source") == PIN, "canonical fresh digest receipt")
     parts = digest_receipt.get("parts")
-    require(isinstance(parts, list) and 8 <= len(parts) <= 53, "bounded semantic page inventory")
+    require(isinstance(parts, list) and 9 <= len(parts) <= 54, "bounded semantic page inventory")
     names = [row[0] for row in parts]
-    require(names[:5] == ["species", "moves", "forms", "abilities-meta", "gender"] and len(set(names)) == len(names)
-            and all(re.fullmatch(r"abilities-(rows|functions|shapes)-[0-9]{2}", name) for name in names[5:]), "exact semantic page names")
+    require(names[:6] == ["species", "moves", "forms", "abilities-meta", "gender", "form-flags"] and len(set(names)) == len(names)
+            and all(re.fullmatch(r"abilities-(rows|functions|shapes)-[0-9]{2}", name) for name in names[6:]), "exact semantic page names")
     exports = {}
     for name, length, digest in parts:
-        cap = 4096 if name == "gender" else 32768 if name in {"species", "moves"} else 16384
+        cap = 4096 if name in {"gender", "form-flags"} else 32768 if name in {"species", "moves"} else 16384
         fact = file_fact(OUTPUT / f"{name}-one.json", cap)
         require(fact["bytes"] == length and fact["sha256"] == digest, "two fresh source observations differ: " + name)
         exports[name] = fact
@@ -780,7 +781,7 @@ def cleanup():
 
 
 def generated_cap(name):
-    if name in {"form-counts.json", "digest-two.json", "gender-one.json"}:
+    if name in {"form-counts.json", "digest-two.json", "gender-one.json", "form-flags-one.json"}:
         return 4096
     if name == "validation.json":
         return 8192
