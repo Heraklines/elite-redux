@@ -14,7 +14,9 @@ import Phaser from "phaser";
 import { afterAll, expect, test, vi } from "vitest";
 
 const PIN = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7";
-const SEED = "m9e-reward-selection-source-v1";
+// This setup seed is installed before GameManager.generateStarters resets the
+// scene seed to "test". Both inputs are part of this controlled source case.
+const SETUP_SEED = "m9e-reward-selection-source-v1";
 let game: Phaser.Game | undefined;
 let manager: GameManager | undefined;
 
@@ -35,7 +37,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   expect(["one", "two"]).toContain(ordinal);
   expect(execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim()).toBe(PIN);
 
-  game = new Phaser.Game({ type: Phaser.HEADLESS, seed: [SEED] });
+  game = new Phaser.Game({ type: Phaser.HEADLESS, seed: [SETUP_SEED] });
   await new Promise<void>(resolve => setTimeout(resolve, 0));
   manager = new GameManager(game);
   manager.override.disableShinies = false;
@@ -52,11 +54,12 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
     .startingBiome(BiomeId.TOWN)
     .startingWave(1)
     .startingLevel(10)
-    .seed(SEED);
+    .seed(SETUP_SEED);
   manager.scene.gameData.trainerId = 12345;
   manager.scene.gameData.secretId = 23456;
   await manager.classicMode.startBattle(SpeciesId.CHARMANDER);
   const scene = globalScene;
+  expect(scene.seed).toBe("test");
   expect(scene.gameData.trainerId).toBe(12345);
   expect(scene.gameData.secretId).toBe(23456);
   expect(scene.currentBattle.waveIndex).toBe(1);
@@ -149,8 +152,10 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   const result = {
     schema: 1,
     source: PIN,
-    seed: SEED,
+    setup_seed: SETUP_SEED,
     scene_seed: scene.seed,
+    effective_pool_time: (scene.arena as unknown as { lastTimeOfDay: number }).lastTimeOfDay,
+    current_time: scene.arena.getTimeOfDay(),
     scope: "controlled level-ten starter attacks, victory reward cancel and queued Town wave-two encounter",
     account: { trainer_id: scene.gameData.trainerId, secret_id: scene.gameData.secretId },
     shiny_context: {
