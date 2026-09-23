@@ -162,6 +162,32 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   expect(waveTwoSelections[0].species).toBe(enemy.species.speciesId);
   const shinyXor = (scene.gameData.trainerId ^ scene.gameData.secretId)
     ^ ((enemy.id >>> 16) ^ (enemy.id & 0xffff));
+  const nextRng = Phaser.Math.RND.state();
+  const nextObservation = {
+    wave: scene.currentBattle.waveIndex,
+    enemy_id: enemy.id,
+    species: enemy.species.speciesId,
+    form: enemy.formIndex,
+    level: enemy.level,
+    exp: enemy.exp,
+    friendship: enemy.friendship,
+    ability_index: enemy.abilityIndex,
+    ability: enemy.getAbility().id,
+    passive: enemy.passive,
+    ivs: [...enemy.ivs],
+    nature: enemy.nature,
+    types: enemy.getTypes(false, false, true),
+    tera_type: enemy.teraType,
+    stats: [...enemy.stats],
+    hp: enemy.hp,
+    gender: enemy.gender,
+    shiny: enemy.shiny,
+    variant: enemy.variant,
+    pokerus: enemy.pokerus,
+    moves: enemy.moveset.map(move => [move.moveId, move.ppUsed]),
+    boss: enemy.isBoss(),
+    selection: waveTwoSelections[0],
+  };
   const secondEnemyHpBefore = enemy.hp;
   const secondPlayerHpBefore = player.hp;
   const secondMove = player.getMoveset().find(move => move.moveId === MoveId.FIRE_FANG);
@@ -193,31 +219,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
       after_reset_seed_rng: afterResetSeed,
       after_new_battle_rng: afterNewBattle,
     },
-    next: {
-      wave: scene.currentBattle.waveIndex,
-      enemy_id: enemy.id,
-      species: enemy.species.speciesId,
-      form: enemy.formIndex,
-      level: enemy.level,
-      exp: enemy.exp,
-      friendship: enemy.friendship,
-      ability_index: enemy.abilityIndex,
-      ability: enemy.getAbility().id,
-      passive: enemy.passive,
-      ivs: [...enemy.ivs],
-      nature: enemy.nature,
-      types: enemy.getTypes(false, false, true),
-      tera_type: enemy.teraType,
-      stats: [...enemy.stats],
-      hp: enemy.hp,
-      gender: enemy.gender,
-      shiny: enemy.shiny,
-      variant: enemy.variant,
-      pokerus: enemy.pokerus,
-      moves: enemy.moveset.map(move => [move.moveId, move.ppUsed]),
-      boss: enemy.isBoss(),
-      selection: waveTwoSelections[0],
-    },
+    next: nextObservation,
     second_battle: {
       action: MoveId.FIRE_FANG,
       enemy_hp_before: secondEnemyHpBefore,
@@ -228,8 +230,9 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
       pp_after: secondMove!.ppUsed,
       enemy_fainted: enemy.isFainted(),
       phase: scene.phaseManager.getCurrentPhase().phaseName,
+      rng_after: Phaser.Math.RND.state(),
     },
-    rng: Phaser.Math.RND.state(),
+    rng: nextRng,
   };
   const raw = Buffer.from(JSON.stringify(result) + "\n");
   expect(raw.length).toBeLessThanOrEqual(4096);
