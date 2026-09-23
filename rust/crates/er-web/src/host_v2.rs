@@ -277,11 +277,24 @@ impl BrowserKernelHostV2 {
             BrowserRequestV2::CoopRebind { control } => {
                 return self.process_rebind(control, request_id, sequence, maximum_response_bytes);
             }
-            BrowserRequestV2::Initialize { initialization } => {
+            BrowserRequestV2::Initialize { mut initialization } => {
                 if self.session.is_some() {
                     return Err(BrowserWebErrorV2::Invalid);
                 }
-                let (session, recorder, generation) = self.initialize(*initialization)?;
+                // Keep capsule replay out of the large multi-mode initializer's
+                // stack frame. A native test thread has the same bounded stack
+                // as the browser-facing entry path.
+                let capsule_bytes = match initialization.as_mut() {
+                    BrowserSessionInitializationV2::CurrentReproCapsule { capsule_bytes } => {
+                        Some(std::mem::take(capsule_bytes))
+                    }
+                    _ => None,
+                };
+                let (session, recorder, generation) = if let Some(capsule_bytes) = capsule_bytes {
+                    self.initialize_current_repro_capsule(capsule_bytes)?
+                } else {
+                    self.initialize(*initialization)?
+                };
                 let bytes = encode_response(
                     BrowserResponseV2::Ready,
                     request_id,
@@ -673,27 +686,8 @@ impl BrowserKernelHostV2 {
                 }
                 session
             }
-            BrowserSessionInitializationV2::CurrentReproCapsule { capsule_bytes } => {
-                let limits = CurrentReproLimitsV1::default();
-                if capsule_bytes.is_empty() || capsule_bytes.len() > limits.maximum_bytes {
-                    return Err(BrowserWebErrorV2::Invalid);
-                }
-                let capsule: CurrentReproCapsuleV1 = serde_json::from_slice(&capsule_bytes)
-                    .map_err(|_| BrowserWebErrorV2::Invalid)?;
-                let generation = capsule
-                    .browser_transport
-                    .as_ref()
-                    .ok_or_else(|| {
-                        BrowserWebErrorV2::Repro("browser transport context missing".to_owned())
-                    })?
-                    .final_generation;
-                let (recorder, session) = CurrentReproRecorderV1::from_capsule(
-                    capsule,
-                    Arc::clone(&self.content),
-                    limits,
-                )
-                .map_err(|error| BrowserWebErrorV2::Repro(error.to_string()))?;
-                return Ok((session, recorder, generation));
+            BrowserSessionInitializationV2::CurrentReproCapsule { .. } => {
+                return Err(BrowserWebErrorV2::Invalid);
             }
         };
         let (local_seat, role) = session.session_context()?;
@@ -710,6 +704,33 @@ impl BrowserKernelHostV2 {
             Arc::clone(&self.content),
             CurrentReproLimitsV1::default(),
             generation,
+        )
+        .map_err(|error| BrowserWebErrorV2::Repro(error.to_string()))?;
+        Ok((session, recorder, generation))
+    }
+
+    #[inline(never)]
+    fn initialize_current_repro_capsule(
+        &self,
+        capsule_bytes: Vec<u8>,
+    ) -> Result<(CurrentGameSession, CurrentReproRecorderV1, SafeU53), BrowserWebErrorV2> {
+        let limits = CurrentReproLimitsV1::default();
+        if capsule_bytes.is_empty() || capsule_bytes.len() > limits.maximum_bytes {
+            return Err(BrowserWebErrorV2::Invalid);
+        }
+        let capsule: CurrentReproCapsuleV1 =
+            serde_json::from_slice(&capsule_bytes).map_err(|_| BrowserWebErrorV2::Invalid)?;
+        let generation = capsule
+            .browser_transport
+            .as_ref()
+            .ok_or_else(|| {
+                BrowserWebErrorV2::Repro("browser transport context missing".to_owned())
+            })?
+            .final_generation;
+        let (recorder, session) = CurrentReproRecorderV1::from_capsule(
+            capsule,
+            Arc::clone(&self.content),
+            limits,
         )
         .map_err(|error| BrowserWebErrorV2::Repro(error.to_string()))?;
         Ok((session, recorder, generation))

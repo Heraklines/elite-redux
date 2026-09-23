@@ -494,7 +494,10 @@ fn choose_combat_party(
     content: &PreparedGameContentV2,
     host: bool,
 ) -> Result<OwnedChoicePublication, Box<dyn Error>> {
-    writeln!(std::io::stderr().lock(), "M9E_COOP_BOOTSTRAP choose_start host={host}")?;
+    writeln!(
+        std::io::stderr().lock(),
+        "M9E_COOP_BOOTSTRAP choose_start host={host}"
+    )?;
     let mode = content
         .bundle()
         .bootstrap
@@ -504,10 +507,16 @@ fn choose_combat_party(
         .ok_or("co-op mode missing")?;
     let mut frames = Vec::new();
     capture_press(kernel, &mut frames)?;
-    writeln!(std::io::stderr().lock(), "M9E_COOP_BOOTSTRAP title_open host={host}")?;
+    writeln!(
+        std::io::stderr().lock(),
+        "M9E_COOP_BOOTSTRAP title_open host={host}"
+    )?;
     navigate(kernel, &format!("bootstrap/mode/{}", mode.mode.get()))?;
     capture_press(kernel, &mut frames)?;
-    writeln!(std::io::stderr().lock(), "M9E_COOP_BOOTSTRAP mode_open host={host}")?;
+    writeln!(
+        std::io::stderr().lock(),
+        "M9E_COOP_BOOTSTRAP mode_open host={host}"
+    )?;
     if mode.challenge_selection && host {
         navigate(kernel, "bootstrap/challenge/done")?;
         capture_press(kernel, &mut frames)?;
@@ -675,7 +684,10 @@ fn natural_owned_cooperative_campaign_reaches_wave_200_victory() -> Result<(), B
     assert!(waiting.is_empty() && host.state().is_none());
     let started = wire(&host.ingest_network_frame(generation, &frames[0])?)?;
     guest.ingest_network_frame(generation, &started)?;
-    writeln!(std::io::stderr().lock(), "M9E_COOP_BOOTSTRAP shared_run_started")?;
+    writeln!(
+        std::io::stderr().lock(),
+        "M9E_COOP_BOOTSTRAP shared_run_started"
+    )?;
     assert_eq!(host.state(), guest.state());
     let initial_party = host
         .state()

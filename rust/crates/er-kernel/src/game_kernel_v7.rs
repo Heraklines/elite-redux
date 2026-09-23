@@ -1705,6 +1705,7 @@ impl GameKernelV7 {
             .cloned()
             .ok_or(GameKernelV7Error::Invalid)?;
         let mut step = GameKernelStepV7::default();
+        let mut read_retired = false;
         match (&pending.effect, result) {
             (
                 GamePlatformEffectV2::StorageWrite {
@@ -1783,6 +1784,12 @@ impl GameKernelV7 {
                     MATERIAL_RETENTION_V7,
                 )
                 .map_err(runtime_error)?;
+                // The loaded phase may retain the same request ID as the READ
+                // being completed. Retire the old owner before reissuing it.
+                self.pending_platform
+                    .remove(&request_id)
+                    .ok_or(GameKernelV7Error::Invalid)?;
+                read_retired = true;
                 self.lifecycle = GameKernelLifecycleV7::Active(runtime);
                 self.install_step_effects(&reissued)?;
                 step.effects.extend(reissued);
@@ -1828,7 +1835,9 @@ impl GameKernelV7 {
                 ));
             }
         }
-        self.pending_platform.remove(&request_id);
+        if !read_retired {
+            self.pending_platform.remove(&request_id);
+        }
         self.advance_replay_sequence()?;
         Ok(step)
     }
@@ -1859,6 +1868,7 @@ impl GameKernelV7 {
         let floor = storage.next_platform_request_id;
         let mut restored_effects = Vec::new();
         let bootstrap_revision = bootstrap.control.revision;
+        let mut read_retired = false;
         match (effect, result) {
             (GamePlatformEffectV2::StorageList { .. }, KernelStorageResultV2::Slots { slots }) => {
                 let GameKernelLifecycleV7::Bootstrap(bootstrap) = &mut self.lifecycle else {
@@ -1969,6 +1979,12 @@ impl GameKernelV7 {
                     MATERIAL_RETENTION_V7,
                 )
                 .map_err(runtime_error)?;
+                // A loaded pending request can reuse the just-completed Title
+                // READ ID. The cloned transaction keeps this replacement atomic.
+                self.pending_platform
+                    .remove(&request_id)
+                    .ok_or(GameKernelV7Error::Invalid)?;
+                read_retired = true;
                 self.lifecycle = GameKernelLifecycleV7::Active(runtime);
                 self.install_step_effects(&reissued)?;
                 restored_effects.extend(reissued);
@@ -1984,9 +2000,11 @@ impl GameKernelV7 {
                 ));
             }
         }
-        self.pending_platform
-            .remove(&request_id)
-            .ok_or(GameKernelV7Error::Invalid)?;
+        if !read_retired {
+            self.pending_platform
+                .remove(&request_id)
+                .ok_or(GameKernelV7Error::Invalid)?;
+        }
         self.advance_replay_sequence()?;
         let control = self
             .current_control()

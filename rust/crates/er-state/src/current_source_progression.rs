@@ -69,7 +69,7 @@ impl CurrentSourceProgressionV1 {
             && self
                 .turn_progress
                 .as_ref()
-                .is_none_or(|progress| progress.valid(run))
+                .is_some_and(|progress| progress.valid(run))
             && self.run_id == run.run_id
             && self.initial_wave.get().get() == 1
             && self.initial_enemy.pokemon.get().get() != 0

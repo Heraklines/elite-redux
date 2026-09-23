@@ -14,8 +14,8 @@ use er_kernel::snapshot::KernelSchedulerSnapshotV2;
 use er_kernel::snapshot_v7::GameKernelLifecycleSnapshotV7;
 use er_protocol::authority_log::{AuthorityLogConfig, BackoffPolicy, PeerBinding};
 use er_repro::current::{
-    CurrentCaptureStatusV1, CurrentReproCapsuleV1, CurrentReproLimitsV1,
-    CurrentReproOutcomeV1, CurrentReproRecorderV1,
+    CurrentCaptureStatusV1, CurrentReproCapsuleV1, CurrentReproLimitsV1, CurrentReproOutcomeV1,
+    CurrentReproRecorderV1,
 };
 use er_save::m9e_save_v2::GameSaveV2;
 use er_state::m7_state::{
