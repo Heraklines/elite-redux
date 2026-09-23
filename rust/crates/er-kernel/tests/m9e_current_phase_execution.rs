@@ -2130,6 +2130,19 @@ fn assert_actual_tm_reward(
     let state = assert_actual_tm_reward_rest(state, content.clone())?;
     let state = assert_actual_tm_reward_after_move(state, content.clone())?;
     let (state, tm, learned) = assert_actual_tm_reward_after_queued(state, content.clone())?;
+    if tm.slot == 4 {
+        let intro = Box::new(state.0.snapshot()?);
+        let event = current_reward(active(&intro)?)?
+            .tm
+            .as_ref()
+            .ok_or("TM absent")?
+            .phase
+            .event()
+            .ok_or("Intro absent")?;
+        writeln!(std::io::stderr().lock(), "M9E_TM_STAGE before_intro_reissue")?;
+        assert_phase_title_read_reissues(&intro, event, content.clone())?;
+        writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_intro_reissue")?;
+    }
     let (state, tm, learned) = assert_actual_tm_fullslot_replace(state, content.clone(), tm, learned)?;
     let (kernel, selected, live, ledger) = state;
     let present = Box::new(kernel.snapshot()?);
@@ -2266,17 +2279,6 @@ fn assert_actual_tm_fullslot_replace(
                 .phase,
             T::Intro { .. }
         ));
-        let intro = Box::new(kernel.snapshot()?);
-        let event = current_reward(active(&intro)?)?
-            .tm
-            .as_ref()
-            .ok_or("TM absent")?
-            .phase
-            .event()
-            .ok_or("Intro absent")?;
-        writeln!(std::io::stderr().lock(), "M9E_TM_STAGE before_intro_reissue")?;
-        assert_phase_title_read_reissues(&intro, event, content.clone())?;
-        writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_intro_reissue")?;
         acknowledge_tm_message(&mut kernel, content.as_ref(), &mut live, &mut ledger)?;
         writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_intro_ack")?;
         writeln!(std::io::stderr().lock(), "M9E_TM_STAGE before_decline")?;
