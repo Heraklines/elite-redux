@@ -73,9 +73,19 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
 
   const actualNewBattle = scene.newBattle.bind(scene);
   const beforeNewBattle: string[] = [];
+  const afterNewBattle: string[] = [];
+  const afterResetSeed: string[] = [];
+  const actualResetSeed = scene.resetSeed.bind(scene);
+  vi.spyOn(scene, "resetSeed").mockImplementation((...args) => {
+    const result = actualResetSeed(...args);
+    afterResetSeed.push(Phaser.Math.RND.state());
+    return result;
+  });
   const newBattle = vi.spyOn(scene, "newBattle").mockImplementation((...args) => {
     beforeNewBattle.push(Phaser.Math.RND.state());
-    return actualNewBattle(...args);
+    const result = actualNewBattle(...args);
+    afterNewBattle.push(Phaser.Math.RND.state());
+    return result;
   });
   const actualRandomSpecies = scene.arena.randomSpecies.bind(scene.arena);
   const speciesCalls: { wave: number; level: number; before: string; species: number }[] = [];
@@ -147,6 +157,8 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
       choice: "cancel",
       new_battle_calls: newBattle.mock.calls.length,
       before_new_battle_rng: beforeNewBattle,
+      after_reset_seed_rng: afterResetSeed,
+      after_new_battle_rng: afterNewBattle,
     },
     next: {
       wave: scene.currentBattle.waveIndex,
