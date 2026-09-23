@@ -12,6 +12,7 @@ import time
 BRANCH = "codex/m9e-current-phase-focused-20260910"
 TARGETS = {
     "m9e_current_entry": [
+        "fresh_account_identity_enters_through_cli_and_survives_snapshot_restore",
         "normal_new_run_resume_and_simulate_use_current_session_events",
         "normal_commands_report_v2_content_and_reject_historical_state_injection",
         "public_agent_natural_start_owns_v7_content_and_raw_controls",
@@ -177,7 +178,7 @@ def main():
             else:
                 result.setdefault("failures", []).append(target)
         require(not result.get("failures"), "whole current entry targets failed")
-        require(result["tests_passed"] == result["tests_expected"] == 21, "exact test count")
+        require(result["tests_passed"] == result["tests_expected"] == 22, "exact test count")
         result["status"] = "passed"
     except Exception as error:
         result["first_failure"] = str(error)[:2048]

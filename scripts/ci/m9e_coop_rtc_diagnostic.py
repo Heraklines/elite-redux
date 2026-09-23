@@ -327,7 +327,9 @@ if __name__ == "__main__":
             with failed_log.open("rb") as stream:
                 stream.seek(max(0, failed_log.stat().st_size - 24000))
                 tail = stream.read(24000)
-        (FULL / "failure.txt").write_text(str(error) + "\nBounded tail; complete logs remain remote.\n" + tail.decode("utf-8", errors="replace"))
+        failure = str(error) + "\nBounded tail; complete logs remain remote.\n" + tail.decode("utf-8", errors="replace")
+        (FULL / "failure.txt").write_text(failure)
+        (COMPACT / "failure.txt").write_text(failure)
     finally:
         summary["logs"] = logs
         raw = json.dumps(summary, sort_keys=True, separators=(",", ":")).encode() + b"\n"
