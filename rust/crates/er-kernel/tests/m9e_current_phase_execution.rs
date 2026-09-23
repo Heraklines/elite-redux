@@ -2156,7 +2156,16 @@ fn assert_actual_tm_intro_reissue(
         .event()
         .ok_or("Intro absent")?;
     writeln!(std::io::stderr().lock(), "M9E_TM_STAGE before_intro_reissue")?;
-    assert_phase_title_read_reissues(&intro, event, content)?;
+    std::thread::scope(|scope| -> Result<()> {
+        let read = std::thread::Builder::new()
+            .name("m9e-title-read".to_owned())
+            .spawn_scoped(scope, move || {
+                assert_phase_title_read_reissues(&intro, event, content)
+                    .map_err(|error| error.to_string())
+            })?;
+        read.join().map_err(|_| "Title READ witness panicked")??;
+        Ok(())
+    })?;
     writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_intro_reissue")?;
     Ok(())
 }
