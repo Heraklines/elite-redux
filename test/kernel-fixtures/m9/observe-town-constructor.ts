@@ -169,8 +169,12 @@ function observeLevelTwoAbilityPowers(){
     enemy.formIndex=formIndex;const form=enemy.getSpeciesForm();const moveIds=[...new Set(levelRows.map(row=>row[1]))];expect(moveIds.length).toBeGreaterThan(0);expect(moveIds.length).toBeLessThanOrEqual(32);
     const abilityRows:unknown[]=[];
     for(let abilityIndex=0;abilityIndex<form.getAbilityCount();abilityIndex++){
-     enemy.abilityIndex=abilityIndex;enemy.calculateStats();enemy.hp=enemy.getMaxHp();const abilityId=enemy.getAbility().id;expect(abilityId).toBe(form.getAbility(abilityIndex));
+     enemy.abilityIndex=abilityIndex;enemy.ivs=[...old.ivs];enemy.nature=old.nature;enemy.calculateStats();enemy.hp=enemy.getMaxHp();const abilityId=enemy.getAbility().id;expect(abilityId).toBe(form.getAbility(abilityIndex));
      const powers=moveIds.map(moveId=>{const power=allMoves[moveId].calculateEffectivePower(enemy);expect(Number.isFinite(power)&&power>=0&&power<=10000).toBe(true);return [moveId,power] as [number,number];});
+     for(const [iv,nature] of [[0,0],[31,24]] as const){
+      enemy.ivs=Array(6).fill(iv);enemy.nature=nature;enemy.calculateStats();enemy.hp=enemy.getMaxHp();
+      for(const [moveId,power] of powers)expect(allMoves[moveId].calculateEffectivePower(enemy),`IV/nature-sensitive Town movegen power species${id} form${formIndex} ability${abilityId} move${moveId}`).toBe(power);
+     }
      abilityRows.push([abilityId,powers]);
     }
     formRows.push([formIndex,abilityRows]);
