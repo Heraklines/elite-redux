@@ -51,9 +51,19 @@ jobs:
             ~/.cargo/bin/wasm2es6js
           key: m9e-tools-${{ runner.os }}-${{ runner.arch }}-rust1.97.1-wasm-bindgen0.2.127
       - name: Install pinned Wasm target remotely
-        run: rustup toolchain install 1.97.1 --profile minimal --target wasm32-unknown-unknown
+        run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt --target wasm32-unknown-unknown
       - name: Compare exact eventwise native and Wasm reports
         run: python3 scripts/ci/m9e_wasm_parity_diagnostic.py
+      - name: Verify Rust source format remotely
+        run: cargo fmt --manifest-path rust/Cargo.toml --all -- --check
+      - name: Prepare bounded formatting patch
+        if: failure()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/m9e-wasm-parity"
+          cargo fmt --manifest-path rust/Cargo.toml --all
+          git diff -- rust/crates/er-wasm/tests/m9e_parity.rs > "$RUNNER_TEMP/m9e-wasm-parity/format.patch"
+          test "$(wc -c < "$RUNNER_TEMP/m9e-wasm-parity/format.patch")" -le 32768
       - name: Compact parity summary
         if: always()
         uses: actions/upload-artifact@v6
@@ -68,5 +78,13 @@ jobs:
         with:
           name: m9e-wasm-parity-diagnostics-${{ github.sha }}
           path: ${{ runner.temp }}/m9e-wasm-parity/diagnostics/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Bounded formatting patch
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-wasm-parity-format-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-wasm-parity/format.patch
           if-no-files-found: ignore
           retention-days: 14

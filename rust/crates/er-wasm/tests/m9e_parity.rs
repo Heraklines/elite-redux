@@ -96,14 +96,8 @@ fn press(
     events: &mut Vec<M9EParityEventV2>,
     code: PhysicalKey,
 ) -> Result<(), Box<dyn Error>> {
-    #[cfg(target_arch = "wasm32")]
-    wasm_bindgen_test::console_log!("M9E_WASM_PRESS=before-down");
     apply_raw(kernel, events, key_down(code.clone()))?;
-    #[cfg(target_arch = "wasm32")]
-    wasm_bindgen_test::console_log!("M9E_WASM_PRESS=before-up");
     apply_raw(kernel, events, RawInputEvent::KeyUp { code })?;
-    #[cfg(target_arch = "wasm32")]
-    wasm_bindgen_test::console_log!("M9E_WASM_PRESS=before-settle");
     settle_presentations(kernel, events)
 }
 
@@ -183,12 +177,8 @@ type RawBootstrap = (
 
 #[inline(never)]
 fn raw_bootstrap() -> Result<RawBootstrap, Box<dyn Error>> {
-    #[cfg(target_arch = "wasm32")]
-    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=request-start");
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle.clone()))?);
-    #[cfg(target_arch = "wasm32")]
-    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=content-prepared");
     let seat = SeatId::new(safe(1));
     let mut bootstrap = GameKernelV7::natural_start(
         profile(),
@@ -200,8 +190,6 @@ fn raw_bootstrap() -> Result<RawBootstrap, Box<dyn Error>> {
         scheduler(),
         None,
     )?;
-    #[cfg(target_arch = "wasm32")]
-    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=natural-start");
     let mut ignored = Vec::new();
     press(&mut bootstrap, &mut ignored, PhysicalKey::Space)?;
     press(&mut bootstrap, &mut ignored, PhysicalKey::Space)?;
@@ -212,8 +200,6 @@ fn raw_bootstrap() -> Result<RawBootstrap, Box<dyn Error>> {
     press(&mut bootstrap, &mut ignored, PhysicalKey::Space)?;
     press(&mut bootstrap, &mut ignored, PhysicalKey::Space)?;
 
-    #[cfg(target_arch = "wasm32")]
-    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=bootstrap-pressed");
     let mut snapshot = bootstrap.snapshot()?;
     let GameKernelLifecycleSnapshotV7::Active(state) = &mut snapshot.lifecycle else {
         return Err("bootstrap snapshot is not active".into());
@@ -276,8 +262,6 @@ fn raw_driver(
         snapshot.scheduler,
         snapshot.protocol,
     )?);
-    #[cfg(target_arch = "wasm32")]
-    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=driver-active");
     Ok((bundle, content, seat, driver))
 }
 
@@ -285,11 +269,7 @@ fn raw_driver(
 fn trace_request(
     (bundle, content, seat, mut driver): RawDriver,
 ) -> Result<M9EParityRequestV1, Box<dyn Error>> {
-    #[cfg(target_arch = "wasm32")]
-    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=trace-start");
     let initial_snapshot = Box::new(driver.snapshot()?);
-    #[cfg(target_arch = "wasm32")]
-    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=initial-snapshot");
     let mut events = Vec::new();
     run_raw_trace(&mut driver, &mut events, content.as_ref())?;
     finish_raw_request(bundle, seat, driver, initial_snapshot, events)
@@ -301,9 +281,7 @@ fn run_raw_trace(
     events: &mut Vec<M9EParityEventV2>,
     content: &PreparedGameContentV2,
 ) -> Result<(), Box<dyn Error>> {
-    for _index in 0..300 {
-        #[cfg(target_arch = "wasm32")]
-        wasm_bindgen_test::console_log!("M9E_WASM_ITER={_index}");
+    for _ in 0..300 {
         let wave = driver
             .state()
             .and_then(|state| state.active_run.as_ref())
@@ -321,19 +299,11 @@ fn run_raw_trace(
             .ok_or("control missing")?
         {
             GameControlKindV2::BattleCommand => {
-                #[cfg(target_arch = "wasm32")]
-                wasm_bindgen_test::console_log!("M9E_WASM_STEP=battle-command");
                 press(driver, events, PhysicalKey::Space)?;
             }
             GameControlKindV2::BattleMove => {
-                #[cfg(target_arch = "wasm32")]
-                wasm_bindgen_test::console_log!("M9E_WASM_STEP=move-before-select");
                 let option = strongest_move_option(driver, content)?;
-                #[cfg(target_arch = "wasm32")]
-                wasm_bindgen_test::console_log!("M9E_WASM_STEP=move-before-navigate");
                 navigate_down_to(driver, events, &option)?;
-                #[cfg(target_arch = "wasm32")]
-                wasm_bindgen_test::console_log!("M9E_WASM_STEP=move-before-confirm");
                 press(driver, events, PhysicalKey::Space)?;
             }
             GameControlKindV2::Progression
@@ -345,8 +315,6 @@ fn run_raw_trace(
             other => return Err(format!("longitudinal trace stalled at {other:?}").into()),
         }
     }
-    #[cfg(target_arch = "wasm32")]
-    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=trace-built");
     Ok(())
 }
 
@@ -444,11 +412,7 @@ fn cohort_report_golden(bundle: &str, progression: &str, bytes: usize) -> Option
 fn assert_eventwise_parity_contract(
     replay: impl FnOnce(M9EParityRequestV1) -> Result<M9EParityReportV1, Box<dyn Error>>,
 ) -> Result<String, Box<dyn Error>> {
-    #[cfg(target_arch = "wasm32")]
-    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=contract-start");
     let request = request()?;
-    #[cfg(target_arch = "wasm32")]
-    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=request-ready");
     let event_count = request.events.len();
     let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(
         request.bundle.clone(),
@@ -498,8 +462,6 @@ fn assert_eventwise_parity_contract(
         request.role,
         content.clone(),
     )?;
-    #[cfg(target_arch = "wasm32")]
-    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=driver-restored");
     let mut expected_observations = Vec::new();
     let mut material_count = 0;
     let mut canonical_control_material_count = 0;
@@ -571,8 +533,6 @@ fn assert_eventwise_parity_contract(
                 .map(|run| run.wave),
         });
     }
-    #[cfg(target_arch = "wasm32")]
-    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=expected-built");
     assert_eq!(event_count, 30);
     assert_eq!(material_count, 6);
     assert!(canonical_control_material_count > 0);
@@ -584,11 +544,7 @@ fn assert_eventwise_parity_contract(
     })
     }
     let expected = expected_raw_report(&request, content)?;
-    #[cfg(target_arch = "wasm32")]
-    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=expected-ready");
     let report = replay(request)?;
-    #[cfg(target_arch = "wasm32")]
-    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=replay-returned");
     assert_eq!(report, expected);
     assert_eq!(report.observations.len(), event_count);
     assert!(
@@ -653,15 +609,12 @@ fn native_replays_v7_raw_inputs_eventwise() -> Result<(), Box<dyn Error>> {
 #[wasm_bindgen_test::wasm_bindgen_test]
 fn wasm_replays_v7_raw_inputs_eventwise() -> Result<(), wasm_bindgen::JsValue> {
     let digest = assert_eventwise_parity_contract(|request| {
-        wasm_bindgen_test::console_log!("M9E_WASM_STAGE=replay-closure-start");
         let json = serde_json::to_string(&request)?;
-        wasm_bindgen_test::console_log!("M9E_WASM_STAGE=replay-serialized");
         let report = er_wasm::m9e_parity::replay_m9e_eventwise_json(&json).map_err(|error| {
             error
                 .as_string()
                 .unwrap_or_else(|| "Wasm replay failed".to_owned())
         })?;
-        wasm_bindgen_test::console_log!("M9E_WASM_STAGE=replay-json-returned");
         Ok(serde_json::from_str(&report)?)
     })
     .map_err(|error| wasm_bindgen::JsValue::from_str(&error.to_string()))?;
