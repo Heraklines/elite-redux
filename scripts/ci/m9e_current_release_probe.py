@@ -12,7 +12,7 @@ import time
 import m9e_current_cost as cost
 
 ROOT = Path(__file__).resolve().parents[2]
-BRANCH = "codex/m9e-current-phase-focused-20260910"
+BRANCH = "codex/m9e-release-clean-probe-20260923"
 OUT = Path(os.environ["RUNNER_TEMP"]).resolve() / "m9e-current-release-probe"
 
 
@@ -42,7 +42,9 @@ def main():
         require(os.name == "posix" and os.uname().machine == "x86_64", "native Linux host")
         require(re.fullmatch(r"[0-9a-f]{40}", result["source_sha"]) is not None, "source SHA")
         require(capture(["git", "rev-parse", "HEAD"]) == result["source_sha"], "exact HEAD")
-        require(not capture(["git", "status", "--porcelain"]), "clean source checkout")
+        status = capture(["git", "status", "--porcelain"])
+        result["checkout_status"] = status.splitlines()[:16]
+        require(not status, "clean source checkout")
         result["source_bindings"] = {
             "workflow_sha256": hashlib.sha256((ROOT / ".github/workflows/m9e-current-release-probe.yml").read_bytes()).hexdigest(),
             "cost_harness_sha256": hashlib.sha256((ROOT / "scripts/ci/m9e_current_cost.py").read_bytes()).hexdigest(),

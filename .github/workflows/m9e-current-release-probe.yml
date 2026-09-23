@@ -1,7 +1,7 @@
 name: M9E Current Release Cost Probe
 on:
   push:
-    branches: [codex/m9e-current-phase-focused-20260910]
+    branches: [codex/m9e-release-clean-probe-20260923]
 permissions:
   contents: read
 concurrency:
@@ -17,6 +17,7 @@ jobs:
       CARGO_TERM_COLOR: never
       CARGO_PROFILE_DEV_DEBUG: '0'
       CARGO_PROFILE_TEST_DEBUG: '0'
+      PYTHONDONTWRITEBYTECODE: '1'
       RUSTUP_TOOLCHAIN: '1.97.1'
     steps:
       - name: Start shared release deadline before checkout
