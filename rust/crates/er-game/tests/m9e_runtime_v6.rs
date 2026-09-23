@@ -11,7 +11,7 @@ use er_state::m7_state::{
     DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
 };
 use er_state::m9e_state_v6::{
-    GAME_STATE_SCHEMA_VERSION_V6, CurrentAccountIdentityV1, GameIdentityAllocatorStateV1,
+    CurrentAccountIdentityV1, GAME_STATE_SCHEMA_VERSION_V6, GameIdentityAllocatorStateV1,
     GameStateV6,
 };
 use er_types::battle_ids::{MenuInstanceId, WaveIndex};
@@ -114,7 +114,10 @@ fn bootstrap_candidate_is_serialized_and_installed_through_the_common_applier()
     );
     assert_eq!(replica.state(), authority.state());
     assert_eq!(
-        replica.state().ok_or("replica state")?.current_account_identity,
+        replica
+            .state()
+            .ok_or("replica state")?
+            .current_account_identity,
         candidate.current_account_identity
     );
     assert_eq!(
