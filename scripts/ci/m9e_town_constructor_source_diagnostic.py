@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 BOUNDED_HELPER_BYTES = 38620
-EXPORTER_SHA256 = "289a8f0895d2417a3a6e5da4acfd8a5f96167d0834b5a7206af8e3b6a5385898"
+EXPORTER_SHA256 = "52bf920c3513141300d8bbbb20bf58b3e4a9e5003a65ac84882f6532822157d3"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -742,13 +742,13 @@ def main(summary):
     require(digest_raw == (json.dumps(digest_receipt, separators=(",", ":")) + "\n").encode()
             and digest_receipt.get("schema") == 1 and digest_receipt.get("source") == PIN, "canonical fresh digest receipt")
     parts = digest_receipt.get("parts")
-    require(isinstance(parts, list) and 14 <= len(parts) <= 59, "bounded semantic page inventory")
+    require(isinstance(parts, list) and 14 <= len(parts) <= 60, "bounded semantic page inventory")
     names = [row[0] for row in parts]
-    require(names[:16] == ["species", "moves", "forms", "abilities-meta", "gender", "form-flags", "ability-slots", "form-types", "form-stats", "level-two-forms", "level-two-meta", "level-two-movegen", "level-two-abilities", "level-two-signatures", "level-two-useless", "movegen-stage"] and len(set(names)) == len(names)
-            and all(re.fullmatch(r"abilities-(rows|functions|shapes)-[0-9]{2}", name) for name in names[16:]), "exact semantic page names")
+    require(names[:17] == ["species", "moves", "forms", "abilities-meta", "gender", "form-flags", "ability-slots", "form-types", "form-stats", "level-two-forms", "level-two-meta", "level-two-movegen", "level-two-abilities", "level-two-signatures", "level-two-useless", "movegen-stage", "level-two-ability-powers"] and len(set(names)) == len(names)
+            and all(re.fullmatch(r"abilities-(rows|functions|shapes)-[0-9]{2}", name) for name in names[17:]), "exact semantic page names")
     exports = {}
     for name, length, digest in parts:
-        cap = 4096 if name in {"gender", "form-flags", "movegen-stage", "level-two-signatures", "level-two-useless"} else 8192 if name in {"ability-slots", "form-types", "level-two-forms", "level-two-meta", "level-two-movegen", "level-two-abilities"} else 32768 if name in {"species", "moves"} else 16384
+        cap = 4096 if name in {"gender", "form-flags", "movegen-stage", "level-two-signatures", "level-two-useless"} else 8192 if name in {"ability-slots", "form-types", "level-two-forms", "level-two-meta", "level-two-movegen", "level-two-abilities"} else 32768 if name in {"species", "moves", "level-two-ability-powers"} else 16384
         fact = file_fact(OUTPUT / f"{name}-one.json", cap)
         require(fact["bytes"] == length and fact["sha256"] == digest, "two fresh source observations differ: " + name)
         exports[name] = fact
@@ -770,7 +770,7 @@ def main(summary):
                                "oracle_after_each_export": True, "oracle_after_reward_verification": True, "injected_exporter": True, "asset": True}
     summary["generated"] = {path.name: file_fact(path, generated_cap(path.name)) for path in sorted(OUTPUT.iterdir())}
     require(set(summary["generated"]) == {"form-counts.json", "digest-two.json", "source-methods.txt", "validation.json", *(name + "-one.json" for name in names)}, "exact output inventory")
-    require(sum(row["bytes"] for row in summary["generated"].values()) <= 7 * 32768, "aggregate generated bound")
+    require(sum(row["bytes"] for row in summary["generated"].values()) <= 8 * 32768, "aggregate generated bound")
     require(time.monotonic() < WORK_DEADLINE, "work deadline exceeded before reserved cleanup")
 
 
@@ -787,7 +787,7 @@ def generated_cap(name):
         return 8192
     if name == "validation.json":
         return 8192
-    if name in {"species-one.json", "moves-one.json"}:
+    if name in {"species-one.json", "moves-one.json", "level-two-ability-powers-one.json"}:
         return 32768
     if name in {"source-methods.txt", "forms-one.json", "form-stats-one.json", "abilities-meta-one.json"} or re.fullmatch(r"abilities-(rows|functions|shapes)-[0-9]{2}-one\.json", name):
         return 16384
