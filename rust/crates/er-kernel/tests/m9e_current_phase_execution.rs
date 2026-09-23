@@ -2114,7 +2114,7 @@ fn assert_actual_tm_reward(
     use er_state::current_reward_tm::{CurrentRewardTmPhaseV1 as T, CurrentUsedTmsV1 as H};
     writeln!(std::io::stderr().lock(), "M9E_TM_STAGE enter")?;
     let selected = current_reward(active(checkpoint)?)?.clone();
-    let mut kernel = restore(checkpoint.clone(), content.clone())?;
+    let mut kernel = Box::new(restore(checkpoint.clone(), content.clone())?);
     writeln!(std::io::stderr().lock(), "M9E_TM_STAGE restored")?;
     let mut live = initial_live.clone();
     let mut ledger = initial_ledger.clone();
@@ -2151,7 +2151,7 @@ fn assert_actual_tm_reward(
         kernel.settle_presentation(presentation.event_id)?;
     }
     let menu_checkpoint = Box::new(kernel.snapshot()?);
-    kernel = restore(*menu_checkpoint.clone(), content.clone())?;
+    *kernel = restore(*menu_checkpoint.clone(), content.clone())?;
     assert_eq!(kernel.snapshot()?, *menu_checkpoint);
     let step = press(&mut kernel, PhysicalKey::Space)?;
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
@@ -2172,7 +2172,7 @@ fn assert_actual_tm_reward(
             .party,
         selected.party_before
     );
-    kernel = restore(*queued, content.clone())?;
+    *kernel = restore(*queued, content.clone())?;
     writeln!(std::io::stderr().lock(), "M9E_TM_STAGE queued_restored")?;
     for presentation in kernel.snapshot()?.pending_presentations {
         kernel.settle_presentation(presentation.event_id)?;
@@ -2304,7 +2304,7 @@ fn assert_actual_tm_reward(
     );
     assert_eq!(retained.rng_audit, selected.rng_audit);
     assert!(learned.transition().rng_audit.is_empty());
-    kernel = restore(*present.clone(), content.clone())?;
+    *kernel = restore(*present.clone(), content.clone())?;
     assert_eq!(kernel.snapshot()?, *present);
     let waiting = kernel.advance_time(SafeU53::ZERO)?;
     assert!(
