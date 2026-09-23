@@ -243,17 +243,24 @@ fn raw_bootstrap() -> Result<RawBootstrap, Box<dyn Error>> {
 }
 
 fn request() -> Result<M9EParityRequestV1, Box<dyn Error>> {
-    trace_request(raw_bootstrap()?)
+    trace_request(raw_driver(raw_bootstrap()?)?)
 }
 
+type RawDriver = (
+    GameContentBundleV2,
+    Arc<PreparedGameContentV2>,
+    SeatId,
+    GameKernelV7,
+);
+
 #[inline(never)]
-fn trace_request(
+fn raw_driver(
     (bundle, content, seat, mut snapshot): RawBootstrap,
-) -> Result<M9EParityRequestV1, Box<dyn Error>> {
+) -> Result<RawDriver, Box<dyn Error>> {
     let GameKernelLifecycleSnapshotV7::Active(state) = &mut snapshot.lifecycle else {
         return Err("bootstrap snapshot is not active".into());
     };
-    let mut driver = GameKernelV7::from_active(
+    let driver = GameKernelV7::from_active(
         state.clone(),
         snapshot.material_ledger.next_authority_revision,
         seat,
@@ -265,7 +272,18 @@ fn trace_request(
     )?;
     #[cfg(target_arch = "wasm32")]
     wasm_bindgen_test::console_log!("M9E_WASM_STAGE=driver-active");
+    Ok((bundle, content, seat, driver))
+}
+
+#[inline(never)]
+fn trace_request(
+    (bundle, content, seat, mut driver): RawDriver,
+) -> Result<M9EParityRequestV1, Box<dyn Error>> {
+    #[cfg(target_arch = "wasm32")]
+    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=trace-start");
     let initial_snapshot = driver.snapshot()?;
+    #[cfg(target_arch = "wasm32")]
+    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=initial-snapshot");
     let mut events = Vec::new();
     for _ in 0..300 {
         let wave = driver
