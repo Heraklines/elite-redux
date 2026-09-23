@@ -71,7 +71,12 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   // retained move, without changing its moveset through a test helper.
   expect(player.getMoveset().map(move => move.moveId)).toContain(MoveId.FIRE_FANG);
 
-  const newBattle = vi.spyOn(scene, "newBattle");
+  const actualNewBattle = scene.newBattle.bind(scene);
+  const beforeNewBattle: string[] = [];
+  const newBattle = vi.spyOn(scene, "newBattle").mockImplementation((...args) => {
+    beforeNewBattle.push(Phaser.Math.RND.state());
+    return actualNewBattle(...args);
+  });
   let attackingTurns = 0;
   const firstEnemyHpTrace = [firstEnemy.hp];
   while (!manager.isVictory() && attackingTurns < 12) {
@@ -105,6 +110,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   // then waits for the next CommandPhase. It does not call newBattle itself.
   await manager.toNextWave();
   expect(newBattle).toHaveBeenCalledTimes(1);
+  expect(beforeNewBattle).toHaveLength(1);
   expect(scene.currentBattle.waveIndex).toBe(2);
   expect(scene.arena.biomeId).toBe(BiomeId.TOWN);
   expect(scene.phaseManager.getCurrentPhase().phaseName).toBe("CommandPhase");
@@ -126,7 +132,11 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
       xor: shinyXor,
     },
     first: { wave: 1, enemy_id: firstEnemyId, species: firstEnemySpecies, attacking_turns: attackingTurns },
-    reward: { choice: "cancel", new_battle_calls: newBattle.mock.calls.length },
+    reward: {
+      choice: "cancel",
+      new_battle_calls: newBattle.mock.calls.length,
+      before_new_battle_rng: beforeNewBattle,
+    },
     next: {
       wave: scene.currentBattle.waveIndex,
       enemy_id: enemy.id,
