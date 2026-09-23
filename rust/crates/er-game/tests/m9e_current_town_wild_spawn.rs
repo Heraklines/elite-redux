@@ -7,7 +7,7 @@ use er_game::current_town_wild_spawn::{
     source_town_ability_id, source_town_day_pools, source_town_form_base_stats,
     source_town_form_types, source_town_initial_level_move_pool, source_town_ivs_from_id,
     source_town_level_two_form_rows, source_town_level_two_species, source_town_male_half_percent,
-    source_town_neutral_unfiltered_moveset, source_town_neutral_weighted_level_move_pool,
+    source_town_neutral_moveset, source_town_neutral_weighted_level_move_pool,
     source_town_unmodified_level_two_stats,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
@@ -38,6 +38,8 @@ const SOURCE_LEVEL_TWO_ABILITIES: &[u8] =
     include_bytes!("../src/current_town_level_two_abilities.json");
 const SOURCE_LEVEL_TWO_SIGNATURES: &[u8] =
     include_bytes!("../src/current_town_level_two_signatures.json");
+const SOURCE_LEVEL_TWO_USELESS: &[u8] =
+    include_bytes!("../src/current_town_level_two_useless.json");
 const SOURCE_MOVEGEN_STAGE: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/town-movegen-stage-v1.json");
 const SOURCE_TYPE_ORDER: [PokemonType; 19] = [
@@ -107,6 +109,7 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         serde_json::from_slice(SOURCE_LEVEL_TWO_ABILITIES)?;
     let level_two_signatures: serde_json::Value =
         serde_json::from_slice(SOURCE_LEVEL_TWO_SIGNATURES)?;
+    let level_two_useless: serde_json::Value = serde_json::from_slice(SOURCE_LEVEL_TWO_USELESS)?;
     let movegen_stage: serde_json::Value = serde_json::from_slice(SOURCE_MOVEGEN_STAGE)?;
     assert_eq!(gender["source"], "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7");
     assert_eq!(form_flags["source"], gender["source"]);
@@ -118,6 +121,7 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     assert_eq!(level_two_movegen["source"], gender["source"]);
     assert_eq!(level_two_abilities["source"], gender["source"]);
     assert_eq!(level_two_signatures["source"], gender["source"]);
+    assert_eq!(level_two_useless["source"], gender["source"]);
     assert_eq!(movegen_stage["source"], gender["source"]);
     assert_eq!(gender["rows"].as_array().ok_or("gender rows")?.len(), 163);
     assert_eq!(form_flags["rows"].as_array().ok_or("form rows")?.len(), 163);
@@ -171,6 +175,11 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
             .len(),
         53
     );
+    let useless_rows = level_two_useless["rows"]
+        .as_array()
+        .ok_or("level-two usefulness rows")?;
+    assert_eq!(useless_rows.len(), 131);
+    assert!(useless_rows.iter().all(|row| row[1].as_i64() == Some(-1)));
     assert_eq!(
         level_two_abilities["movegen_modifiers"]
             .as_array()
@@ -504,7 +513,7 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         74_296
     );
     let mut moveset_rng = constructor_rng.clone();
-    let unfiltered = source_town_neutral_unfiltered_moveset(
+    let moveset = source_town_neutral_moveset(
         &content,
         prefix.root.source_root,
         prefix.form_index,
@@ -513,16 +522,16 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         &mut moveset_rng,
     )?;
     assert_eq!(
-        unfiltered
+        moveset
             .moves
             .iter()
             .map(|id| id.get().get())
             .collect::<Vec<_>>(),
         vec![38, 300, 707, 316]
     );
-    assert_eq!(unfiltered.audit.len(), 4);
+    assert_eq!(moveset.audit.len(), 4);
     assert_eq!(
-        unfiltered
+        moveset
             .audit
             .iter()
             .map(|draw| (draw.cardinality.get(), draw.result.get()))

@@ -223,6 +223,7 @@ type SourceTownMovegenRow = (u64, f64, u8);
 type SourceTownAbilityProfile = (Vec<u64>, Vec<u64>);
 type SourceTownSpeciesAbilityRows = (u64, Vec<SourceTownAbilityProfile>);
 type SourceTownSignatureRow = (u64, Option<Vec<u64>>);
+type SourceTownUselessRow = (u64, i8);
 
 // Source run 35854351965, SHA256
 // 86b764e17e26ec5db4bd201cc7f95950975aa134960eae2a0570a8b5a7201a80.
@@ -282,6 +283,21 @@ struct SourceTownLevelTwoSignaturesV1 {
 }
 
 static SOURCE_LEVEL_TWO_SIGNATURES: OnceLock<Result<SourceTownLevelTwoSignaturesV1, ()>> =
+    OnceLock::new();
+
+// Source run 35867977479, SHA256
+// 308dde1bb4a40500b0762ba676763aefb1a3ffc365f26bc5a3d18818487b7e89.
+// Every level-two move has no applicable filterUselessMoves condition in this
+// Town context; the independent verifier checked all 131 source candidates.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SourceTownLevelTwoUselessV1 {
+    schema: u8,
+    source: String,
+    rows: Vec<SourceTownUselessRow>,
+}
+
+static SOURCE_LEVEL_TWO_USELESS: OnceLock<Result<SourceTownLevelTwoUselessV1, ()>> =
     OnceLock::new();
 
 fn source_level_two_forms() -> Result<&'static SourceTownLevelTwoFormsV1, CurrentTownWildErrorV1> {
@@ -455,6 +471,29 @@ fn source_level_two_signatures()
                     .find(|row| row.0 == 133)
                     .and_then(|row| row.1.as_deref())
                     != Some(&[733, 734, 735, 737, 736, 739, 738, 740][..])
+            {
+                return Err(());
+            }
+            Ok(parsed)
+        })
+        .as_ref()
+        .map_err(|_| CurrentTownWildErrorV1::SourceContent)
+}
+
+fn source_level_two_useless() -> Result<&'static SourceTownLevelTwoUselessV1, CurrentTownWildErrorV1>
+{
+    SOURCE_LEVEL_TWO_USELESS
+        .get_or_init(|| {
+            let parsed: SourceTownLevelTwoUselessV1 =
+                serde_json::from_str(include_str!("current_town_level_two_useless.json"))
+                    .map_err(|_| ())?;
+            let meta = source_level_two_meta().map_err(|_| ())?;
+            if parsed.schema != 1
+                || parsed.source != ORACLE
+                || parsed.rows.len() != 131
+                || parsed.rows.iter().map(|row| row.0).collect::<Vec<_>>()
+                    != meta.rows.iter().map(|row| row.0).collect::<Vec<_>>()
+                || parsed.rows.iter().any(|row| row.1 != -1)
             {
                 return Err(());
             }
@@ -882,7 +921,7 @@ pub fn source_town_neutral_weighted_level_move_pool(
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CurrentTownUnfilteredMovesetV1 {
+pub struct CurrentTownNeutralMovesetV1 {
     pub moves: Vec<MoveId>,
     pub audit: Vec<RngDraw>,
 }
@@ -917,18 +956,20 @@ fn source_town_weighted_move_index(
     Err(CurrentTownWildErrorV1::RandomDraw)
 }
 
-/// Source signature check, forced STAB and the first weighted fill pass for
-/// an ability-neutral wild. The source's filterUselessMoves pass and any
-/// subsequent replacement draws remain a separate stage.
-pub fn source_town_neutral_unfiltered_moveset(
+/// Complete source `generateMoveset` for a level-two ability-neutral wild.
+/// Source signatures are unavailable and filterUselessMoves has no applicable
+/// condition over this bounded 131-move pool; TM/egg/trainer paths are absent.
+/// Enemy shiny, modifiers and encounter settlement remain separate owners.
+pub fn source_town_neutral_moveset(
     content: &PreparedGameContentV2,
     root: SpeciesId,
     form_index: u16,
     ability_index: u8,
     stats: [u32; 6],
     rng: &mut RngRuntime,
-) -> Result<CurrentTownUnfilteredMovesetV1, CurrentTownWildErrorV1> {
+) -> Result<CurrentTownNeutralMovesetV1, CurrentTownWildErrorV1> {
     source_level_two_signatures()?;
+    source_level_two_useless()?;
     let mut pool = source_town_neutral_weighted_level_move_pool(
         content,
         root,
@@ -970,7 +1011,7 @@ pub fn source_town_neutral_unfiltered_moveset(
     }
     let audit = staged.audit_entries()[first_audit..].to_vec();
     *rng = staged;
-    Ok(CurrentTownUnfilteredMovesetV1 { moves, audit })
+    Ok(CurrentTownNeutralMovesetV1 { moves, audit })
 }
 
 /// Source level-two stat formula before held, nature-weight, challenge or
