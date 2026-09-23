@@ -248,6 +248,14 @@ export class CurrentDevelopmentRtcPeerV1 {
     }
     this.#pc.removeEventListener("datachannel", this.#onDataChannel);
     try { await boundedOperation(this.closeTransport()); } catch (error) { issue ??= error; }
+    // Transport disposal awaits the disconnect callback's Worker response,
+    // which can resolve before the operation pump retires its active slot.
+    // Keep the Worker live until that last operation has fully drained.
+    try { await boundedOperation(this.#operationTask); }
+    catch (error) {
+      issue ??= new Error(`current RTC disposal could not drain transport completion; completion is not confirmed: ${String(error)}`);
+      this.#fail(issue);
+    }
     this.#closed = true;
     this.#abort.abort();
     this.#rejectQueued("current RTC peer disposed");
