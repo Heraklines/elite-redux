@@ -1386,12 +1386,21 @@ fn controlled_early_ko_flash_owns_clock_egg_candy_and_canceled_suffix() -> Resul
     use er_state::current_achievement_execution::CurrentAchievementKeyV1 as K;
     use er_state::current_initial_victory_tail::CurrentInitialVictoryTailPhaseV1 as T;
     let content = content()?;
+    writeln!(std::io::stderr().lock(), "M9E_FLASH fixture_start")?;
     let mut kernel = Box::new(controlled_before_early_knockout(content.clone())?);
+    writeln!(std::io::stderr().lock(), "M9E_FLASH fixture_ready")?;
     let (mut live, mut ledger) = admit_knockout(&mut kernel, content.as_ref())?;
+    writeln!(std::io::stderr().lock(), "M9E_FLASH knockout_admitted")?;
     let mut clock_seen = false;
     let mut egg_seen = false;
-    for _ in 0..128 {
+    for iteration in 0..128 {
         let snapshot = kernel.snapshot()?;
+        writeln!(
+            std::io::stderr().lock(),
+            "M9E_FLASH iteration={iteration} presentations={} platform={}",
+            snapshot.pending_presentations.len(),
+            snapshot.pending_platform.len()
+        )?;
         let state = active(&snapshot)?;
         if let Some(tail) = state
             .current_battle_participation
@@ -1434,19 +1443,24 @@ fn controlled_early_ko_flash_owns_clock_egg_candy_and_canceled_suffix() -> Resul
             continue;
         }
         let step = if let Some(pending) = snapshot.pending_platform.first() {
+            writeln!(std::io::stderr().lock(), "M9E_FLASH platform_reissue")?;
             assert_request_title_read_reissues(&snapshot, &pending.effect, content.clone())?;
+            writeln!(std::io::stderr().lock(), "M9E_FLASH platform_restore")?;
             *kernel = restore(snapshot.clone(), content.clone())?;
             match &pending.effect {
                 GamePlatformEffectV2::CurrentFriendshipClock { request } => {
+                    writeln!(std::io::stderr().lock(), "M9E_FLASH friendship_clock")?;
                     kernel.apply_current_utc_clock_result(request.request, 1783641600000)?
                 }
                 GamePlatformEffectV2::CurrentAchievementClock { request } => {
+                    writeln!(std::io::stderr().lock(), "M9E_FLASH achievement_clock")?;
                     assert_eq!(request.achievement, K::RealisticFlash);
                     assert!(!clock_seen);
                     clock_seen = true;
                     accept_flash_test_clock(&mut kernel, request)?
                 }
                 GamePlatformEffectV2::CurrentFlashEgg { request } => {
+                    writeln!(std::io::stderr().lock(), "M9E_FLASH egg")?;
                     assert!(clock_seen && !egg_seen);
                     egg_seen = true;
                     let step = accept_flash_test_egg(&mut kernel, request)?;
@@ -1456,8 +1470,10 @@ fn controlled_early_ko_flash_owns_clock_egg_candy_and_canceled_suffix() -> Resul
                 _ => return Err("unexpected request in actual Flash path".into()),
             }
         } else {
+            writeln!(std::io::stderr().lock(), "M9E_FLASH advance")?;
             kernel.advance_time(SafeU53::ZERO)?
         };
+        writeln!(std::io::stderr().lock(), "M9E_FLASH material")?;
         let material = accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
         if let Ok(reward) = current_reward(kernel.state().ok_or("reward state absent")?) {
             assert_eq!(

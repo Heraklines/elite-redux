@@ -10,10 +10,14 @@ import sys
 import time
 
 BASE = "2f124b450b5c118191bf0d0775ac42a7d27c00cc"
+PROBE_PARENT = "69e04e67cc7a97d16dcde193866aaa861029992a"
 BRANCH = "codex/m9e-host-phase-probe-20260923"
 OWNED = {
     ".github/workflows/m9e-host-phase-probe.yml",
     "scripts/ci/m9e_host_phase_probe.py",
+    "rust/crates/er-kernel/tests/m9e_current_phase_execution.rs",
+    "rust/crates/er-state/src/current_source_progression.rs",
+    "rust/crates/er-web/src/host_v2.rs",
 }
 TARGETS = {
     "m9e_current_phase_execution": (
@@ -89,7 +93,7 @@ def main():
         "harness_sha256": sha(Path(__file__).read_bytes()),
         "tests_expected": 18, "tests_passed": 0, "targets": [],
         "commands": COMMANDS,
-        "scope": "two complete failing native binaries; not whole-game qualification",
+        "scope": "two complete native binaries on a focused source repair; not whole-game qualification",
     }
     try:
         require(os.environ["GITHUB_REPOSITORY"] == "Heraklines/elite-redux", "repository")
@@ -100,9 +104,9 @@ def main():
         output, row = run("head", ["git", "rev-parse", "HEAD"])
         require(row["returncode"] == 0 and output.decode().strip() == result["source_sha"], "exact HEAD")
         output, row = run("delta", ["git", "diff", "--name-only", BASE, "HEAD"])
-        require(row["returncode"] == 0 and set(output.decode().splitlines()) == OWNED, "only focused harness differs")
+        require(row["returncode"] == 0 and set(output.decode().splitlines()) == OWNED, "exact focused repair and harness delta")
         output, row = run("parent", ["git", "rev-parse", "HEAD^"])
-        require(row["returncode"] == 0 and output.decode().strip() == BASE, "exact product parent")
+        require(row["returncode"] == 0 and output.decode().strip() == PROBE_PARENT, "exact probe parent")
         bundle = ROOT / "rust/fixtures/m9/engineering/game-content-bundle-v2.json"
         result["content_bytes"] = bundle.stat().st_size
         result["content_sha256"] = sha(bundle.read_bytes())
