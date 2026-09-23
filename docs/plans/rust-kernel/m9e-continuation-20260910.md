@@ -55,8 +55,9 @@ commands/moves but preserves turn settlement, which executes once.
 The earlier stack overflows were repaired by limiting by-value test frames;
 the e44e089 full integration passes on the ordinary default stack without
 changing stack size, test concurrency or dropping assertions. The initial
-source constructor now matches the observed level2 seed/level arithmetic;
-full weighted species/moveset generation remains a source-fidelity gap.
+source constructor now matches the observed level2 seed/level arithmetic.
+The isolated Town core also matches root, form, ability, IV, nature, stats and
+four selected moves; shiny, modifiers and post-reward settlement remain open.
 
 ## Acceptance scoreboard
 
@@ -472,3 +473,7 @@ Isolated Rust branch `codex/m9e-next-encounter-source-20260923` at `00ff96c91f21
 Source-only successor `1546278ac3bf439efbe4703451bba9a26611fb0e` passed run35875572273 in two fresh processes with 63 independent negative checks. For every one of the 270 Town form/ability profiles, the actual source enemy's calculated level-two stats matched the unmodified base-stat/IV/nature formula at the observed values and at IV/nature extremes 0/0 and 31/24. Its effective-power part retained SHA256 `5bf870bd3df95ce6e723585a1aec1c008c4bec81082e04f4032f15695b861f9c`. This confirms the bounded early Town stat calculation, not later held-item or encounter effects.
 
 The integrated Town source candidate `8d8fb8843e0f774140ad16bc66c4cffac50fd64e` passed release-cost run35875313849 (summary artifact10757741235), native/Wasm parity run35875314020 (artifact10756393565), browser RTC run35875313828 (summary artifact10757868125), and current-entry breadth run35875313906 (artifact10759131013). Current-phase run35875313992 stopped before native test execution at the exact reviewed source-delta gate in all three native jobs (summary artifacts10756182772, 10756632506, 10756622337); the gate still listed the pre-Town paths. Its browser-input job passed. The gate repair now pins 166 changed source paths plus 10 CI paths against 59 baseline inputs, admits exactly six additive Town fixture files, and includes the complete Town target in the native inventory. The repair requires a new exact-SHA remote qualification.
+
+The repaired integration SHA `60d5893c1a6c2eb3cb196b628e3bb5270c837b48` passed all five focused workflows: current-phase run35877552576 (23 complete short targets/163 tests, 25 native binaries, strict Clippy and rustfmt, complete co-op and replay campaign targets1/1 each, browser inputs19/19; summary artifacts10760530879, 10760631161, 10759024176, 10757704049), current-entry run35877552498 (seven normal CLI/Worker targets21/21, artifact10759254564), native/Wasm parity run35877552666 (2/2 each with matching raw-input and held-timer digests, artifact10757924660), release-cost run35877552625 (optimized native target1/1, artifact10759052180), and browser RTC run35877552546 (three actual Worker/RTC Chromium journeys, artifact10759459293). These are the bounded lane results on one SHA; no six-row M9 acceptance or production rollout follows from them.
+
+The isolated Town-core successor `3910460d20f32bf71d80fc27334a3e27d2463d3f` passed run35878402419 (summary artifact10759895482): the direct queued enemy witness checked the composed root, constructor, level-two stats, four moves and exact combined RNG transcript; the complete Town target1/1 and RNG target25/25 passed, with remote rustfmt and both strict Clippy commands. Integration merge `5f7597f79f08b4ea6645f5b3114e945067cf76ed` includes that core but is not itself qualified. Shiny/variant, modifiers, account cosmetic identity, retained reward settlement, material replay and a causal natural wave-two battle remain open.
