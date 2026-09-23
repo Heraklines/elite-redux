@@ -447,8 +447,8 @@ pub fn source_town_unmodified_level_two_stats(
                 unmodified
             }
         };
-        stats[index] = u32::try_from(value.max(1))
-            .map_err(|_| CurrentTownWildErrorV1::SourceContent)?;
+        stats[index] =
+            u32::try_from(value.max(1)).map_err(|_| CurrentTownWildErrorV1::SourceContent)?;
     }
     Ok(stats)
 }

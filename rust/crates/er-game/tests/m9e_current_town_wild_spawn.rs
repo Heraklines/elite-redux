@@ -106,7 +106,10 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         form_types["rows"].as_array().ok_or("form type rows")?.len(),
         163
     );
-    assert_eq!(form_stats["rows"].as_array().ok_or("form stat rows")?.len(), 163);
+    assert_eq!(
+        form_stats["rows"].as_array().ok_or("form stat rows")?.len(),
+        163
+    );
     for root in pools.iter().flatten() {
         let id = root.get().get();
         let source_ratio = gender["rows"]
@@ -190,10 +193,12 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         for (form, observed) in source_forms.iter().take(expected_forms).enumerate() {
             let observed = observed.as_array().ok_or("source base stats")?;
             assert_eq!(observed.len(), 6);
-            let source: [u32; 6] = std::array::from_fn(|index| {
-                observed[index].as_u64().expect("source stat") as u32
-            });
-            assert_eq!(source_town_form_base_stats(&content, *root, form as u16)?, source);
+            let source: [u32; 6] =
+                std::array::from_fn(|index| observed[index].as_u64().expect("source stat") as u32);
+            assert_eq!(
+                source_town_form_base_stats(&content, *root, form as u16)?,
+                source
+            );
         }
     }
     assert_eq!(
