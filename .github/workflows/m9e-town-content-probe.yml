@@ -1,0 +1,33 @@
+name: M9E Town V2 Content Source Probe
+on:
+  push:
+    branches: [codex/m9e-next-encounter-source-20260923]
+permissions:
+  contents: read
+concurrency:
+  group: m9e-town-content-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  town-content:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Observe exact V2 Town pool remotely
+        run: python3 scripts/ci/m9e_town_content_probe.py
+      - name: Compact source-bound observation
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-town-content-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-town-content/summary.json
+          if-no-files-found: error
+          retention-days: 14
