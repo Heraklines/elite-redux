@@ -5,9 +5,10 @@ use er_game::current_town_wild_spawn::{
     CurrentTownDayWaveTwoContextV1, CurrentTownGenderV1, CurrentTownWildErrorV1,
     select_current_town_day_wave_two_constructor_prefix, select_current_town_day_wave_two_root,
     source_town_ability_id, source_town_day_pools, source_town_form_base_stats,
-    source_town_form_types, source_town_ivs_from_id, source_town_level_two_form_rows,
-    source_town_level_two_species,
-    source_town_male_half_percent, source_town_unmodified_level_two_stats,
+    source_town_form_types, source_town_initial_level_move_pool, source_town_ivs_from_id,
+    source_town_level_two_form_rows,
+    source_town_level_two_species, source_town_male_half_percent,
+    source_town_unmodified_level_two_stats,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_rng::audit::{RngCallsiteId, RngPublicApi, RngReason};
@@ -30,6 +31,7 @@ const SOURCE_FORM_TYPES: &[u8] =
 const SOURCE_FORM_STATS: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/town-form-stats-v1.json");
 const SOURCE_LEVEL_TWO_FORMS: &[u8] = include_bytes!("../src/current_town_level_two_forms.json");
+const SOURCE_LEVEL_TWO_META: &[u8] = include_bytes!("../src/current_town_level_two_meta.json");
 const SOURCE_TYPE_ORDER: [PokemonType; 19] = [
     PokemonType::Normal,
     PokemonType::Fighting,
@@ -91,12 +93,14 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     let form_types: serde_json::Value = serde_json::from_slice(SOURCE_FORM_TYPES)?;
     let form_stats: serde_json::Value = serde_json::from_slice(SOURCE_FORM_STATS)?;
     let level_two_forms: serde_json::Value = serde_json::from_slice(SOURCE_LEVEL_TWO_FORMS)?;
+    let level_two_meta: serde_json::Value = serde_json::from_slice(SOURCE_LEVEL_TWO_META)?;
     assert_eq!(gender["source"], "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7");
     assert_eq!(form_flags["source"], gender["source"]);
     assert_eq!(ability_slots["source"], gender["source"]);
     assert_eq!(form_types["source"], gender["source"]);
     assert_eq!(form_stats["source"], gender["source"]);
     assert_eq!(level_two_forms["source"], gender["source"]);
+    assert_eq!(level_two_meta["source"], gender["source"]);
     assert_eq!(gender["rows"].as_array().ok_or("gender rows")?.len(), 163);
     assert_eq!(form_flags["rows"].as_array().ok_or("form rows")?.len(), 163);
     assert_eq!(
@@ -114,7 +118,25 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         form_stats["rows"].as_array().ok_or("form stat rows")?.len(),
         163
     );
-    assert_eq!(level_two_forms["rows"].as_array().ok_or("level-two rows")?.len(), 53);
+    assert_eq!(
+        level_two_forms["rows"]
+            .as_array()
+            .ok_or("level-two rows")?
+            .len(),
+        53
+    );
+    assert_eq!(
+        level_two_meta["rows"]
+            .as_array()
+            .ok_or("level-two metadata")?
+            .len(),
+        131
+    );
+    assert!(level_two_meta["rows"]
+        .as_array()
+        .ok_or("level-two metadata")?
+        .iter()
+        .all(|row| row[5].as_bool() == Some(false)));
     for root in pools.iter().flatten() {
         let id = root.get().get();
         let source_ratio = gender["rows"]
@@ -230,6 +252,7 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
                 .map(|(level, id)| (level, id.get().get()))
                 .collect::<Vec<_>>();
             assert_eq!(actual, expected);
+            assert!(source_town_initial_level_move_pool(&content, *root, form as u16)?.len() <= 512);
         }
     }
     assert_eq!(
@@ -258,6 +281,10 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     );
     assert_eq!(
         source_town_level_two_form_rows(SpeciesId::new(SafeU53::new(133)?), 2),
+        Err(CurrentTownWildErrorV1::SourceContent)
+    );
+    assert_eq!(
+        source_town_initial_level_move_pool(&content, SpeciesId::new(SafeU53::new(133)?), 2),
         Err(CurrentTownWildErrorV1::SourceContent)
     );
     let mut missing = town.clone();
@@ -329,6 +356,18 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     assert_eq!(prefix.form_index, 0);
     assert_eq!(prefix.nature_index, 11);
     assert_eq!(prefix.tera_type, PokemonType::Normal);
+    let initial_moves = source_town_initial_level_move_pool(
+        &content,
+        prefix.root.source_root,
+        prefix.form_index,
+    )?;
+    assert_eq!(
+        initial_moves
+            .iter()
+            .map(|(id, weight)| (id.get().get(), *weight))
+            .collect::<Vec<_>>(),
+        vec![(38, 60), (45, 21), (300, 21), (316, 21), (707, 60)]
+    );
     assert_eq!(
         source_town_unmodified_level_two_stats(
             source_town_form_base_stats(&content, prefix.root.source_root, prefix.form_index)?,

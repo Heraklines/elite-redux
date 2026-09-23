@@ -21,6 +21,7 @@ SOURCE_ABILITY_SLOTS_SHA256 = "c7564ac254fee378288b8cd8a10a1ca27dda01c6775045871
 SOURCE_FORM_TYPES_SHA256 = "d66c5e26ecc920e50bdcc680479dfab9913103435f975ee5b4d0447d65373fcb"
 SOURCE_FORM_STATS_SHA256 = "8ce7ebeb1062ee505b89bf1400b90be9a9273fe7e4130aa2ede2b0821d65a526"
 SOURCE_LEVEL_TWO_FORMS_SHA256 = "63cd454d9e74ae2d77e59327b02a391e8c196edc60bc030cc26037589c6dfd78"
+SOURCE_LEVEL_TWO_META_SHA256 = "86b764e17e26ec5db4bd201cc7f95950975aa134960eae2a0570a8b5a7201a80"
 START = time.monotonic()
 COMMANDS = []
 
@@ -51,7 +52,7 @@ def run(name, argv, seconds=600):
 def main():
     COMPACT.mkdir(parents=True, exist_ok=False)
     result = {"schema": 1, "status": "failed", "source_sha": SHA,
-              "scope": "Ace/Town/day wave-two full-root and source constructor prefix through tera type; no moveset, enemy settlement or next-wave receipt",
+              "scope": "Ace/Town/day wave-two full-root, constructor prefix through tera type and initial level-move pool; no complete moveset, enemy settlement or next-wave receipt",
               "commands": COMMANDS}
     try:
         head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
@@ -60,6 +61,7 @@ def main():
             raise RuntimeError("exact clean source candidate required")
         files = ["rust/crates/er-game/src/current_town_wild_spawn.rs",
                  "rust/crates/er-game/src/current_town_level_two_forms.json",
+                 "rust/crates/er-game/src/current_town_level_two_meta.json",
                  "rust/crates/er-game/src/lib.rs",
                  "rust/crates/er-game/src/m9_new_run.rs",
                  "rust/crates/er-game/src/material.rs",
@@ -85,6 +87,7 @@ def main():
             "form_types": ("rust/fixtures/m9/engineering/town-form-types-v1.json", SOURCE_FORM_TYPES_SHA256),
             "form_stats": ("rust/fixtures/m9/engineering/town-form-stats-v1.json", SOURCE_FORM_STATS_SHA256),
             "level_two_forms": ("rust/crates/er-game/src/current_town_level_two_forms.json", SOURCE_LEVEL_TWO_FORMS_SHA256),
+            "level_two_meta": ("rust/crates/er-game/src/current_town_level_two_meta.json", SOURCE_LEVEL_TWO_META_SHA256),
         }
         for name, (path, expected) in source_fixtures.items():
             actual = digest((ROOT / path).read_bytes())

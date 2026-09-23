@@ -2,12 +2,13 @@
 //! Enemy construction, movesets, modifier draws and receipt settlement remain
 //! separate owners; this selector never advances a game state by itself.
 
+use std::collections::BTreeSet;
 use std::sync::OnceLock;
 
 use er_rng::audit::{RngCallsiteId, RngDraw, RngReason};
 use er_rng::battle::RngRuntime;
 use er_types::battle_ids::{AbilityId, GameModeId, MoveId, SpeciesId};
-use er_types::battle_model::PokemonType;
+use er_types::battle_model::{MoveAccuracy, MoveCategory, MovePower, PokemonType};
 use er_types::run_ids::BiomeId;
 use er_types::{RunDifficultyV1, SafeU53};
 use er_world::content_v2::BiomeDefinitionV2;
@@ -216,6 +217,20 @@ struct SourceTownLevelTwoFormsV1 {
 
 static SOURCE_LEVEL_TWO_FORMS: OnceLock<Result<SourceTownLevelTwoFormsV1, ()>> = OnceLock::new();
 
+type SourceTownMoveMetaRow = (u64, u8, u8, i16, i16, bool, bool);
+
+// Source run 35854351965, SHA256
+// 86b764e17e26ec5db4bd201cc7f95950975aa134960eae2a0570a8b5a7201a80.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SourceTownLevelTwoMetaV1 {
+    schema: u8,
+    source: String,
+    rows: Vec<SourceTownMoveMetaRow>,
+}
+
+static SOURCE_LEVEL_TWO_META: OnceLock<Result<SourceTownLevelTwoMetaV1, ()>> = OnceLock::new();
+
 fn source_level_two_forms() -> Result<&'static SourceTownLevelTwoFormsV1, CurrentTownWildErrorV1> {
     SOURCE_LEVEL_TWO_FORMS
         .get_or_init(|| {
@@ -240,11 +255,46 @@ fn source_level_two_forms() -> Result<&'static SourceTownLevelTwoFormsV1, Curren
                         || forms.iter().any(|rows| {
                             rows.len() > 512
                                 || rows.iter().any(|(level, move_id)| {
-                                    !(-2..=2).contains(level)
-                                        || *move_id == 0
-                                        || *move_id > 100_000
+                                    !(-2..=2).contains(level) || *move_id == 0 || *move_id > 100_000
                                 })
                         })
+                })
+            {
+                return Err(());
+            }
+            Ok(parsed)
+        })
+        .as_ref()
+        .map_err(|_| CurrentTownWildErrorV1::SourceContent)
+}
+
+fn source_level_two_meta() -> Result<&'static SourceTownLevelTwoMetaV1, CurrentTownWildErrorV1> {
+    SOURCE_LEVEL_TWO_META
+        .get_or_init(|| {
+            let parsed: SourceTownLevelTwoMetaV1 =
+                serde_json::from_str(include_str!("current_town_level_two_meta.json"))
+                    .map_err(|_| ())?;
+            let forms = source_level_two_forms().map_err(|_| ())?;
+            let mut expected = Vec::new();
+            for (_, variants) in &forms.rows {
+                for rows in variants {
+                    for (_, id) in rows {
+                        if !expected.contains(id) {
+                            expected.push(*id);
+                        }
+                    }
+                }
+            }
+            if parsed.schema != 1
+                || parsed.source != ORACLE
+                || expected.len() != 131
+                || parsed.rows.iter().map(|row| row.0).collect::<Vec<_>>() != expected
+                || parsed.rows.iter().any(|row| {
+                    row.1 > 2
+                        || row.2 > 18
+                        || !(-1..=250).contains(&row.3)
+                        || !(-1..=100).contains(&row.4)
+                        || row.5
                 })
             {
                 return Err(());
@@ -486,12 +536,89 @@ pub fn source_town_level_two_form_rows(
         .map(|(level, id)| {
             Ok((
                 *level,
-                MoveId::new(
-                    SafeU53::new(*id).map_err(|_| CurrentTownWildErrorV1::SourceContent)?,
-                ),
+                MoveId::new(SafeU53::new(*id).map_err(|_| CurrentTownWildErrorV1::SourceContent)?),
             ))
         })
         .collect()
+}
+
+fn source_town_move_meta(
+    content: &PreparedGameContentV2,
+    id: MoveId,
+) -> Result<&'static SourceTownMoveMetaRow, CurrentTownWildErrorV1> {
+    if content.identity().oracle_sha.as_str() != ORACLE {
+        return Err(CurrentTownWildErrorV1::SourceContent);
+    }
+    let source = source_level_two_meta()?
+        .rows
+        .iter()
+        .find(|row| row.0 == id.get().get())
+        .ok_or(CurrentTownWildErrorV1::SourceContent)?;
+    let category = match source.1 {
+        0 => MoveCategory::Physical,
+        1 => MoveCategory::Special,
+        2 => MoveCategory::Status,
+        _ => return Err(CurrentTownWildErrorV1::SourceContent),
+    };
+    let power = if source.3 < 0 {
+        MovePower::None
+    } else {
+        MovePower::Value(
+            u16::try_from(source.3).map_err(|_| CurrentTownWildErrorV1::SourceContent)?,
+        )
+    };
+    let accuracy = if source.4 < 0 {
+        MoveAccuracy::AlwaysHits
+    } else {
+        MoveAccuracy::Percent(
+            u8::try_from(source.4).map_err(|_| CurrentTownWildErrorV1::SourceContent)?,
+        )
+    };
+    let compiled = content
+        .battle
+        .move_definition(id)
+        .map_err(|_| CurrentTownWildErrorV1::SourceContent)?;
+    if compiled.category != category
+        || compiled.move_type != source_town_type(source.2)?
+        || compiled.power != power
+        || compiled.accuracy != accuracy
+    {
+        return Err(CurrentTownWildErrorV1::SourceContent);
+    }
+    Ok(source)
+}
+
+/// Source getLevelMoves and getAndWeightLevelMoves up to their initial
+/// level-based weights. This stops before move filters, ability-modified
+/// effective power, STAB selection, and the weighted RNG draws.
+pub fn source_town_initial_level_move_pool(
+    content: &PreparedGameContentV2,
+    root: SpeciesId,
+    form_index: u16,
+) -> Result<Vec<(MoveId, u32)>, CurrentTownWildErrorV1> {
+    let mut levels = source_town_level_two_form_rows(root, form_index)?;
+    levels.retain(|(level, _)| *level >= 0);
+    levels.sort_by_key(|(level, _)| *level);
+    let mut seen = BTreeSet::new();
+    let mut pool = Vec::new();
+    for (level, id) in levels {
+        if !seen.insert(id) {
+            continue;
+        }
+        let source = source_town_move_meta(content, id)?;
+        if source.5 {
+            continue;
+        }
+        let weight = if level == 0 {
+            70
+        } else if level == 1 && source.3 >= 70 {
+            60
+        } else {
+            u32::try_from(level + 20).map_err(|_| CurrentTownWildErrorV1::SourceContent)?
+        };
+        pool.push((id, weight));
+    }
+    Ok(pool)
 }
 
 /// Source level-two stat formula before held, nature-weight, challenge or
