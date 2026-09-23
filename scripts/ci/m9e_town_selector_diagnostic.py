@@ -54,7 +54,12 @@ def main():
             raise RuntimeError("exact clean source candidate required")
         files = ["rust/crates/er-game/src/current_town_wild_spawn.rs",
                  "rust/crates/er-game/src/lib.rs",
+                 "rust/crates/er-game/src/m9_new_run.rs",
+                 "rust/crates/er-game/src/material.rs",
                  "rust/crates/er-game/tests/m9e_current_town_wild_spawn.rs",
+                 "rust/crates/er-rng/src/audit.rs",
+                 "rust/crates/er-rng/src/battle.rs",
+                 "rust/crates/er-rng/tests/m3_rng.rs",
                  "scripts/ci/m9e_town_selector_diagnostic.py",
                  ".github/workflows/m9e-town-content-probe.yml"]
         result["source_hashes"] = {name: digest((ROOT / name).read_bytes()) for name in files}
@@ -71,18 +76,28 @@ def main():
         counts = re.findall(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", output)
         if counts != [("1", "0", "0", "0", "0")]:
             raise RuntimeError("Town selector result count differs")
+        rng_base = ["cargo", "test", "--locked", "-p", "er-rng", "--test", "m3_rng", "--"]
+        rng_listing = run("rng-list", rng_base + ["--list", "--format", "terse"])
+        rng_ids = re.findall(r"^([A-Za-z0-9_:]+): test$", rng_listing, re.M)
+        if len(rng_ids) != 25 or len(set(rng_ids)) != 25 or "source_run_float_is_exact_and_rejects_a_forged_audit" not in rng_ids:
+            raise RuntimeError("whole RNG test inventory differs")
+        rng_output = run("rng-execute", rng_base + ["--format", "terse"], 900)
+        rng_counts = re.findall(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", rng_output)
+        if rng_counts != [("25", "0", "0", "0", "0")]:
+            raise RuntimeError("whole RNG result count differs")
         run("clippy", ["cargo", "clippy", "--locked", "-p", "er-game", "--test", TARGET,
                        "--no-deps", "--", "-D", "warnings"], 300)
-        result["tests"] = {"passed": 1, "failed": 0, "ignored": 0, "id": TEST_ID}
+        run("rng-clippy", ["cargo", "clippy", "--locked", "-p", "er-rng", "--test", "m3_rng",
+                           "--no-deps", "--", "-D", "warnings"], 300)
+        result["tests"] = {"passed": 26, "failed": 0, "ignored": 0,
+                           "town_id": TEST_ID, "rng_ids": rng_ids}
         result["status"] = "passed"
     except Exception as error:
         result["first_failure"] = str(error)[:1024]
         if result["first_failure"] == "format failed":
             subprocess.run(["cargo", "fmt", "--manifest-path", "Cargo.toml", "--all"],
                            cwd=RUST, timeout=120, check=False)
-            patch = subprocess.check_output(["git", "diff", "--", "rust/crates/er-game/src/current_town_wild_spawn.rs",
-                                             "rust/crates/er-game/src/lib.rs",
-                                             "rust/crates/er-game/tests/m9e_current_town_wild_spawn.rs"], cwd=ROOT)
+            patch = subprocess.check_output(["git", "diff", "--", *files[:8]], cwd=ROOT)
             if len(patch) <= 32768:
                 (OUT / "format.patch").write_bytes(patch)
     finally:

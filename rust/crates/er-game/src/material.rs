@@ -1563,6 +1563,11 @@ fn replay_ordinary_draw(
                 )
                 .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
         }
+        (RngStream::Run, RngPublicApi::RandSeedFloat) => {
+            replay
+                .run_rand_seed_float(stated.reason, stated.callsite_id.clone())
+                .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
+        }
         (RngStream::Run, RngPublicApi::IntegerInRange) => {
             let maximum = audited_range_maximum(stated)?;
             replay
@@ -1609,7 +1614,8 @@ fn replay_ordinary_draw(
                 .battle_pick_index(length, stated.reason, stated.callsite_id.clone())
                 .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
         }
-        (RngStream::SeedOffset, _) | (_, RngPublicApi::FisherYatesSwap) => {
+        (RngStream::SeedOffset, _)
+        | (_, RngPublicApi::FisherYatesSwap | RngPublicApi::RandSeedFloat) => {
             return Err(BattleMaterialApplyError::InvalidEvidence);
         }
     }

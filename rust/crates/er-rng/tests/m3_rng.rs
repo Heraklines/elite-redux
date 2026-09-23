@@ -28,6 +28,41 @@ fn runtime_with_battle() -> Result<RngRuntime, Box<dyn Error>> {
 }
 
 #[test]
+fn source_run_float_is_exact_and_rejects_a_forged_audit() -> Result<(), Box<dyn Error>> {
+    // Pinned source399d direct Town wave-two queue, before rarity selection.
+    let run = RunRngState {
+        rdg: PhaserRdgState::from_state_string(
+            "!rnd,789153,0.5761283298488706,0.7223087239544839,0.22977968817576766",
+        )?,
+    };
+    let mut runtime = RngRuntime::from_states(run, None)?;
+    let value = runtime.run_rand_seed_float(
+        RngReason::RandomSelector,
+        RngCallsiteId::mechanics(RngReason::RandomSelector),
+    )?;
+    assert_eq!(value.to_bits(), 0.4839005009497851_f64.to_bits());
+    let draw = &runtime.audit_entries()[0];
+    assert_eq!(draw.public_api, RngPublicApi::RandSeedFloat);
+    assert_eq!(draw.fraction_bits, Some(F64Bits::from_f64(value)));
+    draw.validate()?;
+    let encoded = serde_json::to_value(draw)?;
+    assert_eq!(serde_json::from_value::<RngDraw>(encoded.clone())?, draw.clone());
+    let mut forged = encoded;
+    forged["fraction_bits"] = Value::String(F64Bits::from_f64(0.5).as_str().to_owned());
+    assert!(serde_json::from_value::<RngDraw>(forged).is_err());
+
+    let before = runtime.clone();
+    assert!(runtime
+        .run_rand_seed_float(
+            RngReason::DamageVariance,
+            RngCallsiteId::mechanics(RngReason::RandomSelector),
+        )
+        .is_err());
+    assert_eq!(runtime, before);
+    Ok(())
+}
+
+#[test]
 fn primitive_transition_and_integer_have_exact_golden_bits() -> Result<(), Box<dyn Error>> {
     let initial = PhaserRdgState::from_values(1, 0.25, 0.5, 0.75)?;
     let mut primitive = PhaserRdg::from_state(&initial)?;
