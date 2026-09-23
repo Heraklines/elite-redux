@@ -974,11 +974,11 @@ impl GameKernelV7 {
         // Every proposal-producing press includes physical/held/lock ownership.
         // Stage ordinary controls too, so a late proposal or replay rejection
         // cannot leave input state behind on direct kernel calls.
-        let mut candidate = Box::new(self.clone());
+        let mut candidate = self.clone();
         let step = candidate.active_input(event)?;
         candidate.retire_obsolete_repeats()?;
         candidate.validate()?;
-        *self = *candidate;
+        *self = candidate;
         Ok(step)
     }
     pub fn advance_time(

@@ -291,6 +291,16 @@ fn trace_request(
     #[cfg(target_arch = "wasm32")]
     wasm_bindgen_test::console_log!("M9E_WASM_STAGE=initial-snapshot");
     let mut events = Vec::new();
+    run_raw_trace(&mut driver, &mut events, content.as_ref())?;
+    finish_raw_request(bundle, seat, driver, initial_snapshot, events)
+}
+
+#[inline(never)]
+fn run_raw_trace(
+    driver: &mut GameKernelV7,
+    events: &mut Vec<M9EParityEventV2>,
+    content: &PreparedGameContentV2,
+) -> Result<(), Box<dyn Error>> {
     for _index in 0..300 {
         #[cfg(target_arch = "wasm32")]
         wasm_bindgen_test::console_log!("M9E_WASM_ITER={_index}");
@@ -313,30 +323,41 @@ fn trace_request(
             GameControlKindV2::BattleCommand => {
                 #[cfg(target_arch = "wasm32")]
                 wasm_bindgen_test::console_log!("M9E_WASM_STEP=battle-command");
-                press(&mut driver, &mut events, PhysicalKey::Space)?;
+                press(driver, events, PhysicalKey::Space)?;
             }
             GameControlKindV2::BattleMove => {
                 #[cfg(target_arch = "wasm32")]
                 wasm_bindgen_test::console_log!("M9E_WASM_STEP=move-before-select");
-                let option = strongest_move_option(&driver, &content)?;
+                let option = strongest_move_option(driver, content)?;
                 #[cfg(target_arch = "wasm32")]
                 wasm_bindgen_test::console_log!("M9E_WASM_STEP=move-before-navigate");
-                navigate_down_to(&mut driver, &mut events, &option)?;
+                navigate_down_to(driver, events, &option)?;
                 #[cfg(target_arch = "wasm32")]
                 wasm_bindgen_test::console_log!("M9E_WASM_STEP=move-before-confirm");
-                press(&mut driver, &mut events, PhysicalKey::Space)?;
+                press(driver, events, PhysicalKey::Space)?;
             }
             GameControlKindV2::Progression
             | GameControlKindV2::MoveLearn
             | GameControlKindV2::Evolution
             | GameControlKindV2::Reward => {
-                press(&mut driver, &mut events, PhysicalKey::Space)?;
+                press(driver, events, PhysicalKey::Space)?;
             }
             other => return Err(format!("longitudinal trace stalled at {other:?}").into()),
         }
     }
     #[cfg(target_arch = "wasm32")]
     wasm_bindgen_test::console_log!("M9E_WASM_STAGE=trace-built");
+    Ok(())
+}
+
+#[inline(never)]
+fn finish_raw_request(
+    bundle: GameContentBundleV2,
+    seat: SeatId,
+    driver: Box<GameKernelV7>,
+    initial_snapshot: Box<CoreGameKernelSnapshotV7>,
+    events: Vec<M9EParityEventV2>,
+) -> Result<M9EParityRequestV1, Box<dyn Error>> {
     assert!(
         driver
             .state()
