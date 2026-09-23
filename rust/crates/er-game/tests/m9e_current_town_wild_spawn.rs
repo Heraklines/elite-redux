@@ -10,7 +10,8 @@ use er_game::current_town_wild_spawn::{
     source_town_initial_level_move_pool, source_town_is_shiny, source_town_ivs_from_id,
     source_town_level_two_form_rows, source_town_level_two_species, source_town_male_half_percent,
     source_town_moveset, source_town_neutral_moveset, source_town_neutral_weighted_level_move_pool,
-    source_town_shiny_xor, source_town_unmodified_level_two_stats,
+    source_town_shiny_xor, source_town_time_of_day, source_town_wave_cycle_offset,
+    source_town_unmodified_level_two_stats,
     source_town_unmodified_stats_at_level, source_town_weighted_level_move_pool,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
@@ -864,6 +865,25 @@ fn naturally_admitted_day_seed_matches_pinned_postreward_enemy() -> Result<(), B
     // Source run 35910615860 observed this seed twice after actual reward
     // CANCEL and a queued wave-two encounter. Both 2125-byte observations had
     // SHA256 896b56e5d0d4b49d925aeef7cecf30c83bac13271fe518184a464dc91c32b355.
+    // Source run 35934274895 additionally observed the scene's seed-derived
+    // wave-cycle offset 0 and effective Town pool time DAY at wave two.
+    let wave_cycle_offset = source_town_wave_cycle_offset("m9e-town-handoff-308")?;
+    assert_eq!(wave_cycle_offset, 0);
+    assert_eq!(source_town_time_of_day(2, wave_cycle_offset)?, 1);
+    assert_eq!(source_town_time_of_day(1, 0)?, 1);
+    assert_eq!(source_town_time_of_day(14, 0)?, 1);
+    assert_eq!(source_town_time_of_day(15, 0)?, 2);
+    assert_eq!(source_town_time_of_day(20, 0)?, 3);
+    assert_eq!(source_town_time_of_day(35, 0)?, 0);
+    assert_eq!(source_town_time_of_day(40, 0)?, 1);
+    assert_eq!(
+        source_town_time_of_day(0, 0),
+        Err(CurrentTownWildErrorV1::UnsupportedContext)
+    );
+    assert_eq!(
+        source_town_time_of_day(2, 1),
+        Err(CurrentTownWildErrorV1::UnsupportedContext)
+    );
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = PreparedGameContentV2::prepare(Arc::new(bundle))?;
     let mode = content
