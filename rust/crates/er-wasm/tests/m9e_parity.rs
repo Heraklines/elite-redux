@@ -250,7 +250,7 @@ type RawDriver = (
     GameContentBundleV2,
     Arc<PreparedGameContentV2>,
     SeatId,
-    GameKernelV7,
+    Box<GameKernelV7>,
 );
 
 #[inline(never)]
@@ -260,7 +260,7 @@ fn raw_driver(
     let GameKernelLifecycleSnapshotV7::Active(state) = &mut snapshot.lifecycle else {
         return Err("bootstrap snapshot is not active".into());
     };
-    let driver = GameKernelV7::from_active(
+    let driver = Box::new(GameKernelV7::from_active(
         state.clone(),
         snapshot.material_ledger.next_authority_revision,
         seat,
@@ -269,7 +269,7 @@ fn raw_driver(
         snapshot.input_router,
         snapshot.scheduler,
         snapshot.protocol,
-    )?;
+    )?);
     #[cfg(target_arch = "wasm32")]
     wasm_bindgen_test::console_log!("M9E_WASM_STAGE=driver-active");
     Ok((bundle, content, seat, driver))
@@ -281,11 +281,13 @@ fn trace_request(
 ) -> Result<M9EParityRequestV1, Box<dyn Error>> {
     #[cfg(target_arch = "wasm32")]
     wasm_bindgen_test::console_log!("M9E_WASM_STAGE=trace-start");
-    let initial_snapshot = driver.snapshot()?;
+    let initial_snapshot = Box::new(driver.snapshot()?);
     #[cfg(target_arch = "wasm32")]
     wasm_bindgen_test::console_log!("M9E_WASM_STAGE=initial-snapshot");
     let mut events = Vec::new();
-    for _ in 0..300 {
+    for _index in 0..300 {
+        #[cfg(target_arch = "wasm32")]
+        wasm_bindgen_test::console_log!("M9E_WASM_ITER={_index}");
         let wave = driver
             .state()
             .and_then(|state| state.active_run.as_ref())
@@ -360,7 +362,7 @@ fn trace_request(
         role: GameKernelRoleV7::Authority,
         save_slots: Vec::new(),
         local_is_host: true,
-        initial_snapshot: Some(initial_snapshot),
+        initial_snapshot: Some(*initial_snapshot),
         events,
     })
 }
