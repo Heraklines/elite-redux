@@ -532,6 +532,7 @@ impl GameStateV6 {
             content_identity,
             identities,
             profile: source.profile,
+            current_account_identity: None,
             current_friendship_profile: None,
             active_run: source.active_run,
             current_battle_participation: None,
