@@ -587,10 +587,28 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     // Causal source run35888899218 observed these actual account IDs, enemy ID,
     // base threshold and reward multiplier after reward CANCEL/newBattle.
     assert_eq!(core.prefix.pokemon_id, 3_818_575_047);
-    assert_eq!(source_town_shiny_xor(12_345, 23_456, core.prefix.pokemon_id), 23_748);
-    assert!(!source_town_is_shiny(12_345, 23_456, core.prefix.pokemon_id, 64));
-    assert!(!source_town_is_shiny(12_345, 23_456, core.prefix.pokemon_id, 23_748));
-    assert!(source_town_is_shiny(12_345, 23_456, core.prefix.pokemon_id, 23_749));
+    assert_eq!(
+        source_town_shiny_xor(12_345, 23_456, core.prefix.pokemon_id),
+        23_748
+    );
+    assert!(!source_town_is_shiny(
+        12_345,
+        23_456,
+        core.prefix.pokemon_id,
+        64
+    ));
+    assert!(!source_town_is_shiny(
+        12_345,
+        23_456,
+        core.prefix.pokemon_id,
+        23_748
+    ));
+    assert!(source_town_is_shiny(
+        12_345,
+        23_456,
+        core.prefix.pokemon_id,
+        23_749
+    ));
     assert_eq!(core.audit.as_slice(), complete_moveset_rng.audit_entries());
     assert_eq!(core_rng, complete_moveset_rng);
     assert_eq!(
