@@ -21,8 +21,9 @@ const SOURCE_AFTER_SELECTION: &str =
 #[test]
 fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Box<dyn Error>> {
     // Source399d direct queued NextEncounter observation in run34704520605:
-    // tier integer 247/512, common pool index 3/24, root263. It records the
-    // exact run stream on both sides of randomSpecies, not a sampled lookup.
+    // tier integer 247/512, common pool index 3/24, root263. That probe's
+    // retained run stream and its DAY override are separate controls; this
+    // isolated selector test does not claim a causal natural reward receipt.
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = PreparedGameContentV2::prepare(Arc::new(bundle))?;
     let town = content
@@ -65,8 +66,18 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         .iter()
         .find(|mode| mode.key == "CLASSIC")
         .ok_or("Classic mode absent")?;
+    let eight = SafeU53::new(8)?;
+    let day_seed = (0..64)
+        .map(|index| format!("m9e-town-day-{index}"))
+        .find(|seed| {
+            let mut probe = PhaserRdg::from_seed(seed);
+            probe
+                .rand_seed_int(eight, SafeU53::ZERO)
+                .is_ok_and(|draw| (2 + draw.get() * 5) % 40 < 15)
+        })
+        .ok_or("no bounded Town day seed")?;
     let context = CurrentTownDayWaveTwoContextV1 {
-        run_seed: "test",
+        run_seed: &day_seed,
         mode: mode.id,
         biome: town.id,
         difficulty: RunDifficultyV1::Ace,
@@ -81,21 +92,6 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         golden_bug_net: false,
         excluded_species: &[],
     };
-    let mut offset_probe = PhaserRdg::from_seed(context.run_seed);
-    let offset = offset_probe
-        .rand_seed_int(SafeU53::new(8)?, SafeU53::ZERO)?
-        .get()
-        * 5;
-    eprintln!(
-        "town context oracle={} mode={} supported={} cooperative={} challenge={} wave_offset={} time_remainder={}",
-        content.identity().oracle_sha.as_str(),
-        mode.key,
-        mode.supported,
-        mode.cooperative,
-        mode.challenge_selection,
-        offset,
-        (u64::from(context.wave) + offset) % 40
-    );
     let mut rng = RngRuntime::from_states(
         RunRngState {
             rdg: PhaserRdgState::from_state_string(SOURCE_BEFORE)?,
@@ -117,6 +113,13 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     let before = rng.clone();
     let mut unsupported = context;
     unsupported.luck = 1;
+    assert_eq!(
+        select_current_town_day_wave_two_root(&content, unsupported, &mut rng),
+        Err(CurrentTownWildErrorV1::UnsupportedContext)
+    );
+    assert_eq!(rng, before);
+    unsupported = context;
+    unsupported.run_seed = "test";
     assert_eq!(
         select_current_town_day_wave_two_root(&content, unsupported, &mut rng),
         Err(CurrentTownWildErrorV1::UnsupportedContext)
