@@ -380,7 +380,7 @@ fn source_level_two_abilities()
                 || parsed.source != ORACLE
                 || parsed.rows.len() != 53
                 || parsed.movegen_modifiers.len() != 98
-                || parsed.movegen_modifiers.iter().any(|id| *id == 0)
+                || parsed.movegen_modifiers.contains(&0)
                 || parsed
                     .movegen_modifiers
                     .iter()
