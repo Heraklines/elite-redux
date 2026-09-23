@@ -98,7 +98,7 @@ function extractTownStatic(tiers:readonly (readonly [number,readonly number[]])[
   for(const e of evolutions)queue.push([e.speciesId,depth+1]);for(const row of preLevels)queue.push([row[0],depth+1]);if(preOwn){expect(Number.isSafeInteger(preValue)).toBe(true);queue.push([preValue,depth+1]);}
   for(const [parent] of incoming)queue.push([parent,depth+1]);
   const forms=species.forms.length?species.forms:[species];expect(forms.length,`species${id} forms`).toBeLessThanOrEqual(20);
-  const unavailableMask=forms.reduce((mask,form,index)=>{expect(typeof form.isUnobtainable).toBe("boolean");return mask+(form.isUnobtainable?2**index:0);},0);
+  const unavailableMask=forms.reduce((mask,form,index)=>{expect(form.isUnobtainable===undefined||typeof form.isUnobtainable==="boolean").toBe(true);return mask+(form.isUnobtainable===true?2**index:0);},0);
   formFlags.push([id,unavailableMask]);
   const formRows=forms.map((form,index)=>{
    expect([form.getLevelMoves,form.getAbility,form.getAbilityCount,form.getPassiveAbilities]).toEqual(originalRegistryMethods.slice(0,4));

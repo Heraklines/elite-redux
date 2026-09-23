@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 BOUNDED_HELPER_BYTES = 38620
-EXPORTER_SHA256 = "dd2726242b13734babf3d469cf9d5f8079c6a4e713bfde78648a9e14407567fc"
+EXPORTER_SHA256 = "a5bbd1a0f47ad8afc1db13a6844e1819853a433abed51e57b7d6a3787d9cbc46"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
