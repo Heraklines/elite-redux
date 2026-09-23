@@ -82,7 +82,10 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         excluded_species: &[],
     };
     let mut offset_probe = PhaserRdg::from_seed(context.run_seed);
-    let offset = offset_probe.rand_seed_int(SafeU53::new(8)?, SafeU53::ZERO)?.get() * 5;
+    let offset = offset_probe
+        .rand_seed_int(SafeU53::new(8)?, SafeU53::ZERO)?
+        .get()
+        * 5;
     eprintln!(
         "town context oracle={} mode={} supported={} cooperative={} challenge={} wave_offset={} time_remainder={}",
         content.identity().oracle_sha,
