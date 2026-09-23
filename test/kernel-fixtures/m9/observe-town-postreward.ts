@@ -74,11 +74,16 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   const actualNewBattle = scene.newBattle.bind(scene);
   const beforeNewBattle: string[] = [];
   const afterNewBattle: string[] = [];
-  const afterResetSeed: string[] = [];
+  const afterResetSeed: { wave: number | null; seed: string; wave_seed: string; state: string }[] = [];
   const actualResetSeed = scene.resetSeed.bind(scene);
   vi.spyOn(scene, "resetSeed").mockImplementation((...args) => {
     const result = actualResetSeed(...args);
-    afterResetSeed.push(Phaser.Math.RND.state());
+    afterResetSeed.push({
+      wave: args[0] ?? null,
+      seed: scene.seed,
+      wave_seed: scene.waveSeed,
+      state: Phaser.Math.RND.state(),
+    });
     return result;
   });
   const newBattle = vi.spyOn(scene, "newBattle").mockImplementation((...args) => {
@@ -145,6 +150,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
     schema: 1,
     source: PIN,
     seed: SEED,
+    scene_seed: scene.seed,
     scope: "controlled level-ten starter attacks, victory reward cancel and queued Town wave-two encounter",
     account: { trainer_id: scene.gameData.trainerId, secret_id: scene.gameData.secretId },
     shiny_context: {
