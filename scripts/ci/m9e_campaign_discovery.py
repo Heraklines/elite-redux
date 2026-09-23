@@ -9,11 +9,12 @@ import subprocess
 import sys
 import time
 
-BASE = "2f124b450b5c118191bf0d0775ac42a7d27c00cc"
-BRANCH = "codex/m9e-campaign-discovery-20260923"
+BASE = "2d86bea93c5063b843305a6564065d30af7e9f4c"
+BRANCH = "codex/m9e-replay-stack-focused-20260923"
 OWNED = {
     ".github/workflows/m9e-campaign-discovery.yml",
     "scripts/ci/m9e_campaign_discovery.py",
+    "rust/crates/er-repro/tests/m9e_natural_campaign_replay.rs",
 }
 CASES = {
     "coop": (
@@ -71,8 +72,8 @@ def main(case):
     (out / "diagnostics").mkdir()
     result = {
         "status": "failed", "case": case, "source_sha": os.environ["GITHUB_SHA"],
-        "product_base_sha": BASE, "branch": os.environ["GITHUB_REF_NAME"],
-        "scope": "one complete natural campaign on unchanged product source; exploratory, not aggregate M9 acceptance",
+        "harness_parent_sha": BASE, "branch": os.environ["GITHUB_REF_NAME"],
+        "scope": "one complete replay target with a test-frame split on unchanged product source; not aggregate M9 acceptance",
         "commands": COMMANDS, "test_passed": False,
         "harness_sha256": sha(Path(__file__).read_bytes()),
     }

@@ -91,6 +91,30 @@ impl std::ops::Deref for CampaignRecorder {
 
 impl CampaignRecorder {
     fn capture(&mut self, event: CurrentExternalEvent) -> Result<GameKernelStepV7, Box<dyn Error>> {
+        // Release the snapshots and observation from the recording call before
+        // replay imports a complete capsule on the same default test stack.
+        let step = self.capture_event(event)?;
+        // The first segment ends with Space still held, proving that decoding
+        // and importing a capsule preserves input state before the key-up.
+        // Preserve the first held-key checkpoint. The bootstrap catalog makes
+        // those attempts larger, so keep its capsule segment short without
+        // replaying a whole capsule for every navigation input.
+        let segment_limit = if self.session.kernel_ref()?.state().is_none() {
+            2
+        } else {
+            32
+        };
+        if self.position == 1 || self.position - self.base == segment_limit {
+            self.flush()?;
+        }
+        Ok(step)
+    }
+
+    #[inline(never)]
+    fn capture_event(
+        &mut self,
+        event: CurrentExternalEvent,
+    ) -> Result<GameKernelStepV7, Box<dyn Error>> {
         let capture_started = Instant::now();
         let before = self.session.snapshot()?;
         let apply_started = Instant::now();
@@ -113,20 +137,19 @@ impl CampaignRecorder {
         );
         self.capture_elapsed += capture_started.elapsed();
         let step = result?;
-        // The first segment ends with Space still held, proving that decoding
-        // and importing a capsule preserves input state before the key-up.
-        // Preserve the first held-key checkpoint. The bootstrap catalog makes
-        // those attempts larger, so keep its capsule segment short without
-        // replaying a whole capsule for every navigation input.
-        let segment_limit = if self.session.kernel_ref()?.state().is_none() {
-            2
-        } else {
-            32
-        };
-        if self.position == 1 || self.position - self.base == segment_limit {
-            self.flush()?;
-        }
         Ok(step)
+    }
+
+    fn stack_marker(&self, stage: &str) -> Result<(), Box<dyn Error>> {
+        if self.segments >= 1600 {
+            writeln!(
+                std::io::stderr().lock(),
+                "M9E_REPLAY_STACK segment={} event={} stage={stage}",
+                self.segments + 1,
+                self.position
+            )?;
+        }
+        Ok(())
     }
 
     fn raw_input(&mut self, input: RawInputEvent) -> Result<GameKernelStepV7, Box<dyn Error>> {
@@ -149,6 +172,7 @@ impl CampaignRecorder {
         if self.position == self.base {
             return Ok(());
         }
+        self.stack_marker("flush_start")?;
         let roundtrip_started = Instant::now();
         let capsule = self.recorder.export()?;
         assert_eq!(capsule.base_position, self.base);
@@ -157,15 +181,18 @@ impl CampaignRecorder {
         assert_eq!(*capsule.checkpoint, self.checkpoint);
         let expected = self.session.snapshot()?;
         let expected_observation = self.session.observe()?;
+        self.stack_marker("encode")?;
         let encoded = serde_json::to_vec(&capsule)?;
         assert!(encoded.len() <= CurrentReproLimitsV1::default().maximum_bytes);
         let decoded: CurrentReproCapsuleV1 = serde_json::from_slice(&encoded)?;
         assert_eq!(decoded, capsule);
+        self.stack_marker("import")?;
         let (imported, resumed) = CurrentReproRecorderV1::from_capsule(
             decoded.clone(),
             self.content.clone(),
             CurrentReproLimitsV1::default(),
         )?;
+        self.stack_marker("imported")?;
         assert_eq!(imported.export()?, decoded);
         assert_eq!(resumed.snapshot()?, expected);
         assert_eq!(resumed.observe()?, expected_observation);
@@ -183,6 +210,7 @@ impl CampaignRecorder {
             CurrentReproLimitsV1::default(),
             self.position,
         )?;
+        self.stack_marker("next_recorder")?;
         self.roundtrip_elapsed += roundtrip_started.elapsed();
         self.segments += 1;
         if self.segments == 1 || self.segments.is_multiple_of(64) {

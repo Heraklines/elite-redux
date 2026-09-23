@@ -1,7 +1,7 @@
-name: M9E Whole Campaign Discovery
+name: M9E Replay Stack Focus
 on:
   push:
-    branches: [codex/m9e-campaign-discovery-20260923]
+    branches: [codex/m9e-replay-stack-focused-20260923]
 permissions:
   contents: read
 concurrency:
@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        case: [coop, replay]
+        case: [replay]
     env:
       GIT_LFS_SKIP_SMUDGE: '1'
       CARGO_INCREMENTAL: '0'
