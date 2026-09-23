@@ -58,6 +58,8 @@ jobs:
         run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy
       - name: Qualify exact source-bound Town root selector
         run: python3 scripts/ci/m9e_town_selector_diagnostic.py
+      - name: Search bounded natural wave-two Town seeds remotely
+        run: cargo test --manifest-path rust/Cargo.toml --locked -p er-game --test m9e_town_seed_search -- --nocapture
       - name: Compact source-bound selector result
         if: always()
         uses: actions/upload-artifact@v6
