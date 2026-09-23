@@ -6,8 +6,7 @@ use er_game::current_town_wild_spawn::{
     select_current_town_day_wave_two_constructor_prefix, select_current_town_day_wave_two_root,
     source_town_ability_id, source_town_day_pools, source_town_form_base_stats,
     source_town_form_types, source_town_initial_level_move_pool, source_town_ivs_from_id,
-    source_town_level_two_form_rows,
-    source_town_level_two_species, source_town_male_half_percent,
+    source_town_level_two_form_rows, source_town_level_two_species, source_town_male_half_percent,
     source_town_unmodified_level_two_stats,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
@@ -132,11 +131,13 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
             .len(),
         131
     );
-    assert!(level_two_meta["rows"]
-        .as_array()
-        .ok_or("level-two metadata")?
-        .iter()
-        .all(|row| row[5].as_bool() == Some(false)));
+    assert!(
+        level_two_meta["rows"]
+            .as_array()
+            .ok_or("level-two metadata")?
+            .iter()
+            .all(|row| row[5].as_bool() == Some(false))
+    );
     for root in pools.iter().flatten() {
         let id = root.get().get();
         let source_ratio = gender["rows"]
@@ -252,7 +253,9 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
                 .map(|(level, id)| (level, id.get().get()))
                 .collect::<Vec<_>>();
             assert_eq!(actual, expected);
-            assert!(source_town_initial_level_move_pool(&content, *root, form as u16)?.len() <= 512);
+            assert!(
+                source_town_initial_level_move_pool(&content, *root, form as u16)?.len() <= 512
+            );
         }
     }
     assert_eq!(
@@ -356,11 +359,8 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     assert_eq!(prefix.form_index, 0);
     assert_eq!(prefix.nature_index, 11);
     assert_eq!(prefix.tera_type, PokemonType::Normal);
-    let initial_moves = source_town_initial_level_move_pool(
-        &content,
-        prefix.root.source_root,
-        prefix.form_index,
-    )?;
+    let initial_moves =
+        source_town_initial_level_move_pool(&content, prefix.root.source_root, prefix.form_index)?;
     assert_eq!(
         initial_moves
             .iter()
