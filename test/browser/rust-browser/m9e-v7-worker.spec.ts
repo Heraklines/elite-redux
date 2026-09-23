@@ -395,14 +395,18 @@ test("current V7 Worker preserves fresh account IDs through snapshot restore", a
       if (after.response.kind !== "SNAPSHOT" || JSON.stringify(after.response.snapshot) !== JSON.stringify(checkpoint)) {
         throw new Error("fresh Worker account checkpoint changed on restore");
       }
+      const checkpointHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",
+        new TextEncoder().encode(JSON.stringify(checkpoint)))))
+        .map(byte => byte.toString(16).padStart(2, "0")).join("");
       await second.dispose();
       return { account, exact_snapshot_restore: true, disposed_workers: 2,
-        first_closed: first.status.closed, second_closed: second.status.closed };
+        first_closed: first.status.closed, second_closed: second.status.closed, checkpoint_sha256: checkpointHash };
     } finally { first.terminate(); second?.terminate(); }
   }, { entry: `${address}/m9e-assets/${manifest.entry}`, assets: assets(), initialization });
   expect(observed).toHaveLength(2);
   expect(evidence).toEqual({ account: { trainer_id: 12345, secret_id: 23456 },
-    exact_snapshot_restore: true, disposed_workers: 2, first_closed: true, second_closed: true });
+    exact_snapshot_restore: true, disposed_workers: 2, first_closed: true, second_closed: true,
+    checkpoint_sha256: expect.stringMatching(/^[0-9a-f]{64}$/u) });
   const bytes = Buffer.from(JSON.stringify({ ...binding(observed), ...evidence }));
   expect(bytes.length).toBeLessThanOrEqual(4096);
   await testInfo.attach("m9e-fresh-account-worker", { body: bytes, contentType: "application/json" });

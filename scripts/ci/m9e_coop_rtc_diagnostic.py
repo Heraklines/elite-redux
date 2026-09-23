@@ -360,6 +360,8 @@ def execute_prepared(summary, *, install_chromium=True):
             or account.get("worker_path") != worker["worker"]
             or any(account.get(key) != expected for key, expected in worker["cohort"].items())
             or account.get("account") != {"trainer_id": 12345, "secret_id": 23456}
+            or not isinstance(account.get("checkpoint_sha256"), str)
+            or not re.fullmatch(r"[0-9a-f]{64}", account["checkpoint_sha256"])
             or account.get("observed_worker_count") != 2 or account.get("disposed_workers") != 2
             or account.get("exact_snapshot_restore") is not True
             or account.get("first_closed") is not True or account.get("second_closed") is not True):
