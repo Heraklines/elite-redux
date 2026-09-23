@@ -20,7 +20,7 @@ use er_types::battle_ids::{MoveId, WaveIndex};
 use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
 use er_types::run_ids::Experience;
 use er_types::{GameControlKindV2, SafeU53, SeatId};
-use std::{error::Error, sync::Arc};
+use std::{error::Error, io::Write, sync::Arc};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 const BUNDLE: &[u8] =
@@ -347,14 +347,15 @@ fn bounded_town_candidates_admit_natural_first_battle() -> Result<()> {
                     .and_then(|run| run.battle.as_ref())
                     .and_then(|battle| battle.enemy_party.first())
                     .ok_or("natural first enemy absent")?;
-                println!(
+                writeln!(
+                    std::io::stdout().lock(),
                     "admitted={seed} first_enemy={}",
                     enemy.species_id.get().get()
-                );
+                )?;
                 admitted += 1;
                 break;
             }
-            Err(error) => println!("rejected={seed} reason={error}"),
+            Err(error) => writeln!(std::io::stdout().lock(), "rejected={seed} reason={error}")?,
         }
     }
     assert!(

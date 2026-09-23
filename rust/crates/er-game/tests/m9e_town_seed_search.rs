@@ -1,5 +1,5 @@
 //! Bounded remote-only diagnostic for a natural Town wave-two successor seed.
-use std::{error::Error, sync::Arc};
+use std::{error::Error, io::Write, sync::Arc};
 
 use er_game::current_town_wild_spawn::{
     CurrentTownDayWaveTwoContextV1, select_current_town_day_wave_two_root,
@@ -68,10 +68,11 @@ fn bounded_source_wave_two_seed_candidates() -> Result<(), Box<dyn Error>> {
         )?;
         if let Ok(root) = select_current_town_day_wave_two_root(&content, context, &mut rng) {
             assert_eq!(root.source_root.get().get(), 504);
-            println!(
+            writeln!(
+                std::io::stdout().lock(),
                 "candidate={seed} before={} time_offset={time_offset}",
                 wave_rng.state().state_string
-            );
+            )?;
             found += 1;
             if found == 24 {
                 break;
