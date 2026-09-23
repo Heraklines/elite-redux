@@ -426,8 +426,8 @@ fn source_level_two_abilities()
         .map_err(|_| CurrentTownWildErrorV1::SourceContent)
 }
 
-fn source_level_two_signatures(
-) -> Result<&'static SourceTownLevelTwoSignaturesV1, CurrentTownWildErrorV1> {
+fn source_level_two_signatures()
+-> Result<&'static SourceTownLevelTwoSignaturesV1, CurrentTownWildErrorV1> {
     SOURCE_LEVEL_TWO_SIGNATURES
         .get_or_init(|| {
             let parsed: SourceTownLevelTwoSignaturesV1 =
@@ -443,9 +443,8 @@ fn source_level_two_signatures(
                             ids.is_empty()
                                 || ids.len() > 32
                                 || source.1.iter().any(|form| {
-                                    form.iter().any(|(level, id)| {
-                                        *level >= 0 && ids.contains(id)
-                                    })
+                                    form.iter()
+                                        .any(|(level, id)| *level >= 0 && ids.contains(id))
                                 })
                         })
                 })
@@ -946,8 +945,11 @@ pub fn source_town_neutral_unfiltered_moveset(
         .enumerate()
         .map(|(index, row)| {
             let meta = source_town_move_meta(content, row.id)?;
-            Ok((index, row.weighted_weight, meta.1 != 2 && !meta.6
-                && types.contains(&source_town_type(meta.2)?)))
+            Ok((
+                index,
+                row.weighted_weight,
+                meta.1 != 2 && !meta.6 && types.contains(&source_town_type(meta.2)?),
+            ))
         })
         .collect::<Result<Vec<_>, CurrentTownWildErrorV1>>()?
         .into_iter()

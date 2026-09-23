@@ -331,8 +331,8 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
                 );
                 if has_effect {
                     assert_eq!(
-                        result.unwrap_err(),
-                        CurrentTownWildErrorV1::UnsupportedContext
+                        result.err(),
+                        Some(CurrentTownWildErrorV1::UnsupportedContext)
                     );
                 } else {
                     assert!(result?.len() <= 512);
@@ -527,7 +527,12 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
             .iter()
             .map(|draw| (draw.cardinality.get(), draw.result.get()))
             .collect::<Vec<_>>(),
-        vec![(74_296, 2_192), (63_399, 8_533), (50_350, 37_661), (17_354, 8_440)]
+        vec![
+            (74_296, 2_192),
+            (63_399, 8_533),
+            (50_350, 37_661),
+            (17_354, 8_440)
+        ]
     );
     assert_eq!(prefix.audit.len(), 7);
     assert_eq!(prefix.audit[5].public_api, RngPublicApi::RandSeedFloat);
