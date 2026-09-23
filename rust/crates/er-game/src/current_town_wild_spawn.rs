@@ -222,6 +222,7 @@ type SourceTownMoveMetaRow = (u64, u8, u8, i16, i16, bool, bool);
 type SourceTownMovegenRow = (u64, f64, u8);
 type SourceTownAbilityProfile = (Vec<u64>, Vec<u64>);
 type SourceTownSpeciesAbilityRows = (u64, Vec<SourceTownAbilityProfile>);
+type SourceTownSignatureRow = (u64, Option<Vec<u64>>);
 
 // Source run 35854351965, SHA256
 // 86b764e17e26ec5db4bd201cc7f95950975aa134960eae2a0570a8b5a7201a80.
@@ -266,6 +267,21 @@ struct SourceTownLevelTwoAbilitiesV1 {
 }
 
 static SOURCE_LEVEL_TWO_ABILITIES: OnceLock<Result<SourceTownLevelTwoAbilitiesV1, ()>> =
+    OnceLock::new();
+
+// Source run 35865632493, SHA256
+// a7d37de2698ddfa3b4e3b4c67d0c66cbf876784185eaf12ef0407f577f6042a9.
+// The independent source verifier proved no signature is available in the
+// level-two move pool of any effective Town root/form.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SourceTownLevelTwoSignaturesV1 {
+    schema: u8,
+    source: String,
+    rows: Vec<SourceTownSignatureRow>,
+}
+
+static SOURCE_LEVEL_TWO_SIGNATURES: OnceLock<Result<SourceTownLevelTwoSignaturesV1, ()>> =
     OnceLock::new();
 
 fn source_level_two_forms() -> Result<&'static SourceTownLevelTwoFormsV1, CurrentTownWildErrorV1> {
@@ -359,6 +375,11 @@ fn source_level_two_movegen() -> Result<&'static SourceTownLevelTwoMovegenV1, Cu
                     .rows
                     .iter()
                     .any(|row| !row.1.is_finite() || !(0.0..=10_000.0).contains(&row.1))
+                || parsed
+                    .rows
+                    .iter()
+                    .zip(&meta.rows)
+                    .any(|(row, move_meta)| row.2 & 32 != 0 && !move_meta.6)
             {
                 return Err(());
             }
@@ -396,6 +417,45 @@ fn source_level_two_abilities()
                                 || active.iter().chain(passive).any(|id| *id == 0)
                         })
                 })
+            {
+                return Err(());
+            }
+            Ok(parsed)
+        })
+        .as_ref()
+        .map_err(|_| CurrentTownWildErrorV1::SourceContent)
+}
+
+fn source_level_two_signatures(
+) -> Result<&'static SourceTownLevelTwoSignaturesV1, CurrentTownWildErrorV1> {
+    SOURCE_LEVEL_TWO_SIGNATURES
+        .get_or_init(|| {
+            let parsed: SourceTownLevelTwoSignaturesV1 =
+                serde_json::from_str(include_str!("current_town_level_two_signatures.json"))
+                    .map_err(|_| ())?;
+            let forms = source_level_two_forms().map_err(|_| ())?;
+            if parsed.schema != 1
+                || parsed.source != ORACLE
+                || parsed.rows.len() != 53
+                || parsed.rows.iter().zip(&forms.rows).any(|(row, source)| {
+                    row.0 != source.0
+                        || row.1.as_ref().is_some_and(|ids| {
+                            ids.is_empty()
+                                || ids.len() > 32
+                                || source.1.iter().any(|form| {
+                                    form.iter().any(|(level, id)| {
+                                        *level >= 0 && ids.contains(id)
+                                    })
+                                })
+                        })
+                })
+                || parsed.rows.iter().filter(|row| row.1.is_some()).count() != 1
+                || parsed
+                    .rows
+                    .iter()
+                    .find(|row| row.0 == 133)
+                    .and_then(|row| row.1.as_deref())
+                    != Some(&[733, 734, 735, 737, 736, 739, 738, 740][..])
             {
                 return Err(());
             }
@@ -820,6 +880,95 @@ pub fn source_town_neutral_weighted_level_move_pool(
             })
         })
         .collect()
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CurrentTownUnfilteredMovesetV1 {
+    pub moves: Vec<MoveId>,
+    pub audit: Vec<RngDraw>,
+}
+
+fn source_town_weighted_move_index(
+    rng: &mut RngRuntime,
+    candidates: &[(usize, u64)],
+) -> Result<usize, CurrentTownWildErrorV1> {
+    let total = candidates.iter().try_fold(0_u64, |sum, (_, weight)| {
+        sum.checked_add(*weight)
+            .ok_or(CurrentTownWildErrorV1::RandomDraw)
+    })?;
+    if total == 0 {
+        return Err(CurrentTownWildErrorV1::RandomDraw);
+    }
+    let mut roll = rng
+        .run_rand_seed_int(
+            SafeU53::new(total).map_err(|_| CurrentTownWildErrorV1::RandomDraw)?,
+            SafeU53::ZERO,
+            RngReason::RandomSelector,
+            RngCallsiteId::mechanics(RngReason::RandomSelector),
+        )
+        .map_err(|_| CurrentTownWildErrorV1::RandomDraw)?
+        .get();
+    // Source uses `while (rand > weight)`, so equality stays in this slot.
+    for (index, weight) in candidates {
+        if roll <= *weight {
+            return Ok(*index);
+        }
+        roll -= *weight;
+    }
+    Err(CurrentTownWildErrorV1::RandomDraw)
+}
+
+/// Source signature check, forced STAB and the first weighted fill pass for
+/// an ability-neutral wild. The source's filterUselessMoves pass and any
+/// subsequent replacement draws remain a separate stage.
+pub fn source_town_neutral_unfiltered_moveset(
+    content: &PreparedGameContentV2,
+    root: SpeciesId,
+    form_index: u16,
+    ability_index: u8,
+    stats: [u32; 6],
+    rng: &mut RngRuntime,
+) -> Result<CurrentTownUnfilteredMovesetV1, CurrentTownWildErrorV1> {
+    source_level_two_signatures()?;
+    let mut pool = source_town_neutral_weighted_level_move_pool(
+        content,
+        root,
+        form_index,
+        ability_index,
+        stats,
+    )?;
+    let types = source_town_form_types(root, form_index)?;
+    let mut staged = rng.clone();
+    let first_audit = staged.audit_entries().len();
+    let mut moves = Vec::with_capacity(4);
+    let stab = pool
+        .iter()
+        .enumerate()
+        .map(|(index, row)| {
+            let meta = source_town_move_meta(content, row.id)?;
+            Ok((index, row.weighted_weight, meta.1 != 2 && !meta.6
+                && types.contains(&source_town_type(meta.2)?)))
+        })
+        .collect::<Result<Vec<_>, CurrentTownWildErrorV1>>()?
+        .into_iter()
+        .filter_map(|(index, weight, included)| included.then_some((index, weight)))
+        .collect::<Vec<_>>();
+    if !stab.is_empty() {
+        let index = source_town_weighted_move_index(&mut staged, &stab)?;
+        moves.push(pool.remove(index).id);
+    }
+    while moves.len() < 4 && !pool.is_empty() {
+        let candidates = pool
+            .iter()
+            .enumerate()
+            .map(|(index, row)| (index, row.weighted_weight))
+            .collect::<Vec<_>>();
+        let index = source_town_weighted_move_index(&mut staged, &candidates)?;
+        moves.push(pool.remove(index).id);
+    }
+    let audit = staged.audit_entries()[first_audit..].to_vec();
+    *rng = staged;
+    Ok(CurrentTownUnfilteredMovesetV1 { moves, audit })
 }
 
 /// Source level-two stat formula before held, nature-weight, challenge or

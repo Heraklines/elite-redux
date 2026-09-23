@@ -24,6 +24,7 @@ SOURCE_LEVEL_TWO_FORMS_SHA256 = "63cd454d9e74ae2d77e59327b02a391e8c196edc60bc030
 SOURCE_LEVEL_TWO_META_SHA256 = "86b764e17e26ec5db4bd201cc7f95950975aa134960eae2a0570a8b5a7201a80"
 SOURCE_LEVEL_TWO_MOVEGEN_SHA256 = "5369a09a00d1e10bd67025ce6c8ff8079dd5fe05cec45a5e40c0617950cd6575"
 SOURCE_LEVEL_TWO_ABILITIES_SHA256 = "69c24f1b15c8888fd2ae7ec9c1565562135d8f9dc0eefb56774f1a919ca1e013"
+SOURCE_LEVEL_TWO_SIGNATURES_SHA256 = "a7d37de2698ddfa3b4e3b4c67d0c66cbf876784185eaf12ef0407f577f6042a9"
 SOURCE_MOVEGEN_STAGE_SHA256 = "de404f12a5cfffcaf71d41f01b6e5daae821faa57b9d4e3012293fc0260aac29"
 START = time.monotonic()
 COMMANDS = []
@@ -55,7 +56,7 @@ def run(name, argv, seconds=600):
 def main():
     COMPACT.mkdir(parents=True, exist_ok=False)
     result = {"schema": 1, "status": "failed", "source_sha": SHA,
-              "scope": "Ace/Town/day wave-two full-root, constructor prefix through tera type and neutral-ability level-move weighting; no complete moveset, enemy settlement or next-wave receipt",
+              "scope": "Ace/Town/day wave-two full-root, constructor prefix and neutral-ability first-pass move draws; no usefulness replacement, enemy settlement or next-wave receipt",
               "commands": COMMANDS}
     try:
         head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
@@ -67,6 +68,7 @@ def main():
                  "rust/crates/er-game/src/current_town_level_two_meta.json",
                  "rust/crates/er-game/src/current_town_level_two_movegen.json",
                  "rust/crates/er-game/src/current_town_level_two_abilities.json",
+                 "rust/crates/er-game/src/current_town_level_two_signatures.json",
                  "rust/crates/er-game/src/lib.rs",
                  "rust/crates/er-game/src/m9_new_run.rs",
                  "rust/crates/er-game/src/material.rs",
@@ -96,6 +98,7 @@ def main():
             "level_two_meta": ("rust/crates/er-game/src/current_town_level_two_meta.json", SOURCE_LEVEL_TWO_META_SHA256),
             "level_two_movegen": ("rust/crates/er-game/src/current_town_level_two_movegen.json", SOURCE_LEVEL_TWO_MOVEGEN_SHA256),
             "level_two_abilities": ("rust/crates/er-game/src/current_town_level_two_abilities.json", SOURCE_LEVEL_TWO_ABILITIES_SHA256),
+            "level_two_signatures": ("rust/crates/er-game/src/current_town_level_two_signatures.json", SOURCE_LEVEL_TWO_SIGNATURES_SHA256),
             "movegen_stage": ("rust/fixtures/m9/engineering/town-movegen-stage-v1.json", SOURCE_MOVEGEN_STAGE_SHA256),
         }
         for name, (path, expected) in source_fixtures.items():
@@ -135,7 +138,8 @@ def main():
         if result["first_failure"] == "format failed":
             subprocess.run(["cargo", "fmt", "--manifest-path", "Cargo.toml", "--all"],
                            cwd=RUST, timeout=120, check=False)
-            patch = subprocess.check_output(["git", "diff", "--", files[0], files[8]], cwd=ROOT)
+            patch = subprocess.check_output(["git", "diff", "--", files[0],
+                                             "rust/crates/er-game/tests/m9e_current_town_wild_spawn.rs"], cwd=ROOT)
             if len(patch) <= 32768:
                 (OUT / "format.patch").write_bytes(patch)
     finally:
