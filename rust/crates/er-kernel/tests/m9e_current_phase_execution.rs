@@ -2169,7 +2169,15 @@ fn assert_actual_tm_reward(
     if tm.slot == 4 {
         assert_actual_tm_intro_reissue(&state.0, content.clone())?;
     }
-    let (state, tm, learned) = assert_actual_tm_fullslot_replace(state, content.clone(), tm, learned)?;
+    let (state, tm, learned) = if tm.slot == 4 {
+        let (state, tm, learned) =
+            assert_actual_tm_fullslot_replace(state, content.clone(), tm, learned)?;
+        let (state, tm, learned) =
+            assert_actual_tm_replace_yes(state, content.clone(), tm, learned)?;
+        assert_actual_tm_choose_slot(state, content.clone(), tm, learned)?
+    } else {
+        (state, tm, learned)
+    };
     let (kernel, selected, live, ledger) = state;
     let present = Box::new(kernel.snapshot()?);
     writeln!(std::io::stderr().lock(), "M9E_TM_STAGE present")?;
@@ -2316,8 +2324,8 @@ fn assert_actual_tm_reward_after_queued(
 fn assert_actual_tm_fullslot_replace(
     state: TmWitnessState,
     content: Arc<PreparedGameContentV2>,
-    mut tm: Box<er_state::current_reward_tm::CurrentRewardTmV1>,
-    mut learned: GameMaterialV6,
+    tm: Box<er_state::current_reward_tm::CurrentRewardTmV1>,
+    learned: GameMaterialV6,
 ) -> Result<TmWitnessWithMove> {
     let (mut kernel, selected, mut live, mut ledger) = state;
     use er_state::current_reward_tm::CurrentRewardTmPhaseV1 as T;
@@ -2336,6 +2344,19 @@ fn assert_actual_tm_fullslot_replace(
         let decline = Box::new(kernel.snapshot()?);
         assert_tm_decline_on_default_thread(&decline, content.clone(), &live, &ledger)?;
         writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_decline")?;
+    }
+    Ok(((kernel, selected, live, ledger), tm, learned))
+}
+
+#[inline(never)]
+fn assert_actual_tm_replace_yes(
+    state: TmWitnessState,
+    content: Arc<PreparedGameContentV2>,
+    tm: Box<er_state::current_reward_tm::CurrentRewardTmV1>,
+    learned: GameMaterialV6,
+) -> Result<TmWitnessWithMove> {
+    let (mut kernel, selected, mut live, mut ledger) = state;
+    use er_state::current_reward_tm::CurrentRewardTmPhaseV1 as T;
         // Source Replace Yes -> which-move message -> actual first old slot.
         navigate_reward_ordinal(&mut kernel, &mut live, 0)?;
         let step = press(&mut kernel, PhysicalKey::Space)?;
@@ -2354,6 +2375,18 @@ fn assert_actual_tm_fullslot_replace(
                 .phase,
             T::ChooseSlot
         ));
+    Ok(((kernel, selected, live, ledger), tm, learned))
+}
+
+#[inline(never)]
+fn assert_actual_tm_choose_slot(
+    state: TmWitnessState,
+    content: Arc<PreparedGameContentV2>,
+    mut tm: Box<er_state::current_reward_tm::CurrentRewardTmV1>,
+    mut learned: GameMaterialV6,
+) -> Result<TmWitnessWithMove> {
+    let (mut kernel, selected, mut live, mut ledger) = state;
+    use er_state::current_reward_tm::CurrentRewardTmPhaseV1 as T;
         navigate_reward_ordinal(&mut kernel, &mut live, 0)?;
         let step = press(&mut kernel, PhysicalKey::Space)?;
         accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
@@ -2388,7 +2421,6 @@ fn assert_actual_tm_fullslot_replace(
             .as_ref()
             .ok_or("TM absent")?
             .clone();
-    }
     Ok(((kernel, selected, live, ledger), tm, learned))
 }
 
