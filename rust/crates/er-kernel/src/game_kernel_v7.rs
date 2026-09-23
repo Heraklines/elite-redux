@@ -2598,7 +2598,10 @@ impl GameKernelV7 {
                 if !accepted {
                     return Ok(GameKernelStepV7::default());
                 }
-                self.handle_button(button)
+                eprintln!("M9E_INPUT_STAGE before_handle");
+                let step = self.handle_button(button)?;
+                eprintln!("M9E_INPUT_STAGE after_handle");
+                Ok(step)
             }
             RawInputEvent::KeyUp { code } => {
                 let source = PhysicalInputSourceV2::Keyboard(code);
@@ -2790,6 +2793,7 @@ impl GameKernelV7 {
         &mut self,
         button: GameButton,
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+        eprintln!("M9E_INPUT_STAGE submit_enter");
         if button == GameButton::Cancel
             && self
                 .current_control()
@@ -3045,19 +3049,23 @@ impl GameKernelV7 {
                 internal_events: Vec::new(),
             });
         }
+        eprintln!("M9E_INPUT_STAGE before_execution_input");
         let input = self.execution_input(&action)?;
         let context = GameActionDispatchContextV1 {
             action: action_context,
             input,
             authority: true,
         };
+        eprintln!("M9E_INPUT_STAGE before_runtime_clone");
         let mut staged = self.active_runtime()?.clone();
         if let Some(owner) = &self.private_battle_control {
             staged
                 .install_control(owner.canonical_control.clone())
                 .map_err(runtime_error)?;
         }
+        eprintln!("M9E_INPUT_STAGE before_action_transaction");
         let step = execute_action_transaction(&mut staged, action, context)?;
+        eprintln!("M9E_INPUT_STAGE after_action_transaction");
         self.install_step_effects(&step.effects)?;
         self.lifecycle = GameKernelLifecycleV7::Active(staged);
         self.private_battle_control = None;
