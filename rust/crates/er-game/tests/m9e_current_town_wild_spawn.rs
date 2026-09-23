@@ -88,6 +88,22 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     wave_rng.rnd();
     wave_rng.rnd();
     assert_eq!(wave_rng.state().state_string, SOURCE_BEFORE);
+    // The independently launched source run35894333532 kept its requested
+    // seed through Title and Encounter. Its wave-two enemy is level 3, outside
+    // this Town level-two constructor, but the battle-setup RNG boundary is
+    // still reproducible without borrowing the controlled fixture's state.
+    let named_wave_seed = shift_char_codes("m9e-reward-selection-source-v1", 2)?;
+    let mut named_wave_rng = PhaserRdg::from_seed(&named_wave_seed);
+    assert_eq!(
+        named_wave_rng.state().state_string,
+        "!rnd,1,0.1938865149859339,0.3122721794061363,0.8672514262143523"
+    );
+    named_wave_rng.rnd();
+    named_wave_rng.rnd();
+    assert_eq!(
+        named_wave_rng.state().state_string,
+        "!rnd,653160,0.8672514262143523,0.5963186640292406,0.669155293609947"
+    );
     // Source399d direct queued NextEncounter observation in run34704520605:
     // tier integer 247/512, common pool index 3/24, root263. That probe's
     // retained run stream and its effective DAY pool are directly observed;
