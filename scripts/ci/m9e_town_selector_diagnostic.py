@@ -18,6 +18,7 @@ TEST_ID = "entire_town_day_pool_and_actual_wave_two_source_draw_match"
 SOURCE_GENDER_SHA256 = "a27f86e31feccd821f35aecaf9eb496faf120127e3df3d2c7c0b14f6593928fb"
 SOURCE_FORM_FLAGS_SHA256 = "e03db62cf3982e03fbb5a25045e15407abd12010aefcbca8fa8cf5585881f446"
 SOURCE_ABILITY_SLOTS_SHA256 = "c7564ac254fee378288b8cd8a10a1ca27dda01c6775045871feb3f6799a5f558"
+SOURCE_FORM_TYPES_SHA256 = "d66c5e26ecc920e50bdcc680479dfab9913103435f975ee5b4d0447d65373fcb"
 START = time.monotonic()
 COMMANDS = []
 
@@ -48,7 +49,7 @@ def run(name, argv, seconds=600):
 def main():
     COMPACT.mkdir(parents=True, exist_ok=False)
     result = {"schema": 1, "status": "failed", "source_sha": SHA,
-              "scope": "Ace/Town/day wave-two full-root and source constructor prefix through nature; no moveset, enemy settlement or next-wave receipt",
+              "scope": "Ace/Town/day wave-two full-root and source constructor prefix through tera type; no moveset, enemy settlement or next-wave receipt",
               "commands": COMMANDS}
     try:
         head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
@@ -66,6 +67,7 @@ def main():
                  "rust/fixtures/m9/engineering/town-gender-v1.json",
                  "rust/fixtures/m9/engineering/town-form-flags-v1.json",
                  "rust/fixtures/m9/engineering/town-ability-slots-v1.json",
+                 "rust/fixtures/m9/engineering/town-form-types-v1.json",
                  "scripts/ci/m9e_town_selector_diagnostic.py",
                  ".github/workflows/m9e-town-content-probe.yml"]
         result["source_hashes"] = {name: digest((ROOT / name).read_bytes()) for name in files}
@@ -76,6 +78,7 @@ def main():
             "gender": ("rust/fixtures/m9/engineering/town-gender-v1.json", SOURCE_GENDER_SHA256),
             "form_flags": ("rust/fixtures/m9/engineering/town-form-flags-v1.json", SOURCE_FORM_FLAGS_SHA256),
             "ability_slots": ("rust/fixtures/m9/engineering/town-ability-slots-v1.json", SOURCE_ABILITY_SLOTS_SHA256),
+            "form_types": ("rust/fixtures/m9/engineering/town-form-types-v1.json", SOURCE_FORM_TYPES_SHA256),
         }
         for name, (path, expected) in source_fixtures.items():
             actual = digest((ROOT / path).read_bytes())

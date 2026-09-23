@@ -5,6 +5,7 @@
 use er_rng::audit::{RngCallsiteId, RngDraw, RngReason};
 use er_rng::battle::RngRuntime;
 use er_types::battle_ids::{AbilityId, GameModeId, SpeciesId};
+use er_types::battle_model::PokemonType;
 use er_types::run_ids::BiomeId;
 use er_types::{RunDifficultyV1, SafeU53};
 use er_world::content_v2::BiomeDefinitionV2;
@@ -138,6 +139,32 @@ const SOURCE_ACTIVE_ABILITIES_TIERS: [&[[u64; 3]]; 5] = [
     &[[158, 98, 150], [118, 12, 82], [5285, 194, 290]],
 ];
 
+// Pinned source form types (run 35851751221, fixture SHA256
+// d66c5e26ecc920e50bdcc680479dfab9913103435f975ee5b4d0447d65373fcb).
+// 255 is the source's absent secondary type. Every form selectable in this
+// current wave-two context has an empty extra-type list.
+const SOURCE_TYPE_TIERS: [&[[u8; 2]]; 5] = [
+    &[
+        [0, 2], [0, 255], [0, 2], [0, 255], [6, 255], [0, 2],
+        [0, 255], [0, 255], [0, 255], [0, 2], [0, 255], [0, 255],
+        [6, 255], [0, 255], [6, 2], [11, 2], [11, 255], [6, 255],
+        [0, 2], [0, 2], [11, 17], [6, 255], [0, 255], [0, 255],
+    ],
+    &[
+        [11, 255], [0, 255], [6, 3], [17, 255], [3, 255], [3, 255],
+        [11, 3], [16, 255], [10, 11], [0, 255], [6, 2], [11, 255],
+        [0, 255], [12, 255],
+    ],
+    &[
+        [13, 255], [17, 255], [0, 17], [6, 10], [0, 255],
+        [2, 255], [0, 255],
+    ],
+    &[
+        [0, 255], [12, 255], [17, 255], [13, 17], [6, 4], [1, 255],
+    ],
+    &[[0, 255], [0, 255], [16, 255]],
+];
+
 #[derive(Clone, Copy, Debug)]
 pub struct CurrentTownDayWaveTwoContextV1<'a> {
     pub mode: GameModeId,
@@ -194,6 +221,7 @@ pub struct CurrentTownWildConstructorPrefixV1 {
     pub gender: CurrentTownGenderV1,
     pub form_index: u16,
     pub nature_index: u8,
+    pub tera_type: PokemonType,
     /// Includes the two root draws followed by the exact pre-moves draws.
     pub audit: Vec<RngDraw>,
 }
@@ -225,21 +253,17 @@ pub fn source_town_male_half_percent(
     Err(CurrentTownWildErrorV1::SourceContent)
 }
 
-pub fn source_town_ability_id(
-    root: SpeciesId,
-    form_index: u16,
-    ability_index: u8,
-) -> Result<AbilityId, CurrentTownWildErrorV1> {
-    let id = root.get().get();
-    let allowed_form = match id {
+fn source_town_form_supported(id: u64, form_index: u16) -> bool {
+    match id {
         664 => form_index < 20,
         133 | 172 => form_index < 2,
         _ => form_index == 0,
-    };
-    if !allowed_form || ability_index > 2 {
-        return Err(CurrentTownWildErrorV1::SourceContent);
     }
-    let source = SOURCE_TIERS
+}
+
+fn source_town_root_position(root: SpeciesId) -> Result<(usize, usize), CurrentTownWildErrorV1> {
+    let id = root.get().get();
+    SOURCE_TIERS
         .iter()
         .enumerate()
         .find_map(|(tier, roots)| {
@@ -248,7 +272,19 @@ pub fn source_town_ability_id(
                 .position(|item| *item == id)
                 .map(|index| (tier, index))
         })
-        .ok_or(CurrentTownWildErrorV1::SourceContent)?;
+        .ok_or(CurrentTownWildErrorV1::SourceContent)
+}
+
+pub fn source_town_ability_id(
+    root: SpeciesId,
+    form_index: u16,
+    ability_index: u8,
+) -> Result<AbilityId, CurrentTownWildErrorV1> {
+    let id = root.get().get();
+    if !source_town_form_supported(id, form_index) || ability_index > 2 {
+        return Err(CurrentTownWildErrorV1::SourceContent);
+    }
+    let source = source_town_root_position(root)?;
     let slots = if id == 133 && form_index == 1 {
         [158, 109, 86]
     } else {
@@ -258,6 +294,50 @@ pub fn source_town_ability_id(
         SafeU53::new(slots[usize::from(ability_index)])
             .map_err(|_| CurrentTownWildErrorV1::SourceContent)?,
     ))
+}
+
+fn source_town_type(id: u8) -> Result<PokemonType, CurrentTownWildErrorV1> {
+    match id {
+        0 => Ok(PokemonType::Normal),
+        1 => Ok(PokemonType::Fighting),
+        2 => Ok(PokemonType::Flying),
+        3 => Ok(PokemonType::Poison),
+        4 => Ok(PokemonType::Ground),
+        5 => Ok(PokemonType::Rock),
+        6 => Ok(PokemonType::Bug),
+        7 => Ok(PokemonType::Ghost),
+        8 => Ok(PokemonType::Steel),
+        9 => Ok(PokemonType::Fire),
+        10 => Ok(PokemonType::Water),
+        11 => Ok(PokemonType::Grass),
+        12 => Ok(PokemonType::Electric),
+        13 => Ok(PokemonType::Psychic),
+        14 => Ok(PokemonType::Ice),
+        15 => Ok(PokemonType::Dragon),
+        16 => Ok(PokemonType::Dark),
+        17 => Ok(PokemonType::Fairy),
+        18 => Ok(PokemonType::Stellar),
+        _ => Err(CurrentTownWildErrorV1::SourceContent),
+    }
+}
+
+pub fn source_town_form_types(
+    root: SpeciesId,
+    form_index: u16,
+) -> Result<Vec<PokemonType>, CurrentTownWildErrorV1> {
+    if !source_town_form_supported(root.get().get(), form_index) {
+        return Err(CurrentTownWildErrorV1::SourceContent);
+    }
+    let source = source_town_root_position(root)?;
+    let [primary, secondary] = SOURCE_TYPE_TIERS[source.0][source.1];
+    let mut types = vec![source_town_type(primary)?];
+    if secondary != 255 {
+        let second = source_town_type(secondary)?;
+        if second != types[0] {
+            types.push(second);
+        }
+    }
+    Ok(types)
 }
 
 pub fn source_town_level_two_species(root: SpeciesId) -> Result<SpeciesId, CurrentTownWildErrorV1> {
@@ -407,8 +487,8 @@ pub fn select_current_town_day_wave_two_root(
     })
 }
 
-/// The ordinary source constructor through nature selection, stopping before
-/// moveset, shiny/variant, stats, modifiers and encounter settlement. All RNG
+/// The ordinary source constructor through tera-type selection, stopping before
+/// moveset, enemy shiny re-roll, stats, modifiers and encounter settlement. All RNG
 /// changes commit together; a rejected context leaves the caller unchanged.
 pub fn select_current_town_day_wave_two_constructor_prefix(
     content: &PreparedGameContentV2,
@@ -504,10 +584,21 @@ pub fn select_current_town_day_wave_two_constructor_prefix(
             SafeU53::new(25).map_err(|_| CurrentTownWildErrorV1::RandomDraw)?,
             SafeU53::ZERO,
             reason,
-            callsite,
+            callsite.clone(),
         )
         .map_err(|_| CurrentTownWildErrorV1::RandomDraw)?
         .get() as u8;
+    // Source randSeedItem is draw-free for a single type; otherwise it calls
+    // Phaser.RND.pick once after nature and before enemy moveset generation.
+    let types = source_town_form_types(root.source_root, form_index)?;
+    let tera_type = if types.len() == 1 {
+        types[0]
+    } else {
+        let index = staged
+            .run_pick_index(types.len(), reason, callsite.clone())
+            .map_err(|_| CurrentTownWildErrorV1::RandomDraw)?;
+        types[index]
+    };
     let ability_id = source_town_ability_id(root.source_root, form_index, ability_index)?;
     content
         .battle
@@ -524,6 +615,7 @@ pub fn select_current_town_day_wave_two_constructor_prefix(
         gender,
         form_index,
         nature_index,
+        tera_type,
         audit,
     })
 }

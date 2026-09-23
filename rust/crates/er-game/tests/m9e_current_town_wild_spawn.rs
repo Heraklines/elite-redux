@@ -4,7 +4,7 @@ use std::sync::Arc;
 use er_game::current_town_wild_spawn::{
     CurrentTownDayWaveTwoContextV1, CurrentTownGenderV1, CurrentTownWildErrorV1,
     select_current_town_day_wave_two_constructor_prefix, select_current_town_day_wave_two_root,
-    source_town_ability_id, source_town_day_pools, source_town_ivs_from_id,
+    source_town_ability_id, source_town_day_pools, source_town_form_types, source_town_ivs_from_id,
     source_town_level_two_species, source_town_male_half_percent,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
@@ -12,6 +12,7 @@ use er_rng::audit::{RngCallsiteId, RngPublicApi, RngReason};
 use er_rng::battle::RngRuntime;
 use er_rng::phaser::{PhaserRdgState, RunRngState};
 use er_types::battle_ids::SpeciesId;
+use er_types::battle_model::PokemonType;
 use er_types::run_ids::BiomeId;
 use er_types::{RunDifficultyV1, SafeU53};
 
@@ -22,6 +23,17 @@ const SOURCE_FORM_FLAGS: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/town-form-flags-v1.json");
 const SOURCE_ABILITY_SLOTS: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/town-ability-slots-v1.json");
+const SOURCE_FORM_TYPES: &[u8] =
+    include_bytes!("../../../fixtures/m9/engineering/town-form-types-v1.json");
+const SOURCE_TYPE_ORDER: [PokemonType; 19] = [
+    PokemonType::Normal, PokemonType::Fighting, PokemonType::Flying,
+    PokemonType::Poison, PokemonType::Ground, PokemonType::Rock,
+    PokemonType::Bug, PokemonType::Ghost, PokemonType::Steel,
+    PokemonType::Fire, PokemonType::Water, PokemonType::Grass,
+    PokemonType::Electric, PokemonType::Psychic, PokemonType::Ice,
+    PokemonType::Dragon, PokemonType::Dark, PokemonType::Fairy,
+    PokemonType::Stellar,
+];
 const SOURCE_BEFORE: &str = "!rnd,789153,0.5761283298488706,0.7223087239544839,0.22977968817576766";
 const SOURCE_AFTER_SELECTION: &str =
     "!rnd,1012145,0.09734400571323931,0.1575480371247977,0.15997060341760516";
@@ -59,9 +71,11 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     let gender: serde_json::Value = serde_json::from_slice(SOURCE_GENDER)?;
     let form_flags: serde_json::Value = serde_json::from_slice(SOURCE_FORM_FLAGS)?;
     let ability_slots: serde_json::Value = serde_json::from_slice(SOURCE_ABILITY_SLOTS)?;
+    let form_types: serde_json::Value = serde_json::from_slice(SOURCE_FORM_TYPES)?;
     assert_eq!(gender["source"], "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7");
     assert_eq!(form_flags["source"], gender["source"]);
     assert_eq!(ability_slots["source"], gender["source"]);
+    assert_eq!(form_types["source"], gender["source"]);
     assert_eq!(gender["rows"].as_array().ok_or("gender rows")?.len(), 163);
     assert_eq!(form_flags["rows"].as_array().ok_or("form rows")?.len(), 163);
     assert_eq!(
@@ -71,6 +85,7 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
             .len(),
         163
     );
+    assert_eq!(form_types["rows"].as_array().ok_or("form type rows")?.len(), 163);
     for root in pools.iter().flatten() {
         let id = root.get().get();
         let source_ratio = gender["rows"]
@@ -116,6 +131,28 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
                 );
             }
         }
+        let source_types = form_types["rows"]
+            .as_array()
+            .ok_or("form type rows")?
+            .iter()
+            .find(|row| row[0].as_u64() == Some(effective))
+            .ok_or("missing source form types")?;
+        let source_forms = source_types[1].as_array().ok_or("source form types")?;
+        assert!(source_forms.len() >= expected_forms);
+        for (form, observed) in source_forms.iter().take(expected_forms).enumerate() {
+            assert!(observed[2].as_array().ok_or("source extra types")?.is_empty());
+            let primary = observed[0].as_u64().ok_or("source primary type")? as usize;
+            let mut types = vec![*SOURCE_TYPE_ORDER.get(primary).ok_or("source type range")?];
+            if let Some(secondary) = observed[1].as_u64() {
+                let secondary = *SOURCE_TYPE_ORDER
+                    .get(secondary as usize)
+                    .ok_or("source type range")?;
+                if secondary != types[0] {
+                    types.push(secondary);
+                }
+            }
+            assert_eq!(source_town_form_types(*root, form as u16)?, types);
+        }
     }
     assert_eq!(
         source_town_level_two_species(SpeciesId::new(SafeU53::new(9999)?)),
@@ -131,6 +168,10 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     );
     assert_eq!(
         source_town_ability_id(SpeciesId::new(SafeU53::new(9999)?), 0, 0),
+        Err(CurrentTownWildErrorV1::SourceContent)
+    );
+    assert_eq!(
+        source_town_form_types(SpeciesId::new(SafeU53::new(133)?), 2),
         Err(CurrentTownWildErrorV1::SourceContent)
     );
     let mut missing = town.clone();
@@ -201,6 +242,7 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     assert_eq!(prefix.gender, CurrentTownGenderV1::Male);
     assert_eq!(prefix.form_index, 0);
     assert_eq!(prefix.nature_index, 11);
+    assert_eq!(prefix.tera_type, PokemonType::Normal);
     assert_eq!(prefix.audit.len(), 7);
     assert_eq!(prefix.audit[5].public_api, RngPublicApi::RandSeedFloat);
     assert_eq!(
