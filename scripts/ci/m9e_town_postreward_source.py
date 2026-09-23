@@ -175,6 +175,9 @@ def main():
                 raw == (json.dumps(value, separators=(",", ":")) + "\n").encode()
                 and value["source"] == PIN and value["first"]["attacking_turns"] > 0
                 and value["reward"]["new_battle_calls"] == 1
+                and isinstance(value.get("wave_cycle_offset"), int)
+                and value["wave_cycle_offset"] in range(0, 40, 5)
+                and value["current_time"] == value["effective_pool_time"] == 1
                 and value["next"]["wave"] == 2,
                 "canonical causal observation",
             )

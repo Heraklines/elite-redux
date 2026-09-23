@@ -209,6 +209,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
     source: PIN,
     setup_seed: SETUP_SEED,
     scene_seed: scene.seed,
+    wave_cycle_offset: scene.waveCycleOffset,
     effective_pool_time: (scene.arena as unknown as { lastTimeOfDay: number }).lastTimeOfDay,
     current_time: scene.arena.getTimeOfDay(),
     scope: "controlled level-ten starter attacks, victory reward cancel and queued Town wave-two encounter",
