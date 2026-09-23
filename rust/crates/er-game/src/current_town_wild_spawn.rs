@@ -12,8 +12,8 @@ use er_state::mechanic_state_v2::MechanicStateStoreV2;
 use er_state::pokemon_v2::{Iv, PermanentStatBonuses};
 use er_types::battle_ids::{AbilityId, GameModeId, MoveId, SpeciesId};
 use er_types::battle_model::{
-    AbilityLoadout, BattleStats, MoveAccuracy, MoveCategory, MovePower, MoveSlotState,
-    PokemonType, PokemonTyping, StatStages, StatusKind, StatusState,
+    AbilityLoadout, BattleStats, MoveAccuracy, MoveCategory, MovePower, MoveSlotState, PokemonType,
+    PokemonTyping, StatStages, StatusKind, StatusState,
 };
 use er_types::run_ids::BiomeId;
 use er_types::{RunDifficultyV1, SafeU53};
