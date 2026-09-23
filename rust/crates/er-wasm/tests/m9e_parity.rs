@@ -96,8 +96,14 @@ fn press(
     events: &mut Vec<M9EParityEventV2>,
     code: PhysicalKey,
 ) -> Result<(), Box<dyn Error>> {
+    #[cfg(target_arch = "wasm32")]
+    wasm_bindgen_test::console_log!("M9E_WASM_PRESS=before-down");
     apply_raw(kernel, events, key_down(code.clone()))?;
+    #[cfg(target_arch = "wasm32")]
+    wasm_bindgen_test::console_log!("M9E_WASM_PRESS=before-up");
     apply_raw(kernel, events, RawInputEvent::KeyUp { code })?;
+    #[cfg(target_arch = "wasm32")]
+    wasm_bindgen_test::console_log!("M9E_WASM_PRESS=before-settle");
     settle_presentations(kernel, events)
 }
 
@@ -305,11 +311,19 @@ fn trace_request(
             .ok_or("control missing")?
         {
             GameControlKindV2::BattleCommand => {
+                #[cfg(target_arch = "wasm32")]
+                wasm_bindgen_test::console_log!("M9E_WASM_STEP=battle-command");
                 press(&mut driver, &mut events, PhysicalKey::Space)?;
             }
             GameControlKindV2::BattleMove => {
+                #[cfg(target_arch = "wasm32")]
+                wasm_bindgen_test::console_log!("M9E_WASM_STEP=move-before-select");
                 let option = strongest_move_option(&driver, &content)?;
+                #[cfg(target_arch = "wasm32")]
+                wasm_bindgen_test::console_log!("M9E_WASM_STEP=move-before-navigate");
                 navigate_down_to(&mut driver, &mut events, &option)?;
+                #[cfg(target_arch = "wasm32")]
+                wasm_bindgen_test::console_log!("M9E_WASM_STEP=move-before-confirm");
                 press(&mut driver, &mut events, PhysicalKey::Space)?;
             }
             GameControlKindV2::Progression
