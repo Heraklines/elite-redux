@@ -857,3 +857,97 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     assert_eq!(rng, before);
     Ok(())
 }
+
+#[test]
+fn naturally_admitted_day_seed_matches_pinned_postreward_enemy() -> Result<(), Box<dyn Error>> {
+    // Source run 35910615860 observed this seed twice after actual reward
+    // CANCEL and a queued wave-two encounter. Both 2125-byte observations had
+    // SHA256 896b56e5d0d4b49d925aeef7cecf30c83bac13271fe518184a464dc91c32b355.
+    let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
+    let content = PreparedGameContentV2::prepare(Arc::new(bundle))?;
+    let mode = content
+        .bundle()
+        .world
+        .modes
+        .iter()
+        .find(|mode| mode.key == "CLASSIC")
+        .ok_or("Classic mode absent")?;
+    let town = content
+        .bundle()
+        .world
+        .biomes
+        .iter()
+        .find(|biome| biome.key == "biome/0")
+        .ok_or("Town absent")?;
+    let context = CurrentTownDayWaveTwoContextV1 {
+        mode: mode.id,
+        biome: town.id,
+        difficulty: RunDifficultyV1::Ace,
+        wave: 2,
+        level: 3,
+        luck: 0,
+        forced_tier: None,
+        encounter_boss_segments: 0,
+        regional_boost: false,
+        time_override: None,
+        effective_pool_time: 1,
+        override_species: None,
+        golden_bug_net: false,
+        excluded_species: &[],
+    };
+    let mut rng = RngRuntime::from_states(
+        RunRngState {
+            rdg: PhaserRdgState::from_state_string(
+                "!rnd,2033503,0.3750058668665588,0.07516273413784802,0.657086769817397",
+            )?,
+        },
+        None,
+    )?;
+    let shell =
+        select_current_town_day_wave_two_shell(&content, context, 12_345, 23_456, &mut rng)?;
+    let enemy = &shell.pokemon;
+    assert_eq!(enemy.id.get().get(), 2_632_721_102);
+    assert_eq!(enemy.species_id.get().get(), 504);
+    assert_eq!(enemy.form_index, 0);
+    assert_eq!(enemy.level, 3);
+    assert_eq!(enemy.experience.get().get(), 27);
+    assert_eq!(enemy.friendship, 70);
+    assert_eq!(shell.core.prefix.ability_index, 1);
+    assert_eq!(enemy.abilities.active.get().get(), 198);
+    assert_eq!(enemy.ivs.map(|iv| iv.get()), [14, 14, 24, 8, 22, 14]);
+    assert_eq!(enemy.nature.get(), 9);
+    assert_eq!(
+        [
+            enemy.stats.hp,
+            enemy.stats.attack,
+            enemy.stats.defense,
+            enemy.stats.special_attack,
+            enemy.stats.special_defense,
+            enemy.stats.speed,
+        ],
+        [16, 9, 9, 7, 7, 9]
+    );
+    assert_eq!(enemy.hp, 16);
+    assert_eq!(enemy.gender, Some(0));
+    assert!(!enemy.shiny);
+    assert_eq!(enemy.variant, 0);
+    assert_eq!(enemy.types.primary, PokemonType::Normal);
+    assert_eq!(enemy.types.secondary, None);
+    assert_eq!(enemy.tera_type, Some(PokemonType::Normal));
+    assert_eq!(
+        enemy
+            .moves
+            .iter()
+            .map(|slot| slot
+                .as_ref()
+                .map(|slot| (slot.move_id.get().get(), slot.pp_used)))
+            .collect::<Vec<_>>(),
+        vec![
+            Some((158, 0)),
+            Some((95, 0)),
+            Some((747, 0)),
+            Some((116, 0))
+        ]
+    );
+    Ok(())
+}

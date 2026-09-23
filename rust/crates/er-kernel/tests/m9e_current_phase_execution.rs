@@ -198,6 +198,9 @@ fn active(snapshot: &CoreGameKernelSnapshotV7) -> Result<&GameStateV6> {
     }
 }
 fn natural(content: Arc<PreparedGameContentV2>) -> Result<GameKernelV7> {
+    natural_with_seed(content, "m9e-phase-execution-18")
+}
+fn natural_with_seed(content: Arc<PreparedGameContentV2>, seed: &str) -> Result<GameKernelV7> {
     let profile = ProfileStateV1 {
         schema_version: PROFILE_STATE_SCHEMA_VERSION_V1,
         unlocks: vec![],
@@ -216,7 +219,7 @@ fn natural(content: Arc<PreparedGameContentV2>) -> Result<GameKernelV7> {
     };
     let mut kernel = GameKernelV7::natural_start_with_fresh_friendship(FreshFriendshipStartV7 {
         profile,
-        seed: "m9e-phase-execution-18".to_owned(),
+        seed: seed.to_owned(),
         local_seat: seat()?,
         save_slots: vec!["phase-source-slot".to_owned()],
         content: content.clone(),
@@ -315,6 +318,50 @@ fn natural(content: Arc<PreparedGameContentV2>) -> Result<GameKernelV7> {
             .is_some_and(|owner| owner.source_progression.is_some())
     );
     Ok(kernel)
+}
+
+#[test]
+fn bounded_town_candidates_admit_natural_first_battle() -> Result<()> {
+    let content = content()?;
+    let candidates = match std::env::var("M9E_TOWN_SEED_CANDIDATES") {
+        Ok(path) => std::fs::read_to_string(path)?,
+        Err(std::env::VarError::NotPresent) => {
+            // The integrated whole-target lane has no separate search artifact.
+            // This exact source-DAY seed was admitted by the focused search.
+            "candidate=m9e-town-handoff-308".to_owned()
+        }
+        Err(error) => return Err(error.into()),
+    };
+    let mut admitted = 0;
+    for line in candidates.lines() {
+        let seed = line
+            .split_whitespace()
+            .next()
+            .and_then(|part| part.strip_prefix("candidate="))
+            .ok_or("source DAY candidate missing")?;
+        match natural_with_seed(content.clone(), seed) {
+            Ok(kernel) => {
+                let enemy = kernel
+                    .state()
+                    .and_then(|state| state.active_run.as_ref())
+                    .and_then(|run| run.battle.as_ref())
+                    .and_then(|battle| battle.enemy_party.first())
+                    .ok_or("natural first enemy absent")?;
+                println!(
+                    "admitted={seed} first_enemy={}",
+                    enemy.species_id.get().get()
+                );
+                admitted += 1;
+                break;
+            }
+            Err(error) => println!("rejected={seed} reason={error}"),
+        }
+    }
+    assert!(
+        admitted > 0,
+        "no Town wave-two seed admitted a natural first battle"
+    );
+    Ok(())
 }
 
 fn accept_material(

@@ -237,10 +237,17 @@ export class CurrentDevelopmentRtcPeerV1 {
   }
   async #dispose(): Promise<void> {
     this.#disposing = true;
-    if (this.#activeOperation != null) this.#fail(new Error("current RTC disposed with an active operation; completion is not confirmed"));
-    this.#pc.removeEventListener("datachannel", this.#onDataChannel);
     let issue: unknown;
-    try { await boundedOperation(this.closeTransport()); } catch (error) { issue = error; }
+    // A response can reach the caller before its effect delivery and active
+    // operation slot retire. Drain that owned work while RTC and Worker remain
+    // available; only a bounded failure makes its completion unknown.
+    try { await boundedOperation(this.#operationTask); }
+    catch (error) {
+      issue = new Error(`current RTC disposal could not drain an active operation; completion is not confirmed: ${String(error)}`);
+      this.#fail(issue);
+    }
+    this.#pc.removeEventListener("datachannel", this.#onDataChannel);
+    try { await boundedOperation(this.closeTransport()); } catch (error) { issue ??= error; }
     this.#closed = true;
     this.#abort.abort();
     this.#rejectQueued("current RTC peer disposed");
