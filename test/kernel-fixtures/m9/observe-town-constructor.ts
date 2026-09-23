@@ -18,6 +18,7 @@ import { BiomeId } from "#enums/biome-id";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
+import { getNatureStatMultiplier } from "#data/nature";
 import { GameManager } from "#test/framework/game-manager";
 import { PromptHandler } from "#test/helpers/prompt-handler";
 import { execFileSync } from "node:child_process";
@@ -160,6 +161,13 @@ function observeLevelTwoAbilityPowers(){
  const scene=globalScene,enemy=scene.currentBattle.enemyParty[0];expect(enemy).toBeDefined();expect(captured).toBeDefined();
  const before=Phaser.Math.RND.state(),oldFlag=scene.movesetGenInProgress;
  const old={species:enemy.species,form:enemy.formIndex,ability:enemy.abilityIndex,stats:[...enemy.stats],hp:enemy.hp,ivs:[...enemy.ivs],nature:enemy.nature};
+ const assertUnmodifiedStats=(id:number,formIndex:number,abilityId:number)=>{
+  const expected=enemy.getSpeciesForm().baseStats.map((base,index)=>{
+   const raw=Math.floor((2*base+enemy.ivs[index])*enemy.level*0.01);if(index===Stat.HP)return raw+enemy.level+10;
+   const value=raw+5,multiplier=getNatureStatMultiplier(enemy.getNature(),index as Stat);return Math.max(multiplier===1?value:multiplier>1?Math.ceil(value*multiplier):Math.floor(value*multiplier),1);
+  });
+  expect(enemy.stats,`Town stat modifier species${id} form${formIndex} ability${abilityId}`).toEqual(expected);
+ };
  const rows:unknown[]=[];
  try{
   scene.movesetGenInProgress=true;
@@ -169,10 +177,10 @@ function observeLevelTwoAbilityPowers(){
     enemy.formIndex=formIndex;const form=enemy.getSpeciesForm();const moveIds=[...new Set(levelRows.map(row=>row[1]))];expect(moveIds.length).toBeGreaterThan(0);expect(moveIds.length).toBeLessThanOrEqual(32);
     const abilityRows:unknown[]=[];
     for(let abilityIndex=0;abilityIndex<form.getAbilityCount();abilityIndex++){
-     enemy.abilityIndex=abilityIndex;enemy.ivs=[...old.ivs];enemy.nature=old.nature;enemy.calculateStats();enemy.hp=enemy.getMaxHp();const abilityId=enemy.getAbility().id;expect(abilityId).toBe(form.getAbility(abilityIndex));
+     enemy.abilityIndex=abilityIndex;enemy.ivs=[...old.ivs];enemy.nature=old.nature;enemy.calculateStats();enemy.hp=enemy.getMaxHp();const abilityId=enemy.getAbility().id;expect(abilityId).toBe(form.getAbility(abilityIndex));assertUnmodifiedStats(id,formIndex,abilityId);
      const powers=moveIds.map(moveId=>{const power=allMoves[moveId].calculateEffectivePower(enemy);expect(Number.isFinite(power)&&power>=0&&power<=10000).toBe(true);return [moveId,power] as [number,number];});
      for(const [iv,nature] of [[0,0],[31,24]] as const){
-      enemy.ivs=Array(6).fill(iv);enemy.nature=nature;enemy.calculateStats();enemy.hp=enemy.getMaxHp();
+      enemy.ivs=Array(6).fill(iv);enemy.nature=nature;enemy.calculateStats();enemy.hp=enemy.getMaxHp();assertUnmodifiedStats(id,formIndex,abilityId);
       for(const [moveId,power] of powers)expect(allMoves[moveId].calculateEffectivePower(enemy),`IV/nature-sensitive Town movegen power species${id} form${formIndex} ability${abilityId} move${moveId}`).toBe(power);
      }
      abilityRows.push([abilityId,powers]);
