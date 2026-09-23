@@ -4,7 +4,8 @@ use std::sync::Arc;
 use er_game::current_town_wild_spawn::{
     CurrentTownDayWaveTwoContextV1, CurrentTownGenderV1, CurrentTownWildErrorV1,
     select_current_town_day_wave_two_constructor_prefix, select_current_town_day_wave_two_root,
-    source_town_day_pools, source_town_level_two_species, source_town_male_half_percent,
+    source_town_day_pools, source_town_ivs_from_id, source_town_level_two_species,
+    source_town_male_half_percent,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_rng::audit::{RngCallsiteId, RngPublicApi, RngReason};
@@ -146,6 +147,8 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     assert_eq!(prefix.root, selected);
     assert_eq!(prefix.ability_index, 1);
     assert_eq!(prefix.pokemon_id, 3_818_575_047);
+    assert_eq!(prefix.ivs, [17, 25, 21, 21, 6, 7]);
+    assert_eq!(prefix.ivs, source_town_ivs_from_id(prefix.pokemon_id));
     assert_eq!(prefix.gender, CurrentTownGenderV1::Male);
     assert_eq!(prefix.form_index, 0);
     assert_eq!(prefix.nature_index, 11);

@@ -121,11 +121,25 @@ pub struct CurrentTownWildConstructorPrefixV1 {
     pub root: CurrentTownWildRootV1,
     pub ability_index: u8,
     pub pokemon_id: u32,
+    pub ivs: [u8; 6],
     pub gender: CurrentTownGenderV1,
     pub form_index: u16,
     pub nature_index: u8,
     /// Includes the two root draws followed by the exact pre-moves draws.
     pub audit: Vec<RngDraw>,
+}
+
+/// Pinned `src/utils/common.ts:getIvsFromId`: six five-bit chunks of the
+/// generated 32-bit Pokemon ID, ordered HP through speed.
+pub fn source_town_ivs_from_id(id: u32) -> [u8; 6] {
+    [
+        ((id & 0x3e00_0000) >> 25) as u8,
+        ((id & 0x01f0_0000) >> 20) as u8,
+        ((id & 0x000f_8000) >> 15) as u8,
+        ((id & 0x0000_7c00) >> 10) as u8,
+        ((id & 0x0000_03e0) >> 5) as u8,
+        (id & 0x0000_001f) as u8,
+    ]
 }
 
 pub fn source_town_male_half_percent(
@@ -396,6 +410,7 @@ pub fn select_current_town_day_wave_two_constructor_prefix(
         root,
         ability_index,
         pokemon_id,
+        ivs: source_town_ivs_from_id(pokemon_id),
         gender,
         form_index,
         nature_index,
