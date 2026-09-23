@@ -26,12 +26,24 @@ const SOURCE_ABILITY_SLOTS: &[u8] =
 const SOURCE_FORM_TYPES: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/town-form-types-v1.json");
 const SOURCE_TYPE_ORDER: [PokemonType; 19] = [
-    PokemonType::Normal, PokemonType::Fighting, PokemonType::Flying,
-    PokemonType::Poison, PokemonType::Ground, PokemonType::Rock,
-    PokemonType::Bug, PokemonType::Ghost, PokemonType::Steel,
-    PokemonType::Fire, PokemonType::Water, PokemonType::Grass,
-    PokemonType::Electric, PokemonType::Psychic, PokemonType::Ice,
-    PokemonType::Dragon, PokemonType::Dark, PokemonType::Fairy,
+    PokemonType::Normal,
+    PokemonType::Fighting,
+    PokemonType::Flying,
+    PokemonType::Poison,
+    PokemonType::Ground,
+    PokemonType::Rock,
+    PokemonType::Bug,
+    PokemonType::Ghost,
+    PokemonType::Steel,
+    PokemonType::Fire,
+    PokemonType::Water,
+    PokemonType::Grass,
+    PokemonType::Electric,
+    PokemonType::Psychic,
+    PokemonType::Ice,
+    PokemonType::Dragon,
+    PokemonType::Dark,
+    PokemonType::Fairy,
     PokemonType::Stellar,
 ];
 const SOURCE_BEFORE: &str = "!rnd,789153,0.5761283298488706,0.7223087239544839,0.22977968817576766";
@@ -85,7 +97,10 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
             .len(),
         163
     );
-    assert_eq!(form_types["rows"].as_array().ok_or("form type rows")?.len(), 163);
+    assert_eq!(
+        form_types["rows"].as_array().ok_or("form type rows")?.len(),
+        163
+    );
     for root in pools.iter().flatten() {
         let id = root.get().get();
         let source_ratio = gender["rows"]
@@ -140,7 +155,12 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         let source_forms = source_types[1].as_array().ok_or("source form types")?;
         assert!(source_forms.len() >= expected_forms);
         for (form, observed) in source_forms.iter().take(expected_forms).enumerate() {
-            assert!(observed[2].as_array().ok_or("source extra types")?.is_empty());
+            assert!(
+                observed[2]
+                    .as_array()
+                    .ok_or("source extra types")?
+                    .is_empty()
+            );
             let primary = observed[0].as_u64().ok_or("source primary type")? as usize;
             let mut types = vec![*SOURCE_TYPE_ORDER.get(primary).ok_or("source type range")?];
             if let Some(secondary) = observed[1].as_u64() {
