@@ -2191,9 +2191,20 @@ fn assert_actual_tm_fullslot_sequence(
     }
     let (state, tm, learned) =
         assert_actual_tm_fullslot_replace(state, content.clone(), tm, learned)?;
-    let (state, tm, learned) =
-        assert_actual_tm_replace_yes(state, content.clone(), tm, learned)?;
-    assert_actual_tm_choose_slot(state, content, tm, learned)
+    std::thread::scope(|scope| -> Result<TmWitnessWithMove> {
+        let replacement = std::thread::Builder::new()
+            .name("m9e-tm-replacement".to_owned())
+            .spawn_scoped(scope, move || {
+                let (state, tm, learned) =
+                    assert_actual_tm_replace_yes(state, content.clone(), tm, learned)
+                        .map_err(|error| error.to_string())?;
+                assert_actual_tm_choose_slot(state, content, tm, learned)
+                    .map_err(|error| error.to_string())
+            })?;
+        Ok(replacement
+            .join()
+            .map_err(|_| "TM replacement witness panicked")??)
+    })
 }
 
 #[inline(never)]
