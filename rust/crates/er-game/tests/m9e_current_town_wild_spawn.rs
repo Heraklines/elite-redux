@@ -10,6 +10,7 @@ use er_game::current_town_wild_spawn::{
     source_town_level_two_species, source_town_male_half_percent, source_town_moveset,
     source_town_neutral_moveset, source_town_neutral_weighted_level_move_pool,
     source_town_shiny_xor, source_town_unmodified_level_two_stats,
+    source_town_unmodified_stats_at_level,
     source_town_weighted_level_move_pool,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
@@ -110,6 +111,25 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     // this isolated selector test does not claim a causal natural reward receipt.
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = PreparedGameContentV2::prepare(Arc::new(bundle))?;
+    // The named-seed wave-two enemy is a level-three Lillipup. Its observed
+    // identity, ability and unmodified stats are a narrower constructor check;
+    // source moves/modifiers and battle settlement remain unsupported here.
+    let level_three_species = SpeciesId::new(SafeU53::new(504)?);
+    let level_three_ivs = source_town_ivs_from_id(1_776_451_493);
+    assert_eq!(level_three_ivs, [20, 30, 4, 31, 29, 5]);
+    assert_eq!(
+        source_town_ability_id(level_three_species, 0, 2)?.get().get(),
+        5165
+    );
+    assert_eq!(
+        source_town_unmodified_stats_at_level(
+            source_town_form_base_stats(&content, level_three_species, 0)?,
+            level_three_ivs,
+            18,
+            3,
+        )?,
+        [16, 9, 7, 8, 8, 9]
+    );
     let town = content
         .world
         .biome(BiomeId::new(SafeU53::ZERO))
