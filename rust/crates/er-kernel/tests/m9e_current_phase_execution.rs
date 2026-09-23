@@ -135,6 +135,26 @@ fn navigate(kernel: &mut GameKernelV7, option: &str) -> Result<()> {
     }
     Ok(())
 }
+fn navigate_reward_ordinal(kernel: &mut GameKernelV7, ordinal: u32) -> Result<()> {
+    let option = kernel
+        .current_control()
+        .and_then(|control| control.menu.as_ref())
+        .and_then(|menu| {
+            menu.options.iter().find(|row| {
+                matches!(
+                    &row.action,
+                    er_types::GameActionV1::Reward {
+                        action: er_types::RewardActionV1::Select { option_ordinal }
+                    } if *option_ordinal == ordinal
+                )
+            })
+        })
+        .ok_or("reward action ordinal absent")?
+        .option_id
+        .as_str()
+        .to_owned();
+    navigate(kernel, &option)
+}
 fn restore(
     snapshot: CoreGameKernelSnapshotV7,
     content: Arc<PreparedGameContentV2>,
@@ -2304,6 +2324,7 @@ fn assert_actual_tm_fullslot_replace(
         assert_tm_decline_on_default_thread(&decline, content.clone(), &live, &ledger)?;
         writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_decline")?;
         // Source Replace Yes -> which-move message -> actual first old slot.
+        navigate_reward_ordinal(&mut kernel, 0)?;
         let step = press(&mut kernel, PhysicalKey::Space)?;
         accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
         for presentation in kernel.snapshot()?.pending_presentations {
@@ -2320,6 +2341,7 @@ fn assert_actual_tm_fullslot_replace(
                 .phase,
             T::ChooseSlot
         ));
+        navigate_reward_ordinal(&mut kernel, 0)?;
         let step = press(&mut kernel, PhysicalKey::Space)?;
         accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
         for presentation in kernel.snapshot()?.pending_presentations {
@@ -2522,15 +2544,7 @@ fn assert_tm_decline_returns_same_offers(
         before.tm.as_ref().ok_or("TM absent")?.phase,
         T::Replace
     ));
-    let option = kernel
-        .current_control()
-        .and_then(|c| c.menu.as_ref())
-        .and_then(|m| m.options.get(1))
-        .ok_or("No option absent")?
-        .option_id
-        .as_str()
-        .to_owned();
-    navigate(&mut kernel, &option)?;
+    navigate_reward_ordinal(&mut kernel, 1)?;
     let step = press(&mut kernel, PhysicalKey::Space)?;
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
     for presentation in kernel.snapshot()?.pending_presentations {
@@ -2544,6 +2558,7 @@ fn assert_tm_decline_returns_same_offers(
             .phase,
         T::Stop
     ));
+    navigate_reward_ordinal(&mut kernel, 0)?;
     let step = press(&mut kernel, PhysicalKey::Space)?;
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
     for presentation in kernel.snapshot()?.pending_presentations {
@@ -2579,15 +2594,7 @@ fn assert_tm_decline_returns_same_offers(
         .iter()
         .position(|o| o.source_id == "TM_CASE")
         .ok_or("TM offer absent")?;
-    let option = kernel
-        .current_control()
-        .and_then(|c| c.menu.as_ref())
-        .and_then(|m| m.options.get(index))
-        .ok_or("TM offer absent")?
-        .option_id
-        .as_str()
-        .to_owned();
-    navigate(&mut kernel, &option)?;
+    navigate_reward_ordinal(&mut kernel, index as u32)?;
     let step = press(&mut kernel, PhysicalKey::Space)?;
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
     let retained = current_reward(kernel.state().ok_or("TM state absent")?)?;
