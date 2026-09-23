@@ -224,6 +224,9 @@ type SourceTownAbilityProfile = (Vec<u64>, Vec<u64>);
 type SourceTownSpeciesAbilityRows = (u64, Vec<SourceTownAbilityProfile>);
 type SourceTownSignatureRow = (u64, Option<Vec<u64>>);
 type SourceTownUselessRow = (u64, i8);
+type SourceTownAbilityPowerSlot = (u64, Vec<(u64, f64)>);
+type SourceTownFormAbilityPowers = (u16, Vec<SourceTownAbilityPowerSlot>);
+type SourceTownSpeciesAbilityPowers = (u64, Vec<SourceTownFormAbilityPowers>);
 
 // Source run 35854351965, SHA256
 // 86b764e17e26ec5db4bd201cc7f95950975aa134960eae2a0570a8b5a7201a80.
@@ -268,6 +271,23 @@ struct SourceTownLevelTwoAbilitiesV1 {
 }
 
 static SOURCE_LEVEL_TWO_ABILITIES: OnceLock<Result<SourceTownLevelTwoAbilitiesV1, ()>> =
+    OnceLock::new();
+
+// Source runs 35873079157 and 35873636916, SHA256
+// 5bf870bd3df95ce6e723585a1aec1c008c4bec81082e04f4032f15695b861f9c.
+// Effective powers are observed with a real wave-two enemy shell and source
+// moveset generation enabled. The latter run rechecked every profile at IV/nature
+// extremes. This includes the source multi-hit context quirk.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SourceTownLevelTwoAbilityPowersV1 {
+    schema: u8,
+    source: String,
+    context: String,
+    rows: Vec<SourceTownSpeciesAbilityPowers>,
+}
+
+static SOURCE_LEVEL_TWO_ABILITY_POWERS: OnceLock<Result<SourceTownLevelTwoAbilityPowersV1, ()>> =
     OnceLock::new();
 
 // Source run 35865632493, SHA256
@@ -434,6 +454,78 @@ fn source_level_two_abilities()
                         })
                 })
             {
+                return Err(());
+            }
+            Ok(parsed)
+        })
+        .as_ref()
+        .map_err(|_| CurrentTownWildErrorV1::SourceContent)
+}
+
+fn source_level_two_ability_powers()
+-> Result<&'static SourceTownLevelTwoAbilityPowersV1, CurrentTownWildErrorV1> {
+    SOURCE_LEVEL_TWO_ABILITY_POWERS
+        .get_or_init(|| {
+            let parsed: SourceTownLevelTwoAbilityPowersV1 = serde_json::from_str(include_str!(
+                "current_town_level_two_ability_powers.json"
+            ))
+            .map_err(|_| ())?;
+            let forms = source_level_two_forms().map_err(|_| ())?;
+            let abilities = source_level_two_abilities().map_err(|_| ())?;
+            if parsed.schema != 1
+                || parsed.source != ORACLE
+                || parsed.context
+                    != "actual Town wave-two enemy shell at full HP with source moveset generation enabled"
+                || parsed.rows.len() != forms.rows.len()
+            {
+                return Err(());
+            }
+            let mut profiles = 0;
+            for ((observed_species, form_species), ability_species) in parsed
+                .rows
+                .iter()
+                .zip(&forms.rows)
+                .zip(&abilities.rows)
+            {
+                if observed_species.0 != form_species.0
+                    || observed_species.0 != ability_species.0
+                    || observed_species.1.len() != form_species.1.len()
+                    || observed_species.1.len() != ability_species.1.len()
+                {
+                    return Err(());
+                }
+                for (form_index, ((observed_form, move_form), ability_form)) in observed_species
+                    .1
+                    .iter()
+                    .zip(&form_species.1)
+                    .zip(&ability_species.1)
+                    .enumerate()
+                {
+                    if usize::from(observed_form.0) != form_index
+                        || observed_form.1.len() != ability_form.0.len()
+                    {
+                        return Err(());
+                    }
+                    let mut expected = Vec::new();
+                    for (_, id) in move_form {
+                        if !expected.contains(id) {
+                            expected.push(*id);
+                        }
+                    }
+                    for (slot, active) in observed_form.1.iter().zip(&ability_form.0) {
+                        if slot.0 != *active
+                            || slot.1.iter().map(|row| row.0).collect::<Vec<_>>() != expected
+                            || slot.1.iter().any(|row| {
+                                !row.1.is_finite() || !(0.0..=10_000.0).contains(&row.1)
+                            })
+                        {
+                            return Err(());
+                        }
+                        profiles += 1;
+                    }
+                }
+            }
+            if profiles != 270 {
                 return Err(());
             }
             Ok(parsed)
@@ -823,15 +915,16 @@ pub fn source_town_initial_level_move_pool(
 pub struct CurrentTownNeutralLevelMoveWeightV1 {
     pub id: MoveId,
     pub initial_weight: u32,
+    pub effective_power: f64,
     pub adjusted_weight: f64,
     pub weighted_weight: u64,
 }
 
 /// Source wild `filterMovePool`, `adjustDamageMoveWeights`, and the 1.6-power
-/// transform when no active or passive ability changes move power/accuracy.
-/// Ability effects and move selection must be proved before using this in a
-/// connected constructor; this pure stage owns no RNG.
-pub fn source_town_neutral_weighted_level_move_pool(
+/// transform for every observed level-two form and ability profile. Source
+/// effective powers include ability effects and the multi-hit context rule;
+/// this pure stage owns no RNG or encounter settlement.
+pub fn source_town_weighted_level_move_pool(
     content: &PreparedGameContentV2,
     root: SpeciesId,
     form_index: u16,
@@ -860,14 +953,14 @@ pub fn source_town_neutral_weighted_level_move_pool(
     {
         return Err(CurrentTownWildErrorV1::SourceContent);
     }
-    if abilities.movegen_modifiers.contains(active)
-        || profile
-            .1
-            .iter()
-            .any(|id| abilities.movegen_modifiers.contains(id))
-    {
-        return Err(CurrentTownWildErrorV1::UnsupportedContext);
-    }
+    let power_rows = &source_level_two_ability_powers()?
+        .rows
+        .iter()
+        .find(|row| row.0 == effective)
+        .and_then(|row| row.1.get(usize::from(form_index)))
+        .and_then(|row| row.1.get(usize::from(ability_index)))
+        .ok_or(CurrentTownWildErrorV1::SourceContent)?
+        .1;
     let initial = source_town_initial_level_move_pool(content, root, form_index)?;
     let effects = source_level_two_movegen()?;
     let mut rows = Vec::with_capacity(initial.len());
@@ -879,13 +972,18 @@ pub fn source_town_neutral_weighted_level_move_pool(
             .iter()
             .find(|row| row.0 == id.get().get())
             .ok_or(CurrentTownWildErrorV1::SourceContent)?;
+        let power = power_rows
+            .iter()
+            .find(|row| row.0 == id.get().get())
+            .ok_or(CurrentTownWildErrorV1::SourceContent)?
+            .1;
         if weight == 0 || meta.5 || effect.2 & 1 != 0 {
             continue;
         }
         if meta.1 != 2 {
-            max_power = max_power.max(effect.1);
+            max_power = max_power.max(power);
         }
-        rows.push((id, weight, meta.1, effect.1, effect.2));
+        rows.push((id, weight, meta.1, power, effect.2));
     }
     max_power = max_power.min(120.0);
     let attack = f64::from(stats[1]);
@@ -913,11 +1011,44 @@ pub fn source_town_neutral_weighted_level_move_pool(
             Ok(CurrentTownNeutralLevelMoveWeightV1 {
                 id,
                 initial_weight,
+                effective_power: power,
                 adjusted_weight: weight,
                 weighted_weight: weighted as u64,
             })
         })
         .collect()
+}
+
+/// Retained conservative entry for callers that require proof that every
+/// potentially active source ability is neutral for move generation.
+pub fn source_town_neutral_weighted_level_move_pool(
+    content: &PreparedGameContentV2,
+    root: SpeciesId,
+    form_index: u16,
+    ability_index: u8,
+    stats: [u32; 6],
+) -> Result<Vec<CurrentTownNeutralLevelMoveWeightV1>, CurrentTownWildErrorV1> {
+    let abilities = source_level_two_abilities()?;
+    let effective = source_town_level_two_species(root)?.get().get();
+    let profile = abilities
+        .rows
+        .iter()
+        .find(|row| row.0 == effective)
+        .and_then(|row| row.1.get(usize::from(form_index)))
+        .ok_or(CurrentTownWildErrorV1::SourceContent)?;
+    let active = profile
+        .0
+        .get(usize::from(ability_index))
+        .ok_or(CurrentTownWildErrorV1::SourceContent)?;
+    if abilities.movegen_modifiers.contains(active)
+        || profile
+            .1
+            .iter()
+            .any(|id| abilities.movegen_modifiers.contains(id))
+    {
+        return Err(CurrentTownWildErrorV1::UnsupportedContext);
+    }
+    source_town_weighted_level_move_pool(content, root, form_index, ability_index, stats)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -956,11 +1087,11 @@ fn source_town_weighted_move_index(
     Err(CurrentTownWildErrorV1::RandomDraw)
 }
 
-/// Complete source `generateMoveset` for a level-two ability-neutral wild.
+/// Complete source `generateMoveset` for a level-two Town wild.
 /// Source signatures are unavailable and filterUselessMoves has no applicable
 /// condition over this bounded 131-move pool; TM/egg/trainer paths are absent.
 /// Enemy shiny, modifiers and encounter settlement remain separate owners.
-pub fn source_town_neutral_moveset(
+pub fn source_town_moveset(
     content: &PreparedGameContentV2,
     root: SpeciesId,
     form_index: u16,
@@ -970,7 +1101,7 @@ pub fn source_town_neutral_moveset(
 ) -> Result<CurrentTownNeutralMovesetV1, CurrentTownWildErrorV1> {
     source_level_two_signatures()?;
     source_level_two_useless()?;
-    let mut pool = source_town_neutral_weighted_level_move_pool(
+    let mut pool = source_town_weighted_level_move_pool(
         content,
         root,
         form_index,
@@ -1012,6 +1143,20 @@ pub fn source_town_neutral_moveset(
     let audit = staged.audit_entries()[first_audit..].to_vec();
     *rng = staged;
     Ok(CurrentTownNeutralMovesetV1 { moves, audit })
+}
+
+/// Conservative compatibility entry that rejects any potentially non-neutral
+/// ability profile before the audited move draws are attempted.
+pub fn source_town_neutral_moveset(
+    content: &PreparedGameContentV2,
+    root: SpeciesId,
+    form_index: u16,
+    ability_index: u8,
+    stats: [u32; 6],
+    rng: &mut RngRuntime,
+) -> Result<CurrentTownNeutralMovesetV1, CurrentTownWildErrorV1> {
+    source_town_neutral_weighted_level_move_pool(content, root, form_index, ability_index, stats)?;
+    source_town_moveset(content, root, form_index, ability_index, stats, rng)
 }
 
 /// Source level-two stat formula before held, nature-weight, challenge or

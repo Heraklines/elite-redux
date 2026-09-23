@@ -7,7 +7,8 @@ use er_game::current_town_wild_spawn::{
     source_town_ability_id, source_town_day_pools, source_town_form_base_stats,
     source_town_form_types, source_town_initial_level_move_pool, source_town_ivs_from_id,
     source_town_level_two_form_rows, source_town_level_two_species, source_town_male_half_percent,
-    source_town_neutral_moveset, source_town_neutral_weighted_level_move_pool,
+    source_town_moveset, source_town_neutral_moveset,
+    source_town_neutral_weighted_level_move_pool, source_town_weighted_level_move_pool,
     source_town_unmodified_level_two_stats,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
@@ -36,6 +37,8 @@ const SOURCE_LEVEL_TWO_MOVEGEN: &[u8] =
     include_bytes!("../src/current_town_level_two_movegen.json");
 const SOURCE_LEVEL_TWO_ABILITIES: &[u8] =
     include_bytes!("../src/current_town_level_two_abilities.json");
+const SOURCE_LEVEL_TWO_ABILITY_POWERS: &[u8] =
+    include_bytes!("../src/current_town_level_two_ability_powers.json");
 const SOURCE_LEVEL_TWO_SIGNATURES: &[u8] =
     include_bytes!("../src/current_town_level_two_signatures.json");
 const SOURCE_LEVEL_TWO_USELESS: &[u8] =
@@ -107,6 +110,8 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     let level_two_movegen: serde_json::Value = serde_json::from_slice(SOURCE_LEVEL_TWO_MOVEGEN)?;
     let level_two_abilities: serde_json::Value =
         serde_json::from_slice(SOURCE_LEVEL_TWO_ABILITIES)?;
+    let level_two_ability_powers: serde_json::Value =
+        serde_json::from_slice(SOURCE_LEVEL_TWO_ABILITY_POWERS)?;
     let level_two_signatures: serde_json::Value =
         serde_json::from_slice(SOURCE_LEVEL_TWO_SIGNATURES)?;
     let level_two_useless: serde_json::Value = serde_json::from_slice(SOURCE_LEVEL_TWO_USELESS)?;
@@ -120,6 +125,7 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     assert_eq!(level_two_meta["source"], gender["source"]);
     assert_eq!(level_two_movegen["source"], gender["source"]);
     assert_eq!(level_two_abilities["source"], gender["source"]);
+    assert_eq!(level_two_ability_powers["source"], gender["source"]);
     assert_eq!(level_two_signatures["source"], gender["source"]);
     assert_eq!(level_two_useless["source"], gender["source"]);
     assert_eq!(movegen_stage["source"], gender["source"]);
@@ -165,6 +171,13 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         level_two_abilities["rows"]
             .as_array()
             .ok_or("level-two abilities")?
+            .len(),
+        53
+    );
+    assert_eq!(
+        level_two_ability_powers["rows"]
+            .as_array()
+            .ok_or("level-two ability powers")?
             .len(),
         53
     );
@@ -326,6 +339,35 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
                 let active = source_profile[0][ability_index]
                     .as_u64()
                     .ok_or("active ability")?;
+                let observed_species = level_two_ability_powers["rows"]
+                    .as_array()
+                    .ok_or("source ability power species")?
+                    .iter()
+                    .find(|row| row[0].as_u64() == Some(effective))
+                    .ok_or("missing source ability power species")?;
+                let observed_slots = observed_species[1][form][1]
+                    .as_array()
+                    .ok_or("source ability power slots")?;
+                assert_eq!(observed_slots[ability_index][0].as_u64(), Some(active));
+                let observed_powers = observed_slots[ability_index][1]
+                    .as_array()
+                    .ok_or("source effective powers")?;
+                let weighted = source_town_weighted_level_move_pool(
+                    &content,
+                    *root,
+                    form as u16,
+                    ability_index as u8,
+                    [13, 7, 6, 6, 6, 8],
+                )?;
+                for row in &weighted {
+                    let source_power = observed_powers
+                        .iter()
+                        .find(|pair| pair[0].as_u64() == Some(row.id.get().get()))
+                        .ok_or("missing observed effective power")?[1]
+                        .as_f64()
+                        .ok_or("observed effective power")?;
+                    assert_eq!(row.effective_power, source_power);
+                }
                 let passive = source_profile[1].as_array().ok_or("passive abilities")?;
                 let has_effect = modifiers.iter().any(|id| id.as_u64() == Some(active))
                     || passive
@@ -521,6 +563,16 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         [13, 7, 6, 6, 6, 8],
         &mut moveset_rng,
     )?;
+    let mut complete_moveset_rng = constructor_rng.clone();
+    let complete_moveset = source_town_moveset(
+        &content,
+        prefix.root.source_root,
+        prefix.form_index,
+        prefix.ability_index,
+        [13, 7, 6, 6, 6, 8],
+        &mut complete_moveset_rng,
+    )?;
+    assert_eq!(complete_moveset, moveset);
     assert_eq!(
         moveset
             .moves
