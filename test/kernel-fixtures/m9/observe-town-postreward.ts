@@ -64,12 +64,14 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   const firstEnemySpecies = firstEnemy.species.speciesId;
   const player = scene.getPlayerPokemon();
   expect(player).toBeDefined();
-  expect(player.getMoveset().map(move => move.moveId)).toContain(MoveId.EMBER);
+  // The actual seeded starter construction selects Fire Fang here; use the
+  // retained move, without changing its moveset through a test helper.
+  expect(player.getMoveset().map(move => move.moveId)).toContain(MoveId.FIRE_FANG);
 
   const newBattle = vi.spyOn(scene, "newBattle");
   let attackingTurns = 0;
   while (!manager.isVictory() && attackingTurns < 12) {
-    manager.move.select(MoveId.EMBER);
+    manager.move.select(MoveId.FIRE_FANG);
     await manager.toEndOfTurn();
     attackingTurns++;
     if (!manager.isVictory()) {
