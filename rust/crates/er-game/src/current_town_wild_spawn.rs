@@ -368,8 +368,8 @@ fn source_level_two_movegen() -> Result<&'static SourceTownLevelTwoMovegenV1, Cu
         .map_err(|_| CurrentTownWildErrorV1::SourceContent)
 }
 
-fn source_level_two_abilities(
-) -> Result<&'static SourceTownLevelTwoAbilitiesV1, CurrentTownWildErrorV1> {
+fn source_level_two_abilities()
+-> Result<&'static SourceTownLevelTwoAbilitiesV1, CurrentTownWildErrorV1> {
     SOURCE_LEVEL_TWO_ABILITIES
         .get_or_init(|| {
             let parsed: SourceTownLevelTwoAbilitiesV1 =
@@ -381,7 +381,12 @@ fn source_level_two_abilities(
                 || parsed.rows.len() != 53
                 || parsed.movegen_modifiers.len() != 98
                 || parsed.movegen_modifiers.iter().any(|id| *id == 0)
-                || parsed.movegen_modifiers.iter().collect::<BTreeSet<_>>().len() != 98
+                || parsed
+                    .movegen_modifiers
+                    .iter()
+                    .collect::<BTreeSet<_>>()
+                    .len()
+                    != 98
                 || parsed.rows.iter().zip(&forms.rows).any(|(row, source)| {
                     row.0 != source.0
                         || row.1.len() != source.1.len()
@@ -750,7 +755,11 @@ pub fn source_town_neutral_weighted_level_move_pool(
         .0
         .get(usize::from(ability_index))
         .ok_or(CurrentTownWildErrorV1::SourceContent)?;
-    if *active != source_town_ability_id(root, form_index, ability_index)?.get().get() {
+    if *active
+        != source_town_ability_id(root, form_index, ability_index)?
+            .get()
+            .get()
+    {
         return Err(CurrentTownWildErrorV1::SourceContent);
     }
     if abilities.movegen_modifiers.contains(active)

@@ -306,9 +306,9 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
                     .ok_or("active ability")?;
                 let passive = source_profile[1].as_array().ok_or("passive abilities")?;
                 let has_effect = modifiers.iter().any(|id| id.as_u64() == Some(active))
-                    || passive.iter().any(|passive| {
-                        modifiers.iter().any(|id| id == passive)
-                    });
+                    || passive
+                        .iter()
+                        .any(|passive| modifiers.iter().any(|id| id == passive));
                 let result = source_town_neutral_weighted_level_move_pool(
                     &content,
                     *root,
@@ -317,7 +317,10 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
                     [13, 7, 6, 6, 6, 8],
                 );
                 if has_effect {
-                    assert_eq!(result.unwrap_err(), CurrentTownWildErrorV1::UnsupportedContext);
+                    assert_eq!(
+                        result.unwrap_err(),
+                        CurrentTownWildErrorV1::UnsupportedContext
+                    );
                 } else {
                     assert!(result?.len() <= 512);
                 }

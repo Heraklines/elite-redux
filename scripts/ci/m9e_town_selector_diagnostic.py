@@ -135,7 +135,7 @@ def main():
         if result["first_failure"] == "format failed":
             subprocess.run(["cargo", "fmt", "--manifest-path", "Cargo.toml", "--all"],
                            cwd=RUST, timeout=120, check=False)
-            patch = subprocess.check_output(["git", "diff", "--", *files[:8]], cwd=ROOT)
+            patch = subprocess.check_output(["git", "diff", "--", files[0], files[8]], cwd=ROOT)
             if len(patch) <= 32768:
                 (OUT / "format.patch").write_bytes(patch)
     finally:
