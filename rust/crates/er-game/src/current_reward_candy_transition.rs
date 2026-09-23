@@ -124,6 +124,38 @@ pub(super) fn transition(
         .clone();
     let before_digest = game_state_digest(before).map_err(material_error)?;
     let after_digest = game_state_digest(&candidate).map_err(material_error)?;
+    let mut mutations = vec![GameMutationEvidenceV2 {
+        ordinal: 0,
+        domain: GameActionDomainV2::Progression,
+        kind: GameMutationKindV2::StateChanged,
+        before_digest: before_digest.clone(),
+        after_digest: after_digest.clone(),
+    }];
+    if let Some(GamePlatformEffectV2::CurrentFriendshipClock { request }) = platform_effects.first()
+    {
+        if platform_effects.len() != 1
+            || request.request.get() != before.identities.next_platform_request_id
+            || safe_increment(request.request.get())?
+                != candidate.identities.next_platform_request_id
+        {
+            return Err(GameRuntimeV6Error::Invalid);
+        }
+        mutations.push(GameMutationEvidenceV2 {
+            ordinal: 1,
+            domain: GameActionDomainV2::Progression,
+            kind: GameMutationKindV2::IdentityAllocated {
+                domain: GameIdentityDomainV1::PlatformRequest,
+                identity: request.request.get(),
+            },
+            before_digest: before_digest.clone(),
+            after_digest: after_digest.clone(),
+        });
+    } else if !platform_effects.is_empty()
+        || before.identities.next_platform_request_id
+            != candidate.identities.next_platform_request_id
+    {
+        return Err(GameRuntimeV6Error::Invalid);
+    }
     Ok(GameTransitionMaterialV6 {
         schema_version: crate::m9e_material_v6::GAME_MATERIAL_SCHEMA_VERSION_V6,
         domain: GameActionDomainV2::Progression,
@@ -133,13 +165,7 @@ pub(super) fn transition(
         content_identity: before.content_identity.clone(),
         accepted_action: None,
         owned_phase: Some(phase),
-        mutations: vec![GameMutationEvidenceV2 {
-            ordinal: 0,
-            domain: GameActionDomainV2::Progression,
-            kind: GameMutationKindV2::StateChanged,
-            before_digest: before_digest.clone(),
-            after_digest: after_digest.clone(),
-        }],
+        mutations,
         before_digest,
         after_digest,
         after_state: candidate,
