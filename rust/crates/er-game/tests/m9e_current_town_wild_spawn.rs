@@ -80,10 +80,14 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     // from this actual seed before battle setup advanced to SOURCE_BEFORE.
     let wave_seed = shift_char_codes("test", 2)?;
     assert_eq!(wave_seed, "vguv");
-    assert_eq!(
-        PhaserRdg::from_seed(&wave_seed).state().state_string,
-        SOURCE_AFTER_WAVE_RESET
-    );
+    let mut wave_rng = PhaserRdg::from_seed(&wave_seed);
+    assert_eq!(wave_rng.state().state_string, SOURCE_AFTER_WAVE_RESET);
+    // The ordinary source wild battle runs checkIsDouble after resetSeed; its
+    // randSeedInt range consumes Phaser's two primitive draws before the
+    // queued EncounterPhase calls Arena.randomSpecies.
+    wave_rng.rnd();
+    wave_rng.rnd();
+    assert_eq!(wave_rng.state().state_string, SOURCE_BEFORE);
     // Source399d direct queued NextEncounter observation in run34704520605:
     // tier integer 247/512, common pool index 3/24, root263. That probe's
     // retained run stream and its effective DAY pool are directly observed;
