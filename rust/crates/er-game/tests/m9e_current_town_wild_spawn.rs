@@ -7,7 +7,7 @@ use er_game::current_town_wild_spawn::{
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_rng::battle::RngRuntime;
-use er_rng::phaser::{PhaserRdg, PhaserRdgState, RunRngState};
+use er_rng::phaser::{PhaserRdgState, RunRngState};
 use er_types::battle_ids::SpeciesId;
 use er_types::run_ids::BiomeId;
 use er_types::{RunDifficultyV1, SafeU53};
@@ -22,8 +22,8 @@ const SOURCE_AFTER_SELECTION: &str =
 fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Box<dyn Error>> {
     // Source399d direct queued NextEncounter observation in run34704520605:
     // tier integer 247/512, common pool index 3/24, root263. That probe's
-    // retained run stream and its DAY pool observation are separate controls; this
-    // isolated selector test does not claim a causal natural reward receipt.
+    // retained run stream and its effective DAY pool are directly observed;
+    // this isolated selector test does not claim a causal natural reward receipt.
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = PreparedGameContentV2::prepare(Arc::new(bundle))?;
     let town = content
@@ -66,18 +66,7 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         .iter()
         .find(|mode| mode.key == "CLASSIC")
         .ok_or("Classic mode absent")?;
-    let eight = SafeU53::new(8)?;
-    let day_seed = (0..64)
-        .map(|index| format!("m9e-town-day-{index}"))
-        .find(|seed| {
-            let mut probe = PhaserRdg::from_seed(seed);
-            probe
-                .rand_seed_int(eight, SafeU53::ZERO)
-                .is_ok_and(|draw| (2 + draw.get() * 5) % 40 < 15)
-        })
-        .ok_or("no bounded Town day seed")?;
     let context = CurrentTownDayWaveTwoContextV1 {
-        run_seed: &day_seed,
         mode: mode.id,
         biome: town.id,
         difficulty: RunDifficultyV1::Ace,
@@ -88,6 +77,7 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         encounter_boss_segments: 0,
         regional_boost: false,
         time_override: None,
+        effective_pool_time: 1,
         override_species: None,
         golden_bug_net: false,
         excluded_species: &[],
@@ -119,7 +109,7 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     );
     assert_eq!(rng, before);
     unsupported = context;
-    unsupported.run_seed = "test";
+    unsupported.effective_pool_time = 3;
     assert_eq!(
         select_current_town_day_wave_two_root(&content, unsupported, &mut rng),
         Err(CurrentTownWildErrorV1::UnsupportedContext)

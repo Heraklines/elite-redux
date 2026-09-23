@@ -4,7 +4,6 @@
 
 use er_rng::audit::{RngCallsiteId, RngDraw, RngReason};
 use er_rng::battle::RngRuntime;
-use er_rng::phaser::PhaserRdg;
 use er_types::battle_ids::{GameModeId, SpeciesId};
 use er_types::run_ids::BiomeId;
 use er_types::{RunDifficultyV1, SafeU53};
@@ -31,7 +30,6 @@ const SOURCE_TIERS: [&[u64]; 5] = [
 
 #[derive(Clone, Copy, Debug)]
 pub struct CurrentTownDayWaveTwoContextV1<'a> {
-    pub run_seed: &'a str,
     pub mode: GameModeId,
     pub biome: BiomeId,
     pub difficulty: RunDifficultyV1,
@@ -42,6 +40,8 @@ pub struct CurrentTownDayWaveTwoContextV1<'a> {
     pub encounter_boss_segments: u8,
     pub regional_boost: bool,
     pub time_override: Option<i16>,
+    /// Arena.lastTimeOfDay, retained with its effective pokemonPool.
+    pub effective_pool_time: i16,
     pub override_species: Option<SpeciesId>,
     pub golden_bug_net: bool,
     pub excluded_species: &'a [SpeciesId],
@@ -64,7 +64,6 @@ pub struct CurrentTownWildRootV1 {
     pub root_index: usize,
     pub source_root: SpeciesId,
     pub effective_species: SpeciesId,
-    pub wave_cycle_offset: u8,
     pub audit: Vec<RngDraw>,
 }
 
@@ -118,9 +117,8 @@ pub fn source_town_day_pools(
 fn validated_pools(
     content: &PreparedGameContentV2,
     context: CurrentTownDayWaveTwoContextV1<'_>,
-) -> Result<([Vec<SpeciesId>; 5], u8), CurrentTownWildErrorV1> {
+) -> Result<[Vec<SpeciesId>; 5], CurrentTownWildErrorV1> {
     if content.identity().oracle_sha.as_str() != ORACLE
-        || context.run_seed.is_empty()
         || context.difficulty != RunDifficultyV1::Ace
         || context.wave != 2
         || context.level != 2
@@ -129,6 +127,7 @@ fn validated_pools(
         || context.encounter_boss_segments != 0
         || context.regional_boost
         || context.time_override.is_some()
+        || context.effective_pool_time != 1
         || context.override_species.is_some()
         || context.golden_bug_net
         || !context.excluded_species.is_empty()
@@ -142,20 +141,8 @@ fn validated_pools(
     {
         return Err(CurrentTownWildErrorV1::UnsupportedContext);
     }
-    // BattleScene.getGeneratedWaveCycleOffset uses an isolated seed-override
-    // scope. It cannot consume or reset the retained encounter run stream.
-    let mut offset_rng = PhaserRdg::from_seed(context.run_seed);
-    let offset = offset_rng
-        .rand_seed_int(
-            SafeU53::new(8).map_err(|_| CurrentTownWildErrorV1::RandomDraw)?,
-            SafeU53::ZERO,
-        )
-        .map_err(|_| CurrentTownWildErrorV1::RandomDraw)?
-        .get()
-        * 5;
-    if (u64::from(context.wave) + offset) % 40 >= 15 {
-        return Err(CurrentTownWildErrorV1::UnsupportedContext);
-    }
+    // Arena.randomSpecies reads the already effective pokemonPool. Its cached
+    // time can differ from a fresh calculation after BattleScene.setSeed.
     let biome = content
         .world
         .biome(context.biome)
@@ -169,7 +156,7 @@ fn validated_pools(
             }
         }
     }
-    Ok((pools, offset as u8))
+    Ok(pools)
 }
 
 /// Source Arena.randomSpecies root and level-two substitution only. The caller
@@ -180,7 +167,7 @@ pub fn select_current_town_day_wave_two_root(
     context: CurrentTownDayWaveTwoContextV1<'_>,
     rng: &mut RngRuntime,
 ) -> Result<CurrentTownWildRootV1, CurrentTownWildErrorV1> {
-    let (pools, wave_cycle_offset) = validated_pools(content, context)?;
+    let pools = validated_pools(content, context)?;
     let mut staged = rng.clone();
     let first_audit = staged.audit_entries().len();
     let tier_roll = staged
@@ -223,7 +210,6 @@ pub fn select_current_town_day_wave_two_root(
         root_index,
         source_root,
         effective_species,
-        wave_cycle_offset,
         audit,
     })
 }
