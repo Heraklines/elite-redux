@@ -2,10 +2,12 @@ use std::error::Error;
 use std::sync::Arc;
 
 use er_game::current_town_wild_spawn::{
-    CurrentTownDayWaveTwoContextV1, CurrentTownWildErrorV1, select_current_town_day_wave_two_root,
-    source_town_day_pools, source_town_level_two_species,
+    CurrentTownDayWaveTwoContextV1, CurrentTownGenderV1, CurrentTownWildErrorV1,
+    select_current_town_day_wave_two_constructor_prefix, select_current_town_day_wave_two_root,
+    source_town_day_pools, source_town_level_two_species, source_town_male_half_percent,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
+use er_rng::audit::{RngCallsiteId, RngPublicApi, RngReason};
 use er_rng::battle::RngRuntime;
 use er_rng::phaser::{PhaserRdgState, RunRngState};
 use er_types::battle_ids::SpeciesId;
@@ -14,6 +16,9 @@ use er_types::{RunDifficultyV1, SafeU53};
 
 const BUNDLE: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/game-content-bundle-v2.json");
+const SOURCE_GENDER: &[u8] = include_bytes!("../../../fixtures/m9/engineering/town-gender-v1.json");
+const SOURCE_FORM_FLAGS: &[u8] =
+    include_bytes!("../../../fixtures/m9/engineering/town-form-flags-v1.json");
 const SOURCE_BEFORE: &str = "!rnd,789153,0.5761283298488706,0.7223087239544839,0.22977968817576766";
 const SOURCE_AFTER_SELECTION: &str =
     "!rnd,1012145,0.09734400571323931,0.1575480371247977,0.15997060341760516";
@@ -48,6 +53,33 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         mapped += 1;
     }
     assert_eq!(mapped, 54);
+    let gender: serde_json::Value = serde_json::from_slice(SOURCE_GENDER)?;
+    let form_flags: serde_json::Value = serde_json::from_slice(SOURCE_FORM_FLAGS)?;
+    assert_eq!(gender["source"], "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7");
+    assert_eq!(form_flags["source"], gender["source"]);
+    assert_eq!(gender["rows"].as_array().ok_or("gender rows")?.len(), 163);
+    assert_eq!(form_flags["rows"].as_array().ok_or("form rows")?.len(), 163);
+    for root in pools.iter().flatten() {
+        let id = root.get().get();
+        let source_ratio = gender["rows"]
+            .as_array()
+            .ok_or("gender rows")?
+            .iter()
+            .find(|row| row[0].as_u64() == Some(id))
+            .ok_or("missing source gender")?;
+        assert_eq!(
+            source_town_male_half_percent(*root)?.map(|value| f64::from(value) / 2.0),
+            source_ratio[1].as_f64()
+        );
+        let effective = if id == 266 { 265 } else { id };
+        let flags = form_flags["rows"]
+            .as_array()
+            .ok_or("form rows")?
+            .iter()
+            .find(|row| row[0].as_u64() == Some(effective))
+            .ok_or("missing source form flags")?;
+        assert_eq!(flags[1].as_u64(), Some(0));
+    }
     assert_eq!(
         source_town_level_two_species(SpeciesId::new(SafeU53::new(9999)?)),
         Err(CurrentTownWildErrorV1::SourceContent)
@@ -99,6 +131,41 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     assert_eq!(selected.audit[0].result.get(), 247);
     assert_eq!(selected.audit[1].result.get(), 3);
     assert_eq!(rng.run_state().rdg.state_string, SOURCE_AFTER_SELECTION);
+
+    let mut constructor_rng = RngRuntime::from_states(
+        RunRngState {
+            rdg: PhaserRdgState::from_state_string(SOURCE_BEFORE)?,
+        },
+        None,
+    )?;
+    let prefix = select_current_town_day_wave_two_constructor_prefix(
+        &content,
+        context,
+        &mut constructor_rng,
+    )?;
+    assert_eq!(prefix.root, selected);
+    assert_eq!(prefix.ability_index, 1);
+    assert_eq!(prefix.pokemon_id, 3_818_575_047);
+    assert_eq!(prefix.gender, CurrentTownGenderV1::Male);
+    assert_eq!(prefix.form_index, 0);
+    assert_eq!(prefix.nature_index, 11);
+    assert_eq!(prefix.audit.len(), 7);
+    assert_eq!(prefix.audit[5].public_api, RngPublicApi::RandSeedFloat);
+    assert_eq!(
+        prefix.audit[5].fraction_bits.as_ref().map(|bits| bits.to_f64()),
+        Some(0.2272384697785894)
+    );
+    assert_eq!(
+        constructor_rng
+            .run_rand_seed_int(
+                SafeU53::new(74_296)?,
+                SafeU53::ZERO,
+                RngReason::RandomSelector,
+                RngCallsiteId::mechanics(RngReason::RandomSelector),
+            )?
+            .get(),
+        2_192
+    );
 
     let before = rng.clone();
     let mut unsupported = context;

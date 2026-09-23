@@ -15,6 +15,8 @@ COMPACT = OUT / "compact"
 SHA = os.environ["GITHUB_SHA"]
 TARGET = "m9e_current_town_wild_spawn"
 TEST_ID = "entire_town_day_pool_and_actual_wave_two_source_draw_match"
+SOURCE_GENDER_SHA256 = "a27f86e31feccd821f35aecaf9eb496faf120127e3df3d2c7c0b14f6593928fb"
+SOURCE_FORM_FLAGS_SHA256 = "e03db62cf3982e03fbb5a25045e15407abd12010aefcbca8fa8cf5585881f446"
 START = time.monotonic()
 COMMANDS = []
 
@@ -45,7 +47,7 @@ def run(name, argv, seconds=600):
 def main():
     COMPACT.mkdir(parents=True, exist_ok=False)
     result = {"schema": 1, "status": "failed", "source_sha": SHA,
-              "scope": "Ace/Town/day wave-two full-root selection and source RNG; no enemy construction or next-wave receipt",
+              "scope": "Ace/Town/day wave-two full-root and source constructor prefix through nature; no moveset, enemy settlement or next-wave receipt",
               "commands": COMMANDS}
     try:
         head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
@@ -60,12 +62,24 @@ def main():
                  "rust/crates/er-rng/src/audit.rs",
                  "rust/crates/er-rng/src/battle.rs",
                  "rust/crates/er-rng/tests/m3_rng.rs",
+                 "rust/fixtures/m9/engineering/town-gender-v1.json",
+                 "rust/fixtures/m9/engineering/town-form-flags-v1.json",
                  "scripts/ci/m9e_town_selector_diagnostic.py",
                  ".github/workflows/m9e-town-content-probe.yml"]
         result["source_hashes"] = {name: digest((ROOT / name).read_bytes()) for name in files}
         fixture = RUST / "fixtures/m9/engineering/game-content-bundle-v2.json"
         result["fixture"] = {"bytes": fixture.stat().st_size,
                              "sha256": digest(fixture.read_bytes())}
+        source_fixtures = {
+            "gender": ("rust/fixtures/m9/engineering/town-gender-v1.json", SOURCE_GENDER_SHA256),
+            "form_flags": ("rust/fixtures/m9/engineering/town-form-flags-v1.json", SOURCE_FORM_FLAGS_SHA256),
+        }
+        for name, (path, expected) in source_fixtures.items():
+            actual = digest((ROOT / path).read_bytes())
+            if actual != expected:
+                raise RuntimeError("pinned source fixture differs: " + name)
+        result["source_fixtures"] = {name: {"path": path, "sha256": expected}
+                                     for name, (path, expected) in source_fixtures.items()}
         run("format", ["cargo", "fmt", "--manifest-path", "Cargo.toml", "--all", "--", "--check"], 120)
         base = ["cargo", "test", "--locked", "-p", "er-game", "--test", TARGET, "--"]
         listing = run("list", base + ["--list", "--format", "terse"])

@@ -28,6 +28,25 @@ const SOURCE_TIERS: [&[u64]; 5] = [
     &[132, 446, 570],
 ];
 
+// Half-percent units from two identical pinned-source observations of all 163
+// species in the Town evolution closure (run 35847184226, gender SHA256
+// a27f86e31feccd821f35aecaf9eb496faf120127e3df3d2c7c0b14f6593928fb).
+// The arrays follow SOURCE_TIERS, including root 266 before its 265 substitution.
+const MALE_HALF_PERCENT_TIERS: [&[Option<u8>]; 5] = [
+    &[Some(100); 24],
+    &[
+        Some(100), Some(100), Some(100), Some(100), Some(0), Some(200), Some(100), Some(100),
+        Some(100), Some(50), Some(175), Some(100), Some(50), Some(100),
+    ],
+    &[
+        Some(150), Some(50), Some(50), Some(100), Some(0), Some(100), None,
+    ],
+    &[
+        Some(175), Some(100), Some(175), Some(100), Some(100), Some(175),
+    ],
+    &[None, Some(175), Some(175)],
+];
+
 #[derive(Clone, Copy, Debug)]
 pub struct CurrentTownDayWaveTwoContextV1<'a> {
     pub mode: GameModeId,
@@ -65,6 +84,39 @@ pub struct CurrentTownWildRootV1 {
     pub source_root: SpeciesId,
     pub effective_species: SpeciesId,
     pub audit: Vec<RngDraw>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CurrentTownGenderV1 {
+    Male,
+    Female,
+    Genderless,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CurrentTownWildConstructorPrefixV1 {
+    pub root: CurrentTownWildRootV1,
+    pub ability_index: u8,
+    pub pokemon_id: u32,
+    pub gender: CurrentTownGenderV1,
+    pub form_index: u16,
+    pub nature_index: u8,
+    /// Includes the two root draws followed by the exact pre-moves draws.
+    pub audit: Vec<RngDraw>,
+}
+
+pub fn source_town_male_half_percent(
+    root: SpeciesId,
+) -> Result<Option<u8>, CurrentTownWildErrorV1> {
+    for (tier, roots) in SOURCE_TIERS.iter().enumerate() {
+        if let Some(index) = roots.iter().position(|id| *id == root.get().get()) {
+            return MALE_HALF_PERCENT_TIERS[tier]
+                .get(index)
+                .copied()
+                .ok_or(CurrentTownWildErrorV1::SourceContent);
+        }
+    }
+    Err(CurrentTownWildErrorV1::SourceContent)
 }
 
 pub fn source_town_level_two_species(root: SpeciesId) -> Result<SpeciesId, CurrentTownWildErrorV1> {
@@ -210,6 +262,120 @@ pub fn select_current_town_day_wave_two_root(
         root_index,
         source_root,
         effective_species,
+        audit,
+    })
+}
+
+/// The ordinary source constructor through nature selection, stopping before
+/// moveset, shiny/variant, stats, modifiers and encounter settlement. All RNG
+/// changes commit together; a rejected context leaves the caller unchanged.
+pub fn select_current_town_day_wave_two_constructor_prefix(
+    content: &PreparedGameContentV2,
+    context: CurrentTownDayWaveTwoContextV1<'_>,
+    rng: &mut RngRuntime,
+) -> Result<CurrentTownWildConstructorPrefixV1, CurrentTownWildErrorV1> {
+    let mut staged = rng.clone();
+    let first_audit = staged.audit_entries().len();
+    let root = select_current_town_day_wave_two_root(content, context, &mut staged)?;
+    let reason = RngReason::RandomSelector;
+    let callsite = RngCallsiteId::mechanics(reason);
+    // Every level-two effective Town root has distinct regular slots and a
+    // present hidden slot in the complete source graph (run 35795971040).
+    let regular = staged
+        .run_rand_seed_int(
+            SafeU53::new(2).map_err(|_| CurrentTownWildErrorV1::RandomDraw)?,
+            SafeU53::ZERO,
+            reason,
+            callsite.clone(),
+        )
+        .map_err(|_| CurrentTownWildErrorV1::RandomDraw)?
+        .get() as u8;
+    let hidden = staged
+        .run_rand_seed_int(
+            SafeU53::new(256).map_err(|_| CurrentTownWildErrorV1::RandomDraw)?,
+            SafeU53::ZERO,
+            reason,
+            callsite.clone(),
+        )
+        .map_err(|_| CurrentTownWildErrorV1::RandomDraw)?
+        .get();
+    let ability_index = if hidden == 0 { 2 } else { regular };
+    let pokemon_id = staged
+        .run_rand_seed_int(
+            SafeU53::new(1_u64 << 32).map_err(|_| CurrentTownWildErrorV1::RandomDraw)?,
+            SafeU53::ZERO,
+            reason,
+            callsite.clone(),
+        )
+        .map_err(|_| CurrentTownWildErrorV1::RandomDraw)?
+        .get() as u32;
+    let gender = match source_town_male_half_percent(root.source_root)? {
+        None => CurrentTownGenderV1::Genderless,
+        Some(male_half_percent) => {
+            let roll = staged
+                .run_rand_seed_float(reason, callsite.clone())
+                .map_err(|_| CurrentTownWildErrorV1::RandomDraw)?;
+            if roll * 100.0 < f64::from(male_half_percent) / 2.0 {
+                CurrentTownGenderV1::Male
+            } else {
+                CurrentTownGenderV1::Female
+            }
+        }
+    };
+    // On Ace/Town/wave two, only these three effective roots enter the
+    // source's random-form branches. The observed 20 Scatterbug forms are all
+    // obtainable (run 35848256061, form flags SHA256 e03db62cf3982e03fbb5a25045e15407abd12010aefcbca8fa8cf5585881f446).
+    let form_index = match root.effective_species.get().get() {
+        664 => staged
+            .run_rand_seed_int(
+                SafeU53::new(20).map_err(|_| CurrentTownWildErrorV1::RandomDraw)?,
+                SafeU53::ZERO,
+                reason,
+                callsite.clone(),
+            )
+            .map_err(|_| CurrentTownWildErrorV1::RandomDraw)?
+            .get() as u16,
+        172 => u16::from(
+            staged
+                .run_rand_seed_int(
+                    SafeU53::new(8).map_err(|_| CurrentTownWildErrorV1::RandomDraw)?,
+                    SafeU53::ZERO,
+                    reason,
+                    callsite.clone(),
+                )
+                .map_err(|_| CurrentTownWildErrorV1::RandomDraw)?
+                .get()
+                == 0,
+        ),
+        133 => staged
+            .run_rand_seed_int(
+                SafeU53::new(2).map_err(|_| CurrentTownWildErrorV1::RandomDraw)?,
+                SafeU53::ZERO,
+                reason,
+                callsite.clone(),
+            )
+            .map_err(|_| CurrentTownWildErrorV1::RandomDraw)?
+            .get() as u16,
+        _ => 0,
+    };
+    let nature_index = staged
+        .run_rand_seed_int(
+            SafeU53::new(25).map_err(|_| CurrentTownWildErrorV1::RandomDraw)?,
+            SafeU53::ZERO,
+            reason,
+            callsite,
+        )
+        .map_err(|_| CurrentTownWildErrorV1::RandomDraw)?
+        .get() as u8;
+    let audit = staged.audit_entries()[first_audit..].to_vec();
+    *rng = staged;
+    Ok(CurrentTownWildConstructorPrefixV1 {
+        root,
+        ability_index,
+        pokemon_id,
+        gender,
+        form_index,
+        nature_index,
         audit,
     })
 }
