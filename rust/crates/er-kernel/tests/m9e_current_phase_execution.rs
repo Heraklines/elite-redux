@@ -2189,8 +2189,7 @@ fn assert_actual_tm_fullslot_sequence(
                 let (state, _, _) =
                     assert_actual_tm_replace_yes(state, content.clone(), tm, learned)
                         .map_err(|error| error.to_string())?;
-                assert_actual_tm_choose_slot(state, content)
-                    .map_err(|error| error.to_string())
+                assert_actual_tm_choose_slot(state, content).map_err(|error| error.to_string())
             })?;
         Ok(replacement
             .join()
