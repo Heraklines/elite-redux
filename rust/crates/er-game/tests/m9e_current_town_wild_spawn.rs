@@ -2,9 +2,8 @@ use std::error::Error;
 use std::sync::Arc;
 
 use er_game::current_town_wild_spawn::{
-    CurrentTownDayWaveTwoContextV1, CurrentTownWildErrorV1,
-    select_current_town_day_wave_two_root, source_town_day_pools,
-    source_town_level_two_species,
+    CurrentTownDayWaveTwoContextV1, CurrentTownWildErrorV1, select_current_town_day_wave_two_root,
+    source_town_day_pools, source_town_level_two_species,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_rng::battle::RngRuntime;
@@ -15,8 +14,7 @@ use er_types::{RunDifficultyV1, SafeU53};
 
 const BUNDLE: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/game-content-bundle-v2.json");
-const SOURCE_BEFORE: &str =
-    "!rnd,789153,0.5761283298488706,0.7223087239544839,0.22977968817576766";
+const SOURCE_BEFORE: &str = "!rnd,789153,0.5761283298488706,0.7223087239544839,0.22977968817576766";
 const SOURCE_AFTER_SELECTION: &str =
     "!rnd,1012145,0.09734400571323931,0.1575480371247977,0.15997060341760516";
 
@@ -32,12 +30,19 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         .biome(BiomeId::new(SafeU53::ZERO))
         .ok_or("compiled Town absent")?;
     let pools = source_town_day_pools(town)?;
-    assert_eq!(pools.iter().map(Vec::len).collect::<Vec<_>>(), vec![24, 14, 7, 6, 3]);
+    assert_eq!(
+        pools.iter().map(Vec::len).collect::<Vec<_>>(),
+        vec![24, 14, 7, 6, 3]
+    );
     assert_eq!(pools.iter().map(Vec::len).sum::<usize>(), 54);
     let mut mapped = 0;
     for root in pools.iter().flatten() {
         let actual = source_town_level_two_species(*root)?;
-        let expected = if root.get().get() == 266 { 265 } else { root.get().get() };
+        let expected = if root.get().get() == 266 {
+            265
+        } else {
+            root.get().get()
+        };
         assert_eq!(actual.get().get(), expected);
         mapped += 1;
     }
@@ -83,7 +88,10 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         None,
     )?;
     let selected = select_current_town_day_wave_two_root(&content, context, &mut rng)?;
-    assert_eq!((selected.tier_roll, selected.tier, selected.root_index), (247, 0, 3));
+    assert_eq!(
+        (selected.tier_roll, selected.tier, selected.root_index),
+        (247, 0, 3)
+    );
     assert_eq!(selected.source_root, SpeciesId::new(SafeU53::new(263)?));
     assert_eq!(selected.effective_species, selected.source_root);
     assert_eq!(selected.audit.len(), 2);

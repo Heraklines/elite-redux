@@ -11,6 +11,7 @@ pub mod internal_event;
 pub mod m6;
 pub mod m72_bootstrap;
 pub use m72_bootstrap::current_pokerus as current_starter_pokerus;
+pub mod current_town_wild_spawn;
 pub mod m72_new_run_material;
 pub mod m7_content;
 pub mod m7_internal_event;
@@ -24,7 +25,6 @@ pub mod m9e_content_v2;
 pub mod m9e_internal_event_v2;
 pub mod m9e_material_v6;
 pub mod m9e_new_run_v6;
-pub mod current_town_wild_spawn;
 pub mod m9e_runtime_v6;
 // The local adapter remains production source while its kernel integration
 // seam is staged; its contract tests include this source directly.

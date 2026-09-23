@@ -18,10 +18,12 @@ const ORACLE: &str = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7";
 // ALL and DAY in separate rows; source Arena concatenates them in this order.
 const SOURCE_TIERS: [&[u64]; 5] = [
     &[
-        16, 19, 21, 263, 265, 276, 399, 504, 506, 661, 831, 915, 10, 161, 165, 187,
-        191, 266, 396, 519, 546, 664, 734, 819,
+        16, 19, 21, 263, 265, 276, 399, 504, 506, 661, 831, 915, 10, 161, 165, 187, 191, 266, 396,
+        519, 546, 664, 734, 819,
     ],
-    &[273, 293, 543, 926, 29, 32, 69, 261, 270, 300, 415, 420, 572, 921],
+    &[
+        273, 293, 543, 926, 29, 32, 69, 261, 270, 300, 415, 420, 572, 921,
+    ],
     &[63, 173, 174, 283, 440, 821, 924],
     &[133, 172, 175, 280, 290, 447],
     &[132, 446, 570],
@@ -66,9 +68,7 @@ pub struct CurrentTownWildRootV1 {
     pub audit: Vec<RngDraw>,
 }
 
-pub fn source_town_level_two_species(
-    root: SpeciesId,
-) -> Result<SpeciesId, CurrentTownWildErrorV1> {
+pub fn source_town_level_two_species(root: SpeciesId) -> Result<SpeciesId, CurrentTownWildErrorV1> {
     // Complete level-two graph observation: root 266 is forced to prevo 265;
     // none of the 54 roots has an eligible upward evolution at this level.
     if !SOURCE_TIERS
@@ -102,7 +102,11 @@ pub fn source_town_day_pools(
             .collect()
     });
     for (tier, pool) in pools.iter().enumerate() {
-        if pool.iter().map(|id| id.get().get()).collect::<Vec<_>>().as_slice()
+        if pool
+            .iter()
+            .map(|id| id.get().get())
+            .collect::<Vec<_>>()
+            .as_slice()
             != SOURCE_TIERS[tier]
         {
             return Err(CurrentTownWildErrorV1::SourceContent);
