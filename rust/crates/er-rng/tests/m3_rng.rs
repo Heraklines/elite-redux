@@ -46,18 +46,23 @@ fn source_run_float_is_exact_and_rejects_a_forged_audit() -> Result<(), Box<dyn 
     assert_eq!(draw.fraction_bits, Some(F64Bits::from_f64(value)));
     draw.validate()?;
     let encoded = serde_json::to_value(draw)?;
-    assert_eq!(serde_json::from_value::<RngDraw>(encoded.clone())?, draw.clone());
+    assert_eq!(
+        serde_json::from_value::<RngDraw>(encoded.clone())?,
+        draw.clone()
+    );
     let mut forged = encoded;
     forged["fraction_bits"] = Value::String(F64Bits::from_f64(0.5).as_str().to_owned());
     assert!(serde_json::from_value::<RngDraw>(forged).is_err());
 
     let before = runtime.clone();
-    assert!(runtime
-        .run_rand_seed_float(
-            RngReason::DamageVariance,
-            RngCallsiteId::mechanics(RngReason::RandomSelector),
-        )
-        .is_err());
+    assert!(
+        runtime
+            .run_rand_seed_float(
+                RngReason::DamageVariance,
+                RngCallsiteId::mechanics(RngReason::RandomSelector),
+            )
+            .is_err()
+    );
     assert_eq!(runtime, before);
     Ok(())
 }
