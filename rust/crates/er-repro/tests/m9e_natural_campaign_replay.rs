@@ -91,6 +91,30 @@ impl std::ops::Deref for CampaignRecorder {
 
 impl CampaignRecorder {
     fn capture(&mut self, event: CurrentExternalEvent) -> Result<GameKernelStepV7, Box<dyn Error>> {
+        // Release recording snapshots before replay imports a complete capsule
+        // on the same default test stack.
+        let step = self.capture_event(event)?;
+        // The first segment ends with Space still held, proving that decoding
+        // and importing a capsule preserves input state before the key-up.
+        // Preserve the first held-key checkpoint. The bootstrap catalog makes
+        // those attempts larger, so keep its capsule segment short without
+        // replaying a whole capsule for every navigation input.
+        let segment_limit = if self.session.kernel_ref()?.state().is_none() {
+            2
+        } else {
+            32
+        };
+        if self.position == 1 || self.position - self.base == segment_limit {
+            self.flush()?;
+        }
+        Ok(step)
+    }
+
+    #[inline(never)]
+    fn capture_event(
+        &mut self,
+        event: CurrentExternalEvent,
+    ) -> Result<GameKernelStepV7, Box<dyn Error>> {
         let capture_started = Instant::now();
         let before = self.session.snapshot()?;
         let apply_started = Instant::now();
@@ -113,19 +137,6 @@ impl CampaignRecorder {
         );
         self.capture_elapsed += capture_started.elapsed();
         let step = result?;
-        // The first segment ends with Space still held, proving that decoding
-        // and importing a capsule preserves input state before the key-up.
-        // Preserve the first held-key checkpoint. The bootstrap catalog makes
-        // those attempts larger, so keep its capsule segment short without
-        // replaying a whole capsule for every navigation input.
-        let segment_limit = if self.session.kernel_ref()?.state().is_none() {
-            2
-        } else {
-            32
-        };
-        if self.position == 1 || self.position - self.base == segment_limit {
-            self.flush()?;
-        }
         Ok(step)
     }
 
