@@ -334,7 +334,10 @@ fn bounded_town_candidates_admit_natural_first_battle() -> Result<()> {
                     .and_then(|run| run.battle.as_ref())
                     .and_then(|battle| battle.enemy_party.first())
                     .ok_or("natural first enemy absent")?;
-                println!("admitted={seed} first_enemy={}", enemy.species_id.get().get());
+                println!(
+                    "admitted={seed} first_enemy={}",
+                    enemy.species_id.get().get()
+                );
                 admitted += 1;
             }
             Err(error) => println!("rejected={seed} reason={error}"),
