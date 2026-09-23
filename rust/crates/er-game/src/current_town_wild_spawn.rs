@@ -1186,7 +1186,18 @@ pub fn source_town_unmodified_level_two_stats(
     ivs: [u8; 6],
     nature_index: u8,
 ) -> Result<[u32; 6], CurrentTownWildErrorV1> {
-    if nature_index >= 25 || base.iter().any(|stat| *stat > 10_000) {
+    source_town_unmodified_stats_at_level(base, ivs, nature_index, 2)
+}
+
+/// Source unmodified Pokemon stat arithmetic for a bounded ordinary level.
+/// Ability, held-item and temporary modifier effects remain separate stages.
+pub fn source_town_unmodified_stats_at_level(
+    base: [u32; 6],
+    ivs: [u8; 6],
+    nature_index: u8,
+    level: u16,
+) -> Result<[u32; 6], CurrentTownWildErrorV1> {
+    if nature_index >= 25 || !(1..=200).contains(&level) || base.iter().any(|stat| *stat > 10_000) {
         return Err(CurrentTownWildErrorV1::SourceContent);
     }
     let up: [&[u8]; 6] = [
@@ -1207,9 +1218,9 @@ pub fn source_town_unmodified_level_two_stats(
     ];
     let mut stats = [0_u32; 6];
     for index in 0..6 {
-        let raw = ((2 * u64::from(base[index]) + u64::from(ivs[index])) * 2) / 100;
+        let raw = ((2 * u64::from(base[index]) + u64::from(ivs[index])) * u64::from(level)) / 100;
         let value = if index == 0 {
-            raw + 12
+            raw + u64::from(level) + 10
         } else {
             let unmodified = raw + 5;
             if up[index].contains(&nature_index) {
