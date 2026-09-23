@@ -78,7 +78,8 @@ def asset():
     )
     request = urllib.request.Request(
         url, headers={"Accept": "application/vnd.github+json",
-                      "User-Agent": "m9e-town-postreward-source"},
+                      "User-Agent": "m9e-town-postreward-source",
+                      "Authorization": "Bearer " + os.environ["GITHUB_TOKEN"]},
     )
     with urllib.request.urlopen(request, timeout=20) as response:
         require(response.status == 200 and response.geturl() == url, "pinned asset HTTP")

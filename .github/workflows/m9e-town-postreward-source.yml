@@ -42,6 +42,8 @@ jobs:
           run_install: false
           package_json_file: .m9e-town-postreward-source-store/package.json
       - name: Observe actual reward to wave two in two fresh source processes
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: python3 scripts/ci/m9e_town_postreward_source.py
       - name: Upload compact source-bound result
         if: always()
