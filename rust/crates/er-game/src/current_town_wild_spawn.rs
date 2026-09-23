@@ -1291,7 +1291,7 @@ fn validated_pools(
     if content.identity().oracle_sha.as_str() != ORACLE
         || context.difficulty != RunDifficultyV1::Ace
         || context.wave != 2
-        || context.level != 2
+        || !matches!(context.level, 2 | 3)
         || context.luck != 0
         || context.forced_tier.is_some()
         || context.encounter_boss_segments != 0
@@ -1368,6 +1368,11 @@ pub fn select_current_town_day_wave_two_root(
         )
         .map_err(|_| CurrentTownWildErrorV1::RandomDraw)?;
     let source_root = pools[tier][root_index];
+    // Level-three evolution and movegen coverage is currently proven only
+    // for the naturally seeded Lillipup successor (source run35894333532).
+    if context.level == 3 && source_root.get().get() != 504 {
+        return Err(CurrentTownWildErrorV1::UnsupportedContext);
+    }
     let effective_species = source_town_level_two_species(source_root)?;
     let audit = staged.audit_entries()[first_audit..].to_vec();
     if audit.len() != 2 {
@@ -1530,7 +1535,12 @@ pub fn select_current_town_day_wave_two_core(
     let prefix =
         select_current_town_day_wave_two_constructor_prefix(content, context, &mut staged)?;
     let base = source_town_form_base_stats(content, prefix.root.source_root, prefix.form_index)?;
-    let stats = source_town_unmodified_level_two_stats(base, prefix.ivs, prefix.nature_index)?;
+    let stats = source_town_unmodified_stats_at_level(
+        base,
+        prefix.ivs,
+        prefix.nature_index,
+        context.level,
+    )?;
     let moveset = source_town_moveset(
         content,
         prefix.root.source_root,

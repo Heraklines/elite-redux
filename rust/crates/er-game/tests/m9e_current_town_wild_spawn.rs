@@ -68,6 +68,8 @@ const SOURCE_TYPE_ORDER: [PokemonType; 19] = [
     PokemonType::Stellar,
 ];
 const SOURCE_BEFORE: &str = "!rnd,789153,0.5761283298488706,0.7223087239544839,0.22977968817576766";
+const SOURCE_NAMED_BEFORE: &str =
+    "!rnd,653160,0.8672514262143523,0.5963186640292406,0.669155293609947";
 const SOURCE_AFTER_WAVE_RESET: &str =
     "!rnd,1,0.3782209656201303,0.3772894029971212,0.5761283298488706";
 const SOURCE_AFTER_SELECTION: &str =
@@ -506,6 +508,37 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         golden_bug_net: false,
         excluded_species: &[],
     };
+    let mut named_rng = RngRuntime::from_states(
+        RunRngState {
+            rdg: PhaserRdgState::from_state_string(SOURCE_NAMED_BEFORE)?,
+        },
+        None,
+    )?;
+    let named_core = select_current_town_day_wave_two_core(
+        &content,
+        CurrentTownDayWaveTwoContextV1 {
+            level: 3,
+            ..context
+        },
+        &mut named_rng,
+    )?;
+    assert_eq!(named_core.prefix.root.source_root.get().get(), 504);
+    assert_eq!(named_core.prefix.root.effective_species.get().get(), 504);
+    assert_eq!(named_core.prefix.pokemon_id, 1_776_451_493);
+    assert_eq!(named_core.prefix.ability_index, 2);
+    assert_eq!(named_core.prefix.ability_id.get().get(), 5165);
+    assert_eq!(named_core.prefix.ivs, [20, 30, 4, 31, 29, 5]);
+    assert_eq!(named_core.prefix.nature_index, 18);
+    assert_eq!(named_core.stats, [16, 9, 7, 8, 8, 9]);
+    assert_eq!(
+        named_core
+            .moveset
+            .moves
+            .iter()
+            .map(|id| id.get().get())
+            .collect::<Vec<_>>(),
+        vec![158, 95, 116, 43]
+    );
     let mut rng = RngRuntime::from_states(
         RunRngState {
             rdg: PhaserRdgState::from_state_string(SOURCE_BEFORE)?,
