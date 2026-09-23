@@ -93,6 +93,7 @@ pub(super) fn execute(
             matches!(
                 reward.stage,
                 er_state::current_reward_selection::CurrentRewardStageV1::Applied { .. }
+                    | er_state::current_reward_selection::CurrentRewardStageV1::Skipped
                     | er_state::current_reward_selection::CurrentRewardStageV1::CandyPending { .. }
             ) || (matches!(
                 reward.stage,

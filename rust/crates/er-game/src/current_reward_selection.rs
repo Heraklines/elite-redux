@@ -276,7 +276,9 @@ pub(crate) fn validate_live(state: &GameStateV6, id: SafeU53) -> Result<(), Erro
     }
     if let Some(tm) = selection.tm.as_deref() {
         use er_state::current_reward_tm::CurrentRewardTmPhaseV1 as T;
-        if matches!(tm.phase, T::Declined { .. }) && matches!(selection.stage, Stage::Choice) {
+        if matches!(tm.phase, T::Declined { .. })
+            && matches!(selection.stage, Stage::Choice | Stage::SkipConfirm | Stage::Skipped)
+        {
             let replay = crate::current_reward_tm::replay(state, selection, tm)?;
             if replay.party != run.party
                 || replay.history != *crate::current_reward_tm::history(state, tm.holder)?
@@ -344,7 +346,9 @@ pub(crate) fn validate_live(state: &GameStateV6, id: SafeU53) -> Result<(), Erro
             (selection.party_before.clone(), selection.run_before.clone())
         }
         Stage::TmPending { .. } | Stage::CandyPending { .. } => return Err(invalid()),
-        Stage::Choice => (selection.party_before.clone(), selection.run_before.clone()),
+        Stage::Choice | Stage::SkipConfirm | Stage::Skipped => {
+            (selection.party_before.clone(), selection.run_before.clone())
+        }
     };
     if party != run.party || &inventory != owned_run(state)? {
         return Err(invalid());
@@ -476,6 +480,17 @@ pub(crate) fn select(
             .push(*selection.tm.take().ok_or_else(invalid)?);
     }
     let (offer, holder) = match selection.stage {
+        Stage::SkipConfirm => {
+            selection.stage = match ordinal {
+                0 => Stage::Skipped,
+                1 => Stage::Choice,
+                _ => return Err(invalid()),
+            };
+            let mut state = before.clone();
+            set_selection(&mut state, id, selection)?;
+            validate(&state, content, id)?;
+            return Ok(state);
+        }
         Stage::Choice => {
             let index = usize::try_from(ordinal).map_err(|_| invalid())?;
             let option = selection.offers.get(index).ok_or_else(invalid)?;
@@ -547,7 +562,9 @@ pub(crate) fn select(
             validate(&state, content, id)?;
             return Ok(state);
         }
-        Stage::Applied { .. } | Stage::CandyPending { .. } => return Err(invalid()),
+        Stage::Applied { .. } | Stage::CandyPending { .. } | Stage::Skipped => {
+            return Err(invalid());
+        }
     };
     let (party, inventory) = apply(&selection, offer, holder)?;
     selection.stage = Stage::Applied { offer, holder };
@@ -570,6 +587,8 @@ pub(crate) fn cancel_holder(
         .ok_or_else(invalid)?
         .clone();
     selection.stage = match selection.stage {
+        Stage::Choice => Stage::SkipConfirm,
+        Stage::SkipConfirm => Stage::Choice,
         Stage::Holder { .. } => Stage::Choice,
         Stage::TmMove { offer, .. } => Stage::Holder { offer },
         Stage::TmPending { offer, holder } => {
@@ -619,7 +638,22 @@ pub(crate) fn install_control(
                 .enumerate()
                 .map(|(i, _)| (format!("reward/{}/offer/{i}", id.get()), action(i as u32)))
                 .collect::<Vec<_>>(),
-            GameMenuCancelV2::Disabled,
+            GameMenuCancelV2::Back {
+                action: Box::new(GameActionV1::Reward {
+                    action: RewardActionV1::Decline,
+                }),
+            },
+        ),
+        Stage::SkipConfirm => (
+            vec![
+                ("reward/skip/yes".to_owned(), action(0)),
+                ("reward/skip/no".to_owned(), action(1)),
+            ],
+            GameMenuCancelV2::Back {
+                action: Box::new(GameActionV1::Reward {
+                    action: RewardActionV1::Decline,
+                }),
+            },
         ),
         Stage::Holder { .. } => (
             run.party
@@ -706,7 +740,9 @@ pub(crate) fn install_control(
                 cancel,
             )
         }
-        Stage::Applied { .. } | Stage::CandyPending { .. } => return Err(invalid()),
+        Stage::Applied { .. } | Stage::CandyPending { .. } | Stage::Skipped => {
+            return Err(invalid());
+        }
     };
     let operation = OperationId::new(format!(
         "m9e/reward/{}/{}/{}",

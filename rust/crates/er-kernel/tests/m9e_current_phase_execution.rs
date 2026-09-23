@@ -1664,6 +1664,7 @@ fn assert_current_reward_choice_and_pick(
     );
     assert_reward_forgery_rejected(&checkpoint, content.clone(), false)?;
     assert_reward_forgery_rejected(&checkpoint, content.clone(), true)?;
+    assert_reward_skip_confirmation(&checkpoint, content.clone(), live, ledger)?;
     for pending in kernel.snapshot()?.pending_presentations {
         kernel.settle_presentation(pending.event_id)?;
     }
@@ -1795,6 +1796,117 @@ fn assert_current_reward_choice_and_pick(
         canonical_bytes(kernel.state().ok_or("reward absent")?)?,
         before_again,
         "Applied reward cannot be selected a second time"
+    );
+    Ok(())
+}
+
+#[inline(never)]
+fn assert_reward_skip_confirmation(
+    checkpoint: &CoreGameKernelSnapshotV7,
+    content: Arc<PreparedGameContentV2>,
+    live: &Option<GameStateV6>,
+    ledger: &AppliedGameMaterialLedgerV1,
+) -> Result<()> {
+    use er_state::current_reward_selection::CurrentRewardStageV1 as Stage;
+    let mut kernel = Box::new(restore(checkpoint.clone(), content.clone())?);
+    let mut branch_live = Box::new(live.clone());
+    let mut branch_ledger = ledger.clone();
+    for pending in kernel.snapshot()?.pending_presentations {
+        kernel.settle_presentation(pending.event_id)?;
+    }
+    let original = current_reward(kernel.state().ok_or("reward absent")?)?.clone();
+    let original_run = Box::new(
+        kernel
+            .state()
+            .and_then(|state| state.active_run.as_ref())
+            .ok_or("reward run absent")?
+            .clone(),
+    );
+    let step = press(&mut kernel, PhysicalKey::Escape)?;
+    let first_revision = accept_material(
+        &mut branch_live,
+        &mut branch_ledger,
+        &kernel,
+        content.as_ref(),
+        &step,
+    )?
+    .transition()
+    .authority_revision;
+    let mut expected = original.clone();
+    expected.stage = Stage::SkipConfirm;
+    assert_eq!(current_reward(kernel.state().ok_or("reward absent")?)?, &expected);
+    assert_eq!(
+        kernel
+            .state()
+            .and_then(|state| state.active_run.as_ref())
+            .ok_or("reward run absent")?
+            .party,
+        original_run.party
+    );
+    assert!(matches!(
+        kernel.current_control().map(|control| control.kind),
+        Some(GameControlKindV2::Reward)
+    ));
+    let confirm = Box::new(kernel.snapshot()?);
+    let mut canceled = Box::new(restore(*confirm.clone(), content.clone())?);
+    let mut canceled_live = branch_live.clone();
+    let mut canceled_ledger = branch_ledger.clone();
+    for pending in canceled.snapshot()?.pending_presentations {
+        canceled.settle_presentation(pending.event_id)?;
+    }
+    let back = press(&mut canceled, PhysicalKey::Escape)?;
+    accept_material(
+        &mut canceled_live,
+        &mut canceled_ledger,
+        &canceled,
+        content.as_ref(),
+        &back,
+    )?;
+    assert_eq!(current_reward(canceled.state().ok_or("reward absent")?)?, &original);
+    *kernel = restore(*confirm.clone(), content.clone())?;
+    assert_eq!(canonical_bytes(&kernel.snapshot()?)?, canonical_bytes(&*confirm)?);
+    for pending in kernel.snapshot()?.pending_presentations {
+        kernel.settle_presentation(pending.event_id)?;
+    }
+    let step = press(&mut kernel, PhysicalKey::Space)?;
+    let second = accept_material(
+        &mut branch_live,
+        &mut branch_ledger,
+        &kernel,
+        content.as_ref(),
+        &step,
+    )?;
+    expected.stage = Stage::Skipped;
+    assert_eq!(current_reward(kernel.state().ok_or("reward absent")?)?, &expected);
+    assert_eq!(
+        kernel
+            .state()
+            .and_then(|state| state.active_run.as_ref())
+            .ok_or("reward run absent")?
+            .party,
+        original_run.party
+    );
+    let committed = canonical_bytes(&*branch_live)?;
+    assert_eq!(
+        apply_game_material_v6(
+            &mut branch_live,
+            &mut branch_ledger,
+            content.as_ref(),
+            &second.canonical_bytes()?,
+        )?,
+        er_game::m9e_material_v6::GameMaterialApplyOutcomeV6::DuplicateApplied
+    );
+    assert_eq!(canonical_bytes(&*branch_live)?, committed);
+    assert!(first_revision < second.transition().authority_revision);
+    let before_again = canonical_bytes(kernel.state().ok_or("reward absent")?)?;
+    let again = press(&mut kernel, PhysicalKey::Space)?;
+    assert!(!again
+        .effects
+        .iter()
+        .any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. })));
+    assert_eq!(
+        canonical_bytes(kernel.state().ok_or("reward absent")?)?,
+        before_again
     );
     Ok(())
 }

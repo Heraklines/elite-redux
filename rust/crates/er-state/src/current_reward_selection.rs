@@ -66,6 +66,10 @@ pub enum CurrentRewardSpeciesItemV1 {
 #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub enum CurrentRewardStageV1 {
     Choice,
+    /// Source modifier-select CANCEL opens the skip confirmation overlay.
+    SkipConfirm,
+    /// Confirmation accepted without applying any offer or changing inventory.
+    Skipped,
     Holder {
         offer: u8,
     },
@@ -120,7 +124,9 @@ impl CurrentRewardSelectionV1 {
                     && tm.movement.get() != er_types::SafeU53::ZERO
             })
             && match &self.stage {
-                CurrentRewardStageV1::Choice => true,
+                CurrentRewardStageV1::Choice
+                | CurrentRewardStageV1::SkipConfirm
+                | CurrentRewardStageV1::Skipped => true,
                 CurrentRewardStageV1::Holder { offer }
                 | CurrentRewardStageV1::TmMove { offer, .. }
                 | CurrentRewardStageV1::TmPending { offer, .. }
