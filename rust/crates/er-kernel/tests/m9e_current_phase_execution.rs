@@ -2300,12 +2300,8 @@ fn assert_actual_tm_fullslot_replace(
         acknowledge_tm_message(&mut kernel, content.as_ref(), &mut live, &mut ledger)?;
         writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_intro_ack")?;
         writeln!(std::io::stderr().lock(), "M9E_TM_STAGE before_decline")?;
-        assert_tm_decline_returns_same_offers(
-            &kernel.snapshot()?,
-            content.clone(),
-            &live,
-            &ledger,
-        )?;
+        let decline = Box::new(kernel.snapshot()?);
+        assert_tm_decline_on_default_thread(&decline, content.clone(), &live, &ledger)?;
         writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_decline")?;
         // Source Replace Yes -> which-move message -> actual first old slot.
         let step = press(&mut kernel, PhysicalKey::Space)?;
@@ -2491,6 +2487,25 @@ fn acknowledge_tm_message(
     let step = kernel.advance_time(SafeU53::ZERO)?;
     accept_material(live, ledger, kernel, content, &step)
 }
+#[inline(never)]
+fn assert_tm_decline_on_default_thread(
+    checkpoint: &CoreGameKernelSnapshotV7,
+    content: Arc<PreparedGameContentV2>,
+    live: &Option<GameStateV6>,
+    ledger: &AppliedGameMaterialLedgerV1,
+) -> Result<()> {
+    std::thread::scope(|scope| -> Result<()> {
+        let decline = std::thread::Builder::new()
+            .name("m9e-tm-decline".to_owned())
+            .spawn_scoped(scope, move || {
+                assert_tm_decline_returns_same_offers(checkpoint, content, live, ledger)
+                    .map_err(|error| error.to_string())
+            })?;
+        decline.join().map_err(|_| "TM decline witness panicked")??;
+        Ok(())
+    })
+}
+
 #[inline(never)]
 fn assert_tm_decline_returns_same_offers(
     checkpoint: &CoreGameKernelSnapshotV7,
