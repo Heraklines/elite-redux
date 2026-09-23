@@ -9,7 +9,7 @@ use er_kernel::game_kernel_v7::{
     GameKernelEffectV7, GameKernelRoleV7, GameKernelStepV7, GameKernelV7,
 };
 use er_kernel::snapshot::KernelSchedulerSnapshotV2;
-use er_kernel::snapshot_v7::GameKernelLifecycleSnapshotV7;
+use er_kernel::snapshot_v7::{CoreGameKernelSnapshotV7, GameKernelLifecycleSnapshotV7};
 use er_state::m7_state::{
     DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
 };
@@ -168,7 +168,15 @@ fn strongest_move_option(
         .ok_or_else(|| "strong move missing".into())
 }
 
-fn request() -> Result<M9EParityRequestV1, Box<dyn Error>> {
+type RawBootstrap = (
+    GameContentBundleV2,
+    Arc<PreparedGameContentV2>,
+    SeatId,
+    CoreGameKernelSnapshotV7,
+);
+
+#[inline(never)]
+fn raw_bootstrap() -> Result<RawBootstrap, Box<dyn Error>> {
     #[cfg(target_arch = "wasm32")]
     wasm_bindgen_test::console_log!("M9E_WASM_STAGE=request-start");
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
@@ -231,6 +239,20 @@ fn request() -> Result<M9EParityRequestV1, Box<dyn Error>> {
     // Boosting is an explicit controlled fixture boundary. The original
     // bootstrap material digest describes the unmodified state and cannot be
     // retained as evidence for this fixture's canonical state.
+    Ok((bundle, content, seat, snapshot))
+}
+
+fn request() -> Result<M9EParityRequestV1, Box<dyn Error>> {
+    trace_request(raw_bootstrap()?)
+}
+
+#[inline(never)]
+fn trace_request(
+    (bundle, content, seat, mut snapshot): RawBootstrap,
+) -> Result<M9EParityRequestV1, Box<dyn Error>> {
+    let GameKernelLifecycleSnapshotV7::Active(state) = &mut snapshot.lifecycle else {
+        return Err("bootstrap snapshot is not active".into());
+    };
     let mut driver = GameKernelV7::from_active(
         state.clone(),
         snapshot.material_ledger.next_authority_revision,
