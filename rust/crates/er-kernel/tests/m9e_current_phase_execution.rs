@@ -135,7 +135,12 @@ fn navigate(kernel: &mut GameKernelV7, option: &str) -> Result<()> {
     }
     Ok(())
 }
-fn navigate_reward_ordinal(kernel: &mut GameKernelV7, ordinal: u32) -> Result<()> {
+fn navigate_reward_ordinal(
+    kernel: &mut GameKernelV7,
+    live: &mut Option<GameStateV6>,
+    ordinal: u32,
+) -> Result<()> {
+    assert_eq!(live.as_ref(), kernel.state());
     let option = kernel
         .current_control()
         .and_then(|control| control.menu.as_ref())
@@ -153,7 +158,23 @@ fn navigate_reward_ordinal(kernel: &mut GameKernelV7, ordinal: u32) -> Result<()
         .option_id
         .as_str()
         .to_owned();
-    navigate(kernel, &option)
+    navigate(kernel, &option)?;
+    // Raw navigation publishes UiChanged without authority material. A shadow
+    // material consumer must apply that control effect before the next action.
+    let mut projected = live.clone();
+    projected
+        .as_mut()
+        .and_then(|state| state.active_run.as_mut())
+        .ok_or("shadow run absent")?
+        .control = kernel
+        .state()
+        .and_then(|state| state.active_run.as_ref())
+        .ok_or("navigated run absent")?
+        .control
+        .clone();
+    assert_eq!(projected.as_ref(), kernel.state(), "navigation changed non-control state");
+    *live = projected;
+    Ok(())
 }
 fn restore(
     snapshot: CoreGameKernelSnapshotV7,
@@ -1712,12 +1733,7 @@ fn assert_current_reward_choice_and_pick(
         )?;
         return Ok(());
     };
-    let option=kernel.current_control().and_then(|c|c.menu.as_ref()).and_then(|menu|menu.options.iter().find(|row|
-        matches!(&row.action,er_types::GameActionV1::Reward{action:er_types::RewardActionV1::Select{option_ordinal}} if *option_ordinal==index as u32)))
-        .ok_or("actual reward option absent")?.option_id.as_str().to_owned();
-    navigate(kernel, &option)?;
-    // Raw navigation is presentation-only; the common material starts from the
-    // same authoritative state, not the local highlighted menu cursor.
+    navigate_reward_ordinal(kernel, live, index as u32)?;
     let before_live = Box::new(live.clone());
     let before_ledger = ledger.clone();
     let step = press(kernel, PhysicalKey::Space)?;
@@ -2209,11 +2225,8 @@ fn assert_actual_tm_reward_start(
         kernel.settle_presentation(presentation.event_id)?;
     }
     writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_settle")?;
-    let option=kernel.current_control().and_then(|c|c.menu.as_ref()).and_then(|m|m.options.iter().find(|r|
-        matches!(&r.action,er_types::GameActionV1::Reward{action:er_types::RewardActionV1::Select{option_ordinal}} if *option_ordinal==index as u32)))
-        .ok_or("TM option absent")?.option_id.as_str().to_owned();
     writeln!(std::io::stderr().lock(), "M9E_TM_STAGE before_navigate")?;
-    navigate(&mut kernel, &option)?;
+    navigate_reward_ordinal(&mut kernel, &mut live, index as u32)?;
     writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_navigate")?;
     let step = press(&mut kernel, PhysicalKey::Space)?;
     writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_press")?;
@@ -2324,7 +2337,7 @@ fn assert_actual_tm_fullslot_replace(
         assert_tm_decline_on_default_thread(&decline, content.clone(), &live, &ledger)?;
         writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_decline")?;
         // Source Replace Yes -> which-move message -> actual first old slot.
-        navigate_reward_ordinal(&mut kernel, 0)?;
+        navigate_reward_ordinal(&mut kernel, &mut live, 0)?;
         let step = press(&mut kernel, PhysicalKey::Space)?;
         accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
         for presentation in kernel.snapshot()?.pending_presentations {
@@ -2341,7 +2354,7 @@ fn assert_actual_tm_fullslot_replace(
                 .phase,
             T::ChooseSlot
         ));
-        navigate_reward_ordinal(&mut kernel, 0)?;
+        navigate_reward_ordinal(&mut kernel, &mut live, 0)?;
         let step = press(&mut kernel, PhysicalKey::Space)?;
         accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
         for presentation in kernel.snapshot()?.pending_presentations {
@@ -2544,7 +2557,7 @@ fn assert_tm_decline_returns_same_offers(
         before.tm.as_ref().ok_or("TM absent")?.phase,
         T::Replace
     ));
-    navigate_reward_ordinal(&mut kernel, 1)?;
+    navigate_reward_ordinal(&mut kernel, &mut live, 1)?;
     let step = press(&mut kernel, PhysicalKey::Space)?;
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
     for presentation in kernel.snapshot()?.pending_presentations {
@@ -2558,7 +2571,7 @@ fn assert_tm_decline_returns_same_offers(
             .phase,
         T::Stop
     ));
-    navigate_reward_ordinal(&mut kernel, 0)?;
+    navigate_reward_ordinal(&mut kernel, &mut live, 0)?;
     let step = press(&mut kernel, PhysicalKey::Space)?;
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
     for presentation in kernel.snapshot()?.pending_presentations {
@@ -2594,7 +2607,7 @@ fn assert_tm_decline_returns_same_offers(
         .iter()
         .position(|o| o.source_id == "TM_CASE")
         .ok_or("TM offer absent")?;
-    navigate_reward_ordinal(&mut kernel, index as u32)?;
+    navigate_reward_ordinal(&mut kernel, &mut live, index as u32)?;
     let step = press(&mut kernel, PhysicalKey::Space)?;
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
     let retained = current_reward(kernel.state().ok_or("TM state absent")?)?;
@@ -2943,11 +2956,12 @@ fn candy_owner(
         .ok_or("Candy owner absent".into())
 }
 #[inline(never)]
-fn candy_choose(kernel: &mut GameKernelV7, ordinal: u32) -> Result<GameKernelStepV7> {
-    let option=kernel.current_control().and_then(|c|c.menu.as_ref()).and_then(|menu|menu.options.iter().find(|row|
-        matches!(&row.action,er_types::GameActionV1::Reward{action:er_types::RewardActionV1::Select{option_ordinal}} if *option_ordinal==ordinal)))
-        .ok_or("actual Candy reward choice absent")?.option_id.as_str().to_owned();
-    navigate(kernel, &option)?;
+fn candy_choose(
+    kernel: &mut GameKernelV7,
+    live: &mut Option<GameStateV6>,
+    ordinal: u32,
+) -> Result<GameKernelStepV7> {
+    navigate_reward_ordinal(kernel, live, ordinal)?;
     press(kernel, PhysicalKey::Space)
 }
 #[inline(never)]
@@ -2992,14 +3006,14 @@ fn assert_actual_candy_reward(
     let mut live = source_live.clone();
     let mut ledger = source_ledger.clone();
     settle_growl_ordinary_presentations(&mut kernel)?;
-    let step = candy_choose(&mut kernel, index as u32)?;
+    let step = candy_choose(&mut kernel, &mut live, index as u32)?;
     candy_accept(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
     assert!(matches!(
         current_reward(kernel.state().ok_or("state absent")?)?.stage,
         er_state::current_reward_selection::CurrentRewardStageV1::Holder { .. }
     ));
     settle_growl_ordinary_presentations(&mut kernel)?;
-    let step = candy_choose(&mut kernel, 0)?;
+    let step = candy_choose(&mut kernel, &mut live, 0)?;
     candy_accept(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
     assert!(matches!(candy_owner(&kernel)?.phase, C::Queued));
     assert_eq!(
