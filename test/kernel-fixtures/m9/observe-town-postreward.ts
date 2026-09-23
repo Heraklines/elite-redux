@@ -162,6 +162,15 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   expect(waveTwoSelections[0].species).toBe(enemy.species.speciesId);
   const shinyXor = (scene.gameData.trainerId ^ scene.gameData.secretId)
     ^ ((enemy.id >>> 16) ^ (enemy.id & 0xffff));
+  const secondEnemyHpBefore = enemy.hp;
+  const secondPlayerHpBefore = player.hp;
+  const secondMove = player.getMoveset().find(move => move.moveId === MoveId.FIRE_FANG);
+  expect(secondMove).toBeDefined();
+  const secondPpBefore = secondMove!.ppUsed;
+  manager.move.select(MoveId.FIRE_FANG);
+  await manager.toEndOfTurn();
+  expect(secondMove!.ppUsed).toBe(secondPpBefore + 1);
+  expect(enemy.hp).toBeLessThan(secondEnemyHpBefore);
   const result = {
     schema: 1,
     source: PIN,
@@ -208,6 +217,17 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
       moves: enemy.moveset.map(move => [move.moveId, move.ppUsed]),
       boss: enemy.isBoss(),
       selection: waveTwoSelections[0],
+    },
+    second_battle: {
+      action: MoveId.FIRE_FANG,
+      enemy_hp_before: secondEnemyHpBefore,
+      enemy_hp_after: enemy.hp,
+      player_hp_before: secondPlayerHpBefore,
+      player_hp_after: player.hp,
+      pp_before: secondPpBefore,
+      pp_after: secondMove!.ppUsed,
+      enemy_fainted: enemy.isFainted(),
+      phase: scene.phaseManager.getCurrentPhase().phaseName,
     },
     rng: Phaser.Math.RND.state(),
   };
