@@ -2274,8 +2274,11 @@ fn assert_actual_tm_fullslot_replace(
             .phase
             .event()
             .ok_or("Intro absent")?;
+        writeln!(std::io::stderr().lock(), "M9E_TM_STAGE before_intro_reissue")?;
         assert_phase_title_read_reissues(&intro, event, content.clone())?;
+        writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_intro_reissue")?;
         acknowledge_tm_message(&mut kernel, content.as_ref(), &mut live, &mut ledger)?;
+        writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_intro_ack")?;
         writeln!(std::io::stderr().lock(), "M9E_TM_STAGE before_decline")?;
         assert_tm_decline_returns_same_offers(
             &kernel.snapshot()?,
