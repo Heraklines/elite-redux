@@ -483,6 +483,12 @@ fn assert_eventwise_parity_contract(
     ] {
         assert!(cohort_report_golden(bundle, progression, bytes).is_none());
     }
+    #[inline(never)]
+    fn expected_raw_report(
+        request: &M9EParityRequestV1,
+        content: Arc<PreparedGameContentV2>,
+    ) -> Result<M9EParityReportV1, Box<dyn Error>> {
+    let event_count = request.events.len();
     let mut driver = GameKernelV7::from_snapshot(
         request
             .initial_snapshot
@@ -570,12 +576,16 @@ fn assert_eventwise_parity_contract(
     assert_eq!(event_count, 30);
     assert_eq!(material_count, 6);
     assert!(canonical_control_material_count > 0);
-    let expected = M9EParityReportV1 {
+    Ok(M9EParityReportV1 {
         schema_version: M9E_PARITY_REPORT_SCHEMA_VERSION_V1,
         content_identity_digest: er_canonical::content_digest(content.identity())?,
         observations: expected_observations,
         final_snapshot_digest: er_canonical::content_digest(&driver.snapshot()?)?,
-    };
+    })
+    }
+    let expected = expected_raw_report(&request, content)?;
+    #[cfg(target_arch = "wasm32")]
+    wasm_bindgen_test::console_log!("M9E_WASM_STAGE=expected-ready");
     let report = replay(request)?;
     #[cfg(target_arch = "wasm32")]
     wasm_bindgen_test::console_log!("M9E_WASM_STAGE=replay-returned");
@@ -643,12 +653,15 @@ fn native_replays_v7_raw_inputs_eventwise() -> Result<(), Box<dyn Error>> {
 #[wasm_bindgen_test::wasm_bindgen_test]
 fn wasm_replays_v7_raw_inputs_eventwise() -> Result<(), wasm_bindgen::JsValue> {
     let digest = assert_eventwise_parity_contract(|request| {
+        wasm_bindgen_test::console_log!("M9E_WASM_STAGE=replay-closure-start");
         let json = serde_json::to_string(&request)?;
+        wasm_bindgen_test::console_log!("M9E_WASM_STAGE=replay-serialized");
         let report = er_wasm::m9e_parity::replay_m9e_eventwise_json(&json).map_err(|error| {
             error
                 .as_string()
                 .unwrap_or_else(|| "Wasm replay failed".to_owned())
         })?;
+        wasm_bindgen_test::console_log!("M9E_WASM_STAGE=replay-json-returned");
         Ok(serde_json::from_str(&report)?)
     })
     .map_err(|error| wasm_bindgen::JsValue::from_str(&error.to_string()))?;
