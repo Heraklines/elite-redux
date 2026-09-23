@@ -2110,8 +2110,6 @@ fn assert_actual_tm_reward(
     initial_ledger: &AppliedGameMaterialLedgerV1,
     index: usize,
 ) -> Result<()> {
-    use er_state::current_reward_selection::CurrentRewardStageV1 as S;
-    use er_state::current_reward_tm::{CurrentRewardTmPhaseV1 as T, CurrentUsedTmsV1 as H};
     writeln!(std::io::stderr().lock(), "M9E_TM_STAGE enter")?;
     let selected = current_reward(active(checkpoint)?)?.clone();
     let mut kernel = Box::new(restore(checkpoint.clone(), content.clone())?);
@@ -2133,6 +2131,19 @@ fn assert_actual_tm_reward(
     writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_press")?;
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
     writeln!(std::io::stderr().lock(), "M9E_TM_STAGE holder")?;
+    assert_actual_tm_reward_rest(kernel, content, selected, live, ledger)
+}
+
+#[inline(never)]
+fn assert_actual_tm_reward_rest(
+    mut kernel: Box<GameKernelV7>,
+    content: Arc<PreparedGameContentV2>,
+    selected: er_state::current_reward_selection::CurrentRewardSelectionV1,
+    mut live: Option<GameStateV6>,
+    mut ledger: AppliedGameMaterialLedgerV1,
+) -> Result<()> {
+    use er_state::current_reward_selection::CurrentRewardStageV1 as S;
+    use er_state::current_reward_tm::{CurrentRewardTmPhaseV1 as T, CurrentUsedTmsV1 as H};
     assert!(matches!(
         current_reward(kernel.state().ok_or("TM state absent")?)?.stage,
         S::Holder { .. }
