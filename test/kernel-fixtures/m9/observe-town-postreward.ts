@@ -77,7 +77,17 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
     }
   }
   expect(attackingTurns).toBeGreaterThan(0);
-  expect(manager.isVictory()).toBe(true);
+  expect(manager.isVictory(), JSON.stringify({
+    attackingTurns,
+    phase: scene.phaseManager.getCurrentPhase().phaseName,
+    firstEnemySpecies,
+    firstEnemyHp: firstEnemy.hp,
+    firstEnemyFainted: firstEnemy.isFainted(),
+    currentEnemySpecies: scene.currentBattle.enemyParty[0]?.species.speciesId,
+    currentEnemyHp: scene.currentBattle.enemyParty[0]?.hp,
+    playerHp: player.hp,
+    playerMoves: player.getMoveset().map(move => [move.moveId, move.ppUsed]),
+  })).toBe(true);
   expect(firstEnemy.isFainted()).toBe(true);
   expect(newBattle).not.toHaveBeenCalled();
 
