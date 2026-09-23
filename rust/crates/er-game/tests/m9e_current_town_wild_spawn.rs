@@ -5,13 +5,13 @@ use er_game::current_town_wild_spawn::{
     CurrentTownDayWaveTwoContextV1, CurrentTownGenderV1, CurrentTownWildErrorV1,
     select_current_town_day_wave_two_constructor_prefix, select_current_town_day_wave_two_core,
     select_current_town_day_wave_two_root, select_current_town_day_wave_two_shell,
-    source_town_ability_id, source_town_day_pools, source_town_form_base_stats,
-    source_town_form_types, source_town_initial_level_move_pool, source_town_is_shiny,
-    source_town_ivs_from_id, source_town_level_two_form_rows, source_town_level_two_species,
-    source_town_male_half_percent, source_town_moveset, source_town_neutral_moveset,
-    source_town_neutral_weighted_level_move_pool, source_town_shiny_xor,
-    source_town_unmodified_level_two_stats, source_town_unmodified_stats_at_level,
-    source_town_weighted_level_move_pool,
+    select_current_town_day_wave_two_shell_with_identity, source_town_ability_id,
+    source_town_day_pools, source_town_form_base_stats, source_town_form_types,
+    source_town_initial_level_move_pool, source_town_is_shiny, source_town_ivs_from_id,
+    source_town_level_two_form_rows, source_town_level_two_species, source_town_male_half_percent,
+    source_town_moveset, source_town_neutral_moveset, source_town_neutral_weighted_level_move_pool,
+    source_town_shiny_xor, source_town_unmodified_level_two_stats,
+    source_town_unmodified_stats_at_level, source_town_weighted_level_move_pool,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_rng::audit::{RngCallsiteId, RngPublicApi, RngReason};
@@ -904,6 +904,7 @@ fn naturally_admitted_day_seed_matches_pinned_postreward_enemy() -> Result<(), B
         },
         None,
     )?;
+    let initial_rng = rng.clone();
     let shell =
         select_current_town_day_wave_two_shell(&content, context, 12_345, 23_456, &mut rng)?;
     let enemy = &shell.pokemon;
@@ -913,11 +914,34 @@ fn naturally_admitted_day_seed_matches_pinned_postreward_enemy() -> Result<(), B
     let before_rejected = identities.clone();
     assert!(identities.adopt_source_pokemon_id(prior).is_err());
     assert_eq!(identities, before_rejected);
-    identities.adopt_source_pokemon_id(enemy.id)?;
+    let mut reserved_rng = initial_rng.clone();
+    let reserved = select_current_town_day_wave_two_shell_with_identity(
+        &content,
+        context,
+        12_345,
+        23_456,
+        &mut identities,
+        &mut reserved_rng,
+    )?;
+    assert_eq!(reserved, shell);
+    assert_eq!(reserved_rng.run_state(), rng.run_state());
     assert_eq!(identities.next_pokemon_id.get(), 2_632_721_103);
     let before_duplicate = identities.clone();
-    assert!(identities.adopt_source_pokemon_id(enemy.id).is_err());
+    let mut rejected_rng = initial_rng;
+    let before_rejected_rng = rejected_rng.run_state();
+    assert_eq!(
+        select_current_town_day_wave_two_shell_with_identity(
+            &content,
+            context,
+            12_345,
+            23_456,
+            &mut identities,
+            &mut rejected_rng,
+        ),
+        Err(CurrentTownWildErrorV1::IdentityFrontier)
+    );
     assert_eq!(identities, before_duplicate);
+    assert_eq!(rejected_rng.run_state(), before_rejected_rng);
     assert_eq!(identities.allocate_pokemon_id()?.get().get(), 2_632_721_103);
     assert_eq!(enemy.species_id.get().get(), 504);
     assert_eq!(enemy.form_index, 0);
