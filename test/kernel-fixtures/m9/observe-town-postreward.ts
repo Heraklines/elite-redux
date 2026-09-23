@@ -49,6 +49,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
     .battleStyle(BattleStyle.SET)
     .startingBiome(BiomeId.TOWN)
     .startingWave(1)
+    .startingLevel(10)
     .seed(SEED);
   manager.scene.gameData.trainerId = 12345;
   manager.scene.gameData.secretId = 23456;
@@ -70,10 +71,12 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
 
   const newBattle = vi.spyOn(scene, "newBattle");
   let attackingTurns = 0;
+  const firstEnemyHpTrace = [firstEnemy.hp];
   while (!manager.isVictory() && attackingTurns < 12) {
     manager.move.select(MoveId.FIRE_FANG);
     await manager.toEndOfTurn();
     attackingTurns++;
+    firstEnemyHpTrace.push(firstEnemy.hp);
     if (!manager.isVictory()) {
       await manager.toNextTurn();
     }
@@ -83,6 +86,9 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
     attackingTurns,
     phase: scene.phaseManager.getCurrentPhase().phaseName,
     firstEnemySpecies,
+    firstEnemyAbility: firstEnemy.getAbility().id,
+    firstEnemyMoves: firstEnemy.moveset.map(move => [move.moveId, move.ppUsed]),
+    firstEnemyHpTrace,
     firstEnemyHp: firstEnemy.hp,
     firstEnemyFainted: firstEnemy.isFainted(),
     currentEnemySpecies: scene.currentBattle.enemyParty[0]?.species.speciesId,
@@ -108,7 +114,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
     schema: 1,
     source: PIN,
     seed: SEED,
-    scope: "actual wave-one attack, victory reward cancel and queued Town wave-two encounter",
+    scope: "controlled level-ten starter attacks, victory reward cancel and queued Town wave-two encounter",
     account: { trainer_id: scene.gameData.trainerId, secret_id: scene.gameData.secretId },
     first: { wave: 1, enemy_id: firstEnemyId, species: firstEnemySpecies, attacking_turns: attackingTurns },
     reward: { choice: "cancel", new_battle_calls: newBattle.mock.calls.length },
