@@ -64,7 +64,7 @@ def main():
         require(code == 0 and parent.decode().strip() == BASE, "exact product parent")
         delta, code = run("delta", ["git", "diff", "--name-only", BASE, "HEAD"], 30)
         require(code == 0 and set(delta.decode().splitlines()) == OWNED, "sole fixture and harness delta")
-        _, code = run("toolchain", ["rustup", "toolchain", "install", "1.97.1", "--profile", "minimal"], 120)
+        _, code = run("toolchain", ["rustup", "toolchain", "install", "1.97.1", "--profile", "minimal", "--component", "rustfmt"], 120)
         require(code == 0, "pinned toolchain")
         version, code = run("rustc", ["rustc", "-Vv"], 30)
         require(code == 0 and b"release: 1.97.1\n" in version, "pinned compiler")
