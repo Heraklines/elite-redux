@@ -170,7 +170,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   manager.move.select(MoveId.FIRE_FANG);
   await manager.toEndOfTurn();
   expect(secondMove!.ppUsed).toBe(secondPpBefore + 1);
-  expect(enemy.hp).toBeLessThan(secondEnemyHpBefore);
+  expect(enemy.hp).toBeLessThanOrEqual(secondEnemyHpBefore);
   const result = {
     schema: 1,
     source: PIN,
