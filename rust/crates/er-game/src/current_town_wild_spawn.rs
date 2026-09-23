@@ -665,6 +665,22 @@ pub struct CurrentTownWildCoreV1 {
     pub audit: Vec<RngDraw>,
 }
 
+/// Source Pokemon.trySetShiny uses the account's two 16-bit IDs and both
+/// halves of the generated Pokemon ID. The caller owns the source-derived
+/// threshold, including any event, reward and modifier multipliers.
+pub fn source_town_shiny_xor(trainer_id: u16, secret_id: u16, pokemon_id: u32) -> u16 {
+    trainer_id ^ secret_id ^ ((pokemon_id >> 16) as u16) ^ (pokemon_id as u16)
+}
+
+pub fn source_town_is_shiny(
+    trainer_id: u16,
+    secret_id: u16,
+    pokemon_id: u32,
+    threshold: u32,
+) -> bool {
+    u32::from(source_town_shiny_xor(trainer_id, secret_id, pokemon_id)) < threshold
+}
+
 /// Pinned `src/utils/common.ts:getIvsFromId`: six five-bit chunks of the
 /// generated 32-bit Pokemon ID, ordered HP through speed.
 pub fn source_town_ivs_from_id(id: u32) -> [u8; 6] {
