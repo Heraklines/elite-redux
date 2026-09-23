@@ -172,7 +172,11 @@ fn navigate_reward_ordinal(
         .ok_or("navigated run absent")?
         .control
         .clone();
-    assert_eq!(projected.as_ref(), kernel.state(), "navigation changed non-control state");
+    assert_eq!(
+        projected.as_ref(),
+        kernel.state(),
+        "navigation changed non-control state"
+    );
     *live = projected;
     Ok(())
 }
@@ -1437,7 +1441,11 @@ fn controlled_early_ko_flash_owns_clock_egg_candy_and_canceled_suffix() -> Resul
 #[inline(never)]
 fn controlled_early_reward_frontier(
     content: Arc<PreparedGameContentV2>,
-) -> Result<(Box<GameKernelV7>, Option<GameStateV6>, AppliedGameMaterialLedgerV1)> {
+) -> Result<(
+    Box<GameKernelV7>,
+    Option<GameStateV6>,
+    AppliedGameMaterialLedgerV1,
+)> {
     use er_state::current_achievement_execution::CurrentAchievementKeyV1 as K;
     use er_state::current_initial_victory_tail::CurrentInitialVictoryTailPhaseV1 as T;
     let mut kernel = Box::new(controlled_before_early_knockout(content.clone())?);
@@ -2155,7 +2163,11 @@ fn assert_actual_tm_reward(
     index: usize,
 ) -> Result<()> {
     let state = assert_actual_tm_reward_start(
-        checkpoint, content.clone(), initial_live, initial_ledger, index,
+        checkpoint,
+        content.clone(),
+        initial_live,
+        initial_ledger,
+        index,
     )?;
     let state = assert_actual_tm_reward_rest(state, content.clone())?;
     let state = assert_actual_tm_reward_after_move(state, content.clone())?;
@@ -2572,7 +2584,9 @@ fn assert_tm_decline_on_default_thread(
                 assert_tm_decline_returns_same_offers(checkpoint, content, live, ledger)
                     .map_err(|error| error.to_string())
             })?;
-        decline.join().map_err(|_| "TM decline witness panicked")??;
+        decline
+            .join()
+            .map_err(|_| "TM decline witness panicked")??;
         Ok(())
     })
 }
