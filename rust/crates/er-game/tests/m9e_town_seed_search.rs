@@ -16,14 +16,13 @@ const BUNDLE: &[u8] =
 fn bounded_source_wave_two_seed_candidates() -> Result<(), Box<dyn Error>> {
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = PreparedGameContentV2::prepare(Arc::new(bundle))?;
-    let mode = content
-        .world
+    let world = &content.bundle().world;
+    let mode = world
         .modes
         .iter()
         .find(|mode| mode.key == "CLASSIC")
         .ok_or("Classic mode absent")?;
-    let town = content
-        .world
+    let town = world
         .biomes
         .iter()
         .find(|biome| biome.key == "biome/0")
