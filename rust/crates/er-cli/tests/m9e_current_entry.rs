@@ -150,10 +150,18 @@ fn fresh_account_identity_enters_through_cli_and_survives_snapshot_restore()
     assert_eq!(bootstrap.current_account_identity, Some(account));
 
     let restored = run_cli(&[
-        request("restore", "session.create", json!({"session":"restored", "start": {
+        request(
+            "restore",
+            "session.create",
+            json!({"session":"restored", "start": {
             "kind":"SNAPSHOT", "snapshot": original.clone(), "owner_seat": 1,
-            "role":"AUTHORITY"}})),
-        request("restored-snapshot", "session.snapshot", json!({"session":"restored"})),
+            "role":"AUTHORITY"}}),
+        ),
+        request(
+            "restored-snapshot",
+            "session.snapshot",
+            json!({"session":"restored"}),
+        ),
     ])?;
     result(&restored[0])?;
     assert_eq!(snapshot(&restored[1])?, original);
