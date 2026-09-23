@@ -41,7 +41,7 @@ jobs:
           set -euo pipefail
           elapsed=$(($(date +%s) - M9E_STARTED_AT))
           test "$elapsed" -ge 0
-          remaining=$((1780 - elapsed))
+          remaining=$((1960 - elapsed))
           test "$remaining" -gt 0
           timeout "$((remaining < 600 ? remaining : 600))" git fetch --no-tags --depth=1 origin dcd09ddf17ef2e979b2d344c279ba0e6c5a1f89b
       - uses: actions/setup-node@v6
