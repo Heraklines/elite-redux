@@ -189,6 +189,18 @@ impl GameIdentityAllocatorStateV1 {
         allocate(&mut self.next_pokemon_id).map(PokemonId::new)
     }
 
+    /// A source constructor has already chosen this ID. Admit it only beyond
+    /// every ID allocated by this frontier, then advance the frontier past it.
+    /// This intentionally rejects lower but currently unused IDs: old battle
+    /// identities must not become reusable after their roster is replaced.
+    pub fn adopt_source_pokemon_id(&mut self, id: PokemonId) -> Result<(), GameStateV6Error> {
+        if id.get() == SafeU53::ZERO || id.get() < self.next_pokemon_id {
+            return Err(GameStateV6Error::Invalid);
+        }
+        self.next_pokemon_id = next_after(Some(id.get()))?;
+        Ok(())
+    }
+
     pub fn allocate_battle_id(&mut self) -> Result<BattleId, GameStateV6Error> {
         allocate(&mut self.next_battle_id).map(BattleId::new)
     }

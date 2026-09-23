@@ -78,6 +78,7 @@ def main():
                  "rust/crates/er-game/src/m9_new_run.rs",
                  "rust/crates/er-game/src/material.rs",
                  "rust/crates/er-game/tests/m9e_current_town_wild_spawn.rs",
+                 "rust/crates/er-state/src/m9e_state_v6.rs",
                  "rust/crates/er-rng/src/audit.rs",
                  "rust/crates/er-rng/src/battle.rs",
                  "rust/crates/er-rng/tests/m3_rng.rs",
@@ -147,6 +148,7 @@ def main():
                            cwd=RUST, timeout=120, check=False)
             patch = subprocess.check_output(["git", "diff", "--", files[0],
                                              "rust/crates/er-game/tests/m9e_current_town_wild_spawn.rs",
+                                             "rust/crates/er-state/src/m9e_state_v6.rs",
                                              "rust/crates/er-game/tests/m9e_town_seed_search.rs",
                                              "rust/crates/er-kernel/tests/m9e_current_phase_execution.rs"], cwd=ROOT)
             if len(patch) <= 32768:
