@@ -34,7 +34,7 @@ ADDITIONS = sorted([HELPER, VERIFIER, PRODUCER, WORKFLOW])
 BOUNDED_HELPER = "scripts/ci/m9e_current_cost.py"
 BOUNDED_HELPER_SHA256 = "5a25e98778cc7103375a5342600c4bc6e5a22252935f435f847e6434f00e7cd8"
 BOUNDED_HELPER_BYTES = 38620
-EXPORTER_SHA256 = "7573a83386b16d2992c0bc9bc55a50227f2ccd2a2a2108eb0bbdbf2912c5b266"
+EXPORTER_SHA256 = "ee5e75968071e73a8ff21a5c0f9b0952b8442a7505de98f32f4fcfaec2ce13a3"
 ORACLE_CONFIG = ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".nvmrc", ".gitmodules",
                  "vitest.config.ts", "vite.config.ts", "tsconfig.json"]
 DEADLINE = None
@@ -742,13 +742,13 @@ def main(summary):
     require(digest_raw == (json.dumps(digest_receipt, separators=(",", ":")) + "\n").encode()
             and digest_receipt.get("schema") == 1 and digest_receipt.get("source") == PIN, "canonical fresh digest receipt")
     parts = digest_receipt.get("parts")
-    require(isinstance(parts, list) and 10 <= len(parts) <= 55, "bounded semantic page inventory")
+    require(isinstance(parts, list) and 11 <= len(parts) <= 56, "bounded semantic page inventory")
     names = [row[0] for row in parts]
-    require(names[:7] == ["species", "moves", "forms", "abilities-meta", "gender", "form-flags", "ability-slots"] and len(set(names)) == len(names)
-            and all(re.fullmatch(r"abilities-(rows|functions|shapes)-[0-9]{2}", name) for name in names[7:]), "exact semantic page names")
+    require(names[:8] == ["species", "moves", "forms", "abilities-meta", "gender", "form-flags", "ability-slots", "form-types"] and len(set(names)) == len(names)
+            and all(re.fullmatch(r"abilities-(rows|functions|shapes)-[0-9]{2}", name) for name in names[8:]), "exact semantic page names")
     exports = {}
     for name, length, digest in parts:
-        cap = 4096 if name in {"gender", "form-flags"} else 8192 if name == "ability-slots" else 32768 if name in {"species", "moves"} else 16384
+        cap = 4096 if name in {"gender", "form-flags"} else 8192 if name in {"ability-slots", "form-types"} else 32768 if name in {"species", "moves"} else 16384
         fact = file_fact(OUTPUT / f"{name}-one.json", cap)
         require(fact["bytes"] == length and fact["sha256"] == digest, "two fresh source observations differ: " + name)
         exports[name] = fact
@@ -783,7 +783,7 @@ def cleanup():
 def generated_cap(name):
     if name in {"form-counts.json", "digest-two.json", "gender-one.json", "form-flags-one.json"}:
         return 4096
-    if name == "ability-slots-one.json":
+    if name in {"ability-slots-one.json", "form-types-one.json"}:
         return 8192
     if name == "validation.json":
         return 8192
