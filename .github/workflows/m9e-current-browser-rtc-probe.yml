@@ -72,13 +72,3 @@ jobs:
           path: ${{ runner.temp }}/m9e-coop-rtc-focused/compact/
           if-no-files-found: error
           retention-days: 14
-      - name: Remote browser diagnostics
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: m9e-current-browser-rtc-diagnostics-${{ github.sha }}
-          path: |
-            ${{ runner.temp }}/m9e-coop-rtc-focused/diagnostics/
-            test-results/rust-browser/
-          if-no-files-found: error
-          retention-days: 14
