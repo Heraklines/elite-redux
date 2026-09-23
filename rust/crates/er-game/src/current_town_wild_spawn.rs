@@ -2,13 +2,16 @@
 //! Enemy construction, movesets, modifier draws and receipt settlement remain
 //! separate owners; this selector never advances a game state by itself.
 
+use std::sync::OnceLock;
+
 use er_rng::audit::{RngCallsiteId, RngDraw, RngReason};
 use er_rng::battle::RngRuntime;
-use er_types::battle_ids::{AbilityId, GameModeId, SpeciesId};
+use er_types::battle_ids::{AbilityId, GameModeId, MoveId, SpeciesId};
 use er_types::battle_model::PokemonType;
 use er_types::run_ids::BiomeId;
 use er_types::{RunDifficultyV1, SafeU53};
 use er_world::content_v2::BiomeDefinitionV2;
+use serde::Deserialize;
 use thiserror::Error;
 
 use crate::m9e_content_v2::PreparedGameContentV2;
@@ -198,6 +201,59 @@ const SOURCE_TYPE_TIERS: [&[[u8; 2]]; 5] = [
     &[[0, 255], [12, 255], [17, 255], [13, 17], [6, 4], [1, 255]],
     &[[0, 255], [0, 255], [16, 255]],
 ];
+
+// Source run 35853912715, SHA256
+// 63cd454d9e74ae2d77e59327b02a391e8c196edc60bc030cc26037589c6dfd78.
+// These are the raw form registry move rows at levels <= 2; constructor move
+// weighting and random selection are separate operations.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SourceTownLevelTwoFormsV1 {
+    schema: u8,
+    source: String,
+    rows: Vec<(u64, Vec<Vec<(i16, u64)>>)>,
+}
+
+static SOURCE_LEVEL_TWO_FORMS: OnceLock<Result<SourceTownLevelTwoFormsV1, ()>> = OnceLock::new();
+
+fn source_level_two_forms() -> Result<&'static SourceTownLevelTwoFormsV1, CurrentTownWildErrorV1> {
+    SOURCE_LEVEL_TWO_FORMS
+        .get_or_init(|| {
+            let parsed: SourceTownLevelTwoFormsV1 =
+                serde_json::from_str(include_str!("current_town_level_two_forms.json"))
+                    .map_err(|_| ())?;
+            let mut expected = Vec::new();
+            for root in SOURCE_TIERS.iter().flat_map(|tier| tier.iter()) {
+                let effective = if *root == 266 { 265 } else { *root };
+                if !expected.contains(&effective) {
+                    expected.push(effective);
+                }
+            }
+            if parsed.schema != 1
+                || parsed.source != ORACLE
+                || expected.len() != 53
+                || parsed.rows.iter().map(|row| row.0).collect::<Vec<_>>() != expected
+                || parsed.rows.iter().map(|row| row.1.len()).sum::<usize>() != 90
+                || parsed.rows.iter().any(|(_, forms)| {
+                    forms.is_empty()
+                        || forms.len() > 20
+                        || forms.iter().any(|rows| {
+                            rows.len() > 512
+                                || rows.iter().any(|(level, move_id)| {
+                                    !(-2..=2).contains(level)
+                                        || *move_id == 0
+                                        || *move_id > 100_000
+                                })
+                        })
+                })
+            {
+                return Err(());
+            }
+            Ok(parsed)
+        })
+        .as_ref()
+        .map_err(|_| CurrentTownWildErrorV1::SourceContent)
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct CurrentTownDayWaveTwoContextV1<'a> {
@@ -404,6 +460,38 @@ pub fn source_town_form_base_stats(
         source.special_defense,
         source.speed,
     ])
+}
+
+/// Exact unweighted registry rows for one level-two effective Town form.
+/// Negative rows remain present here so the caller can apply the source
+/// evolution/relearner filter in the same order as Pokemon.getLevelMoves.
+pub fn source_town_level_two_form_rows(
+    root: SpeciesId,
+    form_index: u16,
+) -> Result<Vec<(i16, MoveId)>, CurrentTownWildErrorV1> {
+    if !source_town_form_supported(root.get().get(), form_index) {
+        return Err(CurrentTownWildErrorV1::SourceContent);
+    }
+    let effective = source_town_level_two_species(root)?.get().get();
+    let forms = source_level_two_forms()?
+        .rows
+        .iter()
+        .find(|row| row.0 == effective)
+        .ok_or(CurrentTownWildErrorV1::SourceContent)?;
+    forms
+        .1
+        .get(usize::from(form_index))
+        .ok_or(CurrentTownWildErrorV1::SourceContent)?
+        .iter()
+        .map(|(level, id)| {
+            Ok((
+                *level,
+                MoveId::new(
+                    SafeU53::new(*id).map_err(|_| CurrentTownWildErrorV1::SourceContent)?,
+                ),
+            ))
+        })
+        .collect()
 }
 
 /// Source level-two stat formula before held, nature-weight, challenge or

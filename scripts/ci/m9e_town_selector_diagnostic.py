@@ -20,6 +20,7 @@ SOURCE_FORM_FLAGS_SHA256 = "e03db62cf3982e03fbb5a25045e15407abd12010aefcbca8fa8c
 SOURCE_ABILITY_SLOTS_SHA256 = "c7564ac254fee378288b8cd8a10a1ca27dda01c6775045871feb3f6799a5f558"
 SOURCE_FORM_TYPES_SHA256 = "d66c5e26ecc920e50bdcc680479dfab9913103435f975ee5b4d0447d65373fcb"
 SOURCE_FORM_STATS_SHA256 = "8ce7ebeb1062ee505b89bf1400b90be9a9273fe7e4130aa2ede2b0821d65a526"
+SOURCE_LEVEL_TWO_FORMS_SHA256 = "63cd454d9e74ae2d77e59327b02a391e8c196edc60bc030cc26037589c6dfd78"
 START = time.monotonic()
 COMMANDS = []
 
@@ -58,6 +59,7 @@ def main():
         if head != SHA or status:
             raise RuntimeError("exact clean source candidate required")
         files = ["rust/crates/er-game/src/current_town_wild_spawn.rs",
+                 "rust/crates/er-game/src/current_town_level_two_forms.json",
                  "rust/crates/er-game/src/lib.rs",
                  "rust/crates/er-game/src/m9_new_run.rs",
                  "rust/crates/er-game/src/material.rs",
@@ -82,6 +84,7 @@ def main():
             "ability_slots": ("rust/fixtures/m9/engineering/town-ability-slots-v1.json", SOURCE_ABILITY_SLOTS_SHA256),
             "form_types": ("rust/fixtures/m9/engineering/town-form-types-v1.json", SOURCE_FORM_TYPES_SHA256),
             "form_stats": ("rust/fixtures/m9/engineering/town-form-stats-v1.json", SOURCE_FORM_STATS_SHA256),
+            "level_two_forms": ("rust/crates/er-game/src/current_town_level_two_forms.json", SOURCE_LEVEL_TWO_FORMS_SHA256),
         }
         for name, (path, expected) in source_fixtures.items():
             actual = digest((ROOT / path).read_bytes())

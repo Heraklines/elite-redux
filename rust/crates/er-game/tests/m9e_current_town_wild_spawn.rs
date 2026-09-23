@@ -5,7 +5,8 @@ use er_game::current_town_wild_spawn::{
     CurrentTownDayWaveTwoContextV1, CurrentTownGenderV1, CurrentTownWildErrorV1,
     select_current_town_day_wave_two_constructor_prefix, select_current_town_day_wave_two_root,
     source_town_ability_id, source_town_day_pools, source_town_form_base_stats,
-    source_town_form_types, source_town_ivs_from_id, source_town_level_two_species,
+    source_town_form_types, source_town_ivs_from_id, source_town_level_two_form_rows,
+    source_town_level_two_species,
     source_town_male_half_percent, source_town_unmodified_level_two_stats,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
@@ -28,6 +29,7 @@ const SOURCE_FORM_TYPES: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/town-form-types-v1.json");
 const SOURCE_FORM_STATS: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/town-form-stats-v1.json");
+const SOURCE_LEVEL_TWO_FORMS: &[u8] = include_bytes!("../src/current_town_level_two_forms.json");
 const SOURCE_TYPE_ORDER: [PokemonType; 19] = [
     PokemonType::Normal,
     PokemonType::Fighting,
@@ -88,11 +90,13 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     let ability_slots: serde_json::Value = serde_json::from_slice(SOURCE_ABILITY_SLOTS)?;
     let form_types: serde_json::Value = serde_json::from_slice(SOURCE_FORM_TYPES)?;
     let form_stats: serde_json::Value = serde_json::from_slice(SOURCE_FORM_STATS)?;
+    let level_two_forms: serde_json::Value = serde_json::from_slice(SOURCE_LEVEL_TWO_FORMS)?;
     assert_eq!(gender["source"], "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7");
     assert_eq!(form_flags["source"], gender["source"]);
     assert_eq!(ability_slots["source"], gender["source"]);
     assert_eq!(form_types["source"], gender["source"]);
     assert_eq!(form_stats["source"], gender["source"]);
+    assert_eq!(level_two_forms["source"], gender["source"]);
     assert_eq!(gender["rows"].as_array().ok_or("gender rows")?.len(), 163);
     assert_eq!(form_flags["rows"].as_array().ok_or("form rows")?.len(), 163);
     assert_eq!(
@@ -110,6 +114,7 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         form_stats["rows"].as_array().ok_or("form stat rows")?.len(),
         163
     );
+    assert_eq!(level_two_forms["rows"].as_array().ok_or("level-two rows")?.len(), 53);
     for root in pools.iter().flatten() {
         let id = root.get().get();
         let source_ratio = gender["rows"]
@@ -200,6 +205,32 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
                 source
             );
         }
+        let source_levels = level_two_forms["rows"]
+            .as_array()
+            .ok_or("level-two rows")?
+            .iter()
+            .find(|row| row[0].as_u64() == Some(effective))
+            .ok_or("missing source level-two forms")?;
+        let source_forms = source_levels[1].as_array().ok_or("level-two forms")?;
+        assert!(source_forms.len() >= expected_forms);
+        for (form, observed) in source_forms.iter().take(expected_forms).enumerate() {
+            let expected = observed
+                .as_array()
+                .ok_or("source level-two pairs")?
+                .iter()
+                .map(|pair| {
+                    Ok((
+                        pair[0].as_i64().ok_or("source learn level")? as i16,
+                        pair[1].as_u64().ok_or("source move ID")?,
+                    ))
+                })
+                .collect::<Result<Vec<(i16, u64)>, Box<dyn Error>>>()?;
+            let actual = source_town_level_two_form_rows(*root, form as u16)?
+                .into_iter()
+                .map(|(level, id)| (level, id.get().get()))
+                .collect::<Vec<_>>();
+            assert_eq!(actual, expected);
+        }
     }
     assert_eq!(
         source_town_level_two_species(SpeciesId::new(SafeU53::new(9999)?)),
@@ -223,6 +254,10 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     );
     assert_eq!(
         source_town_form_base_stats(&content, SpeciesId::new(SafeU53::new(133)?), 2),
+        Err(CurrentTownWildErrorV1::SourceContent)
+    );
+    assert_eq!(
+        source_town_level_two_form_rows(SpeciesId::new(SafeU53::new(133)?), 2),
         Err(CurrentTownWildErrorV1::SourceContent)
     );
     let mut missing = town.clone();
