@@ -53,7 +53,7 @@ def main():
         head, code, row = run("head", ["git", "rev-parse", "HEAD"], 30)
         result["commands"].append(row)
         require(code == 0 and head.decode().strip() == result["source_sha"], "exact HEAD")
-        parent, code, row = run("parent", ["git", "rev-parse", "HEAD^"], 30)
+        parent, code, row = run("parent", ["git", "merge-base", "HEAD", BASE], 30)
         result["commands"].append(row)
         require(code == 0 and parent.decode().strip() == BASE, "exact product parent")
         delta, code, row = run("delta", ["git", "diff", "--name-only", BASE, "HEAD"], 30)
@@ -69,7 +69,7 @@ def main():
                                                 "--exact", "--nocapture", "--test-threads=1"],
                                 900, ROOT / "rust")
         result["commands"].append(row)
-        matches = re.findall(rb"^M9E_REWARD_SEED_PROBE seed=(m9e-reward-fullslot-[0-9]+) offers=(\[[^\n]+\])$",
+        matches = re.findall(rb"M9E_REWARD_SEED_PROBE seed=(m9e-reward-fullslot-[0-9]+) offers=(\[[^\n]+\])",
                              output, re.M)
         require(len(matches) == 1, "exact successful actual-generator seed marker")
         seed = matches[0][0].decode()

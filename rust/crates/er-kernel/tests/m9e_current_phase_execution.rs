@@ -1657,7 +1657,15 @@ fn assert_current_reward_choice_and_pick(
         let candy = rolled.offers.iter().any(|offer| {
             offer.source_id == "RARE_CANDY" && offer.args.is_none()
         });
-        if tm && candy {
+        let simple = rolled.offers.iter().any(|offer| {
+            offer.args.is_none()
+                && matches!(
+                    offer.source_id.as_str(),
+                    "POKEBALL" | "GREAT_BALL" | "ULTRA_BALL" | "ROGUE_BALL"
+                        | "MASTER_BALL" | "LURE" | "SUPER_LURE" | "MAX_LURE"
+                )
+        });
+        if tm && candy && simple {
             writeln!(
                 std::io::stderr().lock(),
                 "M9E_REWARD_SEED_PROBE seed={seed} offers={:?}",
