@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 import { getGameMode } from "#app/game-mode";
 import { BASE_SHINY_CHANCE } from "#balance/rates";
 import { getCurrentErRewardRates } from "#data/elite-redux/er-reward-rates";
+import { AbilityId } from "#enums/ability-id";
 import { BattleStyle } from "#enums/battle-style";
 import { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
@@ -159,6 +160,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   expect((scene.arena as unknown as { lastTimeOfDay: number }).lastTimeOfDay).toBe(1);
   expect(enemy.species.speciesId).toBe(504);
   expect(enemy.level).toBe(3);
+  expect(enemy.getAbility().id).toBe(AbilityId.STAKEOUT);
   const waveTwoSelections = speciesCalls.filter(call => call.wave === 2);
   expect(waveTwoSelections.length).toBeGreaterThan(0);
   expect(waveTwoSelections.length).toBeLessThanOrEqual(8);
@@ -176,6 +178,8 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
     friendship: enemy.friendship,
     ability_index: enemy.abilityIndex,
     ability: enemy.getAbility().id,
+    player_switched_in_this_turn: player.turnData.switchedInThisTurn,
+    enemy_switched_in_this_turn: enemy.turnData.switchedInThisTurn,
     passive: enemy.passive,
     ivs: [...enemy.ivs],
     nature: enemy.nature,
@@ -232,6 +236,8 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
       pp_before: secondPpBefore,
       pp_after: secondMove!.ppUsed,
       enemy_fainted: enemy.isFainted(),
+      player_switched_in_this_turn_after: player.turnData.switchedInThisTurn,
+      enemy_switched_in_this_turn_after: enemy.turnData.switchedInThisTurn,
       phase: scene.phaseManager.getCurrentPhase().phaseName,
       rng_after: Phaser.Math.RND.state(),
     },
