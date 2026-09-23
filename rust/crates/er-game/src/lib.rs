@@ -69,7 +69,7 @@ pub(crate) mod current_reward_high;
 pub(crate) mod current_reward_metadata;
 pub(crate) mod current_reward_pool;
 pub(crate) mod current_reward_roll;
-pub(crate) mod current_reward_selection;
+pub mod current_reward_selection;
 pub(crate) mod current_reward_tm;
 pub(crate) mod current_reward_tuning;
 pub(crate) mod current_reward_ultra;

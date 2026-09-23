@@ -1635,6 +1635,39 @@ fn assert_current_reward_choice_and_pick(
             &selected
         );
     }
+    // Temporary diagnostic only: inspect the full live generator at this
+    // controlled party context. The original TM/Candy assertions below stay
+    // untouched and are expected to fail on this probe branch.
+    let mut candidate_state = active(&checkpoint)?.clone();
+    let mut located = false;
+    for number in 0..20_000 {
+        let seed = format!("m9e-reward-fullslot-{number}");
+        candidate_state
+            .active_run
+            .as_mut()
+            .ok_or("probe run absent")?
+            .seed = seed.clone();
+        let (rolled, _) = er_game::current_reward_selection::generate(
+            &candidate_state,
+            content.as_ref(),
+        )?;
+        let tm = rolled.offers.iter().any(|offer| {
+            offer.source_id == "TM_CASE" && offer.args.is_none()
+        });
+        let candy = rolled.offers.iter().any(|offer| {
+            offer.source_id == "RARE_CANDY" && offer.args.is_none()
+        });
+        if tm && candy {
+            writeln!(
+                std::io::stderr().lock(),
+                "M9E_REWARD_SEED_PROBE seed={seed} offers={:?}",
+                rolled.offers.iter().map(|offer| offer.source_id.as_str()).collect::<Vec<_>>()
+            )?;
+            located = true;
+            break;
+        }
+    }
+    assert!(located, "bounded actual-generator seed corpus exhausted");
     let tm_index = selected
         .offers
         .iter()

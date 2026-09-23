@@ -106,7 +106,7 @@ fn owned(offer: Offer) -> OwnedOffer {
         args,
     }
 }
-fn generate(
+pub fn generate(
     state: &GameStateV6,
     content: &PreparedGameContentV2,
 ) -> Result<(Selection, er_rng::phaser::PhaserRdgState), Error> {
