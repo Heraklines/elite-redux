@@ -277,7 +277,10 @@ pub(crate) fn validate_live(state: &GameStateV6, id: SafeU53) -> Result<(), Erro
     if let Some(tm) = selection.tm.as_deref() {
         use er_state::current_reward_tm::CurrentRewardTmPhaseV1 as T;
         if matches!(tm.phase, T::Declined { .. })
-            && matches!(selection.stage, Stage::Choice | Stage::SkipConfirm | Stage::Skipped)
+            && matches!(
+                selection.stage,
+                Stage::Choice | Stage::SkipConfirm | Stage::Skipped
+            )
         {
             let replay = crate::current_reward_tm::replay(state, selection, tm)?;
             if replay.party != run.party

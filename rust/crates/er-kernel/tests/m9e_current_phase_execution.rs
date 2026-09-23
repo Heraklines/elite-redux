@@ -1834,7 +1834,10 @@ fn assert_reward_skip_confirmation(
     .authority_revision;
     let mut expected = original.clone();
     expected.stage = Stage::SkipConfirm;
-    assert_eq!(current_reward(kernel.state().ok_or("reward absent")?)?, &expected);
+    assert_eq!(
+        current_reward(kernel.state().ok_or("reward absent")?)?,
+        &expected
+    );
     assert_eq!(
         kernel
             .state()
@@ -1862,9 +1865,15 @@ fn assert_reward_skip_confirmation(
         content.as_ref(),
         &back,
     )?;
-    assert_eq!(current_reward(canceled.state().ok_or("reward absent")?)?, &original);
+    assert_eq!(
+        current_reward(canceled.state().ok_or("reward absent")?)?,
+        &original
+    );
     *kernel = restore(*confirm.clone(), content.clone())?;
-    assert_eq!(canonical_bytes(&kernel.snapshot()?)?, canonical_bytes(&*confirm)?);
+    assert_eq!(
+        canonical_bytes(&kernel.snapshot()?)?,
+        canonical_bytes(&*confirm)?
+    );
     for pending in kernel.snapshot()?.pending_presentations {
         kernel.settle_presentation(pending.event_id)?;
     }
@@ -1877,7 +1886,10 @@ fn assert_reward_skip_confirmation(
         &step,
     )?;
     expected.stage = Stage::Skipped;
-    assert_eq!(current_reward(kernel.state().ok_or("reward absent")?)?, &expected);
+    assert_eq!(
+        current_reward(kernel.state().ok_or("reward absent")?)?,
+        &expected
+    );
     assert_eq!(
         kernel
             .state()
@@ -1900,10 +1912,12 @@ fn assert_reward_skip_confirmation(
     assert!(first_revision < second.transition().authority_revision);
     let before_again = canonical_bytes(kernel.state().ok_or("reward absent")?)?;
     let again = press(&mut kernel, PhysicalKey::Space)?;
-    assert!(!again
-        .effects
-        .iter()
-        .any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. })));
+    assert!(
+        !again
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. }))
+    );
     assert_eq!(
         canonical_bytes(kernel.state().ok_or("reward absent")?)?,
         before_again
