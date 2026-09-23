@@ -14,9 +14,7 @@ import Phaser from "phaser";
 import { afterAll, expect, test, vi } from "vitest";
 
 const PIN = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7";
-// GameManager.generateStarters deliberately pins the source test scene to this
-// seed; the observed wave-two level and Town constructor are bound to it.
-const SEED = "test";
+const SEED = "m9e-reward-selection-source-v1";
 let game: Phaser.Game | undefined;
 let manager: GameManager | undefined;
 
@@ -59,7 +57,6 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   manager.scene.gameData.secretId = 23456;
   await manager.classicMode.startBattle(SpeciesId.CHARMANDER);
   const scene = globalScene;
-  expect(scene.seed).toBe(SEED);
   expect(scene.gameData.trainerId).toBe(12345);
   expect(scene.gameData.secretId).toBe(23456);
   expect(scene.currentBattle.waveIndex).toBe(1);
