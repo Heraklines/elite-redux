@@ -65,6 +65,9 @@ fn bounded_source_wave_two_seed_candidates() -> Result<(), Box<dyn Error>> {
             }
         }
     }
-    assert_eq!(found, 8, "bounded search did not find eight Town candidates");
+    assert_eq!(
+        found, 8,
+        "bounded search did not find eight Town candidates"
+    );
     Ok(())
 }
