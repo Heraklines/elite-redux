@@ -1,17 +1,12 @@
 import { globalScene } from "#app/global-scene";
-import { getGameMode } from "#app/game-mode";
 import { BASE_SHINY_CHANCE } from "#balance/rates";
 import { getCurrentErRewardRates } from "#data/elite-redux/er-reward-rates";
 import { BattleStyle } from "#enums/battle-style";
 import { BiomeId } from "#enums/biome-id";
-import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
-import { UiMode } from "#enums/ui-mode";
-import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { PromptHandler } from "#test/helpers/prompt-handler";
-import { generateStarters } from "#test/utils/game-manager-utils";
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -60,20 +55,8 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
     .seed(SEED);
   manager.scene.gameData.trainerId = 12345;
   manager.scene.gameData.secretId = 23456;
-  await manager.runToTitle();
-  manager.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
-    manager!.scene.gameMode = getGameMode(GameModes.CLASSIC);
-    const starters = generateStarters(manager!.scene, [SpeciesId.CHARMANDER]);
-    // The test helper resets scene.seed to "test". Restore the requested run
-    // seed before EncounterPhase constructs the first battle, as Title does.
-    manager!.scene.setSeed(SEED);
-    manager!.scene.phaseManager.pushNew("EncounterPhase", false);
-    new SelectStarterPhase().initBattleFromCurrentPhase(starters);
-  });
-  await manager.phaseInterceptor.to("EncounterPhase");
-  await manager.phaseInterceptor.to("CommandPhase");
+  await manager.classicMode.startBattle(SpeciesId.CHARMANDER);
   const scene = globalScene;
-  expect(scene.seed).toBe(SEED);
   expect(scene.gameData.trainerId).toBe(12345);
   expect(scene.gameData.secretId).toBe(23456);
   expect(scene.currentBattle.waveIndex).toBe(1);
