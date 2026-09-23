@@ -236,8 +236,7 @@ fn fresh_account_browser_entry_preserves_source_ids_across_wire_restore()
         },
     )?;
     assert!(matches!(initialized, BrowserResponseV2::Ready));
-    let BrowserResponseV2::Snapshot { snapshot } =
-        send(&mut host, 1, BrowserRequestV2::Snapshot)?
+    let BrowserResponseV2::Snapshot { snapshot } = send(&mut host, 1, BrowserRequestV2::Snapshot)?
     else {
         return Err("fresh account browser snapshot missing".into());
     };
