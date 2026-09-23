@@ -653,9 +653,7 @@ pub fn source_town_time_of_day(
     wave: u16,
     wave_cycle_offset: u8,
 ) -> Result<i16, CurrentTownWildErrorV1> {
-    if !(1..=200).contains(&wave)
-        || wave_cycle_offset > 35
-        || !wave_cycle_offset.is_multiple_of(5)
+    if !(1..=200).contains(&wave) || wave_cycle_offset > 35 || !wave_cycle_offset.is_multiple_of(5)
     {
         return Err(CurrentTownWildErrorV1::UnsupportedContext);
     }
@@ -680,8 +678,8 @@ pub fn source_town_reset_seed(
     if !(1..=200).contains(&wave) {
         return Err(CurrentTownWildErrorV1::UnsupportedContext);
     }
-    let wave_seed = shift_char_codes(seed, i64::from(wave))
-        .map_err(|_| CurrentTownWildErrorV1::RandomDraw)?;
+    let wave_seed =
+        shift_char_codes(seed, i64::from(wave)).map_err(|_| CurrentTownWildErrorV1::RandomDraw)?;
     Ok(RunRngState {
         rdg: PhaserRdg::from_seed(&wave_seed).state(),
     })
