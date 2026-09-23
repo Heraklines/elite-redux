@@ -2118,14 +2118,19 @@ fn assert_actual_tm_reward(
     writeln!(std::io::stderr().lock(), "M9E_TM_STAGE restored")?;
     let mut live = initial_live.clone();
     let mut ledger = initial_ledger.clone();
+    writeln!(std::io::stderr().lock(), "M9E_TM_STAGE before_settle")?;
     for presentation in kernel.snapshot()?.pending_presentations {
         kernel.settle_presentation(presentation.event_id)?;
     }
+    writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_settle")?;
     let option=kernel.current_control().and_then(|c|c.menu.as_ref()).and_then(|m|m.options.iter().find(|r|
         matches!(&r.action,er_types::GameActionV1::Reward{action:er_types::RewardActionV1::Select{option_ordinal}} if *option_ordinal==index as u32)))
         .ok_or("TM option absent")?.option_id.as_str().to_owned();
+    writeln!(std::io::stderr().lock(), "M9E_TM_STAGE before_navigate")?;
     navigate(&mut kernel, &option)?;
+    writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_navigate")?;
     let step = press(&mut kernel, PhysicalKey::Space)?;
+    writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_press")?;
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
     writeln!(std::io::stderr().lock(), "M9E_TM_STAGE holder")?;
     assert!(matches!(
