@@ -1,0 +1,46 @@
+name: M9E Reward Skip Focused
+on:
+  push:
+    branches: [codex/m9e-reward-skip-focused-20260923]
+permissions:
+  contents: read
+concurrency:
+  group: m9e-reward-skip-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  reward-skip:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: never
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.97.1 --profile minimal
+      - uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Check reward skip, formatter and strict Clippy
+        run: python3 scripts/ci/m9e_reward_skip_focused.py
+      - name: Upload compact reward skip result
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-reward-skip-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-reward-skip/compact/
+          if-no-files-found: error
+          retention-days: 14
