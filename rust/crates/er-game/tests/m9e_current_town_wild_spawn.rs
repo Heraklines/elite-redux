@@ -152,7 +152,10 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     assert_eq!(prefix.audit.len(), 7);
     assert_eq!(prefix.audit[5].public_api, RngPublicApi::RandSeedFloat);
     assert_eq!(
-        prefix.audit[5].fraction_bits.as_ref().map(|bits| bits.to_f64()),
+        prefix.audit[5]
+            .fraction_bits
+            .as_ref()
+            .map(|bits| bits.to_f64()),
         Some(0.2272384697785894)
     );
     assert_eq!(
