@@ -2169,21 +2169,31 @@ fn assert_actual_tm_reward(
     if tm.slot == 4 {
         assert_actual_tm_intro_reissue(&state.0, content.clone())?;
     }
-    let (state, tm, learned) = if tm.slot == 4 {
-        let (state, tm, learned) =
-            assert_actual_tm_fullslot_replace(state, content.clone(), tm, learned)?;
-        let (state, tm, learned) =
-            assert_actual_tm_replace_yes(state, content.clone(), tm, learned)?;
-        assert_actual_tm_choose_slot(state, content.clone(), tm, learned)?
-    } else {
-        (state, tm, learned)
-    };
+    let (state, tm, learned) =
+        assert_actual_tm_fullslot_sequence(state, content.clone(), tm, learned)?;
     let (kernel, selected, live, ledger) = state;
     let present = Box::new(kernel.snapshot()?);
     writeln!(std::io::stderr().lock(), "M9E_TM_STAGE present")?;
     assert_actual_tm_reward_after_present(
         kernel, content, selected, live, ledger, tm, learned, present,
     )
+}
+
+#[inline(never)]
+fn assert_actual_tm_fullslot_sequence(
+    state: TmWitnessState,
+    content: Arc<PreparedGameContentV2>,
+    tm: Box<er_state::current_reward_tm::CurrentRewardTmV1>,
+    learned: GameMaterialV6,
+) -> Result<TmWitnessWithMove> {
+    if tm.slot != 4 {
+        return Ok((state, tm, learned));
+    }
+    let (state, tm, learned) =
+        assert_actual_tm_fullslot_replace(state, content.clone(), tm, learned)?;
+    let (state, tm, learned) =
+        assert_actual_tm_replace_yes(state, content.clone(), tm, learned)?;
+    assert_actual_tm_choose_slot(state, content, tm, learned)
 }
 
 #[inline(never)]
