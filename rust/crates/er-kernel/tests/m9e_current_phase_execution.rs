@@ -2221,18 +2221,27 @@ fn assert_actual_tm_intro_reissue(
         .event()
         .ok_or("Intro absent")?;
     writeln!(std::io::stderr().lock(), "M9E_TM_STAGE before_intro_reissue")?;
+    assert_phase_title_read_on_default_thread(&intro, event, content)?;
+    writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_intro_reissue")?;
+    Ok(())
+}
+
+#[inline(never)]
+fn assert_phase_title_read_on_default_thread(
+    checkpoint: &CoreGameKernelSnapshotV7,
+    event: er_types::PresentationEventId,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<()> {
     std::thread::scope(|scope| -> Result<()> {
         let read = std::thread::Builder::new()
             .name("m9e-title-read".to_owned())
             .spawn_scoped(scope, move || {
-                assert_phase_title_read_reissues(&intro, event, content)
+                assert_phase_title_read_reissues(checkpoint, event, content)
                     .map_err(|error| error.to_string())
             })?;
         read.join().map_err(|_| "Title READ witness panicked")??;
         Ok(())
-    })?;
-    writeln!(std::io::stderr().lock(), "M9E_TM_STAGE after_intro_reissue")?;
-    Ok(())
+    })
 }
 
 #[inline(never)]
@@ -2464,7 +2473,7 @@ fn assert_actual_tm_reward_after_present(
     let T::Present { event_id } = retained.tm.as_ref().ok_or("TM absent")?.phase else {
         return Err("learned message not retained".into());
     };
-    assert_phase_title_read_reissues(&present, event_id, content.clone())?;
+    assert_phase_title_read_on_default_thread(&present, event_id, content.clone())?;
     let mut expected = selected.party_before.clone();
     expected[0].moves[usize::from(tm.slot)] = Some(er_types::battle_model::MoveSlotState {
         move_id: tm.movement,
