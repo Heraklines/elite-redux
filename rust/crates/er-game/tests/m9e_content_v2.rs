@@ -82,6 +82,7 @@ fn state_v6_validates_the_complete_content_identity() -> Result<(), Box<dyn Erro
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let prepared = PreparedGameContentV2::prepare(Arc::new(bundle))?;
     let state = GameStateV6 {
+        current_account_identity: None,
         current_achievement_tracker: None,
         current_battle_participation: None,
         current_defender_dispatch: None,

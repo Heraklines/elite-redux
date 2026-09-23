@@ -8,6 +8,7 @@ use er_game::m72_bootstrap::{
 use er_state::m7_state::{
     DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
 };
+use er_state::m9e_state_v6::CurrentAccountIdentityV1;
 use er_types::battle_ids::{PokemonId, WaveIndex};
 use er_types::{
     BootstrapActionV1, GameButton, PlatformRequestId, RunDifficultyV1, SafeU53, SeatId,
@@ -310,6 +311,11 @@ fn pending_clock_cancel_restore_and_request_floor_are_owned() -> Result<()> {
 fn picks_retain_their_source_day_through_reentry_and_natural_construction() -> Result<()> {
     let content = content()?;
     let mut state = bootstrap(&content, true)?;
+    let account = CurrentAccountIdentityV1 {
+        trainer_id: 12345,
+        secret_id: 23456,
+    };
+    state.current_account_identity = Some(account);
     enter(&mut state, &content)?;
     sample(&mut state, 1, 1_468_800_000)?; // Actual source day17 includes Bulbasaur.
     pick(&mut state, 1)?;
@@ -332,6 +338,7 @@ fn picks_retain_their_source_day_through_reentry_and_natural_construction() -> R
     assert_eq!(restored, state);
     let natural = construct_natural_run_v6(&restored, &content, safe(10)?)?;
     natural.validate_with(&content)?;
+    assert_eq!(natural.current_account_identity, Some(account));
     let party = &natural
         .active_run
         .as_ref()
@@ -398,6 +405,7 @@ fn historical_absence_remains_unknown_and_requires_actual_fresh_profile() -> Res
     let mut state = bootstrap(&content, false)?;
     let original = serde_json::to_vec(&state)?;
     assert!(!String::from_utf8(original.clone())?.contains("current_starter_pokerus"));
+    assert!(!String::from_utf8(original.clone())?.contains("current_account_identity"));
     assert!(state.enable_current_starter_pokerus().is_err());
     assert_eq!(serde_json::to_vec(&state)?, original);
     enter(&mut state, &content)?;
@@ -405,6 +413,7 @@ fn historical_absence_remains_unknown_and_requires_actual_fresh_profile() -> Res
     pick(&mut state, 1)?;
     finish(&mut state)?;
     let natural = construct_natural_run_v6(&state, &content, safe(2)?)?;
+    assert_eq!(natural.current_account_identity, None);
     assert_eq!(
         natural.active_run.as_ref().ok_or("natural run")?.party[0].pokerus,
         None

@@ -32,6 +32,15 @@ pub struct CurrentRunDifficultyV1 {
     pub difficulty: er_types::RunDifficultyV1,
 }
 
+/// Source GameData account identifiers used by the enemy shiny calculation.
+/// Historical states remain unknown rather than inventing either identifier.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CurrentAccountIdentityV1 {
+    pub trainer_id: u16,
+    pub secret_id: u16,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GameStateV6 {
@@ -39,6 +48,8 @@ pub struct GameStateV6 {
     pub content_identity: GameContentIdentityV2,
     pub identities: GameIdentityAllocatorStateV1,
     pub profile: ProfileStateV1,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_account_identity: Option<CurrentAccountIdentityV1>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_friendship_profile:
         Option<crate::current_friendship_profile::CurrentFriendshipProfileV1>,

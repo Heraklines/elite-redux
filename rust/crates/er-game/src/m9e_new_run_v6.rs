@@ -362,6 +362,7 @@ pub fn construct_natural_run_v6(
         content_identity: content.identity().clone(),
         identities,
         profile,
+        current_account_identity: bootstrap.current_account_identity,
         active_run: Some(run),
     };
     if state.current_presentation.is_some() && state.current_targeting.is_some() {

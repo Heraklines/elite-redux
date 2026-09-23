@@ -53,6 +53,7 @@ fn content() -> TestResult<Arc<PreparedGameContentV2>> {
 
 fn state(content: &PreparedGameContentV2) -> TestResult<GameStateV6> {
     Ok(GameStateV6 {
+        current_account_identity: None,
         current_battle_participation: None,
         current_run_difficulty: None,
         current_targeting: None,

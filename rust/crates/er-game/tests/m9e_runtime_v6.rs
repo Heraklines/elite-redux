@@ -11,7 +11,8 @@ use er_state::m7_state::{
     DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
 };
 use er_state::m9e_state_v6::{
-    GAME_STATE_SCHEMA_VERSION_V6, GameIdentityAllocatorStateV1, GameStateV6,
+    GAME_STATE_SCHEMA_VERSION_V6, CurrentAccountIdentityV1, GameIdentityAllocatorStateV1,
+    GameStateV6,
 };
 use er_types::battle_ids::{MenuInstanceId, WaveIndex};
 use er_types::{
@@ -33,6 +34,7 @@ fn prepared() -> Result<Arc<PreparedGameContentV2>, Box<dyn Error>> {
 
 fn state(content: &PreparedGameContentV2) -> Result<GameStateV6, Box<dyn Error>> {
     Ok(GameStateV6 {
+        current_account_identity: None,
         current_battle_participation: None,
         current_run_difficulty: None,
         current_targeting: None,
@@ -86,7 +88,11 @@ fn context(
 fn bootstrap_candidate_is_serialized_and_installed_through_the_common_applier()
 -> Result<(), Box<dyn Error>> {
     let content = prepared()?;
-    let candidate = state(&content)?;
+    let mut candidate = state(&content)?;
+    candidate.current_account_identity = Some(CurrentAccountIdentityV1 {
+        trainer_id: 12345,
+        secret_id: 23456,
+    });
     let mut authority = GameRuntimeV6::new(None, content.clone(), safe(1))?;
     let prepared = authority.execute(
         GameActionV1::Bootstrap {
@@ -107,6 +113,10 @@ fn bootstrap_candidate_is_serialized_and_installed_through_the_common_applier()
         GameMaterialApplyOutcomeV6::Applied
     );
     assert_eq!(replica.state(), authority.state());
+    assert_eq!(
+        replica.state().ok_or("replica state")?.current_account_identity,
+        candidate.current_account_identity
+    );
     assert_eq!(
         replica.apply_material_bytes(&prepared.material_bytes)?,
         GameMaterialApplyOutcomeV6::DuplicateApplied
@@ -144,7 +154,12 @@ fn replica_cannot_dispatch_canonical_actions() -> Result<(), Box<dyn Error>> {
 fn save_action_allocates_one_typed_request_and_emits_canonical_save_v2()
 -> Result<(), Box<dyn Error>> {
     let content = prepared()?;
-    let candidate = state(&content)?;
+    let mut candidate = state(&content)?;
+    candidate.current_account_identity = Some(CurrentAccountIdentityV1 {
+        trainer_id: 12345,
+        secret_id: 23456,
+    });
+    let account = candidate.current_account_identity;
     let mut runtime = GameRuntimeV6::new(Some(candidate), content, safe(2))?;
     let prepared = runtime.execute(
         GameActionV1::Save {
@@ -174,6 +189,7 @@ fn save_action_allocates_one_typed_request_and_emits_canonical_save_v2()
     assert_eq!(*generation, safe(1));
     let save = GameSaveV2::decode(bytes)?;
     assert_eq!(save.state, prepared.candidate);
+    assert_eq!(save.state.current_account_identity, account);
     assert_eq!(prepared.mutations.len(), 2);
     Ok(())
 }

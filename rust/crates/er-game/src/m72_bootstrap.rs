@@ -83,6 +83,8 @@ pub struct RunBootstrapMachineV1 {
     pub schema_version: u32,
     pub profile: ProfileStateV1,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_account_identity: Option<er_state::m9e_state_v6::CurrentAccountIdentityV1>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_friendship_profile:
         Option<er_state::current_friendship_profile::CurrentFriendshipProfileV1>,
     pub seed: String,
@@ -165,6 +167,7 @@ impl RunBootstrapMachineV1 {
         let mut value = Self {
             schema_version: RUN_BOOTSTRAP_SCHEMA_VERSION_V1,
             profile,
+            current_account_identity: None,
             current_friendship_profile: None,
             seed,
             stage: RunBootstrapStageV1::Title,

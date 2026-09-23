@@ -2812,6 +2812,7 @@ fn adopt_v5_with_turn(
         .validate()
         .map_err(|error| GameRuntimeV6Error::Domain(error.to_string()))?;
     let candidate = GameStateV6 {
+        current_account_identity: before.current_account_identity,
         current_battle_participation: participation,
         current_turn_execution: if after.active_run.is_some() {
             turn
