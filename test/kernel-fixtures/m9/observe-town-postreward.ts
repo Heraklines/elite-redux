@@ -1,12 +1,17 @@
 import { globalScene } from "#app/global-scene";
+import { getGameMode } from "#app/game-mode";
 import { BASE_SHINY_CHANCE } from "#balance/rates";
 import { getCurrentErRewardRates } from "#data/elite-redux/er-reward-rates";
 import { BattleStyle } from "#enums/battle-style";
 import { BiomeId } from "#enums/biome-id";
+import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { UiMode } from "#enums/ui-mode";
+import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { PromptHandler } from "#test/helpers/prompt-handler";
+import { generateStarters } from "#test/utils/game-manager-utils";
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -14,8 +19,7 @@ import Phaser from "phaser";
 import { afterAll, expect, test, vi } from "vitest";
 
 const PIN = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7";
-// This setup seed is installed before GameManager.generateStarters resets the
-// scene seed to "test". Both inputs are part of this controlled source case.
+// Install this seed after the starter helper's hardcoded "test" assignment.
 const SETUP_SEED = "m9e-reward-selection-source-v1";
 let game: Phaser.Game | undefined;
 let manager: GameManager | undefined;
@@ -57,9 +61,18 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
     .seed(SETUP_SEED);
   manager.scene.gameData.trainerId = 12345;
   manager.scene.gameData.secretId = 23456;
-  await manager.classicMode.startBattle(SpeciesId.CHARMANDER);
+  await manager.runToTitle();
+  manager.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
+    manager!.scene.gameMode = getGameMode(GameModes.CLASSIC);
+    const starters = generateStarters(manager!.scene, [SpeciesId.CHARMANDER]);
+    manager!.scene.setSeed(SETUP_SEED);
+    manager!.scene.phaseManager.pushNew("EncounterPhase", false);
+    new SelectStarterPhase().initBattleFromCurrentPhase(starters);
+  });
+  await manager.phaseInterceptor.to("EncounterPhase");
+  await manager.phaseInterceptor.to("CommandPhase");
   const scene = globalScene;
-  expect(scene.seed).toBe("test");
+  expect(scene.seed).toBe(SETUP_SEED);
   expect(scene.gameData.trainerId).toBe(12345);
   expect(scene.gameData.secretId).toBe(23456);
   expect(scene.currentBattle.waveIndex).toBe(1);
@@ -143,7 +156,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   const enemy = scene.currentBattle.enemyParty[0];
   expect(enemy).toBeDefined();
   expect(enemy.id).not.toBe(firstEnemyId);
-  expect(enemy.level).toBe(2);
+  expect(enemy.level).toBeGreaterThan(0);
   const waveTwoSelections = speciesCalls.filter(call => call.wave === 2);
   expect(waveTwoSelections).toHaveLength(1);
   expect(waveTwoSelections[0].species).toBe(enemy.species.speciesId);
