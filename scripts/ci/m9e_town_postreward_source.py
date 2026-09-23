@@ -182,6 +182,7 @@ def main():
                                "next_species": value["next"]["species"],
                                "first_attacking_turns": value["first"]["attacking_turns"]}
         require(observations[0] == observations[1], "two fresh source observations differ")
+        (COMPACT / "observation.json").write_bytes(observations[0])
         result["status"] = "passed"
     except Exception as error:
         result["first_failure"] = str(error)[:1024]
