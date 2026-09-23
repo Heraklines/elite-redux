@@ -22,7 +22,7 @@ const SOURCE_AFTER_SELECTION: &str =
 fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Box<dyn Error>> {
     // Source399d direct queued NextEncounter observation in run34704520605:
     // tier integer 247/512, common pool index 3/24, root263. That probe's
-    // retained run stream and its DAY override are separate controls; this
+    // retained run stream and its DAY pool observation are separate controls; this
     // isolated selector test does not claim a causal natural reward receipt.
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = PreparedGameContentV2::prepare(Arc::new(bundle))?;
