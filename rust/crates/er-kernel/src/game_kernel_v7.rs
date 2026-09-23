@@ -974,14 +974,10 @@ impl GameKernelV7 {
         // Every proposal-producing press includes physical/held/lock ownership.
         // Stage ordinary controls too, so a late proposal or replay rejection
         // cannot leave input state behind on direct kernel calls.
-        eprintln!("M9E_INPUT_STAGE before_clone");
         let mut candidate = self.clone();
-        eprintln!("M9E_INPUT_STAGE after_clone");
         let step = candidate.active_input(event)?;
-        eprintln!("M9E_INPUT_STAGE after_active");
         candidate.retire_obsolete_repeats()?;
         candidate.validate()?;
-        eprintln!("M9E_INPUT_STAGE after_validate");
         *self = candidate;
         Ok(step)
     }
@@ -2598,10 +2594,7 @@ impl GameKernelV7 {
                 if !accepted {
                     return Ok(GameKernelStepV7::default());
                 }
-                eprintln!("M9E_INPUT_STAGE before_handle");
-                let step = self.handle_button(button)?;
-                eprintln!("M9E_INPUT_STAGE after_handle");
-                Ok(step)
+                self.handle_button(button)
             }
             RawInputEvent::KeyUp { code } => {
                 let source = PhysicalInputSourceV2::Keyboard(code);
@@ -2793,7 +2786,6 @@ impl GameKernelV7 {
         &mut self,
         button: GameButton,
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
-        eprintln!("M9E_INPUT_STAGE submit_enter");
         if button == GameButton::Cancel
             && self
                 .current_control()
@@ -3049,23 +3041,19 @@ impl GameKernelV7 {
                 internal_events: Vec::new(),
             });
         }
-        eprintln!("M9E_INPUT_STAGE before_execution_input");
         let input = self.execution_input(&action)?;
         let context = GameActionDispatchContextV1 {
             action: action_context,
             input,
             authority: true,
         };
-        eprintln!("M9E_INPUT_STAGE before_runtime_clone");
         let mut staged = self.active_runtime()?.clone();
         if let Some(owner) = &self.private_battle_control {
             staged
                 .install_control(owner.canonical_control.clone())
                 .map_err(runtime_error)?;
         }
-        eprintln!("M9E_INPUT_STAGE before_action_transaction");
         let step = execute_action_transaction(&mut staged, action, context)?;
-        eprintln!("M9E_INPUT_STAGE after_action_transaction");
         self.install_step_effects(&step.effects)?;
         self.lifecycle = GameKernelLifecycleV7::Active(staged);
         self.private_battle_control = None;
@@ -3738,7 +3726,6 @@ fn execute_action_transaction(
     action: GameActionV1,
     context: GameActionDispatchContextV1,
 ) -> Result<GameKernelStepV7, GameKernelV7Error> {
-    eprintln!("M9E_TRANSACTION_STAGE action_enter");
     execute_current_transaction(
         runtime,
         GameInternalEventV2::ControlSelected { action, context },
@@ -3749,10 +3736,8 @@ fn execute_current_transaction(
     runtime: &mut GameRuntimeV6,
     initial: GameInternalEventV2,
 ) -> Result<GameKernelStepV7, GameKernelV7Error> {
-    eprintln!("M9E_TRANSACTION_STAGE current_enter");
     let mut queue = GameInternalEventQueueV2::new(initial).map_err(internal_error)?;
     let mut effects = Vec::new();
-    eprintln!("M9E_TRANSACTION_STAGE before_quiescence");
     queue
         .run_to_quiescence(|event| match event {
             GameInternalEventV2::OwnedPhaseRequested {
@@ -3767,11 +3752,9 @@ fn execute_current_transaction(
             }
             GameInternalEventV2::ControlSelected { action, context }
             | GameInternalEventV2::ControlCancelled { action, context } => {
-                eprintln!("M9E_TRANSACTION_STAGE before_runtime_execute");
                 let prepared = runtime
                     .execute(action, context)
                     .map_err(|error| error.to_string())?;
-                eprintln!("M9E_TRANSACTION_STAGE after_runtime_execute");
                 Ok(vec![GameInternalEventV2::TransitionPrepared(prepared)])
             }
             GameInternalEventV2::TransitionPrepared(prepared) => {

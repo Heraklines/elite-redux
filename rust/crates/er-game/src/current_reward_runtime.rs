@@ -7,7 +7,6 @@ pub(super) fn execute(
     action: &RewardActionV1,
     context: &GameActionContextV1,
 ) -> Result<DomainExecutionV1, GameRuntimeV6Error> {
-    eprintln!("M9E_REWARD_RUNTIME_STAGE enter");
     let failure = || GameRuntimeV6Error::Action;
     let run = before.active_run.as_ref().ok_or_else(failure)?;
     let pending = before
@@ -26,7 +25,6 @@ pub(super) fn execute(
     // Reconstruct the current menu from the owned stage. Matching only the
     // ordinal or caller-supplied action context would admit hidden choices.
     let mut projected = before.clone();
-    eprintln!("M9E_REWARD_RUNTIME_STAGE projected");
     crate::current_reward_selection::install_control(
         &mut projected,
         pending.id,
@@ -77,7 +75,6 @@ pub(super) fn execute(
     }
     let mut candidate = match action {
         RewardActionV1::Select { option_ordinal } => {
-            eprintln!("M9E_REWARD_RUNTIME_STAGE before_select");
             crate::current_reward_selection::select(before, content, pending.id, *option_ordinal)?
         }
         RewardActionV1::Decline => {

@@ -13,9 +13,6 @@ ROOT = Path(__file__).resolve().parents[2]
 BASE = "d0ee75314e8a272b54777665da012b2d17bef873"
 BRANCH = "codex/m9e-reward-phase-probe-20260923"
 OWNED = {"rust/crates/er-kernel/tests/m9e_current_phase_execution.rs",
-         "rust/crates/er-kernel/src/game_kernel_v7.rs",
-         "rust/crates/er-game/src/m9e_runtime_v6.rs",
-         "rust/crates/er-game/src/current_reward_runtime.rs",
          "scripts/ci/m9e_reward_phase_probe.py", ".github/workflows/m9e-reward-phase-probe.yml"}
 OUT = Path(os.environ["RUNNER_TEMP"]).resolve() / "m9e-reward-phase-probe"
 IDS = [
@@ -53,7 +50,7 @@ def main():
     (OUT / "diagnostics").mkdir()
     result = {"status": "failed", "source_sha": os.environ["GITHUB_SHA"],
               "base_sha": BASE, "branch": os.environ["GITHUB_REF_NAME"],
-              "scope": "temporary kernel input markers on probe branch; all four whole native phase tests; no aggregate M9 acceptance",
+              "scope": "source-equivalent clean product; all four whole native phase tests; no aggregate M9 acceptance",
               "commands": COMMANDS, "expected_ids": IDS, "tests_passed": 0}
     try:
         require(os.environ["GITHUB_REPOSITORY"] == "Heraklines/elite-redux", "repository")
@@ -71,6 +68,8 @@ def main():
         require(code == 0, "pinned toolchain")
         version, code = run("rustc", ["rustc", "-Vv"], 30)
         require(code == 0 and b"release: 1.97.1\n" in version, "pinned compiler")
+        _, code = run("format", ["cargo", "fmt", "--all", "--", "--check"], 120, ROOT / "rust")
+        require(code == 0, "workspace Rust formatting")
         bundle = ROOT / "rust/fixtures/m9/engineering/game-content-bundle-v2.json"
         result["content_sha256"] = hashlib.sha256(bundle.read_bytes()).hexdigest()
         os.environ["CARGO_TARGET_DIR"] = str(OUT / "target")
