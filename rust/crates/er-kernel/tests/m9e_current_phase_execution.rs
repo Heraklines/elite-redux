@@ -1256,6 +1256,7 @@ fn assert_request_title_read_reissues(
         original.clone(),
     )?
     .encode()?;
+    writeln!(std::io::stderr().lock(), "M9E_FLASH_READ save_encoded")?;
     let mut reader = Box::new(GameKernelV7::natural_start(
         original.profile.clone(),
         "request-title-read".into(),
@@ -1272,8 +1273,11 @@ fn assert_request_title_read_reissues(
         None,
     )?);
     reader.enable_current_title_storage()?;
+    writeln!(std::io::stderr().lock(), "M9E_FLASH_READ title_enabled")?;
     navigate(&mut reader, "bootstrap/title/existing-saves")?;
+    writeln!(std::io::stderr().lock(), "M9E_FLASH_READ title_navigated")?;
     let list = press(&mut reader, PhysicalKey::Space)?;
+    writeln!(std::io::stderr().lock(), "M9E_FLASH_READ list_pressed")?;
     let list_id = list
         .effects
         .iter()
@@ -1290,7 +1294,9 @@ fn assert_request_title_read_reissues(
             slots: vec!["request-slot".into()],
         },
     )?;
+    writeln!(std::io::stderr().lock(), "M9E_FLASH_READ list_applied")?;
     let read = press(&mut reader, PhysicalKey::Space)?;
+    writeln!(std::io::stderr().lock(), "M9E_FLASH_READ read_pressed")?;
     let read_id = read
         .effects
         .iter()
@@ -1308,6 +1314,7 @@ fn assert_request_title_read_reissues(
             bytes: Some(saved.clone()),
         },
     )?;
+    writeln!(std::io::stderr().lock(), "M9E_FLASH_READ read_applied")?;
     let requests: Vec<_> = loaded
         .effects
         .iter()
@@ -1350,6 +1357,7 @@ fn assert_request_title_read_reissues(
     );
     assert_eq!(reader.snapshot()?, after);
     *reader = restore(after.clone(), content)?;
+    writeln!(std::io::stderr().lock(), "M9E_FLASH_READ restored")?;
     let blocked = reader.advance_time(SafeU53::ZERO)?;
     assert!(
         !blocked
@@ -1444,6 +1452,24 @@ fn controlled_early_ko_flash_owns_clock_egg_candy_and_canceled_suffix() -> Resul
         }
         let step = if let Some(pending) = snapshot.pending_platform.first() {
             writeln!(std::io::stderr().lock(), "M9E_FLASH platform_reissue")?;
+            let run = state.active_run.as_ref().ok_or("Flash run absent")?;
+            let owner = state
+                .current_battle_participation
+                .as_ref()
+                .and_then(|participation| participation.experience.as_ref())
+                .ok_or("Flash experience absent")?;
+            writeln!(
+                std::io::stderr().lock(),
+                "M9E_FLASH state control={:?} actionable={} owner={:?} menu={} turn={:?} pending={} source={} valid={:?}",
+                run.control.kind,
+                run.control.actionable,
+                run.control.owner_seat,
+                run.control.menu.is_some(),
+                state.current_turn_execution.as_ref().map(|turn| &turn.stage),
+                owner.pending.len(),
+                owner.source_progression.is_some(),
+                state.validate_with(content.as_ref()).map(|_| ())
+            )?;
             assert_request_title_read_reissues(&snapshot, &pending.effect, content.clone())?;
             writeln!(std::io::stderr().lock(), "M9E_FLASH platform_restore")?;
             *kernel = restore(snapshot.clone(), content.clone())?;

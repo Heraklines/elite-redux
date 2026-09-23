@@ -10,7 +10,7 @@ import sys
 import time
 
 BASE = "2f124b450b5c118191bf0d0775ac42a7d27c00cc"
-PROBE_PARENT = "34bbec3276db4ecbfeda59492417ebc084cbc817"
+PROBE_PARENT = "45612e28c78aaedf1b47382b84b5e1c7bfe018cf"
 BRANCH = "codex/m9e-host-phase-probe-20260923"
 OWNED = {
     ".github/workflows/m9e-host-phase-probe.yml",
