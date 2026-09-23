@@ -974,10 +974,14 @@ impl GameKernelV7 {
         // Every proposal-producing press includes physical/held/lock ownership.
         // Stage ordinary controls too, so a late proposal or replay rejection
         // cannot leave input state behind on direct kernel calls.
+        eprintln!("M9E_INPUT_STAGE before_clone");
         let mut candidate = self.clone();
+        eprintln!("M9E_INPUT_STAGE after_clone");
         let step = candidate.active_input(event)?;
+        eprintln!("M9E_INPUT_STAGE after_active");
         candidate.retire_obsolete_repeats()?;
         candidate.validate()?;
+        eprintln!("M9E_INPUT_STAGE after_validate");
         *self = candidate;
         Ok(step)
     }

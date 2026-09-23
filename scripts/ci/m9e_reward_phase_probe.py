@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 BASE = "d0ee75314e8a272b54777665da012b2d17bef873"
 BRANCH = "codex/m9e-reward-phase-probe-20260923"
 OWNED = {"rust/crates/er-kernel/tests/m9e_current_phase_execution.rs",
+         "rust/crates/er-kernel/src/game_kernel_v7.rs",
          "scripts/ci/m9e_reward_phase_probe.py", ".github/workflows/m9e-reward-phase-probe.yml"}
 OUT = Path(os.environ["RUNNER_TEMP"]).resolve() / "m9e-reward-phase-probe"
 IDS = [
@@ -50,7 +51,7 @@ def main():
     (OUT / "diagnostics").mkdir()
     result = {"status": "failed", "source_sha": os.environ["GITHUB_SHA"],
               "base_sha": BASE, "branch": os.environ["GITHUB_REF_NAME"],
-              "scope": "all four whole native phase tests with only controlled fixture seed and CI harness changed; no aggregate M9 acceptance",
+              "scope": "temporary kernel input markers on probe branch; all four whole native phase tests; no aggregate M9 acceptance",
               "commands": COMMANDS, "expected_ids": IDS, "tests_passed": 0}
     try:
         require(os.environ["GITHUB_REPOSITORY"] == "Heraklines/elite-redux", "repository")
