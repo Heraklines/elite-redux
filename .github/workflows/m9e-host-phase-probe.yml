@@ -32,6 +32,9 @@ jobs:
           persist-credentials: false
           submodules: false
           lfs: false
+      - name: Retrieve exact product base for source comparison
+        timeout-minutes: 5
+        run: git fetch --no-tags --depth=1 origin 2f124b450b5c118191bf0d0775ac42a7d27c00cc
       - uses: actions/cache/restore@v5
         with:
           path: |
