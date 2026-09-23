@@ -3738,6 +3738,7 @@ fn execute_action_transaction(
     action: GameActionV1,
     context: GameActionDispatchContextV1,
 ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+    eprintln!("M9E_TRANSACTION_STAGE action_enter");
     execute_current_transaction(
         runtime,
         GameInternalEventV2::ControlSelected { action, context },
@@ -3748,8 +3749,10 @@ fn execute_current_transaction(
     runtime: &mut GameRuntimeV6,
     initial: GameInternalEventV2,
 ) -> Result<GameKernelStepV7, GameKernelV7Error> {
+    eprintln!("M9E_TRANSACTION_STAGE current_enter");
     let mut queue = GameInternalEventQueueV2::new(initial).map_err(internal_error)?;
     let mut effects = Vec::new();
+    eprintln!("M9E_TRANSACTION_STAGE before_quiescence");
     queue
         .run_to_quiescence(|event| match event {
             GameInternalEventV2::OwnedPhaseRequested {
@@ -3764,9 +3767,11 @@ fn execute_current_transaction(
             }
             GameInternalEventV2::ControlSelected { action, context }
             | GameInternalEventV2::ControlCancelled { action, context } => {
+                eprintln!("M9E_TRANSACTION_STAGE before_runtime_execute");
                 let prepared = runtime
                     .execute(action, context)
                     .map_err(|error| error.to_string())?;
+                eprintln!("M9E_TRANSACTION_STAGE after_runtime_execute");
                 Ok(vec![GameInternalEventV2::TransitionPrepared(prepared)])
             }
             GameInternalEventV2::TransitionPrepared(prepared) => {

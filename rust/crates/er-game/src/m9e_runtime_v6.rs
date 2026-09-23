@@ -385,6 +385,7 @@ impl GameRuntimeV6 {
         action: GameActionV1,
         context: GameActionDispatchContextV1,
     ) -> Result<PreparedGameTransitionV2, GameRuntimeV6Error> {
+        eprintln!("M9E_RUNTIME_STAGE execute_enter");
         let proof = GameActionDispatcherV1::prepare_with_proof(
             self.state.as_ref(),
             self.content.as_ref(),
@@ -454,6 +455,7 @@ impl GameActionDispatcherV1 {
         context: GameActionDispatchContextV1,
         retention: AppliedMaterialRetentionV1,
     ) -> Result<PreparedGameTransitionProof, GameRuntimeV6Error> {
+        eprintln!("M9E_RUNTIME_STAGE proof_enter");
         let validated_ledger =
             if matches!(retention, AppliedMaterialRetentionV1::BoundedSuffix { .. }) {
                 Some(
