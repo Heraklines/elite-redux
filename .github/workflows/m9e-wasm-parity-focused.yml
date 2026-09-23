@@ -1,0 +1,92 @@
+name: M9E Native and Wasm Parity Focused
+on:
+  push:
+    branches:
+      - codex/m9e-wasm-parity-20260923
+      - codex/m9e-current-phase-focused-20260910
+permissions:
+  contents: read
+concurrency:
+  group: m9e-wasm-parity-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  parity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - uses: actions/cache/restore@v5
+        with:
+          path: rust/target/debug
+          key: m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
+          restore-keys: |
+            m9e-focused-native-v2-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-
+      - uses: actions/cache/restore@v5
+        with:
+          path: ${{ runner.temp }}/m9e-wasm-target
+          key: m9e-focused-wasm-v1-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-${{ github.sha }}
+          restore-keys: |
+            m9e-focused-wasm-v1-${{ runner.os }}-${{ runner.arch }}-test-default-debug0-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock', 'rust/.cargo/config.toml', 'rust/**/build.rs', 'rust/**/Cargo.toml') }}-
+      - uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cargo/bin/wasm-bindgen
+            ~/.cargo/bin/wasm-bindgen-test-runner
+            ~/.cargo/bin/wasm2es6js
+          key: m9e-tools-${{ runner.os }}-${{ runner.arch }}-rust1.97.1-wasm-bindgen0.2.127
+      - name: Install pinned Wasm target remotely
+        run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt --target wasm32-unknown-unknown
+      - name: Compare exact eventwise native and Wasm reports
+        run: python3 scripts/ci/m9e_wasm_parity_diagnostic.py
+      - name: Verify Rust source format remotely
+        run: cargo fmt --manifest-path rust/Cargo.toml --all -- --check
+      - name: Prepare bounded formatting patch
+        if: failure()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/m9e-wasm-parity"
+          cargo fmt --manifest-path rust/Cargo.toml --all
+          git diff -- rust/crates/er-wasm/tests/m9e_parity.rs > "$RUNNER_TEMP/m9e-wasm-parity/format.patch"
+          test "$(wc -c < "$RUNNER_TEMP/m9e-wasm-parity/format.patch")" -le 32768
+      - name: Compact parity summary
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-wasm-parity-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-wasm-parity/compact/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Bounded parity diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-wasm-parity-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-wasm-parity/diagnostics/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Bounded formatting patch
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-wasm-parity-format-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-wasm-parity/format.patch
+          if-no-files-found: ignore
+          retention-days: 14

@@ -9,7 +9,7 @@ use er_kernel::game_kernel_v7::{
     GameKernelEffectV7, GameKernelRoleV7, GameKernelStepV7, GameKernelV7,
 };
 use er_kernel::snapshot::KernelSchedulerSnapshotV2;
-use er_kernel::snapshot_v7::GameKernelLifecycleSnapshotV7;
+use er_kernel::snapshot_v7::{CoreGameKernelSnapshotV7, GameKernelLifecycleSnapshotV7};
 use er_state::m7_state::{
     DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
 };
@@ -168,7 +168,17 @@ fn strongest_move_option(
         .ok_or_else(|| "strong move missing".into())
 }
 
-fn request() -> Result<M9EParityRequestV1, Box<dyn Error>> {
+// Keep large kernel/snapshot temporaries in non-inlined frames so the debug
+// Wasm witness can exercise real input and replay with its ordinary stack.
+type RawBootstrap = (
+    GameContentBundleV2,
+    Arc<PreparedGameContentV2>,
+    SeatId,
+    CoreGameKernelSnapshotV7,
+);
+
+#[inline(never)]
+fn raw_bootstrap() -> Result<RawBootstrap, Box<dyn Error>> {
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle.clone()))?);
     let seat = SeatId::new(safe(1));
@@ -223,7 +233,28 @@ fn request() -> Result<M9EParityRequestV1, Box<dyn Error>> {
     // Boosting is an explicit controlled fixture boundary. The original
     // bootstrap material digest describes the unmodified state and cannot be
     // retained as evidence for this fixture's canonical state.
-    let mut driver = GameKernelV7::from_active(
+    Ok((bundle, content, seat, snapshot))
+}
+
+fn request() -> Result<M9EParityRequestV1, Box<dyn Error>> {
+    trace_request(raw_driver(raw_bootstrap()?)?)
+}
+
+type RawDriver = (
+    GameContentBundleV2,
+    Arc<PreparedGameContentV2>,
+    SeatId,
+    Box<GameKernelV7>,
+);
+
+#[inline(never)]
+fn raw_driver(
+    (bundle, content, seat, mut snapshot): RawBootstrap,
+) -> Result<RawDriver, Box<dyn Error>> {
+    let GameKernelLifecycleSnapshotV7::Active(state) = &mut snapshot.lifecycle else {
+        return Err("bootstrap snapshot is not active".into());
+    };
+    let driver = Box::new(GameKernelV7::from_active(
         state.clone(),
         snapshot.material_ledger.next_authority_revision,
         seat,
@@ -232,9 +263,26 @@ fn request() -> Result<M9EParityRequestV1, Box<dyn Error>> {
         snapshot.input_router,
         snapshot.scheduler,
         snapshot.protocol,
-    )?;
-    let initial_snapshot = driver.snapshot()?;
+    )?);
+    Ok((bundle, content, seat, driver))
+}
+
+#[inline(never)]
+fn trace_request(
+    (bundle, content, seat, mut driver): RawDriver,
+) -> Result<M9EParityRequestV1, Box<dyn Error>> {
+    let initial_snapshot = Box::new(driver.snapshot()?);
     let mut events = Vec::new();
+    run_raw_trace(&mut driver, &mut events, content.as_ref())?;
+    finish_raw_request(bundle, seat, driver, initial_snapshot, events)
+}
+
+#[inline(never)]
+fn run_raw_trace(
+    driver: &mut GameKernelV7,
+    events: &mut Vec<M9EParityEventV2>,
+    content: &PreparedGameContentV2,
+) -> Result<(), Box<dyn Error>> {
     for _ in 0..300 {
         let wave = driver
             .state()
@@ -253,22 +301,33 @@ fn request() -> Result<M9EParityRequestV1, Box<dyn Error>> {
             .ok_or("control missing")?
         {
             GameControlKindV2::BattleCommand => {
-                press(&mut driver, &mut events, PhysicalKey::Space)?;
+                press(driver, events, PhysicalKey::Space)?;
             }
             GameControlKindV2::BattleMove => {
-                let option = strongest_move_option(&driver, &content)?;
-                navigate_down_to(&mut driver, &mut events, &option)?;
-                press(&mut driver, &mut events, PhysicalKey::Space)?;
+                let option = strongest_move_option(driver, content)?;
+                navigate_down_to(driver, events, &option)?;
+                press(driver, events, PhysicalKey::Space)?;
             }
             GameControlKindV2::Progression
             | GameControlKindV2::MoveLearn
             | GameControlKindV2::Evolution
             | GameControlKindV2::Reward => {
-                press(&mut driver, &mut events, PhysicalKey::Space)?;
+                press(driver, events, PhysicalKey::Space)?;
             }
             other => return Err(format!("longitudinal trace stalled at {other:?}").into()),
         }
     }
+    Ok(())
+}
+
+#[inline(never)]
+fn finish_raw_request(
+    bundle: GameContentBundleV2,
+    seat: SeatId,
+    driver: Box<GameKernelV7>,
+    initial_snapshot: Box<CoreGameKernelSnapshotV7>,
+    events: Vec<M9EParityEventV2>,
+) -> Result<M9EParityRequestV1, Box<dyn Error>> {
     assert!(
         driver
             .state()
@@ -308,7 +367,7 @@ fn request() -> Result<M9EParityRequestV1, Box<dyn Error>> {
         role: GameKernelRoleV7::Authority,
         save_slots: Vec::new(),
         local_is_host: true,
-        initial_snapshot: Some(initial_snapshot),
+        initial_snapshot: Some(*initial_snapshot),
         events,
     })
 }
@@ -390,95 +449,104 @@ fn assert_eventwise_parity_contract(
     ] {
         assert!(cohort_report_golden(bundle, progression, bytes).is_none());
     }
-    let mut driver = GameKernelV7::from_snapshot(
-        request
-            .initial_snapshot
-            .clone()
-            .ok_or("controlled checkpoint missing")?,
-        request.local_seat,
-        request.role,
-        content.clone(),
-    )?;
-    let mut expected_observations = Vec::new();
-    let mut material_count = 0;
-    let mut canonical_control_material_count = 0;
-    for (index, event) in request.events.iter().enumerate() {
-        let before_snapshot = driver.snapshot()?;
-        let mut admission_before = driver.state().cloned().ok_or("active state missing")?;
-        // Material admission restores the retained canonical battle control
-        // before hashing its frontier (game_kernel_v7::collect_battle_action).
-        // Derive only that field from the actual pre-event owner; never from
-        // the returned material. The real driver and its raw report stay intact.
-        if let Some(owner) = &before_snapshot.private_battle_control {
-            admission_before
-                .active_run
-                .as_mut()
-                .ok_or("canonical admission run missing")?
-                .control = owner.canonical_control.clone();
-        }
-        let before_digest = game_state_digest(&admission_before)?;
-        let step = apply_timer_event(&mut driver, event.clone())?;
-        let snapshot = driver.snapshot()?;
-        for effect in &step.effects {
-            if let GameKernelEffectV7::AuthorityMaterial {
-                operation_id,
-                bytes,
-            } = effect
-            {
-                let material = GameMaterialV6::decode(bytes)?;
-                let transition = material.transition();
-                assert_eq!(&transition.operation_id, operation_id);
-                assert_eq!(&transition.content_identity, content.identity());
-                assert_eq!(transition.before_digest, before_digest);
-                assert_eq!(
-                    &transition.after_state,
-                    driver.state().ok_or("material after-state missing")?
-                );
-                let after_digest = game_state_digest(&transition.after_state)?;
-                assert_eq!(transition.after_digest, after_digest);
-                for mutation in &transition.mutations {
-                    assert_eq!(mutation.before_digest, before_digest);
-                    assert_eq!(mutation.after_digest, after_digest);
-                }
-                let record = snapshot
-                    .material_ledger
-                    .record(operation_id)
-                    .ok_or("actual material receipt missing")?;
-                assert_eq!(record.authority_revision, transition.authority_revision);
-                assert_eq!(record.after_digest, after_digest);
-                assert_eq!(
-                    record.material_fingerprint,
-                    format!("blake3-v1:{}", er_canonical::content_digest(bytes)?)
-                );
-                material_count += 1;
-                if before_snapshot.private_battle_control.is_some() {
-                    canonical_control_material_count += 1;
+    // The expected material walk must return before the Wasm JSON replay starts.
+    #[inline(never)]
+    fn expected_raw_report(
+        request: &M9EParityRequestV1,
+        content: Arc<PreparedGameContentV2>,
+    ) -> Result<M9EParityReportV1, Box<dyn Error>> {
+        let event_count = request.events.len();
+        let mut driver = GameKernelV7::from_snapshot(
+            request
+                .initial_snapshot
+                .clone()
+                .ok_or("controlled checkpoint missing")?,
+            request.local_seat,
+            request.role,
+            content.clone(),
+        )?;
+        let mut expected_observations = Vec::new();
+        let mut material_count = 0;
+        let mut canonical_control_material_count = 0;
+        for (index, event) in request.events.iter().enumerate() {
+            let before_snapshot = driver.snapshot()?;
+            let mut admission_before = driver.state().cloned().ok_or("active state missing")?;
+            // Material admission restores the retained canonical battle control
+            // before hashing its frontier (game_kernel_v7::collect_battle_action).
+            // Derive only that field from the actual pre-event owner; never from
+            // the returned material. The real driver and its raw report stay intact.
+            if let Some(owner) = &before_snapshot.private_battle_control {
+                admission_before
+                    .active_run
+                    .as_mut()
+                    .ok_or("canonical admission run missing")?
+                    .control = owner.canonical_control.clone();
+            }
+            let before_digest = game_state_digest(&admission_before)?;
+            let step = apply_timer_event(&mut driver, event.clone())?;
+            let snapshot = driver.snapshot()?;
+            for effect in &step.effects {
+                if let GameKernelEffectV7::AuthorityMaterial {
+                    operation_id,
+                    bytes,
+                } = effect
+                {
+                    let material = GameMaterialV6::decode(bytes)?;
+                    let transition = material.transition();
+                    assert_eq!(&transition.operation_id, operation_id);
+                    assert_eq!(&transition.content_identity, content.identity());
+                    assert_eq!(transition.before_digest, before_digest);
+                    assert_eq!(
+                        &transition.after_state,
+                        driver.state().ok_or("material after-state missing")?
+                    );
+                    let after_digest = game_state_digest(&transition.after_state)?;
+                    assert_eq!(transition.after_digest, after_digest);
+                    for mutation in &transition.mutations {
+                        assert_eq!(mutation.before_digest, before_digest);
+                        assert_eq!(mutation.after_digest, after_digest);
+                    }
+                    let record = snapshot
+                        .material_ledger
+                        .record(operation_id)
+                        .ok_or("actual material receipt missing")?;
+                    assert_eq!(record.authority_revision, transition.authority_revision);
+                    assert_eq!(record.after_digest, after_digest);
+                    assert_eq!(
+                        record.material_fingerprint,
+                        format!("blake3-v1:{}", er_canonical::content_digest(bytes)?)
+                    );
+                    material_count += 1;
+                    if before_snapshot.private_battle_control.is_some() {
+                        canonical_control_material_count += 1;
+                    }
                 }
             }
+            expected_observations.push(M9EParityObservationV1 {
+                sequence: safe((index + 1) as u64),
+                input_digest: er_canonical::content_digest(event)?,
+                effect_digest: er_canonical::content_digest(&step.effects)?,
+                internal_event_digest: er_canonical::content_digest(&step.internal_events)?,
+                mechanical_state_digest: er_canonical::content_digest(&driver.state())?,
+                kernel_determinism_digest: er_canonical::content_digest(&snapshot)?,
+                control_kind: driver.current_control().map(|control| control.kind),
+                wave: driver
+                    .state()
+                    .and_then(|state| state.active_run.as_ref())
+                    .map(|run| run.wave),
+            });
         }
-        expected_observations.push(M9EParityObservationV1 {
-            sequence: safe((index + 1) as u64),
-            input_digest: er_canonical::content_digest(event)?,
-            effect_digest: er_canonical::content_digest(&step.effects)?,
-            internal_event_digest: er_canonical::content_digest(&step.internal_events)?,
-            mechanical_state_digest: er_canonical::content_digest(&driver.state())?,
-            kernel_determinism_digest: er_canonical::content_digest(&snapshot)?,
-            control_kind: driver.current_control().map(|control| control.kind),
-            wave: driver
-                .state()
-                .and_then(|state| state.active_run.as_ref())
-                .map(|run| run.wave),
-        });
+        assert_eq!(event_count, 30);
+        assert_eq!(material_count, 6);
+        assert!(canonical_control_material_count > 0);
+        Ok(M9EParityReportV1 {
+            schema_version: M9E_PARITY_REPORT_SCHEMA_VERSION_V1,
+            content_identity_digest: er_canonical::content_digest(content.identity())?,
+            observations: expected_observations,
+            final_snapshot_digest: er_canonical::content_digest(&driver.snapshot()?)?,
+        })
     }
-    assert_eq!(event_count, 30);
-    assert_eq!(material_count, 6);
-    assert!(canonical_control_material_count > 0);
-    let expected = M9EParityReportV1 {
-        schema_version: M9E_PARITY_REPORT_SCHEMA_VERSION_V1,
-        content_identity_digest: er_canonical::content_digest(content.identity())?,
-        observations: expected_observations,
-        final_snapshot_digest: er_canonical::content_digest(&driver.snapshot()?)?,
-    };
+    let expected = expected_raw_report(&request, content)?;
     let report = replay(request)?;
     assert_eq!(report, expected);
     assert_eq!(report.observations.len(), event_count);
