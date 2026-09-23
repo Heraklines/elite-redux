@@ -4,8 +4,8 @@ use std::sync::Arc;
 use er_game::current_town_wild_spawn::{
     CurrentTownDayWaveTwoContextV1, CurrentTownGenderV1, CurrentTownWildErrorV1,
     select_current_town_day_wave_two_constructor_prefix, select_current_town_day_wave_two_root,
-    source_town_ability_id, source_town_day_pools, source_town_ivs_from_id, source_town_level_two_species,
-    source_town_male_half_percent,
+    source_town_ability_id, source_town_day_pools, source_town_ivs_from_id,
+    source_town_level_two_species, source_town_male_half_percent,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_rng::audit::{RngCallsiteId, RngPublicApi, RngReason};
@@ -64,7 +64,13 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     assert_eq!(ability_slots["source"], gender["source"]);
     assert_eq!(gender["rows"].as_array().ok_or("gender rows")?.len(), 163);
     assert_eq!(form_flags["rows"].as_array().ok_or("form rows")?.len(), 163);
-    assert_eq!(ability_slots["rows"].as_array().ok_or("ability slot rows")?.len(), 163);
+    assert_eq!(
+        ability_slots["rows"]
+            .as_array()
+            .ok_or("ability slot rows")?
+            .len(),
+        163
+    );
     for root in pools.iter().flatten() {
         let id = root.get().get();
         let source_ratio = gender["rows"]
