@@ -1,4 +1,6 @@
 import { globalScene } from "#app/global-scene";
+import { BASE_SHINY_CHANCE } from "#balance/rates";
+import { getCurrentErRewardRates } from "#data/elite-redux/er-reward-rates";
 import { BattleStyle } from "#enums/battle-style";
 import { BiomeId } from "#enums/biome-id";
 import { MoveId } from "#enums/move-id";
@@ -110,12 +112,19 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   expect(enemy).toBeDefined();
   expect(enemy.id).not.toBe(firstEnemyId);
   expect(enemy.level).toBe(2);
+  const shinyXor = (scene.gameData.trainerId ^ scene.gameData.secretId)
+    ^ ((enemy.id >>> 16) ^ (enemy.id & 0xffff));
   const result = {
     schema: 1,
     source: PIN,
     seed: SEED,
     scope: "controlled level-ten starter attacks, victory reward cancel and queued Town wave-two encounter",
     account: { trainer_id: scene.gameData.trainerId, secret_id: scene.gameData.secretId },
+    shiny_context: {
+      base_threshold: BASE_SHINY_CHANCE,
+      reward_multiplier: getCurrentErRewardRates().totalShiny,
+      xor: shinyXor,
+    },
     first: { wave: 1, enemy_id: firstEnemyId, species: firstEnemySpecies, attacking_turns: attackingTurns },
     reward: { choice: "cancel", new_battle_calls: newBattle.mock.calls.length },
     next: {
