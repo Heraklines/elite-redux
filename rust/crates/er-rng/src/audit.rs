@@ -4,7 +4,7 @@ use er_types::SafeU53;
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::battle::BattleRngState;
-use crate::phaser::{PhaserRdgState, RngError};
+use crate::phaser::{F64Bits, PhaserRdg, PhaserRdgState, RngError};
 
 const ORACLE_SHA: &str = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
 
@@ -59,6 +59,7 @@ pub enum RngStream {
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum RngPublicApi {
     RandSeedInt,
+    RandSeedFloat,
     IntegerInRange,
     Pick,
     FisherYatesSwap,
@@ -255,6 +256,8 @@ pub struct RngDraw {
     pub minimum: SafeU53,
     pub cardinality: SafeU53,
     pub result: SafeU53,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fraction_bits: Option<F64Bits>,
     pub consumed: bool,
     pub primitive_draw_count: u8,
     pub before_state: RngAuditState,
@@ -306,6 +309,8 @@ impl<'de> Deserialize<'de> for RngDraw {
             minimum: SafeU53,
             cardinality: SafeU53,
             result: SafeU53,
+            #[serde(default)]
+            fraction_bits: Option<F64Bits>,
             consumed: bool,
             primitive_draw_count: u8,
             before_state: RngAuditState,
@@ -324,6 +329,7 @@ impl<'de> Deserialize<'de> for RngDraw {
             minimum: raw.minimum,
             cardinality: raw.cardinality,
             result: raw.result,
+            fraction_bits: raw.fraction_bits,
             consumed: raw.consumed,
             primitive_draw_count: raw.primitive_draw_count,
             before_state: raw.before_state,
@@ -389,6 +395,7 @@ impl RngAuditLog {
             minimum: input.minimum,
             cardinality: input.cardinality,
             result: input.result,
+            fraction_bits: input.fraction_bits,
             consumed: input.consumed,
             primitive_draw_count: if input.consumed { 2 } else { 0 },
             before_state: input.before_state,
@@ -417,6 +424,7 @@ pub(crate) struct RngDrawInput {
     pub minimum: SafeU53,
     pub cardinality: SafeU53,
     pub result: SafeU53,
+    pub fraction_bits: Option<F64Bits>,
     pub consumed: bool,
     pub before_state: RngAuditState,
     pub after_state: RngAuditState,
@@ -430,8 +438,39 @@ pub fn rng_state_fingerprint(state: &RngAuditState) -> Result<String, RngError> 
 
 fn validate_api_shape(draw: &RngDraw) -> Result<(), RngError> {
     let cardinality = draw.cardinality.get();
+    if draw.public_api == RngPublicApi::RandSeedFloat {
+        if draw.stream != RngStream::Run
+            || draw.minimum != SafeU53::ZERO
+            || draw.cardinality != SafeU53::ZERO
+            || draw.result != SafeU53::ZERO
+            || !draw.consumed
+            || draw.primitive_draw_count != 2
+            || draw.before_state.battle != draw.after_state.battle
+            || draw.before_state.seed_offset != draw.after_state.seed_offset
+        {
+            return Err(RngError::InvalidAudit {
+                detail: "randSeedFloat audit shape differs",
+            });
+        }
+        let mut source = PhaserRdg::from_state(&draw.before_state.run)?;
+        let fraction = source.frac();
+        if draw.fraction_bits.as_ref() != Some(&F64Bits::from_f64(fraction))
+            || &source.state() != &draw.after_state.run
+        {
+            return Err(RngError::InvalidAudit {
+                detail: "randSeedFloat result or stream transition differs",
+            });
+        }
+        return Ok(());
+    }
+    if draw.fraction_bits.is_some() {
+        return Err(RngError::InvalidAudit {
+            detail: "integer audit carries a float result",
+        });
+    }
     let expected_consumed = match draw.public_api {
         RngPublicApi::RandSeedInt => cardinality > 1,
+        RngPublicApi::RandSeedFloat => unreachable!("handled above"),
         RngPublicApi::IntegerInRange => {
             if cardinality == 0 {
                 return Err(RngError::InvalidAudit {

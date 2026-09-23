@@ -9,7 +9,7 @@ use crate::audit::{
     RngStream, SeedOffsetContext,
 };
 use crate::phaser::{
-    PhaserRdg, PhaserRdgState, RngError, RunRngState, checked_range_max, safe_from_usize,
+    F64Bits, PhaserRdg, PhaserRdgState, RngError, RunRngState, checked_range_max, safe_from_usize,
     shift_char_code_units,
 };
 
@@ -219,6 +219,34 @@ impl RngRuntime {
             callsite_id,
             consumed,
         )?;
+        *self = staged;
+        Ok(result)
+    }
+
+    /// Executes the source global `randSeedFloat()` as one exact, audited run draw.
+    pub fn run_rand_seed_float(
+        &mut self,
+        reason: RngReason,
+        callsite_id: RngCallsiteId,
+    ) -> Result<f64, RngError> {
+        let mut staged = self.clone();
+        callsite_id.validate_for(reason, RngStream::Run)?;
+        let before_state = staged.audit_state();
+        let result = staged.run.frac();
+        let after_state = staged.audit_state();
+        staged.audit.record(RngDrawInput {
+            stream: RngStream::Run,
+            reason,
+            public_api: RngPublicApi::RandSeedFloat,
+            callsite_id,
+            minimum: SafeU53::ZERO,
+            cardinality: SafeU53::ZERO,
+            result: SafeU53::ZERO,
+            fraction_bits: Some(F64Bits::from_f64(result)),
+            consumed: true,
+            before_state,
+            after_state,
+        })?;
         *self = staged;
         Ok(result)
     }
@@ -474,6 +502,7 @@ impl RngRuntime {
             minimum,
             cardinality,
             result,
+            fraction_bits: None,
             consumed,
             before_state,
             after_state,
@@ -534,6 +563,7 @@ impl RngRuntime {
             minimum,
             cardinality,
             result,
+            fraction_bits: None,
             consumed,
             before_state,
             after_state,

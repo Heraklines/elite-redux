@@ -313,6 +313,7 @@ fn oracle_rng_audit(oracle: &StarterOracleV1) -> Result<Vec<RngDraw>, M9NewRunEr
             minimum: safe(draw.min)?,
             cardinality: safe(cardinality)?,
             result: safe(draw.result)?,
+            fraction_bits: None,
             consumed,
             primitive_draw_count: if consumed { 2 } else { 0 },
             before_fingerprint: rng_state_fingerprint(&before_state)

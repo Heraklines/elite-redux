@@ -1,0 +1,76 @@
+name: M9E Town V2 Content Source Probe
+on:
+  push:
+    branches: [codex/m9e-next-encounter-source-20260923]
+permissions:
+  contents: read
+concurrency:
+  group: m9e-town-content-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  town-content:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Observe exact V2 Town pool remotely
+        run: python3 scripts/ci/m9e_town_content_probe.py
+      - name: Compact source-bound observation
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-town-content-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-town-content/summary.json
+          if-no-files-found: error
+          retention-days: 14
+  town-selector:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Install pinned Rust tools remotely
+        run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy
+      - name: Qualify exact source-bound Town root selector
+        run: python3 scripts/ci/m9e_town_selector_diagnostic.py
+      - name: Compact source-bound selector result
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-town-selector-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-town-selector/compact/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Bounded source formatting patch
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-town-selector-format-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-town-selector/format.patch
+          if-no-files-found: ignore
+          retention-days: 14

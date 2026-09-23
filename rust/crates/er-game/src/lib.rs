@@ -11,6 +11,7 @@ pub mod internal_event;
 pub mod m6;
 pub mod m72_bootstrap;
 pub use m72_bootstrap::current_pokerus as current_starter_pokerus;
+pub mod current_town_wild_spawn;
 pub mod m72_new_run_material;
 pub mod m7_content;
 pub mod m7_internal_event;
