@@ -1,4 +1,4 @@
-"""Focused, source-bound remote Rust qualification for the Town root selector."""
+"""Focused, source-bound remote Rust qualification for the Town selector and shell."""
 
 import hashlib
 import json
@@ -14,7 +14,8 @@ OUT = Path(os.environ["RUNNER_TEMP"]) / "m9e-town-selector"
 COMPACT = OUT / "compact"
 SHA = os.environ["GITHUB_SHA"]
 TARGET = "m9e_current_town_wild_spawn"
-TEST_ID = "entire_town_day_pool_and_actual_wave_two_source_draw_match"
+TEST_IDS = ["entire_town_day_pool_and_actual_wave_two_source_draw_match",
+            "naturally_admitted_day_seed_matches_pinned_postreward_enemy"]
 SOURCE_GENDER_SHA256 = "a27f86e31feccd821f35aecaf9eb496faf120127e3df3d2c7c0b14f6593928fb"
 SOURCE_FORM_FLAGS_SHA256 = "e03db62cf3982e03fbb5a25045e15407abd12010aefcbca8fa8cf5585881f446"
 SOURCE_ABILITY_SLOTS_SHA256 = "c7564ac254fee378288b8cd8a10a1ca27dda01c6775045871feb3f6799a5f558"
@@ -58,7 +59,7 @@ def run(name, argv, seconds=600):
 def main():
     COMPACT.mkdir(parents=True, exist_ok=False)
     result = {"schema": 1, "status": "failed", "source_sha": SHA,
-              "scope": "Ace/Town/day wave-two full-root, constructor prefix and complete source-observed level-two ability-profile moveset; no enemy settlement or next-wave receipt",
+              "scope": "Ace/Town/day wave-two full-root, constructor prefix, level-two ability-profile moveset and pinned level-three successor shell; no enemy settlement or next-wave receipt",
               "commands": COMMANDS}
     try:
         head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
@@ -117,11 +118,11 @@ def main():
         base = ["cargo", "test", "--locked", "-p", "er-game", "--test", TARGET, "--"]
         listing = run("list", base + ["--list", "--format", "terse"])
         ids = re.findall(r"^([A-Za-z0-9_:]+): test$", listing, re.M)
-        if ids != [TEST_ID]:
+        if ids != TEST_IDS:
             raise RuntimeError("whole Town selector test inventory differs")
         output = run("execute", base + ["--format", "terse"], 900)
         counts = re.findall(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", output)
-        if counts != [("1", "0", "0", "0", "0")]:
+        if counts != [("2", "0", "0", "0", "0")]:
             raise RuntimeError("Town selector result count differs")
         rng_base = ["cargo", "test", "--locked", "-p", "er-rng", "--test", "m3_rng", "--"]
         rng_listing = run("rng-list", rng_base + ["--list", "--format", "terse"])
@@ -136,8 +137,8 @@ def main():
                        "--no-deps", "--", "-D", "warnings"], 300)
         run("rng-clippy", ["cargo", "clippy", "--locked", "-p", "er-rng", "--test", "m3_rng",
                            "--no-deps", "--", "-D", "warnings"], 300)
-        result["tests"] = {"passed": 26, "failed": 0, "ignored": 0,
-                           "town_id": TEST_ID, "rng_ids": rng_ids}
+        result["tests"] = {"passed": 27, "failed": 0, "ignored": 0,
+                           "town_ids": TEST_IDS, "rng_ids": rng_ids}
         result["status"] = "passed"
     except Exception as error:
         result["first_failure"] = str(error)[:1024]
