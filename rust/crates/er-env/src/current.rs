@@ -169,6 +169,21 @@ impl CurrentGameSession {
         })
     }
 
+    pub fn natural_start_with_fresh_account(
+        start: er_kernel::game_kernel_v7::FreshFriendshipStartV7,
+        account: er_state::m9e_state_v6::CurrentAccountIdentityV1,
+    ) -> Result<Self, CurrentSessionError> {
+        let content = start.content.clone();
+        let local_seat = start.local_seat;
+        let kernel = GameKernelV7::natural_start_with_fresh_account(start, account)?;
+        Ok(Self {
+            kernel: Some(kernel),
+            content,
+            local_seat,
+            role: GameKernelRoleV7::Authority,
+        })
+    }
+
     pub fn enable_current_coop_setup(&mut self) -> Result<(), CurrentSessionError> {
         self.kernel
             .as_mut()

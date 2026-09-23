@@ -15,6 +15,7 @@ use er_kernel::snapshot_v7::{CoreGameKernelSnapshotV7, GameKernelLifecycleSnapsh
 use er_state::m7_state::{
     DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
 };
+use er_state::m9e_state_v6::CurrentAccountIdentityV1;
 use er_types::battle_ids::WaveIndex;
 use er_types::{GameControlKindV2, InputFocus, PhysicalKey, RawInputEvent, SafeU53, SeatId};
 use serde_json::{Value, json};
@@ -125,6 +126,42 @@ fn result(response: &Value) -> Result<&Value, Box<dyn Error>> {
 
 fn snapshot(response: &Value) -> Result<CoreGameKernelSnapshotV7, Box<dyn Error>> {
     Ok(serde_json::from_value(result(response)?.clone())?)
+}
+
+#[test]
+fn fresh_account_identity_enters_through_cli_and_survives_snapshot_restore()
+-> Result<(), Box<dyn Error>> {
+    let account = CurrentAccountIdentityV1 {
+        trainer_id: 12345,
+        secret_id: 23456,
+    };
+    let mut create = create_request()?;
+    create["params"]["start"]["fresh_profile"] = json!(true);
+    create["params"]["start"]["account_identity"] = json!(account);
+    let responses = run_cli(&[
+        create,
+        request("snapshot", "session.snapshot", json!({"session":"current"})),
+    ])?;
+    result(&responses[0])?;
+    let original = snapshot(&responses[1])?;
+    let GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) = &original.lifecycle else {
+        return Err("fresh account did not start at the title".into());
+    };
+    assert_eq!(bootstrap.current_account_identity, Some(account));
+
+    let restored = run_cli(&[
+        request("restore", "session.create", json!({"session":"restored", "start": {
+            "kind":"SNAPSHOT", "snapshot": original.clone(), "owner_seat": 1,
+            "role":"AUTHORITY"}})),
+        request("restored-snapshot", "session.snapshot", json!({"session":"restored"})),
+    ])?;
+    result(&restored[0])?;
+    assert_eq!(snapshot(&restored[1])?, original);
+
+    let mut historical = create_request()?;
+    historical["params"]["start"]["account_identity"] = json!(account);
+    assert!(run_cli(&[historical])?[0]["error"].is_object());
+    Ok(())
 }
 
 struct CommandFiles(PathBuf);

@@ -16,6 +16,7 @@ use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_kernel::game_kernel_v7::{GameKernelRoleV7, KernelPresentationOutcomeV2};
 use er_kernel::snapshot_v7::{CoreGameKernelSnapshotV7, GameKernelLifecycleSnapshotV7};
 use er_state::m7_state::ProfileStateV1;
+use er_state::m9e_state_v6::CurrentAccountIdentityV1;
 use er_types::battle_ids::MenuInstanceId;
 use er_types::{MenuOptionId, RawInputEvent, SafeU53, SeatId};
 use serde::Deserialize;
@@ -53,6 +54,8 @@ pub(crate) enum CurrentStart {
         existing_saves: bool,
         #[serde(default)]
         fresh_profile: bool,
+        #[serde(default)]
+        account_identity: Option<CurrentAccountIdentityV1>,
     },
     Snapshot {
         snapshot: Box<CoreGameKernelSnapshotV7>,
@@ -366,13 +369,13 @@ impl CurrentStart {
                 local_is_host,
                 existing_saves,
                 fresh_profile,
+                account_identity,
             } => {
                 let mut session = if fresh_profile {
                     if !local_is_host {
                         return Err(backend("fresh profile requires the solo authority"));
                     }
-                    CurrentGameSession::natural_start_with_fresh_friendship(
-                        er_kernel::game_kernel_v7::FreshFriendshipStartV7 {
+                    let start = er_kernel::game_kernel_v7::FreshFriendshipStartV7 {
                             profile: *profile,
                             seed,
                             local_seat: owner_seat,
@@ -384,10 +387,16 @@ impl CurrentStart {
                                 pauses: Vec::new(),
                                 disposed: false,
                             },
-                        },
-                    )
+                        };
+                    match account_identity {
+                        Some(account) => CurrentGameSession::natural_start_with_fresh_account(start, account),
+                        None => CurrentGameSession::natural_start_with_fresh_friendship(start),
+                    }
                     .map_err(backend)?
                 } else {
+                    if account_identity.is_some() {
+                        return Err(backend("account identity requires fresh profile creation"));
+                    }
                     CurrentGameSession::natural_start(
                         *profile,
                         seed,
