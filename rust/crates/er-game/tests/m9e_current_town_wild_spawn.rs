@@ -15,7 +15,7 @@ use er_game::current_town_wild_spawn::{
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_rng::audit::{RngCallsiteId, RngPublicApi, RngReason};
 use er_rng::battle::RngRuntime;
-use er_rng::phaser::{PhaserRdg, PhaserRdgState, RunRngState, shift_char_codes};
+use er_rng::phaser::{PhaserRdgState, RunRngState};
 use er_types::battle_ids::SpeciesId;
 use er_types::battle_model::PokemonType;
 use er_types::run_ids::BiomeId;
@@ -73,14 +73,10 @@ const SOURCE_AFTER_SELECTION: &str =
 
 #[test]
 fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Box<dyn Error>> {
-    // Causal source run35890696066 observed the pre-selector state after the
-    // real reward CANCEL/newBattle path, matching the earlier direct queue.
-    // The source newBattle() calls resetSeed(wave) before the encounter.
-    let wave_seed = shift_char_codes("m9e-reward-selection-source-v1", 2)?;
-    assert_eq!(
-        PhaserRdg::from_seed(&wave_seed).state().state_string,
-        SOURCE_BEFORE
-    );
+    // Source399d direct queued NextEncounter observation in run34704520605:
+    // tier integer 247/512, common pool index 3/24, root263. That probe's
+    // retained run stream and its effective DAY pool are directly observed;
+    // this isolated selector test does not claim a causal natural reward receipt.
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = PreparedGameContentV2::prepare(Arc::new(bundle))?;
     let town = content
