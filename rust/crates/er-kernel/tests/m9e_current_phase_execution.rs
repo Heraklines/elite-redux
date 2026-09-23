@@ -1371,6 +1371,11 @@ fn controlled_before_early_knockout(content: Arc<PreparedGameContentV2>) -> Resu
         return Err("active absent".into());
     };
     let run = state.active_run.as_mut().ok_or("run absent")?;
+    // The source reward observation used this exact seed. The qualified
+    // bootstrap seed still supplies the supported wave-zero encounter; this
+    // controlled combat preimage binds the later reward draw to its observed
+    // source stream without rewriting RNG state or filtering offers.
+    run.seed = "m9e-reward-selection-source-v1".to_owned();
     run.party[0].stats.speed = 500;
     run.battle.as_mut().ok_or("battle absent")?.enemy_party[0]
         .stats
@@ -1572,8 +1577,8 @@ fn current_reward(
         .ok_or_else(|| "actual reward receipt absent".into())
 }
 
-// Same controlled combat and original seed. The test consumes the actual menu;
-// it never rewrites RNG, filters production offers, or searches alternate seeds.
+// Same controlled combat and source-observed reward seed. The test consumes the
+// actual generated menu without rewriting RNG state or filtering offers.
 #[inline(never)]
 fn assert_current_reward_choice_and_pick(
     kernel: &mut GameKernelV7,

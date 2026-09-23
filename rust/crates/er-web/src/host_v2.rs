@@ -727,12 +727,9 @@ impl BrowserKernelHostV2 {
                 BrowserWebErrorV2::Repro("browser transport context missing".to_owned())
             })?
             .final_generation;
-        let (recorder, session) = CurrentReproRecorderV1::from_capsule(
-            capsule,
-            Arc::clone(&self.content),
-            limits,
-        )
-        .map_err(|error| BrowserWebErrorV2::Repro(error.to_string()))?;
+        let (recorder, session) =
+            CurrentReproRecorderV1::from_capsule(capsule, Arc::clone(&self.content), limits)
+                .map_err(|error| BrowserWebErrorV2::Repro(error.to_string()))?;
         Ok((session, recorder, generation))
     }
 
