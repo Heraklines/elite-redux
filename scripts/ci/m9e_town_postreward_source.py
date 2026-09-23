@@ -1,0 +1,182 @@
+"""Two fresh pinned-source observations of an actual reward-to-next-wave path."""
+
+import base64
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import time
+import urllib.request
+
+ROOT = Path(__file__).resolve().parents[2]
+SOURCE = ROOT / ".m9e-town-postreward-source-store"
+OUT = Path(os.environ["RUNNER_TEMP"]) / "m9e-town-postreward-source"
+COMPACT = OUT / "compact"
+PIN = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7"
+BRANCH = "codex/m9e-town-postreward-source-20260923"
+HELPER = "test/kernel-fixtures/m9/observe-town-postreward.ts"
+INJECTED = "test/kernel-fixtures/m9-observe-town-postreward.test.ts"
+ASSET_COMMIT = "d5f67989d02b7082ca32e7eaddf3b9421916ff12"
+ASSET_PATH = "battle-anims/tackle.json"
+START = time.monotonic()
+COMMANDS = []
+
+
+def require(condition, reason):
+    if not condition:
+        raise RuntimeError(reason)
+
+
+def sha(raw):
+    return hashlib.sha256(raw).hexdigest()
+
+
+def run(name, argv, *, cwd, seconds=600, env=None):
+    remaining = min(seconds, 1680 - int(time.monotonic() - START))
+    require(remaining > 0, "shared source deadline")
+    completed = subprocess.run(
+        argv, cwd=cwd, env=env, stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT, timeout=remaining, check=False,
+    )
+    raw = completed.stdout
+    require(len(raw) <= 8 << 20, name + " log bound")
+    COMMANDS.append({
+        "name": name, "exit": completed.returncode,
+        "bytes": len(raw), "sha256": sha(raw),
+    })
+    if completed.returncode:
+        excerpt = raw[:4096] + (
+            b"\n...[middle omitted]...\n" + raw[-8192:] if len(raw) > 12288
+            else raw[4096:]
+        )
+        (COMPACT / "failure.txt").write_bytes(name.encode() + b" failed\n" + excerpt)
+        raise RuntimeError(name + " failed")
+    return raw
+
+
+def asset():
+    url = (
+        "https://api.github.com/repos/Heraklines/er-assets/contents/"
+        + ASSET_PATH + "?ref=" + ASSET_COMMIT
+    )
+    request = urllib.request.Request(
+        url, headers={"Accept": "application/vnd.github+json",
+                      "User-Agent": "m9e-town-postreward-source"},
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        require(response.status == 200 and response.geturl() == url, "pinned asset HTTP")
+        raw = response.read((256 << 10) + 1)
+    require(0 < len(raw) <= 256 << 10, "asset response bound")
+    row = json.loads(raw)
+    require(
+        row.get("path") == ASSET_PATH and row.get("type") == "file"
+        and row.get("encoding") == "base64",
+        "asset identity",
+    )
+    content = base64.b64decode("".join(row["content"].split()), validate=True)
+    require(
+        len(content) == row.get("size")
+        and hashlib.sha1(f"blob {len(content)}\0".encode() + content).hexdigest()
+        == row.get("sha"),
+        "asset Git blob",
+    )
+    path = SOURCE / "assets" / ASSET_PATH
+    require(not path.exists(), "fresh asset path")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(content)
+    return {"commit": ASSET_COMMIT, "path": ASSET_PATH,
+            "bytes": len(content), "sha256": sha(content)}
+
+
+def main():
+    COMPACT.mkdir(parents=True, exist_ok=False)
+    result = {
+        "schema": 1, "status": "failed", "source_pin": PIN,
+        "candidate_sha": os.environ["GITHUB_SHA"],
+        "scope": "actual bounded wave-one attack, reward cancel and queued Town wave-two encounter; no Rust settlement qualification",
+        "commands": COMMANDS,
+    }
+    try:
+        require(os.environ["GITHUB_REF_NAME"] == BRANCH, "exact source-probe branch")
+        require(
+            run("candidate-head", ["git", "rev-parse", "HEAD"], cwd=ROOT).decode().strip()
+            == result["candidate_sha"],
+            "candidate HEAD",
+        )
+        require(
+            run("source-head", ["git", "rev-parse", "HEAD"], cwd=SOURCE).decode().strip()
+            == PIN,
+            "pinned source HEAD",
+        )
+        candidate_status = run(
+            "candidate-status", ["git", "status", "--porcelain"], cwd=ROOT,
+        ).decode().splitlines()
+        require(
+            candidate_status in ([], ["?? .m9e-town-postreward-source-store/"]),
+            "candidate changed outside the pinned nested checkout",
+        )
+        require(
+            not run("source-status", ["git", "status", "--porcelain"], cwd=SOURCE),
+            "clean pinned source",
+        )
+        injected = SOURCE / INJECTED
+        require(not injected.exists(), "fresh additive probe path")
+        injected.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / HELPER, injected)
+        result["probe_sha256"] = sha(injected.read_bytes())
+        result["asset"] = asset()
+        run("pinned-dependencies", ["pnpm", "install", "--frozen-lockfile"],
+            cwd=SOURCE, seconds=700)
+        observations = []
+        for ordinal in ("one", "two"):
+            report = OUT / ("vitest-" + ordinal + ".json")
+            environment = os.environ.copy()
+            environment["M9_TOWN_POSTREWARD_OUTPUT"] = str(OUT)
+            environment["M9_TOWN_POSTREWARD_ORDINAL"] = ordinal
+            run(
+                "source-" + ordinal,
+                ["pnpm", "exec", "vitest", "run", INJECTED, "--pool=forks",
+                 "--isolate", "--no-file-parallelism", "--reporter=json",
+                 "--outputFile=" + str(report)],
+                cwd=SOURCE, seconds=300, env=environment,
+            )
+            vitest = json.loads(report.read_bytes())
+            require(
+                all(vitest.get(key) == value for key, value in {
+                    "numTotalTests": 1, "numPassedTests": 1,
+                    "numFailedTests": 0, "numPendingTests": 0,
+                    "numTodoTests": 0, "success": True,
+                }.items()),
+                "one complete source test: " + ordinal,
+            )
+            path = OUT / ("observation-" + ordinal + ".json")
+            raw = path.read_bytes()
+            require(0 < len(raw) <= 4096, "bounded source observation")
+            value = json.loads(raw)
+            require(
+                raw == (json.dumps(value, separators=(",", ":")) + "\n").encode()
+                and value["source"] == PIN and value["first"]["attacking_turns"] > 0
+                and value["reward"]["new_battle_calls"] == 1
+                and value["next"]["wave"] == 2,
+                "canonical causal observation",
+            )
+            observations.append(raw)
+            result[ordinal] = {"bytes": len(raw), "sha256": sha(raw),
+                               "next_species": value["next"]["species"],
+                               "first_attacking_turns": value["first"]["attacking_turns"]}
+        require(observations[0] == observations[1], "two fresh source observations differ")
+        result["status"] = "passed"
+    except Exception as error:
+        result["first_failure"] = str(error)[:1024]
+    finally:
+        result["elapsed_seconds"] = round(time.monotonic() - START, 1)
+        encoded = (json.dumps(result, sort_keys=True, separators=(",", ":")) + "\n").encode()
+        require(len(encoded) <= 16384, "summary bound")
+        (COMPACT / "summary.json").write_bytes(encoded)
+    require(result["status"] == "passed", result.get("first_failure", "source failed"))
+
+
+if __name__ == "__main__":
+    main()
