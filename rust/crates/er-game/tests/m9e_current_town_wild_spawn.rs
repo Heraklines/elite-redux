@@ -3,12 +3,13 @@ use std::sync::Arc;
 
 use er_game::current_town_wild_spawn::{
     CurrentTownDayWaveTwoContextV1, CurrentTownGenderV1, CurrentTownWildErrorV1,
-    select_current_town_day_wave_two_constructor_prefix, select_current_town_day_wave_two_root,
-    source_town_ability_id, source_town_day_pools, source_town_form_base_stats,
-    source_town_form_types, source_town_initial_level_move_pool, source_town_ivs_from_id,
-    source_town_level_two_form_rows, source_town_level_two_species, source_town_male_half_percent,
-    source_town_moveset, source_town_neutral_moveset, source_town_neutral_weighted_level_move_pool,
-    source_town_unmodified_level_two_stats, source_town_weighted_level_move_pool,
+    select_current_town_day_wave_two_constructor_prefix, select_current_town_day_wave_two_core,
+    select_current_town_day_wave_two_root, source_town_ability_id, source_town_day_pools,
+    source_town_form_base_stats, source_town_form_types, source_town_initial_level_move_pool,
+    source_town_ivs_from_id, source_town_level_two_form_rows, source_town_level_two_species,
+    source_town_male_half_percent, source_town_moveset, source_town_neutral_moveset,
+    source_town_neutral_weighted_level_move_pool, source_town_unmodified_level_two_stats,
+    source_town_weighted_level_move_pool,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_rng::audit::{RngCallsiteId, RngPublicApi, RngReason};
@@ -572,6 +573,18 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         &mut complete_moveset_rng,
     )?;
     assert_eq!(complete_moveset, moveset);
+    let mut core_rng = RngRuntime::from_states(
+        RunRngState {
+            rdg: PhaserRdgState::from_state_string(SOURCE_BEFORE)?,
+        },
+        None,
+    )?;
+    let core = select_current_town_day_wave_two_core(&content, context, &mut core_rng)?;
+    assert_eq!(core.prefix, prefix);
+    assert_eq!(core.stats, [13, 7, 6, 6, 6, 8]);
+    assert_eq!(core.moveset, complete_moveset);
+    assert_eq!(core.audit.as_slice(), complete_moveset_rng.audit_entries());
+    assert_eq!(core_rng, complete_moveset_rng);
     assert_eq!(
         moveset
             .moves

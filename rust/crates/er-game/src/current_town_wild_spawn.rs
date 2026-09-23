@@ -656,6 +656,15 @@ pub struct CurrentTownWildConstructorPrefixV1 {
     pub audit: Vec<RngDraw>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CurrentTownWildCoreV1 {
+    pub prefix: CurrentTownWildConstructorPrefixV1,
+    pub stats: [u32; 6],
+    pub moveset: CurrentTownNeutralMovesetV1,
+    /// Root, constructor and moveset draws in source order.
+    pub audit: Vec<RngDraw>,
+}
+
 /// Pinned `src/utils/common.ts:getIvsFromId`: six five-bit chunks of the
 /// generated 32-bit Pokemon ID, ordered HP through speed.
 pub fn source_town_ivs_from_id(id: u32) -> [u8; 6] {
@@ -1477,6 +1486,38 @@ pub fn select_current_town_day_wave_two_constructor_prefix(
         form_index,
         nature_index,
         tera_type,
+        audit,
+    })
+}
+
+/// Atomically constructs the source-observed Town wild through its four-move
+/// selection. Shiny, variant, modifiers and encounter settlement follow this
+/// boundary and must be owned by the eventual phase transition.
+pub fn select_current_town_day_wave_two_core(
+    content: &PreparedGameContentV2,
+    context: CurrentTownDayWaveTwoContextV1<'_>,
+    rng: &mut RngRuntime,
+) -> Result<CurrentTownWildCoreV1, CurrentTownWildErrorV1> {
+    let mut staged = rng.clone();
+    let first_audit = staged.audit_entries().len();
+    let prefix =
+        select_current_town_day_wave_two_constructor_prefix(content, context, &mut staged)?;
+    let base = source_town_form_base_stats(content, prefix.root.source_root, prefix.form_index)?;
+    let stats = source_town_unmodified_level_two_stats(base, prefix.ivs, prefix.nature_index)?;
+    let moveset = source_town_moveset(
+        content,
+        prefix.root.source_root,
+        prefix.form_index,
+        prefix.ability_index,
+        stats,
+        &mut staged,
+    )?;
+    let audit = staged.audit_entries()[first_audit..].to_vec();
+    *rng = staged;
+    Ok(CurrentTownWildCoreV1 {
+        prefix,
+        stats,
+        moveset,
         audit,
     })
 }
