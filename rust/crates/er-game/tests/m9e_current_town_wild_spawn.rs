@@ -539,6 +539,25 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
             .collect::<Vec<_>>(),
         vec![158, 95, 116, 43]
     );
+    let mut unsupported_level_three = RngRuntime::from_states(
+        RunRngState {
+            rdg: PhaserRdgState::from_state_string(SOURCE_BEFORE)?,
+        },
+        None,
+    )?;
+    let prior_unsupported = unsupported_level_three.clone();
+    assert_eq!(
+        select_current_town_day_wave_two_core(
+            &content,
+            CurrentTownDayWaveTwoContextV1 {
+                level: 3,
+                ..context
+            },
+            &mut unsupported_level_three,
+        ),
+        Err(CurrentTownWildErrorV1::UnsupportedContext)
+    );
+    assert_eq!(unsupported_level_three, prior_unsupported);
     let mut rng = RngRuntime::from_states(
         RunRngState {
             rdg: PhaserRdgState::from_state_string(SOURCE_BEFORE)?,
