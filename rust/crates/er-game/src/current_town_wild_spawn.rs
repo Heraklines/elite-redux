@@ -7,8 +7,14 @@ use std::sync::OnceLock;
 
 use er_rng::audit::{RngCallsiteId, RngDraw, RngReason};
 use er_rng::battle::RngRuntime;
+use er_state::m7_state::{POKEMON_STATE_SCHEMA_VERSION_V5, PokemonStateV5};
+use er_state::mechanic_state_v2::MechanicStateStoreV2;
+use er_state::pokemon_v2::{Iv, PermanentStatBonuses};
 use er_types::battle_ids::{AbilityId, GameModeId, MoveId, SpeciesId};
-use er_types::battle_model::{MoveAccuracy, MoveCategory, MovePower, PokemonType};
+use er_types::battle_model::{
+    AbilityLoadout, BattleStats, MoveAccuracy, MoveCategory, MovePower, MoveSlotState,
+    PokemonType, PokemonTyping, StatStages, StatusKind, StatusState,
+};
 use er_types::run_ids::BiomeId;
 use er_types::{RunDifficultyV1, SafeU53};
 use er_world::content_v2::BiomeDefinitionV2;
@@ -663,6 +669,12 @@ pub struct CurrentTownWildCoreV1 {
     pub moveset: CurrentTownNeutralMovesetV1,
     /// Root, constructor and moveset draws in source order.
     pub audit: Vec<RngDraw>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CurrentTownWildShellV1 {
+    pub core: CurrentTownWildCoreV1,
+    pub pokemon: PokemonStateV5,
 }
 
 /// Source Pokemon.trySetShiny uses the account's two 16-bit IDs and both
@@ -1557,4 +1569,160 @@ pub fn select_current_town_day_wave_two_core(
         moveset,
         audit,
     })
+}
+
+/// The first source-observed level-three Town successor in V5 state shape.
+/// Admission is limited to ordinary nonshiny species504 with no shiny/reward
+/// modifiers (base threshold64). The caller still owns reward settlement,
+/// identity-frontier rebasing, enemy modifiers, battle creation and replay.
+pub fn select_current_town_day_wave_two_shell(
+    content: &PreparedGameContentV2,
+    context: CurrentTownDayWaveTwoContextV1<'_>,
+    trainer_id: u16,
+    secret_id: u16,
+    rng: &mut RngRuntime,
+) -> Result<CurrentTownWildShellV1, CurrentTownWildErrorV1> {
+    if context.level != 3 {
+        return Err(CurrentTownWildErrorV1::UnsupportedContext);
+    }
+    let mut staged = rng.clone();
+    let core = select_current_town_day_wave_two_core(content, context, &mut staged)?;
+    let prefix = &core.prefix;
+    if prefix.root.source_root.get().get() != 504
+        || prefix.root.effective_species.get().get() != 504
+        || prefix.form_index != 0
+        || source_town_is_shiny(trainer_id, secret_id, prefix.pokemon_id, 64)
+    {
+        return Err(CurrentTownWildErrorV1::UnsupportedContext);
+    }
+    let progression = content
+        .progression
+        .species(prefix.root.effective_species, prefix.form_index)
+        .ok_or(CurrentTownWildErrorV1::SourceContent)?;
+    let growth = content
+        .progression
+        .growth_rate(progression.growth_rate)
+        .ok_or(CurrentTownWildErrorV1::SourceContent)?;
+    let experience = er_progression::progression::current_growth_experience_for_level(growth, 3)
+        .map_err(|_| CurrentTownWildErrorV1::SourceContent)?;
+    if experience.get().get() != 27 || progression.base_friendship != 70 {
+        return Err(CurrentTownWildErrorV1::SourceContent);
+    }
+    let nature = content
+        .progression
+        .pack()
+        .natures
+        .get(usize::from(prefix.nature_index))
+        .ok_or(CurrentTownWildErrorV1::SourceContent)?;
+    if nature.id.get() != prefix.nature_index {
+        return Err(CurrentTownWildErrorV1::SourceContent);
+    }
+    let types = source_town_form_types(prefix.root.source_root, prefix.form_index)?;
+    if types.as_slice() != [PokemonType::Normal] || prefix.tera_type != PokemonType::Normal {
+        return Err(CurrentTownWildErrorV1::SourceContent);
+    }
+    let [hp, attack, defense, special_attack, special_defense, speed] = core.stats;
+    let stats = BattleStats {
+        hp,
+        attack,
+        defense,
+        special_attack,
+        special_defense,
+        speed,
+    };
+    let ivs = prefix
+        .ivs
+        .map(|value| Iv::new(value).map_err(|_| CurrentTownWildErrorV1::SourceContent))
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?
+        .try_into()
+        .map_err(|_| CurrentTownWildErrorV1::SourceContent)?;
+    let moves: [MoveId; 4] = core
+        .moveset
+        .moves
+        .clone()
+        .try_into()
+        .map_err(|_| CurrentTownWildErrorV1::SourceContent)?;
+    let pokemon = PokemonStateV5 {
+        schema_version: POKEMON_STATE_SCHEMA_VERSION_V5,
+        id: er_types::battle_ids::PokemonId::new(
+            SafeU53::new(u64::from(prefix.pokemon_id))
+                .map_err(|_| CurrentTownWildErrorV1::SourceContent)?,
+        ),
+        owner_seat: None,
+        species_id: prefix.root.effective_species,
+        form_index: prefix.form_index,
+        level: 3,
+        experience,
+        types: PokemonTyping {
+            primary: types[0],
+            secondary: None,
+        },
+        stats,
+        hp,
+        max_hp: hp,
+        status: StatusState {
+            kind: StatusKind::None,
+            toxic_turn_count: 0,
+            sleep_turns_remaining: None,
+        },
+        stat_stages: StatStages {
+            attack: 0,
+            defense: 0,
+            special_attack: 0,
+            special_defense: 0,
+            speed: 0,
+            accuracy: 0,
+            evasion: 0,
+        },
+        moves: moves.map(|move_id| {
+            Some(MoveSlotState {
+                move_id,
+                pp_used: 0,
+                pp_ups: 0,
+                max_pp_override: None,
+            })
+        }),
+        abilities: AbilityLoadout {
+            active: prefix.ability_id,
+            passives: [None; 3],
+            active_suppressed: false,
+            passive_suppressed: [false; 3],
+        },
+        ivs,
+        gender: Some(match prefix.gender {
+            CurrentTownGenderV1::Male => 0,
+            CurrentTownGenderV1::Female => 1,
+            CurrentTownGenderV1::Genderless => {
+                return Err(CurrentTownWildErrorV1::SourceContent);
+            }
+        }),
+        nature: nature.id,
+        effective_nature: nature.id,
+        friendship: progression.base_friendship,
+        pokerus: Some(false),
+        permanent_bonuses: PermanentStatBonuses {
+            hp: 0,
+            attack: 0,
+            defense: 0,
+            special_attack: 0,
+            special_defense: 0,
+            speed: 0,
+        },
+        pause_evolutions: false,
+        held_items: Vec::new(),
+        mechanics: MechanicStateStoreV2::default(),
+        fusion: None,
+        evolution: er_state::m7_state::EvolutionStateV1 {
+            last_completed: None,
+            cancelled: Vec::new(),
+        },
+        tera_type: Some(prefix.tera_type),
+        shiny: false,
+        variant: 0,
+        capture: None,
+        fainted: false,
+    };
+    *rng = staged;
+    Ok(CurrentTownWildShellV1 { core, pokemon })
 }
