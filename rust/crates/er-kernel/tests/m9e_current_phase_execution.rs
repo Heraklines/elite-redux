@@ -135,6 +135,51 @@ fn navigate(kernel: &mut GameKernelV7, option: &str) -> Result<()> {
     }
     Ok(())
 }
+fn navigate_reward_ordinal(
+    kernel: &mut GameKernelV7,
+    live: &mut Option<GameStateV6>,
+    ordinal: u32,
+) -> Result<()> {
+    assert_eq!(live.as_ref(), kernel.state());
+    let option = kernel
+        .current_control()
+        .and_then(|control| control.menu.as_ref())
+        .and_then(|menu| {
+            menu.options.iter().find(|row| {
+                matches!(
+                    &row.action,
+                    er_types::GameActionV1::Reward {
+                        action: er_types::RewardActionV1::Select { option_ordinal }
+                    } if *option_ordinal == ordinal
+                )
+            })
+        })
+        .ok_or("reward action ordinal absent")?
+        .option_id
+        .as_str()
+        .to_owned();
+    navigate(kernel, &option)?;
+    // Raw navigation publishes UiChanged without authority material. A shadow
+    // material consumer must apply that control effect before the next action.
+    let mut projected = live.clone();
+    projected
+        .as_mut()
+        .and_then(|state| state.active_run.as_mut())
+        .ok_or("shadow run absent")?
+        .control = kernel
+        .state()
+        .and_then(|state| state.active_run.as_ref())
+        .ok_or("navigated run absent")?
+        .control
+        .clone();
+    assert_eq!(
+        projected.as_ref(),
+        kernel.state(),
+        "navigation changed non-control state"
+    );
+    *live = projected;
+    Ok(())
+}
 fn restore(
     snapshot: CoreGameKernelSnapshotV7,
     content: Arc<PreparedGameContentV2>,
@@ -1364,18 +1409,18 @@ fn assert_request_title_read_reissues(
 #[inline(never)]
 fn controlled_before_early_knockout(content: Arc<PreparedGameContentV2>) -> Result<GameKernelV7> {
     // Explicit controlled combat preimage: four source-qualified level-one moves.
-    // This keeps the original seed and Tackle command while exercising full TM replacement.
+    // Keep the Tackle command while exercising full TM replacement.
     let mut checkpoint =
         controlled_before_knockout(content.clone(), 5, &[33, 74, 77, 78])?.snapshot()?;
     let GameKernelLifecycleSnapshotV7::Active(state) = &mut checkpoint.lifecycle else {
         return Err("active absent".into());
     };
     let run = state.active_run.as_mut().ok_or("run absent")?;
-    // The source reward observation used this exact seed. The qualified
-    // bootstrap seed still supplies the supported wave-zero encounter; this
-    // controlled combat preimage binds the later reward draw to its observed
-    // source stream without rewriting RNG state or filtering offers.
-    run.seed = "m9e-reward-selection-source-v1".to_owned();
+    // The actual full-slot generator probe 941cdceb6/run35810588435 found
+    // TM_CASE, RARE_CANDY and GREAT_BALL at this controlled seed. The
+    // qualified bootstrap still supplies the supported encounter; no RNG
+    // state or offers are rewritten, and every descendant checks the live menu.
+    run.seed = "m9e-reward-fullslot-53".to_owned();
     run.party[0].stats.speed = 500;
     run.battle.as_mut().ok_or("battle absent")?.enemy_party[0]
         .stats
@@ -1388,9 +1433,21 @@ fn controlled_before_early_knockout(content: Arc<PreparedGameContentV2>) -> Resu
 
 #[test]
 fn controlled_early_ko_flash_owns_clock_egg_candy_and_canceled_suffix() -> Result<()> {
+    let content = content()?;
+    let (mut kernel, mut live, mut ledger) = controlled_early_reward_frontier(content.clone())?;
+    assert_current_reward_choice_and_pick(&mut kernel, content, &mut live, &mut ledger)
+}
+
+#[inline(never)]
+fn controlled_early_reward_frontier(
+    content: Arc<PreparedGameContentV2>,
+) -> Result<(
+    Box<GameKernelV7>,
+    Option<GameStateV6>,
+    AppliedGameMaterialLedgerV1,
+)> {
     use er_state::current_achievement_execution::CurrentAchievementKeyV1 as K;
     use er_state::current_initial_victory_tail::CurrentInitialVictoryTailPhaseV1 as T;
-    let content = content()?;
     let mut kernel = Box::new(controlled_before_early_knockout(content.clone())?);
     let (mut live, mut ledger) = admit_knockout(&mut kernel, content.as_ref())?;
     let mut clock_seen = false;
@@ -1424,13 +1481,7 @@ fn controlled_early_ko_flash_owns_clock_egg_candy_and_canceled_suffix() -> Resul
                 10821,
                 "qualified actual source seed projection"
             );
-            assert_current_reward_choice_and_pick(
-                &mut kernel,
-                content.clone(),
-                &mut live,
-                &mut ledger,
-            )?;
-            return Ok(());
+            return Ok((kernel, live, ledger));
         }
         if !snapshot.pending_presentations.is_empty() {
             for pending in &snapshot.pending_presentations {
@@ -1577,8 +1628,8 @@ fn current_reward(
         .ok_or_else(|| "actual reward receipt absent".into())
 }
 
-// Same controlled combat and source-observed reward seed. The test consumes the
-// actual generated menu without rewriting RNG state or filtering offers.
+// Same controlled combat and generator-probed reward seed. The test consumes
+// the actual generated menu without rewriting RNG state or filtering offers.
 #[inline(never)]
 fn assert_current_reward_choice_and_pick(
     kernel: &mut GameKernelV7,
@@ -1672,24 +1723,8 @@ fn assert_current_reward_choice_and_pick(
                 _ => false,
             }
     });
-    let Some(index) = index else {
-        writeln!(
-            std::io::stderr().lock(),
-            "M9_REWARD_CHOICE_ONLY: fixed controlled seed produced {:?}; selected descendants remain unsupported",
-            selected
-                .offers
-                .iter()
-                .map(|offer| offer.source_id.as_str())
-                .collect::<Vec<_>>()
-        )?;
-        return Ok(());
-    };
-    let option=kernel.current_control().and_then(|c|c.menu.as_ref()).and_then(|menu|menu.options.iter().find(|row|
-        matches!(&row.action,er_types::GameActionV1::Reward{action:er_types::RewardActionV1::Select{option_ordinal}} if *option_ordinal==index as u32)))
-        .ok_or("actual reward option absent")?.option_id.as_str().to_owned();
-    navigate(kernel, &option)?;
-    // Raw navigation is presentation-only; the common material starts from the
-    // same authoritative state, not the local highlighted menu cursor.
+    let index = index.ok_or("actual ordinary reward absent")?;
+    navigate_reward_ordinal(kernel, live, index as u32)?;
     let before_live = Box::new(live.clone());
     let before_ledger = ledger.clone();
     let step = press(kernel, PhysicalKey::Space)?;
@@ -2094,8 +2129,20 @@ fn assert_tail_counter_restore_rejects(
     Ok(())
 }
 
-// Exercise only an actually generated TM choice on the original retained seed.
+// Exercise only an actually generated TM choice on the controlled seed.
 // This alternate user choice gets its own restored kernel and common ledger.
+type TmWitnessState = (
+    Box<GameKernelV7>,
+    er_state::current_reward_selection::CurrentRewardSelectionV1,
+    Option<GameStateV6>,
+    AppliedGameMaterialLedgerV1,
+);
+type TmWitnessWithMove = (
+    TmWitnessState,
+    Box<er_state::current_reward_tm::CurrentRewardTmV1>,
+    GameMaterialV6,
+);
+
 #[inline(never)]
 fn assert_actual_tm_reward(
     checkpoint: &CoreGameKernelSnapshotV7,
@@ -2104,21 +2151,119 @@ fn assert_actual_tm_reward(
     initial_ledger: &AppliedGameMaterialLedgerV1,
     index: usize,
 ) -> Result<()> {
-    use er_state::current_reward_selection::CurrentRewardStageV1 as S;
-    use er_state::current_reward_tm::{CurrentRewardTmPhaseV1 as T, CurrentUsedTmsV1 as H};
+    let state = assert_actual_tm_reward_start(
+        checkpoint,
+        content.clone(),
+        initial_live,
+        initial_ledger,
+        index,
+    )?;
+    let state = assert_actual_tm_reward_rest(state, content.clone())?;
+    let state = assert_actual_tm_reward_after_move(state, content.clone())?;
+    let (state, tm, learned) = assert_actual_tm_reward_after_queued(state, content.clone())?;
+    if tm.slot == 4 {
+        assert_actual_tm_intro_reissue(&state.0, content.clone())?;
+    }
+    let (state, tm, learned) =
+        assert_actual_tm_fullslot_sequence(state, content.clone(), tm, learned)?;
+    let (kernel, selected, live, ledger) = state;
+    let present = Box::new(kernel.snapshot()?);
+    assert_actual_tm_reward_after_present(
+        kernel, content, selected, live, ledger, tm, learned, present,
+    )
+}
+
+#[inline(never)]
+fn assert_actual_tm_fullslot_sequence(
+    state: TmWitnessState,
+    content: Arc<PreparedGameContentV2>,
+    tm: Box<er_state::current_reward_tm::CurrentRewardTmV1>,
+    learned: GameMaterialV6,
+) -> Result<TmWitnessWithMove> {
+    if tm.slot != 4 {
+        return Ok((state, tm, learned));
+    }
+    let (state, tm, learned) =
+        assert_actual_tm_fullslot_replace(state, content.clone(), tm, learned)?;
+    std::thread::scope(|scope| -> Result<TmWitnessWithMove> {
+        let replacement = std::thread::Builder::new()
+            .name("m9e-tm-replacement".to_owned())
+            .spawn_scoped(scope, move || {
+                let (state, tm, learned) =
+                    assert_actual_tm_replace_yes(state, content.clone(), tm, learned)
+                        .map_err(|error| error.to_string())?;
+                assert_actual_tm_choose_slot(state, content, tm, learned)
+                    .map_err(|error| error.to_string())
+            })?;
+        Ok(replacement
+            .join()
+            .map_err(|_| "TM replacement witness panicked")??)
+    })
+}
+
+#[inline(never)]
+fn assert_actual_tm_intro_reissue(
+    kernel: &GameKernelV7,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<()> {
+    let intro = Box::new(kernel.snapshot()?);
+    let event = current_reward(active(&intro)?)?
+        .tm
+        .as_ref()
+        .ok_or("TM absent")?
+        .phase
+        .event()
+        .ok_or("Intro absent")?;
+    assert_phase_title_read_on_default_thread(&intro, event, content)?;
+    Ok(())
+}
+
+#[inline(never)]
+fn assert_phase_title_read_on_default_thread(
+    checkpoint: &CoreGameKernelSnapshotV7,
+    event: er_types::PresentationEventId,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<()> {
+    std::thread::scope(|scope| -> Result<()> {
+        let read = std::thread::Builder::new()
+            .name("m9e-title-read".to_owned())
+            .spawn_scoped(scope, move || {
+                assert_phase_title_read_reissues(checkpoint, event, content)
+                    .map_err(|error| error.to_string())
+            })?;
+        read.join().map_err(|_| "Title READ witness panicked")??;
+        Ok(())
+    })
+}
+
+#[inline(never)]
+fn assert_actual_tm_reward_start(
+    checkpoint: &CoreGameKernelSnapshotV7,
+    content: Arc<PreparedGameContentV2>,
+    initial_live: &Option<GameStateV6>,
+    initial_ledger: &AppliedGameMaterialLedgerV1,
+    index: usize,
+) -> Result<TmWitnessState> {
     let selected = current_reward(active(checkpoint)?)?.clone();
-    let mut kernel = restore(checkpoint.clone(), content.clone())?;
+    let mut kernel = Box::new(restore(checkpoint.clone(), content.clone())?);
     let mut live = initial_live.clone();
     let mut ledger = initial_ledger.clone();
     for presentation in kernel.snapshot()?.pending_presentations {
         kernel.settle_presentation(presentation.event_id)?;
     }
-    let option=kernel.current_control().and_then(|c|c.menu.as_ref()).and_then(|m|m.options.iter().find(|r|
-        matches!(&r.action,er_types::GameActionV1::Reward{action:er_types::RewardActionV1::Select{option_ordinal}} if *option_ordinal==index as u32)))
-        .ok_or("TM option absent")?.option_id.as_str().to_owned();
-    navigate(&mut kernel, &option)?;
+    navigate_reward_ordinal(&mut kernel, &mut live, index as u32)?;
     let step = press(&mut kernel, PhysicalKey::Space)?;
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
+    Ok((kernel, selected, live, ledger))
+}
+
+#[inline(never)]
+fn assert_actual_tm_reward_rest(
+    state: TmWitnessState,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<TmWitnessState> {
+    let (mut kernel, selected, mut live, mut ledger) = state;
+    use er_state::current_reward_selection::CurrentRewardStageV1 as S;
     assert!(matches!(
         current_reward(kernel.state().ok_or("TM state absent")?)?.stage,
         S::Holder { .. }
@@ -2128,6 +2273,16 @@ fn assert_actual_tm_reward(
     }
     let step = press(&mut kernel, PhysicalKey::Space)?;
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
+    Ok((kernel, selected, live, ledger))
+}
+
+#[inline(never)]
+fn assert_actual_tm_reward_after_move(
+    state: TmWitnessState,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<TmWitnessState> {
+    let (mut kernel, selected, mut live, mut ledger) = state;
+    use er_state::current_reward_selection::CurrentRewardStageV1 as S;
     assert!(matches!(
         current_reward(kernel.state().ok_or("TM state absent")?)?.stage,
         S::TmMove { .. }
@@ -2136,12 +2291,22 @@ fn assert_actual_tm_reward(
         kernel.settle_presentation(presentation.event_id)?;
     }
     let menu_checkpoint = Box::new(kernel.snapshot()?);
-    kernel = restore(*menu_checkpoint.clone(), content.clone())?;
+    *kernel = restore(*menu_checkpoint.clone(), content.clone())?;
     assert_eq!(kernel.snapshot()?, *menu_checkpoint);
     let step = press(&mut kernel, PhysicalKey::Space)?;
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
+    Ok((kernel, selected, live, ledger))
+}
+
+#[inline(never)]
+fn assert_actual_tm_reward_after_queued(
+    state: TmWitnessState,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<TmWitnessWithMove> {
+    let (mut kernel, selected, mut live, mut ledger) = state;
+    use er_state::current_reward_tm::{CurrentRewardTmPhaseV1 as T, CurrentUsedTmsV1 as H};
     let queued = Box::new(kernel.snapshot()?);
-    let mut tm = current_reward(active(&queued)?)?
+    let tm = current_reward(active(&queued)?)?
         .tm
         .as_ref()
         .ok_or("queued TM absent")?
@@ -2156,12 +2321,24 @@ fn assert_actual_tm_reward(
             .party,
         selected.party_before
     );
-    kernel = restore(*queued, content.clone())?;
+    *kernel = restore(*queued, content.clone())?;
     for presentation in kernel.snapshot()?.pending_presentations {
         kernel.settle_presentation(presentation.event_id)?;
     }
     let step = kernel.advance_time(SafeU53::ZERO)?;
-    let mut learned = accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
+    let learned = accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
+    Ok(((kernel, selected, live, ledger), tm, learned))
+}
+
+#[inline(never)]
+fn assert_actual_tm_fullslot_replace(
+    state: TmWitnessState,
+    content: Arc<PreparedGameContentV2>,
+    tm: Box<er_state::current_reward_tm::CurrentRewardTmV1>,
+    learned: GameMaterialV6,
+) -> Result<TmWitnessWithMove> {
+    let (mut kernel, selected, mut live, mut ledger) = state;
+    use er_state::current_reward_tm::CurrentRewardTmPhaseV1 as T;
     if tm.slot == 4 {
         assert!(matches!(
             current_reward(kernel.state().ok_or("TM state absent")?)?
@@ -2171,80 +2348,108 @@ fn assert_actual_tm_reward(
                 .phase,
             T::Intro { .. }
         ));
-        let intro = Box::new(kernel.snapshot()?);
-        let event = current_reward(active(&intro)?)?
-            .tm
-            .as_ref()
-            .ok_or("TM absent")?
-            .phase
-            .event()
-            .ok_or("Intro absent")?;
-        assert_phase_title_read_reissues(&intro, event, content.clone())?;
         acknowledge_tm_message(&mut kernel, content.as_ref(), &mut live, &mut ledger)?;
-        assert_tm_decline_returns_same_offers(
-            &kernel.snapshot()?,
-            content.clone(),
-            &live,
-            &ledger,
-        )?;
-        // Source Replace Yes -> which-move message -> actual first old slot.
-        let step = press(&mut kernel, PhysicalKey::Space)?;
-        accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
-        for presentation in kernel.snapshot()?.pending_presentations {
-            kernel.settle_presentation(presentation.event_id)?;
-        }
-        let step = kernel.advance_time(SafeU53::ZERO)?;
-        accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
-        acknowledge_tm_message(&mut kernel, content.as_ref(), &mut live, &mut ledger)?;
-        assert!(matches!(
-            current_reward(kernel.state().ok_or("TM state absent")?)?
-                .tm
-                .as_ref()
-                .ok_or("TM absent")?
-                .phase,
-            T::ChooseSlot
-        ));
-        let step = press(&mut kernel, PhysicalKey::Space)?;
-        accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
-        for presentation in kernel.snapshot()?.pending_presentations {
-            kernel.settle_presentation(presentation.event_id)?;
-        }
-        let step = kernel.advance_time(SafeU53::ZERO)?;
-        accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
-        let forgotten = kernel.snapshot()?;
-        assert!(matches!(
-            current_reward(active(&forgotten)?)?
-                .tm
-                .as_ref()
-                .ok_or("TM absent")?
-                .phase,
-            T::Forgotten { .. }
-        ));
-        // The source mutation precedes forgotten-text acknowledgement.
-        assert_ne!(
-            active(&forgotten)?
-                .active_run
-                .as_ref()
-                .ok_or("run absent")?
-                .party,
-            selected.party_before
-        );
-        assert_invalid_full_tm_slot(&forgotten, content.clone())?;
-        learned = acknowledge_tm_message(&mut kernel, content.as_ref(), &mut live, &mut ledger)?;
-        tm = current_reward(kernel.state().ok_or("TM state absent")?)?
-            .tm
-            .as_ref()
-            .ok_or("TM absent")?
-            .clone();
+        let decline = Box::new(kernel.snapshot()?);
+        assert_tm_decline_on_default_thread(&decline, content.clone(), &live, &ledger)?;
     }
-    let present = Box::new(kernel.snapshot()?);
+    Ok(((kernel, selected, live, ledger), tm, learned))
+}
+
+#[inline(never)]
+fn assert_actual_tm_replace_yes(
+    state: TmWitnessState,
+    content: Arc<PreparedGameContentV2>,
+    tm: Box<er_state::current_reward_tm::CurrentRewardTmV1>,
+    learned: GameMaterialV6,
+) -> Result<TmWitnessWithMove> {
+    let (mut kernel, selected, mut live, mut ledger) = state;
+    use er_state::current_reward_tm::CurrentRewardTmPhaseV1 as T;
+    // Source Replace Yes -> which-move message -> actual first old slot.
+    navigate_reward_ordinal(&mut kernel, &mut live, 0)?;
+    let step = press(&mut kernel, PhysicalKey::Space)?;
+    accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
+    for presentation in kernel.snapshot()?.pending_presentations {
+        kernel.settle_presentation(presentation.event_id)?;
+    }
+    let step = kernel.advance_time(SafeU53::ZERO)?;
+    accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
+    acknowledge_tm_message(&mut kernel, content.as_ref(), &mut live, &mut ledger)?;
+    assert!(matches!(
+        current_reward(kernel.state().ok_or("TM state absent")?)?
+            .tm
+            .as_ref()
+            .ok_or("TM absent")?
+            .phase,
+        T::ChooseSlot
+    ));
+    Ok(((kernel, selected, live, ledger), tm, learned))
+}
+
+#[inline(never)]
+fn assert_actual_tm_choose_slot(
+    state: TmWitnessState,
+    content: Arc<PreparedGameContentV2>,
+    mut tm: Box<er_state::current_reward_tm::CurrentRewardTmV1>,
+    mut learned: GameMaterialV6,
+) -> Result<TmWitnessWithMove> {
+    let (mut kernel, selected, mut live, mut ledger) = state;
+    use er_state::current_reward_tm::CurrentRewardTmPhaseV1 as T;
+    navigate_reward_ordinal(&mut kernel, &mut live, 0)?;
+    let step = press(&mut kernel, PhysicalKey::Space)?;
+    accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
+    for presentation in kernel.snapshot()?.pending_presentations {
+        kernel.settle_presentation(presentation.event_id)?;
+    }
+    let step = kernel.advance_time(SafeU53::ZERO)?;
+    accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
+    let forgotten = kernel.snapshot()?;
+    assert!(matches!(
+        current_reward(active(&forgotten)?)?
+            .tm
+            .as_ref()
+            .ok_or("TM absent")?
+            .phase,
+        T::Forgotten { .. }
+    ));
+    // The source mutation precedes forgotten-text acknowledgement.
+    assert_ne!(
+        active(&forgotten)?
+            .active_run
+            .as_ref()
+            .ok_or("run absent")?
+            .party,
+        selected.party_before
+    );
+    assert_invalid_full_tm_slot(&forgotten, content.clone())?;
+    learned = acknowledge_tm_message(&mut kernel, content.as_ref(), &mut live, &mut ledger)?;
+    tm = current_reward(kernel.state().ok_or("TM state absent")?)?
+        .tm
+        .as_ref()
+        .ok_or("TM absent")?
+        .clone();
+    Ok(((kernel, selected, live, ledger), tm, learned))
+}
+
+#[inline(never)]
+fn assert_actual_tm_reward_after_present(
+    mut kernel: Box<GameKernelV7>,
+    content: Arc<PreparedGameContentV2>,
+    selected: er_state::current_reward_selection::CurrentRewardSelectionV1,
+    mut live: Option<GameStateV6>,
+    mut ledger: AppliedGameMaterialLedgerV1,
+    tm: Box<er_state::current_reward_tm::CurrentRewardTmV1>,
+    learned: GameMaterialV6,
+    present: Box<CoreGameKernelSnapshotV7>,
+) -> Result<()> {
+    use er_state::current_reward_selection::CurrentRewardStageV1 as S;
+    use er_state::current_reward_tm::{CurrentRewardTmPhaseV1 as T, CurrentUsedTmsV1 as H};
     assert_tm_menu_allocator_bound(&present, content.clone())?;
     let state = active(&present)?;
     let retained = current_reward(state)?;
     let T::Present { event_id } = retained.tm.as_ref().ok_or("TM absent")?.phase else {
         return Err("learned message not retained".into());
     };
-    assert_phase_title_read_reissues(&present, event_id, content.clone())?;
+    assert_phase_title_read_on_default_thread(&present, event_id, content.clone())?;
     let mut expected = selected.party_before.clone();
     expected[0].moves[usize::from(tm.slot)] = Some(er_types::battle_model::MoveSlotState {
         move_id: tm.movement,
@@ -2282,7 +2487,7 @@ fn assert_actual_tm_reward(
     );
     assert_eq!(retained.rng_audit, selected.rng_audit);
     assert!(learned.transition().rng_audit.is_empty());
-    kernel = restore(*present.clone(), content.clone())?;
+    *kernel = restore(*present.clone(), content.clone())?;
     assert_eq!(kernel.snapshot()?, *present);
     let waiting = kernel.advance_time(SafeU53::ZERO)?;
     assert!(
@@ -2355,6 +2560,27 @@ fn acknowledge_tm_message(
     accept_material(live, ledger, kernel, content, &step)
 }
 #[inline(never)]
+fn assert_tm_decline_on_default_thread(
+    checkpoint: &CoreGameKernelSnapshotV7,
+    content: Arc<PreparedGameContentV2>,
+    live: &Option<GameStateV6>,
+    ledger: &AppliedGameMaterialLedgerV1,
+) -> Result<()> {
+    std::thread::scope(|scope| -> Result<()> {
+        let decline = std::thread::Builder::new()
+            .name("m9e-tm-decline".to_owned())
+            .spawn_scoped(scope, move || {
+                assert_tm_decline_returns_same_offers(checkpoint, content, live, ledger)
+                    .map_err(|error| error.to_string())
+            })?;
+        decline
+            .join()
+            .map_err(|_| "TM decline witness panicked")??;
+        Ok(())
+    })
+}
+
+#[inline(never)]
 fn assert_tm_decline_returns_same_offers(
     checkpoint: &CoreGameKernelSnapshotV7,
     content: Arc<PreparedGameContentV2>,
@@ -2370,15 +2596,7 @@ fn assert_tm_decline_returns_same_offers(
         before.tm.as_ref().ok_or("TM absent")?.phase,
         T::Replace
     ));
-    let option = kernel
-        .current_control()
-        .and_then(|c| c.menu.as_ref())
-        .and_then(|m| m.options.get(1))
-        .ok_or("No option absent")?
-        .option_id
-        .as_str()
-        .to_owned();
-    navigate(&mut kernel, &option)?;
+    navigate_reward_ordinal(&mut kernel, &mut live, 1)?;
     let step = press(&mut kernel, PhysicalKey::Space)?;
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
     for presentation in kernel.snapshot()?.pending_presentations {
@@ -2392,6 +2610,7 @@ fn assert_tm_decline_returns_same_offers(
             .phase,
         T::Stop
     ));
+    navigate_reward_ordinal(&mut kernel, &mut live, 0)?;
     let step = press(&mut kernel, PhysicalKey::Space)?;
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
     for presentation in kernel.snapshot()?.pending_presentations {
@@ -2427,15 +2646,7 @@ fn assert_tm_decline_returns_same_offers(
         .iter()
         .position(|o| o.source_id == "TM_CASE")
         .ok_or("TM offer absent")?;
-    let option = kernel
-        .current_control()
-        .and_then(|c| c.menu.as_ref())
-        .and_then(|m| m.options.get(index))
-        .ok_or("TM offer absent")?
-        .option_id
-        .as_str()
-        .to_owned();
-    navigate(&mut kernel, &option)?;
+    navigate_reward_ordinal(&mut kernel, &mut live, index as u32)?;
     let step = press(&mut kernel, PhysicalKey::Space)?;
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
     let retained = current_reward(kernel.state().ok_or("TM state absent")?)?;
@@ -2784,11 +2995,12 @@ fn candy_owner(
         .ok_or("Candy owner absent".into())
 }
 #[inline(never)]
-fn candy_choose(kernel: &mut GameKernelV7, ordinal: u32) -> Result<GameKernelStepV7> {
-    let option=kernel.current_control().and_then(|c|c.menu.as_ref()).and_then(|menu|menu.options.iter().find(|row|
-        matches!(&row.action,er_types::GameActionV1::Reward{action:er_types::RewardActionV1::Select{option_ordinal}} if *option_ordinal==ordinal)))
-        .ok_or("actual Candy reward choice absent")?.option_id.as_str().to_owned();
-    navigate(kernel, &option)?;
+fn candy_choose(
+    kernel: &mut GameKernelV7,
+    live: &mut Option<GameStateV6>,
+    ordinal: u32,
+) -> Result<GameKernelStepV7> {
+    navigate_reward_ordinal(kernel, live, ordinal)?;
     press(kernel, PhysicalKey::Space)
 }
 #[inline(never)]
@@ -2833,14 +3045,14 @@ fn assert_actual_candy_reward(
     let mut live = source_live.clone();
     let mut ledger = source_ledger.clone();
     settle_growl_ordinary_presentations(&mut kernel)?;
-    let step = candy_choose(&mut kernel, index as u32)?;
+    let step = candy_choose(&mut kernel, &mut live, index as u32)?;
     candy_accept(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
     assert!(matches!(
         current_reward(kernel.state().ok_or("state absent")?)?.stage,
         er_state::current_reward_selection::CurrentRewardStageV1::Holder { .. }
     ));
     settle_growl_ordinary_presentations(&mut kernel)?;
-    let step = candy_choose(&mut kernel, 0)?;
+    let step = candy_choose(&mut kernel, &mut live, 0)?;
     candy_accept(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
     assert!(matches!(candy_owner(&kernel)?.phase, C::Queued));
     assert_eq!(
