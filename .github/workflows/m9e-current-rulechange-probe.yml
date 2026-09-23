@@ -1,0 +1,59 @@
+name: M9E Current Rulechange Reload Probe
+on:
+  push:
+    branches: [codex/m9e-rulechange-probe-20260923]
+permissions:
+  contents: read
+concurrency:
+  group: m9e-rulechange-probe-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  rulechange:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: never
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      CARGO_PROFILE_DEV_OPT_LEVEL: '1'
+      CARGO_PROFILE_TEST_OPT_LEVEL: '1'
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - name: Start bounded rulechange deadline before checkout
+        run: echo "M9E_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Retrieve exact product parent
+        timeout-minutes: 5
+        run: git fetch --no-tags --depth=1 origin d0ee75314e8a272b54777665da012b2d17bef873
+      - uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Qualify whole changed-rule Worker reload
+        run: python3 scripts/ci/m9e_current_rulechange_probe.py
+      - name: Compact rulechange result
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-current-rulechange-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-current-rulechange-probe/compact/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Named remote rulechange logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m9e-current-rulechange-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-current-rulechange-probe/diagnostics/
+          if-no-files-found: error
+          retention-days: 14
