@@ -69,7 +69,7 @@ function extractTownStatic(tiers:readonly (readonly [number,readonly number[]])[
  const countRaw=Buffer.from(JSON.stringify(countReceipt)+"\n");expect(countRaw.length).toBeLessThanOrEqual(4096);expect(Phaser.Math.RND.state()).toBe(before);
  const countPath=process.env.M9_TOWN_CONSTRUCTOR_COUNTS;expect(countPath).toBeTruthy();if(existsSync(countPath!))expect(readFileSync(countPath!).equals(countRaw)).toBe(true);else writeFileSync(countPath!,countRaw,{flag:"wx"});
  expect(maxForms,`Source form bound20 disproved: max${maxForms}, species${formCounts.filter(r=>r[1]===maxForms).map(r=>r[0]).join(",")}; complete count receipt retained`).toBeLessThanOrEqual(20);
- const moveIds=new Set<number>(),abilityIds=new Set<number>();const speciesRows:unknown[]=[],genderRows:Array<[number,number|null]>=[],formFlags:Array<[number,number]>=[],abilitySlots:Array<[number,number[]]>=[];
+ const moveIds=new Set<number>(),abilityIds=new Set<number>();const speciesRows:unknown[]=[],genderRows:Array<[number,number|null]>=[],formFlags:Array<[number,number]>=[],abilitySlots:Array<[number,number[][]]>=[];
  function encoder(){const functions:Array<[string,number]>=[],shapes:Array<[string|null,string[]]>=[];const intern=new Map<string,number>(),shapeIds=new Map<string,number>();
   function encode(value:unknown,depth=0,seen=new Set<object>(),path="root"):unknown{
    expect(depth).toBeLessThanOrEqual(12);
@@ -100,14 +100,14 @@ function extractTownStatic(tiers:readonly (readonly [number,readonly number[]])[
   const forms=species.forms.length?species.forms:[species];expect(forms.length,`species${id} forms`).toBeLessThanOrEqual(20);
   const unavailableMask=forms.reduce((mask,form,index)=>{expect(form.isUnobtainable===undefined||typeof form.isUnobtainable==="boolean").toBe(true);return mask+(form.isUnobtainable===true?2**index:0);},0);
   formFlags.push([id,unavailableMask]);
-  const formRows=forms.map((form,index)=>{
+  const formActives:number[][]=[];const formRows=forms.map((form,index)=>{
    expect([form.getLevelMoves,form.getAbility,form.getAbilityCount,form.getPassiveAbilities]).toEqual(originalRegistryMethods.slice(0,4));
    // PokemonForm registry method only: never Pokemon.getLevelMoves or simulated evolution chain.
    const allRows=form.getLevelMoves();expect(allRows.length).toBeLessThanOrEqual(512);for(const row of allRows){expect(Array.isArray(row)&&row.length===2&&Number.isSafeInteger(row[0])&&row[0]>=-2&&Number.isSafeInteger(row[1])&&row[1]>=0).toBe(true);}const levels=allRows.filter(row=>row[0]<=10);for(const row of levels)moveIds.add(row[1]);
-   const active=Array.from({length:form.getAbilityCount()},(_,i)=>form.getAbility(i)),passives=[...form.getPassiveAbilities()];if(index===0)abilitySlots.push([id,active]);for(const ability of [...active,...passives])abilityIds.add(ability);
+   const active=Array.from({length:form.getAbilityCount()},(_,i)=>form.getAbility(i)),passives=[...form.getPassiveAbilities()];formActives.push(active);for(const ability of [...active,...passives])abilityIds.add(ability);
    const levelsId=internRow([levels,allRows.length,createHash("sha256").update(JSON.stringify(allRows)).digest("hex")],levelSets,levelIds);const formId=internRow([form.type1,form.type2,[...form.baseStats],active,passives,levelsId],formData,formIds);return [index,form.formKey??null,formId];
   });
-  speciesRows.push([id,evoOwn,se.encode(evolutions),preOwn,se.encode(preValue),se.encode(preLevels),formRows,se.encode(FORCED_SIGNATURE_MOVES[id]),Object.hasOwn(FORCED_SIGNATURE_MOVES,id),incoming]);
+  abilitySlots.push([id,formActives]);speciesRows.push([id,evoOwn,se.encode(evolutions),preOwn,se.encode(preValue),se.encode(preLevels),formRows,se.encode(FORCED_SIGNATURE_MOVES[id]),Object.hasOwn(FORCED_SIGNATURE_MOVES,id),incoming]);
  }
  expect(moveIds.size).toBeLessThanOrEqual(512);expect(abilityIds.size).toBeLessThanOrEqual(512);
  const moves=[...moveIds].map(id=>{const m=allMoves[id];if(!m)return [id,false];return [id,true,m.category,m.type,m.power,m.accuracy,m.name.endsWith(" (N)"),STAB_BLACKLIST.has(id),m.constructor.name,me.encode(m.attrs),me.encode(m.conditions),m.hasCondition(targetSleptOrComatoseCondition),m.hasCondition(userSleptOrComatoseCondition)];});
