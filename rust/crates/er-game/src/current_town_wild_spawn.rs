@@ -4,7 +4,7 @@
 
 use er_rng::audit::{RngCallsiteId, RngDraw, RngReason};
 use er_rng::battle::RngRuntime;
-use er_types::battle_ids::{GameModeId, SpeciesId};
+use er_types::battle_ids::{AbilityId, GameModeId, SpeciesId};
 use er_types::run_ids::BiomeId;
 use er_types::{RunDifficultyV1, SafeU53};
 use er_world::content_v2::BiomeDefinitionV2;
@@ -70,6 +70,37 @@ const MALE_HALF_PERCENT_TIERS: [&[Option<u8>]; 5] = [
     &[None, Some(175), Some(175)],
 ];
 
+// All effective level-two Town root forms have three active source slots
+// (run 35850969668, source fixture SHA256
+// c7564ac254fee378288b8cd8a10a1ca27dda01c6775045871feb3f6799a5f558).
+// Root 266 is substituted with species 265 before enemy construction. The
+// partner Eevee exception is applied by source_town_ability_id below.
+const SOURCE_ACTIVE_ABILITIES_TIERS: [&[[u64; 3]]; 5] = [
+    &[
+        [99, 62, 145], [55, 96, 5102], [5205, 177, 97], [5109, 113, 5102],
+        [19, 21, 38], [62, 5058, 5236], [86, 5181, 141], [50, 198, 5165],
+        [72, 53, 50], [79, 177, 145], [157, 113, 171], [268, 173, 53],
+        [107, 5269, 50], [50, 157, 95], [50, 155, 142], [102, 151, 5280],
+        [142, 229, 179], [19, 21, 38], [22, 120, 145], [105, 109, 79],
+        [158, 5280, 5020], [132, 68, 107], [5171, 55, 290], [5164, 119, 5102],
+    ],
+    &[
+        [106, 5067, 128], [5033, 113, 125], [127, 5451, 3], [82, 165, 173],
+        [5027, 55, 107], [5027, 55, 107], [5006, 94, 5171], [153, 22, 173],
+        [33, 34, 20], [96, 132, 147], [155, 5020, 118], [257, 94, 107],
+        [5026, 142, 92], [5185, 89, 5208],
+    ],
+    &[
+        [5025, 36, 5065], [187, 109, 98], [5487, 172, 98], [33, 165, 44],
+        [144, 32, 5280], [5067, 22, 5098], [132, 53, 96],
+    ],
+    &[
+        [158, 91, 109], [5019, 9, 5074], [158, 55, 56],
+        [140, 36, 32], [107, 5165, 87], [158, 95, 5038],
+    ],
+    &[[158, 98, 150], [118, 12, 82], [5285, 194, 290]],
+];
+
 #[derive(Clone, Copy, Debug)]
 pub struct CurrentTownDayWaveTwoContextV1<'a> {
     pub mode: GameModeId,
@@ -120,6 +151,7 @@ pub enum CurrentTownGenderV1 {
 pub struct CurrentTownWildConstructorPrefixV1 {
     pub root: CurrentTownWildRootV1,
     pub ability_index: u8,
+    pub ability_id: AbilityId,
     pub pokemon_id: u32,
     pub ivs: [u8; 6],
     pub gender: CurrentTownGenderV1,
@@ -154,6 +186,34 @@ pub fn source_town_male_half_percent(
         }
     }
     Err(CurrentTownWildErrorV1::SourceContent)
+}
+
+pub fn source_town_ability_id(
+    root: SpeciesId,
+    form_index: u16,
+    ability_index: u8,
+) -> Result<AbilityId, CurrentTownWildErrorV1> {
+    let id = root.get().get();
+    let allowed_form = match id {
+        664 => form_index < 20,
+        133 | 172 => form_index < 2,
+        _ => form_index == 0,
+    };
+    if !allowed_form || ability_index > 2 {
+        return Err(CurrentTownWildErrorV1::SourceContent);
+    }
+    let source = SOURCE_TIERS
+        .iter()
+        .enumerate()
+        .find_map(|(tier, roots)| roots.iter().position(|item| *item == id).map(|index| (tier, index)))
+        .ok_or(CurrentTownWildErrorV1::SourceContent)?;
+    let slots = if id == 133 && form_index == 1 {
+        [158, 109, 86]
+    } else {
+        SOURCE_ACTIVE_ABILITIES_TIERS[source.0][source.1]
+    };
+    Ok(AbilityId::new(SafeU53::new(slots[usize::from(ability_index)])
+        .map_err(|_| CurrentTownWildErrorV1::SourceContent)?))
 }
 
 pub fn source_town_level_two_species(root: SpeciesId) -> Result<SpeciesId, CurrentTownWildErrorV1> {
@@ -404,11 +464,17 @@ pub fn select_current_town_day_wave_two_constructor_prefix(
         )
         .map_err(|_| CurrentTownWildErrorV1::RandomDraw)?
         .get() as u8;
+    let ability_id = source_town_ability_id(root.source_root, form_index, ability_index)?;
+    content
+        .battle
+        .ability_definition(ability_id)
+        .map_err(|_| CurrentTownWildErrorV1::SourceContent)?;
     let audit = staged.audit_entries()[first_audit..].to_vec();
     *rng = staged;
     Ok(CurrentTownWildConstructorPrefixV1 {
         root,
         ability_index,
+        ability_id,
         pokemon_id,
         ivs: source_town_ivs_from_id(pokemon_id),
         gender,

@@ -17,6 +17,7 @@ TARGET = "m9e_current_town_wild_spawn"
 TEST_ID = "entire_town_day_pool_and_actual_wave_two_source_draw_match"
 SOURCE_GENDER_SHA256 = "a27f86e31feccd821f35aecaf9eb496faf120127e3df3d2c7c0b14f6593928fb"
 SOURCE_FORM_FLAGS_SHA256 = "e03db62cf3982e03fbb5a25045e15407abd12010aefcbca8fa8cf5585881f446"
+SOURCE_ABILITY_SLOTS_SHA256 = "c7564ac254fee378288b8cd8a10a1ca27dda01c6775045871feb3f6799a5f558"
 START = time.monotonic()
 COMMANDS = []
 
@@ -64,6 +65,7 @@ def main():
                  "rust/crates/er-rng/tests/m3_rng.rs",
                  "rust/fixtures/m9/engineering/town-gender-v1.json",
                  "rust/fixtures/m9/engineering/town-form-flags-v1.json",
+                 "rust/fixtures/m9/engineering/town-ability-slots-v1.json",
                  "scripts/ci/m9e_town_selector_diagnostic.py",
                  ".github/workflows/m9e-town-content-probe.yml"]
         result["source_hashes"] = {name: digest((ROOT / name).read_bytes()) for name in files}
@@ -73,6 +75,7 @@ def main():
         source_fixtures = {
             "gender": ("rust/fixtures/m9/engineering/town-gender-v1.json", SOURCE_GENDER_SHA256),
             "form_flags": ("rust/fixtures/m9/engineering/town-form-flags-v1.json", SOURCE_FORM_FLAGS_SHA256),
+            "ability_slots": ("rust/fixtures/m9/engineering/town-ability-slots-v1.json", SOURCE_ABILITY_SLOTS_SHA256),
         }
         for name, (path, expected) in source_fixtures.items():
             actual = digest((ROOT / path).read_bytes())
