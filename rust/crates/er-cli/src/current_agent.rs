@@ -376,20 +376,22 @@ impl CurrentStart {
                         return Err(backend("fresh profile requires the solo authority"));
                     }
                     let start = er_kernel::game_kernel_v7::FreshFriendshipStartV7 {
-                            profile: *profile,
-                            seed,
-                            local_seat: owner_seat,
-                            save_slots,
-                            content,
-                            scheduler: er_kernel::snapshot::KernelSchedulerSnapshotV2 {
-                                next_timer_id: Some(SafeU53::ZERO),
-                                timers: Vec::new(),
-                                pauses: Vec::new(),
-                                disposed: false,
-                            },
-                        };
+                        profile: *profile,
+                        seed,
+                        local_seat: owner_seat,
+                        save_slots,
+                        content,
+                        scheduler: er_kernel::snapshot::KernelSchedulerSnapshotV2 {
+                            next_timer_id: Some(SafeU53::ZERO),
+                            timers: Vec::new(),
+                            pauses: Vec::new(),
+                            disposed: false,
+                        },
+                    };
                     match account_identity {
-                        Some(account) => CurrentGameSession::natural_start_with_fresh_account(start, account),
+                        Some(account) => {
+                            CurrentGameSession::natural_start_with_fresh_account(start, account)
+                        }
                         None => CurrentGameSession::natural_start_with_fresh_friendship(start),
                     }
                     .map_err(backend)?

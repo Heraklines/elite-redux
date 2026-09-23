@@ -23,6 +23,9 @@ export type BrowserSessionInitializationV2 =
       seed: string; save_slots: string[]; local_is_host: boolean }
   | { kind: "NATURAL_START"; context: BrowserSessionContextV2; profile: CurrentJsonObject;
       seed: string; save_slots: string[]; local_is_host: boolean; existing_saves?: boolean }
+  | { kind: "FRESH_ACCOUNT_START"; context: BrowserSessionContextV2; profile: CurrentJsonObject;
+      seed: string; save_slots: string[]; account_identity: { trainer_id: number; secret_id: number };
+      existing_saves?: boolean }
   | { kind: "EXISTING_SAVE"; context: BrowserSessionContextV2; save: CurrentJsonObject }
   | { kind: "SNAPSHOT"; context: BrowserSessionContextV2; snapshot: CurrentJsonObject }
   | { kind: "SCENARIO"; context: BrowserSessionContextV2; snapshot: CurrentJsonObject; scenario: number }
