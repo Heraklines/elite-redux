@@ -374,6 +374,85 @@ pub fn source_town_form_types(
     Ok(types)
 }
 
+/// Exact source base stats for the selected Town form. The V2 canonical
+/// species covers all eligible forms except partner Eevee, whose source form
+/// has a distinct base-stat row.
+pub fn source_town_form_base_stats(
+    content: &PreparedGameContentV2,
+    root: SpeciesId,
+    form_index: u16,
+) -> Result<[u32; 6], CurrentTownWildErrorV1> {
+    if content.identity().oracle_sha.as_str() != ORACLE
+        || !source_town_form_supported(root.get().get(), form_index)
+    {
+        return Err(CurrentTownWildErrorV1::SourceContent);
+    }
+    let effective = source_town_level_two_species(root)?;
+    let source = content
+        .battle
+        .species(effective)
+        .map_err(|_| CurrentTownWildErrorV1::SourceContent)?
+        .base_stats;
+    if root.get().get() == 133 && form_index == 1 {
+        return Ok([65, 75, 70, 65, 85, 75]);
+    }
+    Ok([
+        source.hp,
+        source.attack,
+        source.defense,
+        source.special_attack,
+        source.special_defense,
+        source.speed,
+    ])
+}
+
+/// Source level-two stat formula before held, nature-weight, challenge or
+/// other modifiers. This is a reference calculation, not settled enemy stats.
+pub fn source_town_unmodified_level_two_stats(
+    base: [u32; 6],
+    ivs: [u8; 6],
+    nature_index: u8,
+) -> Result<[u32; 6], CurrentTownWildErrorV1> {
+    if nature_index >= 25 || base.iter().any(|stat| *stat > 10_000) {
+        return Err(CurrentTownWildErrorV1::SourceContent);
+    }
+    let up: [&[u8]; 6] = [
+        &[],
+        &[1, 2, 3, 4],
+        &[5, 7, 8, 9],
+        &[15, 16, 17, 19],
+        &[20, 21, 22, 23],
+        &[10, 11, 13, 14],
+    ];
+    let down: [&[u8]; 6] = [
+        &[],
+        &[5, 10, 15, 20],
+        &[1, 11, 16, 21],
+        &[3, 8, 13, 23],
+        &[4, 9, 14, 19],
+        &[2, 7, 17, 22],
+    ];
+    let mut stats = [0_u32; 6];
+    for index in 0..6 {
+        let raw = ((2 * u64::from(base[index]) + u64::from(ivs[index])) * 2) / 100;
+        let value = if index == 0 {
+            raw + 12
+        } else {
+            let unmodified = raw + 5;
+            if up[index].contains(&nature_index) {
+                (unmodified * 11).div_ceil(10)
+            } else if down[index].contains(&nature_index) {
+                (unmodified * 9) / 10
+            } else {
+                unmodified
+            }
+        };
+        stats[index] = u32::try_from(value.max(1))
+            .map_err(|_| CurrentTownWildErrorV1::SourceContent)?;
+    }
+    Ok(stats)
+}
+
 pub fn source_town_level_two_species(root: SpeciesId) -> Result<SpeciesId, CurrentTownWildErrorV1> {
     // Complete level-two graph observation: root 266 is forced to prevo 265;
     // none of the 54 roots has an eligible upward evolution at this level.
