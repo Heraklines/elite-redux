@@ -156,10 +156,13 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   const enemy = scene.currentBattle.enemyParty[0];
   expect(enemy).toBeDefined();
   expect(enemy.id).not.toBe(firstEnemyId);
-  expect(enemy.level).toBeGreaterThan(0);
+  expect((scene.arena as unknown as { lastTimeOfDay: number }).lastTimeOfDay).toBe(1);
+  expect(enemy.species.speciesId).toBe(504);
+  expect(enemy.level).toBe(3);
   const waveTwoSelections = speciesCalls.filter(call => call.wave === 2);
   expect(waveTwoSelections.length).toBeGreaterThan(0);
   expect(waveTwoSelections.length).toBeLessThanOrEqual(8);
+  expect(waveTwoSelections[0].species).toBe(enemy.species.speciesId);
   const shinyXor = (scene.gameData.trainerId ^ scene.gameData.secretId)
     ^ ((enemy.id >>> 16) ^ (enemy.id & 0xffff));
   const nextRng = Phaser.Math.RND.state();
