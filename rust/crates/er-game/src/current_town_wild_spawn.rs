@@ -219,6 +219,7 @@ static SOURCE_LEVEL_TWO_FORMS: OnceLock<Result<SourceTownLevelTwoFormsV1, ()>> =
 
 type SourceTownSpeciesLevelTwoRows = (u64, Vec<Vec<(i16, u64)>>);
 type SourceTownMoveMetaRow = (u64, u8, u8, i16, i16, bool, bool);
+type SourceTownMovegenRow = (u64, f64, u8);
 
 // Source run 35854351965, SHA256
 // 86b764e17e26ec5db4bd201cc7f95950975aa134960eae2a0570a8b5a7201a80.
@@ -231,6 +232,23 @@ struct SourceTownLevelTwoMetaV1 {
 }
 
 static SOURCE_LEVEL_TWO_META: OnceLock<Result<SourceTownLevelTwoMetaV1, ()>> = OnceLock::new();
+
+// Source run 35857027335, SHA256
+// 5369a09a00d1e10bd67025ce6c8ff8079dd5fe05cec45a5e40c0617950cd6575.
+// Each row is [move ID, effective power without ability effects, movegen flags].
+// Flags are SacrificialOnHit, DefAtk, PhotonGeyserCategory,
+// ShellSideArmCategory, TeraMoveCategory, VariableMoveType, FixedDamage,
+// and charging, in that bit order.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SourceTownLevelTwoMovegenV1 {
+    schema: u8,
+    source: String,
+    rows: Vec<SourceTownMovegenRow>,
+}
+
+static SOURCE_LEVEL_TWO_MOVEGEN: OnceLock<Result<SourceTownLevelTwoMovegenV1, ()>> =
+    OnceLock::new();
 
 fn source_level_two_forms() -> Result<&'static SourceTownLevelTwoFormsV1, CurrentTownWildErrorV1> {
     SOURCE_LEVEL_TWO_FORMS
@@ -296,6 +314,35 @@ fn source_level_two_meta() -> Result<&'static SourceTownLevelTwoMetaV1, CurrentT
                         || !(-1..=250).contains(&row.3)
                         || !(-1..=100).contains(&row.4)
                         || row.5
+                })
+            {
+                return Err(());
+            }
+            Ok(parsed)
+        })
+        .as_ref()
+        .map_err(|_| CurrentTownWildErrorV1::SourceContent)
+}
+
+fn source_level_two_movegen(
+) -> Result<&'static SourceTownLevelTwoMovegenV1, CurrentTownWildErrorV1> {
+    SOURCE_LEVEL_TWO_MOVEGEN
+        .get_or_init(|| {
+            let parsed: SourceTownLevelTwoMovegenV1 =
+                serde_json::from_str(include_str!("current_town_level_two_movegen.json"))
+                    .map_err(|_| ())?;
+            let meta = source_level_two_meta().map_err(|_| ())?;
+            if parsed.schema != 1
+                || parsed.source != ORACLE
+                || parsed.rows.len() != 131
+                || parsed
+                    .rows
+                    .iter()
+                    .map(|row| row.0)
+                    .collect::<Vec<_>>()
+                    != meta.rows.iter().map(|row| row.0).collect::<Vec<_>>()
+                || parsed.rows.iter().any(|row| {
+                    !row.1.is_finite() || !(0.0..=10_000.0).contains(&row.1)
                 })
             {
                 return Err(());
@@ -620,6 +667,79 @@ pub fn source_town_initial_level_move_pool(
         pool.push((id, weight));
     }
     Ok(pool)
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct CurrentTownNeutralLevelMoveWeightV1 {
+    pub id: MoveId,
+    pub initial_weight: u32,
+    pub adjusted_weight: f64,
+    pub weighted_weight: u64,
+}
+
+/// Source wild `filterMovePool`, `adjustDamageMoveWeights`, and the 1.6-power
+/// transform when no active or passive ability changes move power/accuracy.
+/// Ability effects and move selection must be proved before using this in a
+/// connected constructor; this pure stage owns no RNG.
+pub fn source_town_neutral_weighted_level_move_pool(
+    content: &PreparedGameContentV2,
+    root: SpeciesId,
+    form_index: u16,
+    stats: [u32; 6],
+) -> Result<Vec<CurrentTownNeutralLevelMoveWeightV1>, CurrentTownWildErrorV1> {
+    if stats.iter().any(|stat| *stat == 0 || *stat > 10_000) {
+        return Err(CurrentTownWildErrorV1::SourceContent);
+    }
+    let initial = source_town_initial_level_move_pool(content, root, form_index)?;
+    let effects = source_level_two_movegen()?;
+    let mut rows = Vec::with_capacity(initial.len());
+    let mut max_power = 40.0_f64;
+    for (id, weight) in initial {
+        let meta = *source_town_move_meta(content, id)?;
+        let effect = *effects
+            .rows
+            .iter()
+            .find(|row| row.0 == id.get().get())
+            .ok_or(CurrentTownWildErrorV1::SourceContent)?;
+        if weight == 0 || meta.5 || effect.2 & 1 != 0 {
+            continue;
+        }
+        if meta.1 != 2 {
+            max_power = max_power.max(effect.1);
+        }
+        rows.push((id, weight, meta.1, effect.1, effect.2));
+    }
+    max_power = max_power.min(120.0);
+    let attack = f64::from(stats[1]);
+    let special_attack = f64::from(stats[3]);
+    let higher = attack.max(special_attack);
+    let lower = attack.min(special_attack);
+    let worse_category = if attack > special_attack { 1 } else { 0 };
+    let adjustment_ratio = ((lower / higher).powi(3) * 2.0).min(1.0);
+    rows.into_iter()
+        .map(|(id, initial_weight, category, power, flags)| {
+            let mut weight = f64::from(initial_weight);
+            if category != 2 {
+                weight *= (power / max_power).clamp(0.25, 1.0);
+                if flags & 2 != 0 {
+                    let defense_ratio = f64::from(stats[2]) / higher;
+                    weight *= (defense_ratio.powi(3) * 1.3).min(1.1);
+                } else if category == worse_category && flags & (4 | 8 | 16) == 0 {
+                    weight *= adjustment_ratio;
+                }
+            }
+            let weighted = (weight.powf(1.6) * 100.0).ceil();
+            if !weighted.is_finite() || !(0.0..=1_000_000_000.0).contains(&weighted) {
+                return Err(CurrentTownWildErrorV1::SourceContent);
+            }
+            Ok(CurrentTownNeutralLevelMoveWeightV1 {
+                id,
+                initial_weight,
+                adjusted_weight: weight,
+                weighted_weight: weighted as u64,
+            })
+        })
+        .collect()
 }
 
 /// Source level-two stat formula before held, nature-weight, challenge or

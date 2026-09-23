@@ -22,6 +22,8 @@ SOURCE_FORM_TYPES_SHA256 = "d66c5e26ecc920e50bdcc680479dfab9913103435f975ee5b4d0
 SOURCE_FORM_STATS_SHA256 = "8ce7ebeb1062ee505b89bf1400b90be9a9273fe7e4130aa2ede2b0821d65a526"
 SOURCE_LEVEL_TWO_FORMS_SHA256 = "63cd454d9e74ae2d77e59327b02a391e8c196edc60bc030cc26037589c6dfd78"
 SOURCE_LEVEL_TWO_META_SHA256 = "86b764e17e26ec5db4bd201cc7f95950975aa134960eae2a0570a8b5a7201a80"
+SOURCE_LEVEL_TWO_MOVEGEN_SHA256 = "5369a09a00d1e10bd67025ce6c8ff8079dd5fe05cec45a5e40c0617950cd6575"
+SOURCE_MOVEGEN_STAGE_SHA256 = "de404f12a5cfffcaf71d41f01b6e5daae821faa57b9d4e3012293fc0260aac29"
 START = time.monotonic()
 COMMANDS = []
 
@@ -52,7 +54,7 @@ def run(name, argv, seconds=600):
 def main():
     COMPACT.mkdir(parents=True, exist_ok=False)
     result = {"schema": 1, "status": "failed", "source_sha": SHA,
-              "scope": "Ace/Town/day wave-two full-root, constructor prefix through tera type and initial level-move pool; no complete moveset, enemy settlement or next-wave receipt",
+              "scope": "Ace/Town/day wave-two full-root, constructor prefix through tera type and neutral-ability level-move weighting; no complete moveset, enemy settlement or next-wave receipt",
               "commands": COMMANDS}
     try:
         head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
@@ -62,6 +64,7 @@ def main():
         files = ["rust/crates/er-game/src/current_town_wild_spawn.rs",
                  "rust/crates/er-game/src/current_town_level_two_forms.json",
                  "rust/crates/er-game/src/current_town_level_two_meta.json",
+                 "rust/crates/er-game/src/current_town_level_two_movegen.json",
                  "rust/crates/er-game/src/lib.rs",
                  "rust/crates/er-game/src/m9_new_run.rs",
                  "rust/crates/er-game/src/material.rs",
@@ -74,6 +77,7 @@ def main():
                  "rust/fixtures/m9/engineering/town-ability-slots-v1.json",
                  "rust/fixtures/m9/engineering/town-form-types-v1.json",
                  "rust/fixtures/m9/engineering/town-form-stats-v1.json",
+                 "rust/fixtures/m9/engineering/town-movegen-stage-v1.json",
                  "scripts/ci/m9e_town_selector_diagnostic.py",
                  ".github/workflows/m9e-town-content-probe.yml"]
         result["source_hashes"] = {name: digest((ROOT / name).read_bytes()) for name in files}
@@ -88,6 +92,8 @@ def main():
             "form_stats": ("rust/fixtures/m9/engineering/town-form-stats-v1.json", SOURCE_FORM_STATS_SHA256),
             "level_two_forms": ("rust/crates/er-game/src/current_town_level_two_forms.json", SOURCE_LEVEL_TWO_FORMS_SHA256),
             "level_two_meta": ("rust/crates/er-game/src/current_town_level_two_meta.json", SOURCE_LEVEL_TWO_META_SHA256),
+            "level_two_movegen": ("rust/crates/er-game/src/current_town_level_two_movegen.json", SOURCE_LEVEL_TWO_MOVEGEN_SHA256),
+            "movegen_stage": ("rust/fixtures/m9/engineering/town-movegen-stage-v1.json", SOURCE_MOVEGEN_STAGE_SHA256),
         }
         for name, (path, expected) in source_fixtures.items():
             actual = digest((ROOT / path).read_bytes())

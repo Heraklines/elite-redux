@@ -7,7 +7,7 @@ use er_game::current_town_wild_spawn::{
     source_town_ability_id, source_town_day_pools, source_town_form_base_stats,
     source_town_form_types, source_town_initial_level_move_pool, source_town_ivs_from_id,
     source_town_level_two_form_rows, source_town_level_two_species, source_town_male_half_percent,
-    source_town_unmodified_level_two_stats,
+    source_town_neutral_weighted_level_move_pool, source_town_unmodified_level_two_stats,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_rng::audit::{RngCallsiteId, RngPublicApi, RngReason};
@@ -31,6 +31,10 @@ const SOURCE_FORM_STATS: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/town-form-stats-v1.json");
 const SOURCE_LEVEL_TWO_FORMS: &[u8] = include_bytes!("../src/current_town_level_two_forms.json");
 const SOURCE_LEVEL_TWO_META: &[u8] = include_bytes!("../src/current_town_level_two_meta.json");
+const SOURCE_LEVEL_TWO_MOVEGEN: &[u8] =
+    include_bytes!("../src/current_town_level_two_movegen.json");
+const SOURCE_MOVEGEN_STAGE: &[u8] =
+    include_bytes!("../../../fixtures/m9/engineering/town-movegen-stage-v1.json");
 const SOURCE_TYPE_ORDER: [PokemonType; 19] = [
     PokemonType::Normal,
     PokemonType::Fighting,
@@ -93,6 +97,8 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     let form_stats: serde_json::Value = serde_json::from_slice(SOURCE_FORM_STATS)?;
     let level_two_forms: serde_json::Value = serde_json::from_slice(SOURCE_LEVEL_TWO_FORMS)?;
     let level_two_meta: serde_json::Value = serde_json::from_slice(SOURCE_LEVEL_TWO_META)?;
+    let level_two_movegen: serde_json::Value = serde_json::from_slice(SOURCE_LEVEL_TWO_MOVEGEN)?;
+    let movegen_stage: serde_json::Value = serde_json::from_slice(SOURCE_MOVEGEN_STAGE)?;
     assert_eq!(gender["source"], "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7");
     assert_eq!(form_flags["source"], gender["source"]);
     assert_eq!(ability_slots["source"], gender["source"]);
@@ -100,6 +106,8 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
     assert_eq!(form_stats["source"], gender["source"]);
     assert_eq!(level_two_forms["source"], gender["source"]);
     assert_eq!(level_two_meta["source"], gender["source"]);
+    assert_eq!(level_two_movegen["source"], gender["source"]);
+    assert_eq!(movegen_stage["source"], gender["source"]);
     assert_eq!(gender["rows"].as_array().ok_or("gender rows")?.len(), 163);
     assert_eq!(form_flags["rows"].as_array().ok_or("form rows")?.len(), 163);
     assert_eq!(
@@ -128,6 +136,13 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         level_two_meta["rows"]
             .as_array()
             .ok_or("level-two metadata")?
+            .len(),
+        131
+    );
+    assert_eq!(
+        level_two_movegen["rows"]
+            .as_array()
+            .ok_or("level-two movegen")?
             .len(),
         131
     );
@@ -256,6 +271,16 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
             assert!(
                 source_town_initial_level_move_pool(&content, *root, form as u16)?.len() <= 512
             );
+            assert!(
+                source_town_neutral_weighted_level_move_pool(
+                    &content,
+                    *root,
+                    form as u16,
+                    [13, 7, 6, 6, 6, 8],
+                )?
+                .len()
+                    <= 512
+            );
         }
     }
     assert_eq!(
@@ -376,6 +401,29 @@ fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Bo
         )?,
         [13, 7, 6, 6, 6, 8]
     );
+    let weighted = source_town_neutral_weighted_level_move_pool(
+        &content,
+        prefix.root.source_root,
+        prefix.form_index,
+        [13, 7, 6, 6, 6, 8],
+    )?;
+    let observed_initial = movegen_stage["initial"]
+        .as_array()
+        .ok_or("source initial pool")?;
+    let observed_adjusted = movegen_stage["adjusted"]
+        .as_array()
+        .ok_or("source adjusted pool")?;
+    let observed_weighted = movegen_stage["weighted"]
+        .as_array()
+        .ok_or("source weighted pool")?;
+    assert_eq!(weighted.len(), observed_weighted.len());
+    for (index, row) in weighted.iter().enumerate() {
+        assert_eq!(row.id.get().get(), observed_initial[index][0].as_u64().ok_or("move ID")?);
+        assert_eq!(u64::from(row.initial_weight), observed_initial[index][1].as_u64().ok_or("initial weight")?);
+        assert_eq!(row.adjusted_weight, observed_adjusted[index][1].as_f64().ok_or("adjusted weight")?);
+        assert_eq!(row.weighted_weight, observed_weighted[index][1].as_u64().ok_or("weighted weight")?);
+    }
+    assert_eq!(weighted[0].weighted_weight + weighted[1].weighted_weight, 74_296);
     assert_eq!(prefix.audit.len(), 7);
     assert_eq!(prefix.audit[5].public_api, RngPublicApi::RandSeedFloat);
     assert_eq!(
