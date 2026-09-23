@@ -10,7 +10,8 @@ use er_game::current_town_wild_spawn::{
     source_town_initial_level_move_pool, source_town_is_shiny, source_town_ivs_from_id,
     source_town_level_two_form_rows, source_town_level_two_species, source_town_male_half_percent,
     source_town_moveset, source_town_neutral_moveset, source_town_neutral_weighted_level_move_pool,
-    source_town_shiny_xor, source_town_time_of_day, source_town_unmodified_level_two_stats,
+    source_town_reset_seed, source_town_shiny_xor, source_town_time_of_day,
+    source_town_unmodified_level_two_stats,
     source_town_unmodified_stats_at_level, source_town_wave_cycle_offset,
     source_town_weighted_level_move_pool,
 };
@@ -870,6 +871,12 @@ fn naturally_admitted_day_seed_matches_pinned_postreward_enemy() -> Result<(), B
     let wave_cycle_offset = source_town_wave_cycle_offset("m9e-town-handoff-308")?;
     assert_eq!(wave_cycle_offset, 0);
     assert_eq!(source_town_time_of_day(2, wave_cycle_offset)?, 1);
+    assert_eq!(
+        source_town_reset_seed("m9e-town-handoff-308", 2)?
+            .rdg
+            .state_string,
+        "!rnd,1,0.3367574783042073,0.9722058428451419,0.3750058668665588"
+    );
     assert_eq!(source_town_time_of_day(1, 0)?, 1);
     assert_eq!(source_town_time_of_day(14, 0)?, 1);
     assert_eq!(source_town_time_of_day(15, 0)?, 2);

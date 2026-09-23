@@ -7,7 +7,7 @@ use std::sync::OnceLock;
 
 use er_rng::audit::{RngCallsiteId, RngDraw, RngReason};
 use er_rng::battle::RngRuntime;
-use er_rng::phaser::PhaserRdg;
+use er_rng::phaser::{PhaserRdg, RunRngState, shift_char_codes};
 use er_state::m7_state::{POKEMON_STATE_SCHEMA_VERSION_V5, PokemonStateV5};
 use er_state::m9e_state_v6::GameIdentityAllocatorStateV1;
 use er_state::mechanic_state_v2::MechanicStateStoreV2;
@@ -653,7 +653,10 @@ pub fn source_town_time_of_day(
     wave: u16,
     wave_cycle_offset: u8,
 ) -> Result<i16, CurrentTownWildErrorV1> {
-    if !(1..=200).contains(&wave) || wave_cycle_offset > 35 || wave_cycle_offset % 5 != 0 {
+    if !(1..=200).contains(&wave)
+        || wave_cycle_offset > 35
+        || !wave_cycle_offset.is_multiple_of(5)
+    {
         return Err(CurrentTownWildErrorV1::UnsupportedContext);
     }
     let cycle = (u32::from(wave) + u32::from(wave_cycle_offset)) % 40;
@@ -665,6 +668,22 @@ pub fn source_town_time_of_day(
         3
     } else {
         0
+    })
+}
+
+/// Source scene.resetSeed(wave) replaces the global run stream with the
+/// wave-shifted seed before constructing the next encounter.
+pub fn source_town_reset_seed(
+    seed: &str,
+    wave: u16,
+) -> Result<RunRngState, CurrentTownWildErrorV1> {
+    if !(1..=200).contains(&wave) {
+        return Err(CurrentTownWildErrorV1::UnsupportedContext);
+    }
+    let wave_seed = shift_char_codes(seed, i64::from(wave))
+        .map_err(|_| CurrentTownWildErrorV1::RandomDraw)?;
+    Ok(RunRngState {
+        rdg: PhaserRdg::from_seed(&wave_seed).state(),
     })
 }
 
