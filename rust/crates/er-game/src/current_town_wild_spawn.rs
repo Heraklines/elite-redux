@@ -685,6 +685,23 @@ pub fn source_town_reset_seed(
     })
 }
 
+/// The ordinary wild checkIsDouble roll with source base chance eight. Only
+/// valid when no lure, ability, biome multiplier or battle-style override
+/// changes that chance; its audited draw precedes Town species selection.
+pub fn source_town_unboosted_wild_double_roll(
+    rng: &mut RngRuntime,
+) -> Result<bool, CurrentTownWildErrorV1> {
+    let roll = rng
+        .run_rand_seed_int(
+            SafeU53::new(8).map_err(|_| CurrentTownWildErrorV1::RandomDraw)?,
+            SafeU53::ZERO,
+            RngReason::RandomSelector,
+            RngCallsiteId::current_wild_double(),
+        )
+        .map_err(|_| CurrentTownWildErrorV1::RandomDraw)?;
+    Ok(roll == SafeU53::ZERO)
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CurrentTownWildRootV1 {
     pub tier: u8,

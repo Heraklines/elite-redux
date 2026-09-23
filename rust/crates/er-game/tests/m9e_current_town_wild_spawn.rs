@@ -11,6 +11,7 @@ use er_game::current_town_wild_spawn::{
     source_town_level_two_form_rows, source_town_level_two_species, source_town_male_half_percent,
     source_town_moveset, source_town_neutral_moveset, source_town_neutral_weighted_level_move_pool,
     source_town_reset_seed, source_town_shiny_xor, source_town_time_of_day,
+    source_town_unboosted_wild_double_roll,
     source_town_unmodified_level_two_stats, source_town_unmodified_stats_at_level,
     source_town_wave_cycle_offset, source_town_weighted_level_move_pool,
 };
@@ -876,6 +877,17 @@ fn naturally_admitted_day_seed_matches_pinned_postreward_enemy() -> Result<(), B
             .state_string,
         "!rnd,1,0.3367574783042073,0.9722058428451419,0.3750058668665588"
     );
+    let mut preselection_rng =
+        RngRuntime::from_states(source_town_reset_seed("m9e-town-handoff-308", 2)?, None)?;
+    assert!(!source_town_unboosted_wild_double_roll(
+        &mut preselection_rng
+    )?);
+    assert_eq!(preselection_rng.audit_entries().len(), 1);
+    assert_eq!(
+        preselection_rng.audit_entries()[0].callsite_id,
+        RngCallsiteId::current_wild_double()
+    );
+    preselection_rng.audit_entries()[0].validate()?;
     assert_eq!(source_town_time_of_day(1, 0)?, 1);
     assert_eq!(source_town_time_of_day(14, 0)?, 1);
     assert_eq!(source_town_time_of_day(15, 0)?, 2);
@@ -930,6 +942,7 @@ fn naturally_admitted_day_seed_matches_pinned_postreward_enemy() -> Result<(), B
         },
         None,
     )?;
+    assert_eq!(preselection_rng.run_state(), rng.run_state());
     let initial_rng = rng.clone();
     let shell =
         select_current_town_day_wave_two_shell(&content, context, 12_345, 23_456, &mut rng)?;
