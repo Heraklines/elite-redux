@@ -212,11 +212,12 @@ const SOURCE_TYPE_TIERS: [&[[u8; 2]]; 5] = [
 struct SourceTownLevelTwoFormsV1 {
     schema: u8,
     source: String,
-    rows: Vec<(u64, Vec<Vec<(i16, u64)>>)>,
+    rows: Vec<SourceTownSpeciesLevelTwoRows>,
 }
 
 static SOURCE_LEVEL_TWO_FORMS: OnceLock<Result<SourceTownLevelTwoFormsV1, ()>> = OnceLock::new();
 
+type SourceTownSpeciesLevelTwoRows = (u64, Vec<Vec<(i16, u64)>>);
 type SourceTownMoveMetaRow = (u64, u8, u8, i16, i16, bool, bool);
 
 // Source run 35854351965, SHA256
