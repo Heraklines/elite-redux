@@ -8,6 +8,7 @@ use std::sync::OnceLock;
 use er_rng::audit::{RngCallsiteId, RngDraw, RngReason};
 use er_rng::battle::RngRuntime;
 use er_state::m7_state::{POKEMON_STATE_SCHEMA_VERSION_V5, PokemonStateV5};
+use er_state::m9e_state_v6::GameIdentityAllocatorStateV1;
 use er_state::mechanic_state_v2::MechanicStateStoreV2;
 use er_state::pokemon_v2::{Iv, PermanentStatBonuses};
 use er_types::battle_ids::{AbilityId, GameModeId, MoveId, SpeciesId};
@@ -628,6 +629,8 @@ pub enum CurrentTownWildErrorV1 {
     SourceContent,
     #[error("source random draw failed")]
     RandomDraw,
+    #[error("source Pokemon ID is behind the allocated identity frontier")]
+    IdentityFrontier,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1725,4 +1728,31 @@ pub fn select_current_town_day_wave_two_shell(
     };
     *rng = staged;
     Ok(CurrentTownWildShellV1 { core, pokemon })
+}
+
+/// Commit the source draw and its externally chosen Pokemon ID together.
+/// A rejected ID must not consume RNG or partially advance the allocator.
+pub fn select_current_town_day_wave_two_shell_with_identity(
+    content: &PreparedGameContentV2,
+    context: CurrentTownDayWaveTwoContextV1<'_>,
+    trainer_id: u16,
+    secret_id: u16,
+    identities: &mut GameIdentityAllocatorStateV1,
+    rng: &mut RngRuntime,
+) -> Result<CurrentTownWildShellV1, CurrentTownWildErrorV1> {
+    let mut staged_rng = rng.clone();
+    let mut staged_identities = identities.clone();
+    let shell = select_current_town_day_wave_two_shell(
+        content,
+        context,
+        trainer_id,
+        secret_id,
+        &mut staged_rng,
+    )?;
+    staged_identities
+        .adopt_source_pokemon_id(shell.pokemon.id)
+        .map_err(|_| CurrentTownWildErrorV1::IdentityFrontier)?;
+    *rng = staged_rng;
+    *identities = staged_identities;
+    Ok(shell)
 }
