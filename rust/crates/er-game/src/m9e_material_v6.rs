@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::io::Write;
 
 use er_canonical::{canonical_bytes, content_digest};
 use er_rng::audit::RngDraw;
@@ -478,6 +479,13 @@ fn apply_to_validated_ledger(
 ) -> Result<GameMaterialApplyOutcomeV6, GameMaterialV6Error> {
     let material = GameMaterialV6::decode(bytes)?;
     let transition = material.transition();
+    let _ = writeln!(
+        std::io::stderr().lock(),
+        "M9E_MATERIAL stage=decoded revision={} owned={} domain={:?}",
+        transition.authority_revision.get(),
+        transition.owned_phase.is_some(),
+        transition.domain
+    );
     if matches!(retention, AppliedMaterialRetentionV1::BoundedSuffix { .. }) {
         let floor = ledger
             .records
@@ -515,7 +523,9 @@ fn apply_to_validated_ledger(
         .after_state
         .validate_with(content)
         .map_err(|_| GameMaterialV6Error::Invalid)?;
+    let _ = writeln!(std::io::stderr().lock(), "M9E_MATERIAL stage=after_state");
     validate_presentation_frontier(live.as_ref(), transition)?;
+    let _ = writeln!(std::io::stderr().lock(), "M9E_MATERIAL stage=presentation_frontier");
     let owned_reward = matches!(
         transition.accepted_action,
         Some(GameActionV1::Reward { .. })
@@ -544,6 +554,7 @@ fn apply_to_validated_ledger(
         )
         .map_err(|_| GameMaterialV6Error::Invalid)?;
     }
+    let _ = writeln!(std::io::stderr().lock(), "M9E_MATERIAL stage=reward_learning");
     if transition.owned_phase.is_none()
         && !owned_learning
         && !owned_reward
@@ -583,10 +594,13 @@ fn apply_to_validated_ledger(
             return Err(GameMaterialV6Error::Invalid);
         }
     }
+    let _ = writeln!(std::io::stderr().lock(), "M9E_MATERIAL stage=defender");
     crate::current_random_target_admission::validate_transition(live.as_ref(), content, transition)
         .map_err(|_| GameMaterialV6Error::Invalid)?;
+    let _ = writeln!(std::io::stderr().lock(), "M9E_MATERIAL stage=random_target");
     crate::m9e_runtime_v6::validate_current_turn_transition(live.as_ref(), content, transition)
         .map_err(|_| GameMaterialV6Error::Invalid)?;
+    let _ = writeln!(std::io::stderr().lock(), "M9E_MATERIAL stage=turn");
     // The preceding validator independently replays the complete turn-begin
     // candidate. Its real TurnInit resets source damageTaken/last_reset_turn;
     // the legacy XP successor conservation rule cannot represent that mutation.
@@ -627,6 +641,7 @@ fn apply_to_validated_ledger(
             return Err(GameMaterialV6Error::Invalid);
         }
     }
+    let _ = writeln!(std::io::stderr().lock(), "M9E_MATERIAL stage=achievement");
     if transition.owned_phase.is_some() {
         crate::m9e_runtime_v6::validate_owned_phase_transition(
             live.as_ref().ok_or(GameMaterialV6Error::Invalid)?,
@@ -635,6 +650,7 @@ fn apply_to_validated_ledger(
         )
         .map_err(|_| GameMaterialV6Error::Invalid)?;
     }
+    let _ = writeln!(std::io::stderr().lock(), "M9E_MATERIAL stage=owned_phase");
     if let Some(prior) = live
         .as_ref()
         .and_then(|state| state.current_battle_participation.as_ref())
@@ -656,6 +672,7 @@ fn apply_to_validated_ledger(
                 .map_err(|_| GameMaterialV6Error::Invalid)?;
         }
     }
+    let _ = writeln!(std::io::stderr().lock(), "M9E_MATERIAL stage=successor");
     // Only a fully recomputed owned phase can change an established account.
     // Unknown historical profiles retain the original exact conservation rule.
     if transition.owned_phase.is_none()
@@ -665,6 +682,7 @@ fn apply_to_validated_ledger(
     {
         return Err(GameMaterialV6Error::Invalid);
     }
+    let _ = writeln!(std::io::stderr().lock(), "M9E_MATERIAL stage=friendship");
     // Current targeting is established only by bootstrap. Same-run material cannot
     // erase or invent it; a true terminal transition may retire the run owner.
     if let Some(prior) = live.as_ref() {
@@ -694,6 +712,7 @@ fn apply_to_validated_ledger(
     {
         return Err(GameMaterialV6Error::Invalid);
     }
+    let _ = writeln!(std::io::stderr().lock(), "M9E_MATERIAL stage=ownership");
     let before_digest = match live.as_ref() {
         Some(state) => game_state_digest(state)?,
         None => empty_game_state_digest()?,
