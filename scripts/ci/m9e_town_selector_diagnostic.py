@@ -145,7 +145,8 @@ def main():
             subprocess.run(["cargo", "fmt", "--manifest-path", "Cargo.toml", "--all"],
                            cwd=RUST, timeout=120, check=False)
             patch = subprocess.check_output(["git", "diff", "--", files[0],
-                                             "rust/crates/er-game/tests/m9e_current_town_wild_spawn.rs"], cwd=ROOT)
+                                             "rust/crates/er-game/tests/m9e_current_town_wild_spawn.rs",
+                                             "rust/crates/er-game/tests/m9e_town_seed_search.rs"], cwd=ROOT)
             if len(patch) <= 32768:
                 (OUT / "format.patch").write_bytes(patch)
     finally:

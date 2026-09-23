@@ -22,7 +22,12 @@ fn bounded_source_wave_two_seed_candidates() -> Result<(), Box<dyn Error>> {
         .iter()
         .find(|mode| mode.key == "CLASSIC")
         .ok_or("Classic mode absent")?;
-    let town = content.world.biomes.iter().find(|biome| biome.key == "biome/0").ok_or("Town absent")?;
+    let town = content
+        .world
+        .biomes
+        .iter()
+        .find(|biome| biome.key == "biome/0")
+        .ok_or("Town absent")?;
     let context = CurrentTownDayWaveTwoContextV1 {
         mode: mode.id,
         biome: town.id,
@@ -45,7 +50,12 @@ fn bounded_source_wave_two_seed_candidates() -> Result<(), Box<dyn Error>> {
         let mut wave_rng = PhaserRdg::from_seed(&shift_char_codes(&seed, 2)?);
         wave_rng.rnd();
         wave_rng.rnd();
-        let mut rng = RngRuntime::from_states(RunRngState { rdg: wave_rng.state() }, None)?;
+        let mut rng = RngRuntime::from_states(
+            RunRngState {
+                rdg: wave_rng.state(),
+            },
+            None,
+        )?;
         if let Ok(root) = select_current_town_day_wave_two_root(&content, context, &mut rng) {
             assert_eq!(root.source_root.get().get(), 504);
             println!("candidate={seed} before={}", wave_rng.state().state_string);
