@@ -2389,8 +2389,8 @@ fn assert_actual_tm_replace_yes(
 fn assert_actual_tm_choose_slot(
     state: TmWitnessState,
     content: Arc<PreparedGameContentV2>,
-    mut tm: Box<er_state::current_reward_tm::CurrentRewardTmV1>,
-    mut learned: GameMaterialV6,
+    _tm: Box<er_state::current_reward_tm::CurrentRewardTmV1>,
+    _learned: GameMaterialV6,
 ) -> Result<TmWitnessWithMove> {
     let (mut kernel, selected, mut live, mut ledger) = state;
     use er_state::current_reward_tm::CurrentRewardTmPhaseV1 as T;
@@ -2421,8 +2421,8 @@ fn assert_actual_tm_choose_slot(
         selected.party_before
     );
     assert_invalid_full_tm_slot(&forgotten, content.clone())?;
-    learned = acknowledge_tm_message(&mut kernel, content.as_ref(), &mut live, &mut ledger)?;
-    tm = current_reward(kernel.state().ok_or("TM state absent")?)?
+    let learned = acknowledge_tm_message(&mut kernel, content.as_ref(), &mut live, &mut ledger)?;
+    let tm = current_reward(kernel.state().ok_or("TM state absent")?)?
         .tm
         .as_ref()
         .ok_or("TM absent")?
