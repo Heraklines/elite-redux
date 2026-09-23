@@ -452,96 +452,96 @@ fn assert_eventwise_parity_contract(
         request: &M9EParityRequestV1,
         content: Arc<PreparedGameContentV2>,
     ) -> Result<M9EParityReportV1, Box<dyn Error>> {
-    let event_count = request.events.len();
-    let mut driver = GameKernelV7::from_snapshot(
-        request
-            .initial_snapshot
-            .clone()
-            .ok_or("controlled checkpoint missing")?,
-        request.local_seat,
-        request.role,
-        content.clone(),
-    )?;
-    let mut expected_observations = Vec::new();
-    let mut material_count = 0;
-    let mut canonical_control_material_count = 0;
-    for (index, event) in request.events.iter().enumerate() {
-        let before_snapshot = driver.snapshot()?;
-        let mut admission_before = driver.state().cloned().ok_or("active state missing")?;
-        // Material admission restores the retained canonical battle control
-        // before hashing its frontier (game_kernel_v7::collect_battle_action).
-        // Derive only that field from the actual pre-event owner; never from
-        // the returned material. The real driver and its raw report stay intact.
-        if let Some(owner) = &before_snapshot.private_battle_control {
-            admission_before
-                .active_run
-                .as_mut()
-                .ok_or("canonical admission run missing")?
-                .control = owner.canonical_control.clone();
-        }
-        let before_digest = game_state_digest(&admission_before)?;
-        let step = apply_timer_event(&mut driver, event.clone())?;
-        let snapshot = driver.snapshot()?;
-        for effect in &step.effects {
-            if let GameKernelEffectV7::AuthorityMaterial {
-                operation_id,
-                bytes,
-            } = effect
-            {
-                let material = GameMaterialV6::decode(bytes)?;
-                let transition = material.transition();
-                assert_eq!(&transition.operation_id, operation_id);
-                assert_eq!(&transition.content_identity, content.identity());
-                assert_eq!(transition.before_digest, before_digest);
-                assert_eq!(
-                    &transition.after_state,
-                    driver.state().ok_or("material after-state missing")?
-                );
-                let after_digest = game_state_digest(&transition.after_state)?;
-                assert_eq!(transition.after_digest, after_digest);
-                for mutation in &transition.mutations {
-                    assert_eq!(mutation.before_digest, before_digest);
-                    assert_eq!(mutation.after_digest, after_digest);
-                }
-                let record = snapshot
-                    .material_ledger
-                    .record(operation_id)
-                    .ok_or("actual material receipt missing")?;
-                assert_eq!(record.authority_revision, transition.authority_revision);
-                assert_eq!(record.after_digest, after_digest);
-                assert_eq!(
-                    record.material_fingerprint,
-                    format!("blake3-v1:{}", er_canonical::content_digest(bytes)?)
-                );
-                material_count += 1;
-                if before_snapshot.private_battle_control.is_some() {
-                    canonical_control_material_count += 1;
+        let event_count = request.events.len();
+        let mut driver = GameKernelV7::from_snapshot(
+            request
+                .initial_snapshot
+                .clone()
+                .ok_or("controlled checkpoint missing")?,
+            request.local_seat,
+            request.role,
+            content.clone(),
+        )?;
+        let mut expected_observations = Vec::new();
+        let mut material_count = 0;
+        let mut canonical_control_material_count = 0;
+        for (index, event) in request.events.iter().enumerate() {
+            let before_snapshot = driver.snapshot()?;
+            let mut admission_before = driver.state().cloned().ok_or("active state missing")?;
+            // Material admission restores the retained canonical battle control
+            // before hashing its frontier (game_kernel_v7::collect_battle_action).
+            // Derive only that field from the actual pre-event owner; never from
+            // the returned material. The real driver and its raw report stay intact.
+            if let Some(owner) = &before_snapshot.private_battle_control {
+                admission_before
+                    .active_run
+                    .as_mut()
+                    .ok_or("canonical admission run missing")?
+                    .control = owner.canonical_control.clone();
+            }
+            let before_digest = game_state_digest(&admission_before)?;
+            let step = apply_timer_event(&mut driver, event.clone())?;
+            let snapshot = driver.snapshot()?;
+            for effect in &step.effects {
+                if let GameKernelEffectV7::AuthorityMaterial {
+                    operation_id,
+                    bytes,
+                } = effect
+                {
+                    let material = GameMaterialV6::decode(bytes)?;
+                    let transition = material.transition();
+                    assert_eq!(&transition.operation_id, operation_id);
+                    assert_eq!(&transition.content_identity, content.identity());
+                    assert_eq!(transition.before_digest, before_digest);
+                    assert_eq!(
+                        &transition.after_state,
+                        driver.state().ok_or("material after-state missing")?
+                    );
+                    let after_digest = game_state_digest(&transition.after_state)?;
+                    assert_eq!(transition.after_digest, after_digest);
+                    for mutation in &transition.mutations {
+                        assert_eq!(mutation.before_digest, before_digest);
+                        assert_eq!(mutation.after_digest, after_digest);
+                    }
+                    let record = snapshot
+                        .material_ledger
+                        .record(operation_id)
+                        .ok_or("actual material receipt missing")?;
+                    assert_eq!(record.authority_revision, transition.authority_revision);
+                    assert_eq!(record.after_digest, after_digest);
+                    assert_eq!(
+                        record.material_fingerprint,
+                        format!("blake3-v1:{}", er_canonical::content_digest(bytes)?)
+                    );
+                    material_count += 1;
+                    if before_snapshot.private_battle_control.is_some() {
+                        canonical_control_material_count += 1;
+                    }
                 }
             }
+            expected_observations.push(M9EParityObservationV1 {
+                sequence: safe((index + 1) as u64),
+                input_digest: er_canonical::content_digest(event)?,
+                effect_digest: er_canonical::content_digest(&step.effects)?,
+                internal_event_digest: er_canonical::content_digest(&step.internal_events)?,
+                mechanical_state_digest: er_canonical::content_digest(&driver.state())?,
+                kernel_determinism_digest: er_canonical::content_digest(&snapshot)?,
+                control_kind: driver.current_control().map(|control| control.kind),
+                wave: driver
+                    .state()
+                    .and_then(|state| state.active_run.as_ref())
+                    .map(|run| run.wave),
+            });
         }
-        expected_observations.push(M9EParityObservationV1 {
-            sequence: safe((index + 1) as u64),
-            input_digest: er_canonical::content_digest(event)?,
-            effect_digest: er_canonical::content_digest(&step.effects)?,
-            internal_event_digest: er_canonical::content_digest(&step.internal_events)?,
-            mechanical_state_digest: er_canonical::content_digest(&driver.state())?,
-            kernel_determinism_digest: er_canonical::content_digest(&snapshot)?,
-            control_kind: driver.current_control().map(|control| control.kind),
-            wave: driver
-                .state()
-                .and_then(|state| state.active_run.as_ref())
-                .map(|run| run.wave),
-        });
-    }
-    assert_eq!(event_count, 30);
-    assert_eq!(material_count, 6);
-    assert!(canonical_control_material_count > 0);
-    Ok(M9EParityReportV1 {
-        schema_version: M9E_PARITY_REPORT_SCHEMA_VERSION_V1,
-        content_identity_digest: er_canonical::content_digest(content.identity())?,
-        observations: expected_observations,
-        final_snapshot_digest: er_canonical::content_digest(&driver.snapshot()?)?,
-    })
+        assert_eq!(event_count, 30);
+        assert_eq!(material_count, 6);
+        assert!(canonical_control_material_count > 0);
+        Ok(M9EParityReportV1 {
+            schema_version: M9E_PARITY_REPORT_SCHEMA_VERSION_V1,
+            content_identity_digest: er_canonical::content_digest(content.identity())?,
+            observations: expected_observations,
+            final_snapshot_digest: er_canonical::content_digest(&driver.snapshot()?)?,
+        })
     }
     let expected = expected_raw_report(&request, content)?;
     let report = replay(request)?;
