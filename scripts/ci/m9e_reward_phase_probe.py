@@ -60,7 +60,7 @@ def main():
         require(not any(os.environ.get(key) for key in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUST_MIN_STACK", "RUST_TEST_THREADS")), "ambient Rust flags")
         head, code = run("head", ["git", "rev-parse", "HEAD"], 30)
         require(code == 0 and head.decode().strip() == result["source_sha"], "exact HEAD")
-        parent, code = run("parent", ["git", "rev-parse", "HEAD^"], 30)
+        parent, code = run("parent", ["git", "merge-base", "HEAD", BASE], 30)
         require(code == 0 and parent.decode().strip() == BASE, "exact product parent")
         delta, code = run("delta", ["git", "diff", "--name-only", BASE, "HEAD"], 30)
         require(code == 0 and set(delta.decode().splitlines()) == OWNED, "sole fixture and harness delta")

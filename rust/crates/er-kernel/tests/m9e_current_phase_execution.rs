@@ -1424,6 +1424,7 @@ fn controlled_early_ko_flash_owns_clock_egg_candy_and_canceled_suffix() -> Resul
                 10821,
                 "qualified actual source seed projection"
             );
+            writeln!(std::io::stderr().lock(), "M9E_REWARD_STAGE before_choice")?;
             assert_current_reward_choice_and_pick(
                 &mut kernel,
                 content.clone(),
@@ -1588,6 +1589,7 @@ fn assert_current_reward_choice_and_pick(
 ) -> Result<()> {
     use er_state::current_reward_selection::CurrentRewardStageV1 as Stage;
     let checkpoint = Box::new(kernel.snapshot()?);
+    writeln!(std::io::stderr().lock(), "M9E_REWARD_STAGE choice_enter")?;
     let selected = current_reward(active(&checkpoint)?)?.clone();
     assert!(matches!(selected.stage, Stage::Choice));
     assert!((1..=3).contains(&selected.offers.len()));
@@ -1653,13 +1655,17 @@ fn assert_current_reward_choice_and_pick(
         selected.party_before[0].moves.iter().all(Option::is_some),
         "full-slot preimage must be exercised"
     );
+    writeln!(std::io::stderr().lock(), "M9E_REWARD_STAGE before_tm")?;
     assert_actual_tm_reward(&checkpoint, content.clone(), live, ledger, tm_index)?;
+    writeln!(std::io::stderr().lock(), "M9E_REWARD_STAGE after_tm")?;
     let candy_index = selected
         .offers
         .iter()
         .position(|offer| offer.source_id == "RARE_CANDY" && offer.args.is_none())
         .ok_or("actual Rare Candy reward absent")?;
+    writeln!(std::io::stderr().lock(), "M9E_REWARD_STAGE before_candy")?;
     assert_actual_candy_reward(&checkpoint, content.clone(), live, ledger, candy_index)?;
+    writeln!(std::io::stderr().lock(), "M9E_REWARD_STAGE after_candy")?;
     let pokemon = &selected.party_before[0];
     let index = selected.offers.iter().position(|offer| {
         offer.args.is_none()
