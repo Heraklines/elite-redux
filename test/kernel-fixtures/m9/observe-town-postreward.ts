@@ -52,7 +52,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
     .seed(SEED);
   manager.scene.gameData.trainerId = 12345;
   manager.scene.gameData.secretId = 23456;
-  await manager.classicMode.startBattle(SpeciesId.BULBASAUR);
+  await manager.classicMode.startBattle(SpeciesId.CHARMANDER);
   const scene = globalScene;
   expect(scene.gameData.trainerId).toBe(12345);
   expect(scene.gameData.secretId).toBe(23456);
@@ -64,12 +64,12 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   const firstEnemySpecies = firstEnemy.species.speciesId;
   const player = scene.getPlayerPokemon();
   expect(player).toBeDefined();
-  expect(player.getMoveset().map(move => move.moveId)).toContain(MoveId.VINE_WHIP);
+  expect(player.getMoveset().map(move => move.moveId)).toContain(MoveId.EMBER);
 
   const newBattle = vi.spyOn(scene, "newBattle");
   let attackingTurns = 0;
   while (!manager.isVictory() && attackingTurns < 12) {
-    manager.move.select(MoveId.VINE_WHIP);
+    manager.move.select(MoveId.EMBER);
     await manager.toEndOfTurn();
     attackingTurns++;
     if (!manager.isVictory()) {
