@@ -51,6 +51,21 @@ def run(name, argv, *, cwd, seconds=600, env=None):
             b"\n...[middle omitted]...\n" + raw[-8192:] if len(raw) > 12288
             else raw[4096:]
         )
+        if name.startswith("source-"):
+            report = OUT / ("vitest-" + name.removeprefix("source-") + ".json")
+            if report.is_file() and report.stat().st_size <= 1 << 20:
+                parsed = json.loads(report.read_bytes())
+                messages = [parsed.get("testExecError"), *[
+                    suite.get("message") for suite in parsed.get("testResults", [])
+                ], *[
+                    assertion.get("failureMessages")
+                    for suite in parsed.get("testResults", [])
+                    for assertion in suite.get("assertionResults", [])
+                ]]
+                excerpt += b"\nVitest JSON failure messages:\n" + json.dumps(
+                    [message for message in messages if message],
+                    separators=(",", ":"),
+                ).encode()[:12288]
         (COMPACT / "failure.txt").write_bytes(name.encode() + b" failed\n" + excerpt)
         raise RuntimeError(name + " failed")
     return raw
