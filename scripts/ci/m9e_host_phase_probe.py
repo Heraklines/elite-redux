@@ -10,7 +10,7 @@ import sys
 import time
 
 BASE = "2f124b450b5c118191bf0d0775ac42a7d27c00cc"
-PROBE_PARENT = "76d5024fa1f76f4fce063e61ac9d1a9599d5c089"
+PROBE_PARENT = "7f5274cc39df02d1f8de16b99e3816512c94275b"
 BRANCH = "codex/m9e-host-phase-probe-20260923"
 OWNED = {
     ".github/workflows/m9e-host-phase-probe.yml",
@@ -123,7 +123,12 @@ def main():
             require(listed["returncode"] == 0, target + " list")
             actual = re.findall(rb"^([A-Za-z0-9_:]+): test$", listing, re.M)
             require(sorted(value.decode() for value in actual) == sorted(ids), target + " whole test identity")
-            output, executed = run(target + "-execute", base + ["--format", "terse"], ROOT / "rust")
+            execution_args = ["--format", "terse"]
+            if target == "m9e_current_phase_execution":
+                # Keep the complete target while making temporary validator
+                # stage markers attributable to one test at a time.
+                execution_args.append("--test-threads=1")
+            output, executed = run(target + "-execute", base + execution_args, ROOT / "rust")
             counts = re.findall(rb"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", output)
             passed = executed["returncode"] == 0 and counts == [(str(len(ids)).encode(), b"0", b"0", b"0", b"0")]
             result["targets"].append({
