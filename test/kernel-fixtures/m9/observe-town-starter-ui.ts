@@ -148,11 +148,11 @@ test("Title and actual starter controls construct a source-owned Classic starter
       mark("save-slot");
       const handler = manager!.scene.ui.getHandler() as SaveSlotSelectUiHandler;
       handler.processInput(Button.ACTION);
+      mark("save-slot-action-returned");
       resolve();
     });
   });
-  await manager.phaseInterceptor.to("EncounterPhase", false);
-  mark("encounter-phase-seen");
+  mark("awaiting-command-phase");
   await manager.phaseInterceptor.to("CommandPhase");
   mark("command-phase-seen");
 
