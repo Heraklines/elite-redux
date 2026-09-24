@@ -4,17 +4,17 @@ use std::sync::Arc;
 use er_game::current_town_wild_spawn::{
     CurrentTownDayWaveTwoContextV1, CurrentTownDayWildContextV1, CurrentTownGenderV1,
     CurrentTownWildErrorV1, select_current_town_day_wave_one_root,
-    select_current_town_day_wave_two_constructor_prefix, select_current_town_day_wave_two_core,
-    select_current_town_day_wave_two_root, select_current_town_day_wave_two_shell,
-    select_current_town_day_wave_two_shell_with_identity, source_town_ability_id,
-    source_town_day_pools, source_town_form_base_stats, source_town_form_types,
-    source_town_initial_level_move_pool, source_town_is_shiny, source_town_ivs_from_id,
-    source_town_level_two_form_rows, source_town_level_two_species, source_town_male_half_percent,
-    source_town_moveset, source_town_neutral_moveset, source_town_neutral_weighted_level_move_pool,
-    source_town_reset_seed, source_town_shiny_xor, source_town_time_of_day,
-    source_town_unboosted_wild_double_roll, source_town_unmodified_level_two_stats,
-    source_town_unmodified_stats_at_level, source_town_wave_cycle_offset,
-    source_town_weighted_level_move_pool,
+    select_current_town_day_wave_one_shell, select_current_town_day_wave_two_constructor_prefix,
+    select_current_town_day_wave_two_core, select_current_town_day_wave_two_root,
+    select_current_town_day_wave_two_shell, select_current_town_day_wave_two_shell_with_identity,
+    source_town_ability_id, source_town_day_pools, source_town_form_base_stats,
+    source_town_form_types, source_town_initial_level_move_pool, source_town_is_shiny,
+    source_town_ivs_from_id, source_town_level_two_form_rows, source_town_level_two_species,
+    source_town_male_half_percent, source_town_moveset, source_town_neutral_moveset,
+    source_town_neutral_weighted_level_move_pool, source_town_reset_seed, source_town_shiny_xor,
+    source_town_time_of_day, source_town_unboosted_wild_double_roll,
+    source_town_unmodified_level_two_stats, source_town_unmodified_stats_at_level,
+    source_town_wave_cycle_offset, source_town_weighted_level_move_pool,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_rng::audit::{RngCallsiteId, RngPublicApi, RngReason};
@@ -1257,6 +1257,88 @@ fn source_single_width_successor_with_matching_natural_opening() -> Result<(), B
             Some((116, 0)),
             Some((95, 0))
         ]
+    );
+    Ok(())
+}
+
+#[test]
+fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Box<dyn Error>> {
+    // Pinned-source run35942477027 observed the opening before the actual
+    // level-five Bulbasaur's two-turn victory and reward-CANCEL handoff.
+    let seed = "m9e-town-handoff-5042";
+    let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
+    let content = PreparedGameContentV2::prepare(Arc::new(bundle))?;
+    let mode = content
+        .bundle()
+        .world
+        .modes
+        .iter()
+        .find(|mode| mode.key == "CLASSIC")
+        .ok_or("Classic mode absent")?;
+    let town = content
+        .bundle()
+        .world
+        .biomes
+        .iter()
+        .find(|biome| biome.key == "biome/0")
+        .ok_or("Town absent")?;
+    let context = CurrentTownDayWildContextV1 {
+        mode: mode.id,
+        biome: town.id,
+        difficulty: RunDifficultyV1::Ace,
+        wave: 1,
+        level: 2,
+        luck: 0,
+        forced_tier: None,
+        encounter_boss_segments: 0,
+        regional_boost: false,
+        time_override: None,
+        effective_pool_time: 1,
+        override_species: None,
+        golden_bug_net: false,
+        excluded_species: &[],
+    };
+    let mut rng = RngRuntime::from_states(source_town_reset_seed(seed, 1)?, None)?;
+    let shell =
+        select_current_town_day_wave_one_shell(&content, context, 12_345, 23_456, &mut rng)?;
+    let enemy = &shell.pokemon;
+    assert_eq!(enemy.id.get().get(), 1_173_608_932);
+    assert_eq!(enemy.species_id.get().get(), 915);
+    assert_eq!(enemy.form_index, 0);
+    assert_eq!(enemy.level, 2);
+    assert_eq!(enemy.experience.get().get(), 8);
+    assert_eq!(enemy.friendship, 50);
+    assert_eq!(shell.core.prefix.ability_index, 0);
+    assert_eq!(enemy.abilities.active.get().get(), 268);
+    assert_eq!(enemy.ivs.map(|iv| iv.get()), [2, 31, 7, 22, 15, 4]);
+    assert_eq!(enemy.nature.get(), 1);
+    assert_eq!(
+        [
+            enemy.stats.hp,
+            enemy.stats.attack,
+            enemy.stats.defense,
+            enemy.stats.special_attack,
+            enemy.stats.special_defense,
+            enemy.stats.speed,
+        ],
+        [14, 9, 6, 6, 7, 6]
+    );
+    assert_eq!(enemy.hp, 14);
+    assert_eq!(enemy.gender, Some(0));
+    assert!(!enemy.shiny);
+    assert_eq!(enemy.variant, 0);
+    assert_eq!(enemy.types.primary, PokemonType::Normal);
+    assert_eq!(enemy.types.secondary, None);
+    assert_eq!(enemy.tera_type, Some(PokemonType::Normal));
+    assert_eq!(
+        enemy
+            .moves
+            .iter()
+            .map(|slot| slot
+                .as_ref()
+                .map(|slot| (slot.move_id.get().get(), slot.pp_used)))
+            .collect::<Vec<_>>(),
+        vec![Some((158, 0)), Some((230, 0)), Some((39, 0)), Some((98, 0))]
     );
     Ok(())
 }

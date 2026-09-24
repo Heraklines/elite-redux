@@ -1508,9 +1508,33 @@ pub fn select_current_town_day_wave_two_constructor_prefix(
     context: CurrentTownDayWaveTwoContextV1<'_>,
     rng: &mut RngRuntime,
 ) -> Result<CurrentTownWildConstructorPrefixV1, CurrentTownWildErrorV1> {
+    if context.wave != 2 {
+        return Err(CurrentTownWildErrorV1::UnsupportedContext);
+    }
+    select_town_day_constructor_prefix(content, context, rng)
+}
+
+/// Source Town opening uses the same enemy constructor after its own wave-one
+/// reset stream and does not consume the ordinary wave-two width roll.
+pub fn select_current_town_day_wave_one_constructor_prefix(
+    content: &PreparedGameContentV2,
+    context: CurrentTownDayWildContextV1<'_>,
+    rng: &mut RngRuntime,
+) -> Result<CurrentTownWildConstructorPrefixV1, CurrentTownWildErrorV1> {
+    if context.wave != 1 || context.level != 2 {
+        return Err(CurrentTownWildErrorV1::UnsupportedContext);
+    }
+    select_town_day_constructor_prefix(content, context, rng)
+}
+
+fn select_town_day_constructor_prefix(
+    content: &PreparedGameContentV2,
+    context: CurrentTownDayWildContextV1<'_>,
+    rng: &mut RngRuntime,
+) -> Result<CurrentTownWildConstructorPrefixV1, CurrentTownWildErrorV1> {
     let mut staged = rng.clone();
     let first_audit = staged.audit_entries().len();
-    let root = select_current_town_day_wave_two_root(content, context, &mut staged)?;
+    let root = select_town_day_root(content, context, &mut staged)?;
     let reason = RngReason::RandomSelector;
     let callsite = RngCallsiteId::mechanics(reason);
     // Every level-two effective Town root has distinct regular slots and a
@@ -1641,10 +1665,31 @@ pub fn select_current_town_day_wave_two_core(
     context: CurrentTownDayWaveTwoContextV1<'_>,
     rng: &mut RngRuntime,
 ) -> Result<CurrentTownWildCoreV1, CurrentTownWildErrorV1> {
+    if context.wave != 2 {
+        return Err(CurrentTownWildErrorV1::UnsupportedContext);
+    }
+    select_town_day_core(content, context, rng)
+}
+
+pub fn select_current_town_day_wave_one_core(
+    content: &PreparedGameContentV2,
+    context: CurrentTownDayWildContextV1<'_>,
+    rng: &mut RngRuntime,
+) -> Result<CurrentTownWildCoreV1, CurrentTownWildErrorV1> {
+    if context.wave != 1 || context.level != 2 {
+        return Err(CurrentTownWildErrorV1::UnsupportedContext);
+    }
+    select_town_day_core(content, context, rng)
+}
+
+fn select_town_day_core(
+    content: &PreparedGameContentV2,
+    context: CurrentTownDayWildContextV1<'_>,
+    rng: &mut RngRuntime,
+) -> Result<CurrentTownWildCoreV1, CurrentTownWildErrorV1> {
     let mut staged = rng.clone();
     let first_audit = staged.audit_entries().len();
-    let prefix =
-        select_current_town_day_wave_two_constructor_prefix(content, context, &mut staged)?;
+    let prefix = select_town_day_constructor_prefix(content, context, &mut staged)?;
     let base = source_town_form_base_stats(content, prefix.root.source_root, prefix.form_index)?;
     let stats = source_town_unmodified_stats_at_level(
         base,
@@ -1670,7 +1715,7 @@ pub fn select_current_town_day_wave_two_core(
     })
 }
 
-/// Source-observed level-two and level-three Town successors in V5 state shape.
+/// Source-observed level-two and level-three Town enemy shells in V5 state shape.
 /// Admission is limited to ordinary nonshiny species504 with no shiny/reward
 /// modifiers (base threshold64). The caller still owns reward settlement,
 /// identity-frontier rebasing, enemy modifiers, battle creation and replay.
@@ -1681,14 +1726,41 @@ pub fn select_current_town_day_wave_two_shell(
     secret_id: u16,
     rng: &mut RngRuntime,
 ) -> Result<CurrentTownWildShellV1, CurrentTownWildErrorV1> {
-    if !matches!(context.level, 2 | 3) {
+    if context.wave != 2 {
+        return Err(CurrentTownWildErrorV1::UnsupportedContext);
+    }
+    select_town_day_shell(content, context, trainer_id, secret_id, rng)
+}
+
+pub fn select_current_town_day_wave_one_shell(
+    content: &PreparedGameContentV2,
+    context: CurrentTownDayWildContextV1<'_>,
+    trainer_id: u16,
+    secret_id: u16,
+    rng: &mut RngRuntime,
+) -> Result<CurrentTownWildShellV1, CurrentTownWildErrorV1> {
+    if context.wave != 1 || context.level != 2 {
+        return Err(CurrentTownWildErrorV1::UnsupportedContext);
+    }
+    select_town_day_shell(content, context, trainer_id, secret_id, rng)
+}
+
+fn select_town_day_shell(
+    content: &PreparedGameContentV2,
+    context: CurrentTownDayWildContextV1<'_>,
+    trainer_id: u16,
+    secret_id: u16,
+    rng: &mut RngRuntime,
+) -> Result<CurrentTownWildShellV1, CurrentTownWildErrorV1> {
+    if !matches!((context.wave, context.level), (1, 2) | (2, 2 | 3)) {
         return Err(CurrentTownWildErrorV1::UnsupportedContext);
     }
     let mut staged = rng.clone();
-    let core = select_current_town_day_wave_two_core(content, context, &mut staged)?;
+    let core = select_town_day_core(content, context, &mut staged)?;
     let prefix = &core.prefix;
-    if prefix.root.source_root.get().get() != 504
-        || prefix.root.effective_species.get().get() != 504
+    let expected_species = if context.wave == 1 { 915 } else { 504 };
+    if prefix.root.source_root.get().get() != expected_species
+        || prefix.root.effective_species.get().get() != expected_species
         || prefix.form_index != 0
         || source_town_is_shiny(trainer_id, secret_id, prefix.pokemon_id, 64)
     {
@@ -1706,7 +1778,10 @@ pub fn select_current_town_day_wave_two_shell(
         er_progression::progression::current_growth_experience_for_level(growth, context.level)
             .map_err(|_| CurrentTownWildErrorV1::SourceContent)?;
     let expected_experience = if context.level == 2 { 8 } else { 27 };
-    if experience.get().get() != expected_experience || progression.base_friendship != 70 {
+    let expected_friendship = if context.wave == 1 { 50 } else { 70 };
+    if experience.get().get() != expected_experience
+        || progression.base_friendship != expected_friendship
+    {
         return Err(CurrentTownWildErrorV1::SourceContent);
     }
     let nature = content

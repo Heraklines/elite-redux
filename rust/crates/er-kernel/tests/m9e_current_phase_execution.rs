@@ -346,12 +346,16 @@ fn bounded_town_candidates_admit_natural_first_battle() -> Result<()> {
             .parse::<u64>()?;
         match natural_with_seed(content.clone(), seed) {
             Ok(kernel) => {
-                let enemy = kernel
+                let run = kernel
                     .state()
                     .and_then(|state| state.active_run.as_ref())
-                    .and_then(|run| run.battle.as_ref())
+                    .ok_or("natural run absent")?;
+                let enemy = run
+                    .battle
+                    .as_ref()
                     .and_then(|battle| battle.enemy_party.first())
                     .ok_or("natural first enemy absent")?;
+                let player = run.party.first().ok_or("natural starter absent")?;
                 if enemy.species_id.get().get() != source_first {
                     writeln!(
                         std::io::stdout().lock(),
@@ -362,8 +366,19 @@ fn bounded_town_candidates_admit_natural_first_battle() -> Result<()> {
                 }
                 writeln!(
                     std::io::stdout().lock(),
-                    "admitted={seed} first_enemy={}",
-                    enemy.species_id.get().get()
+                    "admitted={seed} first_enemy={} enemy_id={} enemy_level={} enemy_ability={} enemy_hp={} enemy_stats={:?} enemy_moves={:?} player_id={} player_level={} player_hp={} player_stats={:?} player_moves={:?}",
+                    enemy.species_id.get().get(),
+                    enemy.id.get().get(),
+                    enemy.level,
+                    enemy.abilities.active.get().get(),
+                    enemy.hp,
+                    enemy.stats,
+                    enemy.moves,
+                    player.id.get().get(),
+                    player.level,
+                    player.hp,
+                    player.stats,
+                    player.moves,
                 )?;
                 admitted += 1;
                 break;

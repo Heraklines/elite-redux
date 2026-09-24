@@ -1,7 +1,7 @@
 name: M9E Town V2 Content Source Probe
 on:
   push:
-    branches: [codex/m9e-next-encounter-source-20260923]
+    branches: [codex/m9e-next-encounter-source-20260923, codex/m9e-connected-successor-20260924]
 permissions:
   contents: read
 concurrency:
@@ -62,7 +62,7 @@ jobs:
         run: |
           set -euo pipefail
           cargo test --manifest-path rust/Cargo.toml --locked -p er-game --test m9e_town_seed_search -- --nocapture 2>&1 | tee "$RUNNER_TEMP/m9e-town-seed.log"
-          grep -o 'candidate=m9e-town-handoff-[0-9]* before=!rnd,[^[:space:]]* time_offset=[0-9]*' "$RUNNER_TEMP/m9e-town-seed.log" > "$RUNNER_TEMP/m9e-town-seed-candidates.txt"
+          grep -o 'candidate=m9e-town-handoff-[0-9]* before=!rnd,[^[:space:]]* time_offset=[0-9]* first=[0-9]*' "$RUNNER_TEMP/m9e-town-seed.log" > "$RUNNER_TEMP/m9e-town-seed-candidates.txt"
           test "$(wc -l < "$RUNNER_TEMP/m9e-town-seed-candidates.txt")" -eq 24
       - name: Publish bounded seed candidates
         if: always()
@@ -79,6 +79,11 @@ jobs:
           result=${PIPESTATUS[0]}
           grep -E 'admitted=m9e-town-handoff-|rejected=m9e-town-handoff-' "$RUNNER_TEMP/m9e-town-natural.log" > "$RUNNER_TEMP/m9e-town-natural-candidates.txt" || true
           exit "$result"
+      - name: Qualify source Vine Whip owned turn
+        run: |
+          cargo test --manifest-path rust/Cargo.toml --locked -p er-kernel --test m9e_current_target_execution source_vine_whip_enters_the_owned_single_target_turn -- --exact
+          cargo clippy --manifest-path rust/Cargo.toml --locked -p er-battle --lib --no-deps -- -D warnings
+          cargo clippy --manifest-path rust/Cargo.toml --locked -p er-kernel --test m9e_current_target_execution --no-deps -- -D warnings
       - name: Publish bounded natural admission
         if: always()
         uses: actions/upload-artifact@v6
