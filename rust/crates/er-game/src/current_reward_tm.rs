@@ -87,7 +87,9 @@ pub(crate) fn available(pokemon: &PokemonStateV5) -> Result<Vec<MoveId>, Error> 
     if pokemon.species_id.get().get() != source.species
         || pokemon.form_index != source.form
         || pokemon.fusion.is_some()
-        || pokemon.tera_type.is_some()
+        || pokemon
+            .tera_type
+            .is_some_and(|tera| tera != pokemon.types.primary)
         || !pokemon.held_items.is_empty()
         || pokemon.mechanics != er_state::mechanic_state_v2::MechanicStateStoreV2::default()
         || pokemon.types.primary != er_types::battle_model::PokemonType::Grass

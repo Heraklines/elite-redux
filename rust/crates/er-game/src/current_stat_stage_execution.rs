@@ -51,7 +51,9 @@ pub(crate) fn validate<'a>(
     for pokemon in run.party.iter().chain(&battle.enemy_party) {
         if pokemon.status.kind != er_types::battle_model::StatusKind::None
             || pokemon.mechanics != er_state::mechanic_state_v2::MechanicStateStoreV2::default()
-            || pokemon.tera_type.is_some()
+            || pokemon
+                .tera_type
+                .is_some_and(|tera| tera != pokemon.types.primary)
         {
             return Err(failure());
         }

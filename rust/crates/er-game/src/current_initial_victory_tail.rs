@@ -113,7 +113,9 @@ fn neutral_context(
         || pokemon.fainted
         || pokemon.status.kind != StatusKind::None
         || pokemon.mechanics != MechanicStateStoreV2::default()
-        || pokemon.tera_type.is_some()
+        || pokemon
+            .tera_type
+            .is_some_and(|tera| tera != pokemon.types.primary)
     {
         return Err(failure());
     }

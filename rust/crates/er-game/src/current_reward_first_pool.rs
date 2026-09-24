@@ -62,7 +62,7 @@ impl FirstRewardPool {
             || p.mechanics != MechanicStateStoreV2::default()
             || !p.held_items.is_empty()
             || p.fusion.is_some()
-            || p.tera_type.is_some()
+            || p.tera_type.is_some_and(|tera| tera != p.types.primary)
             || p.shiny
             || p.variant != 0
         {
