@@ -625,11 +625,14 @@ fn wasm_replays_v7_raw_inputs_eventwise() -> Result<(), wasm_bindgen::JsValue> {
     Ok(())
 }
 
+// The held-timer witness keeps a live kernel and a restored peer across
+// snapshots. Separate its frames and heap-own both kernels on Wasm.
+#[inline(never)]
 fn timer_request() -> Result<(M9EParityRequestV1, Arc<PreparedGameContentV2>), Box<dyn Error>> {
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle.clone()))?);
     let seat = SeatId::new(safe(1));
-    let mut kernel = GameKernelV7::natural_start(
+    let mut kernel = Box::new(GameKernelV7::natural_start(
         profile(),
         "m9e-native-wasm-held-timer".to_owned(),
         seat,
@@ -638,7 +641,7 @@ fn timer_request() -> Result<(M9EParityRequestV1, Arc<PreparedGameContentV2>), B
         content.clone(),
         scheduler(),
         None,
-    )?;
+    )?);
     let mut setup = Vec::new();
     for _ in 0..3 {
         press(&mut kernel, &mut setup, PhysicalKey::Space)?;
@@ -715,11 +718,12 @@ fn apply_timer_event(
     })
 }
 
+#[inline(never)]
 fn assert_timer_eventwise_parity_contract(
     replay: impl Fn(M9EParityRequestV1) -> Result<M9EParityReportV1, Box<dyn Error>>,
 ) -> Result<String, Box<dyn Error>> {
     let (request, content) = timer_request()?;
-    let mut driver = GameKernelV7::from_snapshot(
+    let mut driver = Box::new(GameKernelV7::from_snapshot(
         request
             .initial_snapshot
             .clone()
@@ -727,7 +731,7 @@ fn assert_timer_eventwise_parity_contract(
         request.local_seat,
         request.role,
         content.clone(),
-    )?;
+    )?);
     let expected_cursors = [
         "battle/command/party",
         "battle/command/party",
@@ -738,7 +742,7 @@ fn assert_timer_eventwise_parity_contract(
     ];
     let mut observations = Vec::new();
     let mut midpoint = None;
-    let mut restored: Option<GameKernelV7> = None;
+    let mut restored: Option<Box<GameKernelV7>> = None;
     for (index, event) in request.events.iter().enumerate() {
         let step = apply_timer_event(&mut driver, event.clone())?;
         let snapshot = driver.snapshot()?;
@@ -778,12 +782,12 @@ fn assert_timer_eventwise_parity_contract(
         if index == 1 {
             assert_eq!(snapshot.scheduler.timers[0].remaining_active_ms, safe(1));
             midpoint = Some(snapshot.clone());
-            restored = Some(GameKernelV7::from_snapshot(
+            restored = Some(Box::new(GameKernelV7::from_snapshot(
                 snapshot.clone(),
                 request.local_seat,
                 request.role,
                 content.clone(),
-            )?);
+            )?));
         }
         if index >= 4 {
             assert!(snapshot.input_router.repeats.is_empty());
