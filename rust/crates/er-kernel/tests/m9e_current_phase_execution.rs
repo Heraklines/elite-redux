@@ -2078,18 +2078,13 @@ fn admit_wave_two_vine_whip(
             }
             continue;
         }
-        let turn = state.current_turn_execution.as_ref().map(|turn| {
-            (
-                turn.stage.clone(),
-                turn.next_action,
-                turn.actions.len(),
-            )
-        });
+        let turn = state
+            .current_turn_execution
+            .as_ref()
+            .map(|turn| (turn.stage.clone(), turn.next_action, turn.actions.len()));
         let enemy_hp = battle.enemy_party[0].hp;
         let step = kernel.advance_time(SafeU53::ZERO).map_err(|error| {
-            format!(
-                "wave-two turn drain {iteration}: turn={turn:?}, enemy_hp={enemy_hp}: {error}"
-            )
+            format!("wave-two turn drain {iteration}: turn={turn:?}, enemy_hp={enemy_hp}: {error}")
         })?;
         if !step
             .effects
