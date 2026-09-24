@@ -41,7 +41,8 @@ SOURCES = [EXAMPLE, SPEC, WORKER_SPEC, "scripts/ci/m9e_coop_rtc_diagnostic.py", 
            "rust/crates/er-cli/Cargo.toml", "rust/crates/er-cli/src/main.rs",
            "rust/crates/er-cli/src/current_commands.rs", WORKER_IMPORT_EXAMPLE,
            "rust/crates/er-kernel-worker/Cargo.toml", "rust/crates/er-kernel-worker/src/protocol_v2.rs",
-           "rust/crates/er-kernel-worker/src/runtime_v2.rs",
+           "rust/crates/er-kernel-worker/src/runtime_v2.rs", "rust/crates/er-kernel-worker/src/main.rs",
+           "rust/crates/er-kernel-worker/src/framing.rs",
            "rust/crates/er-web/Cargo.toml", "pnpm-lock.yaml", "package.json", ".nvmrc",
            "playwright.rust-browser.config.ts", "scripts/ci/m9e_current_cost.py"]
 logs = {}
@@ -469,11 +470,18 @@ def execute_prepared(summary, *, install_chromium=True):
     run(["cargo", "build", "--manifest-path", "rust/Cargo.toml", "--locked", "-p",
          "er-kernel-worker", "--example", "m9e_browser_capsule_import"],
         "native-worker-import-build", 360)
+    run(["cargo", "build", "--manifest-path", "rust/Cargo.toml", "--locked", "-p",
+         "er-kernel-worker", "--bin", "er-kernel-worker"],
+        "native-worker-process-build", 360)
     witness = ROOT / "rust/target/debug/examples/m9e_browser_capsule_import"
     if witness.is_symlink() or not witness.is_file() or not 0 < witness.stat().st_size <= 128 << 20:
         raise RuntimeError("actual native worker import witness executable required")
+    process_worker = ROOT / "rust/target/debug/er-kernel-worker"
+    if (process_worker.is_symlink() or not process_worker.is_file()
+            or not 0 < process_worker.stat().st_size <= 128 << 20):
+        raise RuntimeError("actual native worker process executable required")
     worker_log = run([str(witness), str(OUTPUT / "game-content-bundle-v2.json"),
-                      str(capsule_path), str(snapshot_path), sha],
+                      str(capsule_path), str(snapshot_path), sha, str(process_worker)],
                      "native-worker-import", 120, 1 << 20)
     worker_import = json.loads(worker_log.read_text())
     if (worker_import.get("source_sha") != sha
@@ -481,6 +489,11 @@ def execute_prepared(summary, *, install_chromium=True):
             or worker_import.get("native_frontier") != capsule["final_position"] + 1
             or worker_import.get("native_suffix_attempts") != 1
             or worker_import.get("full_snapshot_equal") is not True
+            or worker_import.get("process_snapshot_equal") is not True
+            or worker_import.get("process_native_frontier") != capsule["final_position"] + 1
+            or worker_import.get("process_suffix_attempts") != 1
+            or worker_import.get("process_worker_sha256") != digest(process_worker)
+            or worker_import.get("process_disposed") is not True
             or worker_import.get("executable_sha256") != digest(witness)):
         raise RuntimeError("native worker runtime did not preserve and continue browser capsule")
     summary["native_worker_import"] = worker_import
@@ -539,7 +552,7 @@ def execute_prepared(summary, *, install_chromium=True):
         raise RuntimeError("early browser snapshot exceeds native worker import bound")
     early_snapshot_path.write_bytes(early_snapshot_bytes)
     early_worker_log = run([str(witness), str(OUTPUT / "game-content-bundle-v2.json"),
-                            str(early_capsule_path), str(early_snapshot_path), sha],
+                            str(early_capsule_path), str(early_snapshot_path), sha, str(process_worker)],
                            "native-worker-early-import", 120, 1 << 20)
     early_worker = json.loads(early_worker_log.read_text())
     if (early_worker.get("source_sha") != sha
@@ -547,6 +560,11 @@ def execute_prepared(summary, *, install_chromium=True):
             or early_worker.get("native_frontier") != early_capsule["final_position"] + 1
             or early_worker.get("native_suffix_attempts") != 1
             or early_worker.get("full_snapshot_equal") is not True
+            or early_worker.get("process_snapshot_equal") is not True
+            or early_worker.get("process_native_frontier") != early_capsule["final_position"] + 1
+            or early_worker.get("process_suffix_attempts") != 1
+            or early_worker.get("process_worker_sha256") != digest(process_worker)
+            or early_worker.get("process_disposed") is not True
             or early_worker.get("executable_sha256") != digest(witness)):
         raise RuntimeError("native worker did not preserve and continue the early browser causal prefix")
     summary["early_cross_entry"] = {
@@ -557,7 +575,9 @@ def execute_prepared(summary, *, install_chromium=True):
         "snapshot_sha256": hashlib.sha256(json.dumps(early["snapshot"], sort_keys=True,
                                                  separators=(",", ":")).encode()).hexdigest(),
         "cli_sha256": digest(cli), "worker_sha256": digest(witness),
+        "process_worker_sha256": digest(process_worker),
         "full_snapshot_equal": True, "native_suffix_attempts": 1,
+        "process_snapshot_equal": True, "process_suffix_attempts": 1,
     }
     summary["tests"] = {"passed": 4, "failed": 0, "skipped": 0, "ids": IDS + [WORKER_ID]}
 
