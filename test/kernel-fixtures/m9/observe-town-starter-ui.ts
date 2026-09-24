@@ -151,6 +151,11 @@ test("Title and actual starter controls construct a source-owned Classic starter
       mark(`save-slot-action-returned:${accepted}`);
       resolve();
     });
+    manager!.onNextPrompt("SelectStarterPhase", UiMode.CONFIRM, () => {
+      mark("save-overwrite-confirm");
+      const handler = manager!.scene.ui.getHandler() as StarterSelectUiHandler;
+      handler.processInput(Button.ACTION);
+    });
   });
   const phase = () => manager!.scene.phaseManager.getCurrentPhase().phaseName;
   const mode = () => manager!.scene.ui.getMode();
