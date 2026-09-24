@@ -554,7 +554,7 @@ fn actual_abi2_process_runs_current_natural_controls_and_non_key_time() -> Resul
 fn actual_abi2_process_exports_complete_causal_repro() -> Result<(), Box<dyn Error>> {
     let (bundle, identity) = fixture()?;
     let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle.clone()))?);
-    let mut worker = WorkerProcess::spawn(identity)?;
+    let mut worker = WorkerProcess::spawn(identity.clone())?;
     worker.accepted(0, KernelWorkerRequestV2::Hello)?;
     worker.accepted(1, initialization(bundle)?)?;
     worker.accepted(
@@ -594,14 +594,53 @@ fn actual_abi2_process_exports_complete_causal_repro() -> Result<(), Box<dyn Err
             .all(|attempt| attempt.origin.as_deref() == Some("worker.apply"))
     );
     let replayed = replay_current_capsule_v1(&capsule, content, CurrentReproLimitsV1::default())?;
-    assert_eq!(replayed.snapshot()?, worker.snapshot(6)?);
+    let expected = worker.snapshot(6)?;
+    assert_eq!(replayed.snapshot()?, expected);
     let KernelWorkerResponseV2::Repro { capsule: second } =
         worker.accepted(7, KernelWorkerRequestV2::ExportRepro)?
     else {
         return Err("second worker export absent".into());
     };
     assert_eq!(capsule, second);
-    worker.dispose(8)
+    worker.dispose(8)?;
+
+    let mut imported = WorkerProcess::spawn(identity)?;
+    imported.accepted(0, KernelWorkerRequestV2::Hello)?;
+    let mut tampered = (*capsule).clone();
+    tampered.final_snapshot_digest = "0".repeat(64);
+    assert_fault(
+        imported.exchange(1, KernelWorkerRequestV2::Initialize {
+            content_bundle: Box::new(bundle.clone()),
+            initialization: Box::new(KernelWorkerInitializationV2::Capsule {
+                capsule: Box::new(tampered),
+            }),
+        })?,
+        KernelWorkerFaultCodeV2::KernelFailure,
+        Some(0),
+    );
+    imported.accepted(1, KernelWorkerRequestV2::Initialize {
+        content_bundle: Box::new(bundle),
+        initialization: Box::new(KernelWorkerInitializationV2::Capsule { capsule: capsule.clone() }),
+    })?;
+    assert_eq!(imported.snapshot(2)?, expected);
+    let KernelWorkerResponseV2::Repro { capsule: restored } =
+        imported.accepted(3, KernelWorkerRequestV2::ExportRepro)?
+    else {
+        return Err("imported worker did not retain native causal capsule".into());
+    };
+    assert_eq!(capsule, restored);
+    imported.accepted(4, KernelWorkerRequestV2::Apply(CurrentExternalEvent::AdvanceTime {
+        milliseconds: safe(1),
+    }))?;
+    let KernelWorkerResponseV2::Repro { capsule: continued } =
+        imported.accepted(5, KernelWorkerRequestV2::ExportRepro)?
+    else {
+        return Err("imported worker did not continue causal capture".into());
+    };
+    assert_eq!(continued.base_position, capsule.base_position);
+    assert_eq!(continued.final_position, capsule.final_position + 1);
+    assert_eq!(&continued.attempts[..capsule.attempts.len()], capsule.attempts.as_slice());
+    imported.dispose(6)
 }
 
 #[test]

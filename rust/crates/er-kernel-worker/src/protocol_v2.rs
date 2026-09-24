@@ -95,6 +95,9 @@ pub enum KernelWorkerInitializationV2 {
         local_seat: SeatId,
         role: GameKernelRoleV7,
     },
+    Capsule {
+        capsule: Box<CurrentReproCapsuleV1>,
+    },
 }
 
 impl KernelWorkerInitializationV2 {
@@ -120,6 +123,7 @@ impl KernelWorkerInitializationV2 {
             Self::Snapshot {
                 local_seat, role, ..
             } => (*local_seat, *role),
+            Self::Capsule { capsule } => (capsule.local_seat, capsule.role),
         }
     }
 }

@@ -158,7 +158,7 @@ impl KernelWorkerRuntimeV2 {
                         "generation content identity differs".to_owned(),
                     ));
                 }
-                let session = match *initialization {
+                let (session, capture) = match *initialization {
                     KernelWorkerInitializationV2::Natural {
                         profile,
                         seed,
@@ -167,21 +167,45 @@ impl KernelWorkerRuntimeV2 {
                         local_is_host,
                         scheduler,
                         protocol,
-                    } => CurrentGameSession::natural_start_with_scheduler(
-                        *profile,
-                        seed,
-                        local_seat,
-                        save_slots,
-                        local_is_host,
-                        Arc::clone(&content),
-                        scheduler,
-                        *protocol,
-                    )?,
+                    } => {
+                        let session = CurrentGameSession::natural_start_with_scheduler(
+                            *profile,
+                            seed,
+                            local_seat,
+                            save_slots,
+                            local_is_host,
+                            Arc::clone(&content),
+                            scheduler,
+                            *protocol,
+                        )?;
+                        let capture = capture_for_session(&session, 0).ok();
+                        (session, capture)
+                    }
                     KernelWorkerInitializationV2::Snapshot {
                         snapshot_bytes,
                         local_seat,
                         role,
-                    } => restored(&snapshot_bytes, local_seat, role, Arc::clone(&content))?,
+                    } => {
+                        let session = restored(&snapshot_bytes, local_seat, role, Arc::clone(&content))?;
+                        let capture = capture_for_session(&session, 0).ok();
+                        (session, capture)
+                    }
+                    KernelWorkerInitializationV2::Capsule { capsule } => {
+                        let browser_origin = capsule.browser_transport.is_some();
+                        let position = capsule.final_position;
+                        let (recorder, session) = CurrentReproRecorderV1::from_capsule(
+                            *capsule,
+                            Arc::clone(&content),
+                            CurrentReproLimitsV1::default(),
+                        )
+                        .map_err(|error| KernelWorkerRuntimeErrorV2::Repro(error.to_string()))?;
+                        let capture = if browser_origin {
+                            capture_for_session(&session, position).ok()
+                        } else {
+                            Some(recorder)
+                        };
+                        (session, capture)
+                    }
                 };
                 let observation = session.observe()?;
                 let bytes = encode_response(
@@ -194,7 +218,7 @@ impl KernelWorkerRuntimeV2 {
                     },
                     self.maximum_success_response_bytes,
                 )?;
-                self.capture = capture_for_session(&session, 0).ok();
+                self.capture = capture;
                 self.session = Some(session);
                 self.content = Some(content);
                 Ok(bytes)
