@@ -715,6 +715,12 @@ impl GameStateV6ContentContext for PreparedGameContentV2 {
         let Ok(expected_battle) = identities.allocate_battle_id() else {
             return false;
         };
+        let [enemy] = battle.enemy_party.as_slice() else {
+            return false;
+        };
+        let mut expected_enemy = plan.shell.pokemon;
+        expected_enemy.hp = enemy.hp;
+        expected_enemy.fainted = enemy.fainted;
         previous.active_run.as_ref().is_some_and(|prior_run| {
             prior_run.run_id == run.run_id
                 && prior_run.world.encounter_sequence.get().checked_add(1)
@@ -722,13 +728,17 @@ impl GameStateV6ContentContext for PreparedGameContentV2 {
                 && battle.battle_id == expected_battle
                 && battle.wave == run.wave
                 && run.wave.get().get() == 2
-                && battle.enemy_party.as_slice() == [plan.shell.pokemon]
-                && battle.outcome == er_types::battle_model::BattleOutcome::Ongoing
+                && enemy.hp <= expected_enemy.max_hp
+                && enemy == &expected_enemy
+                && matches!(
+                    battle.outcome,
+                    er_types::battle_model::BattleOutcome::Ongoing
+                        | er_types::battle_model::BattleOutcome::Victory
+                )
                 && run.run_rng == plan.next_run_rng
                 && state.identities == identities
                 && source.initial_battle == battle.battle_id
                 && source.initial_wave == run.wave
-                && owner.pending.is_empty()
         })
     }
     fn current_random_target_commands_match(
