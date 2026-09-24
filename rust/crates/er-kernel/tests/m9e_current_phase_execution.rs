@@ -1998,6 +1998,159 @@ fn actual_reward_skip_inner(
     );
     assert_eq!(canonical_bytes(state)?, before);
     assert_eq!(live.as_ref(), kernel.state());
+    assert_skipped_reward_wave_two(state, content.as_ref(), &plan)?;
+    for pending in kernel.snapshot()?.pending_presentations {
+        kernel.settle_presentation(pending.event_id)?;
+    }
+    let next = kernel.advance_time(SafeU53::ZERO)?;
+    assert!(
+        next.effects
+            .iter()
+            .any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. }))
+    );
+    accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &next)?;
+    let successor = kernel.state().ok_or("Town successor state absent")?;
+    let run = successor
+        .active_run
+        .as_ref()
+        .ok_or("Town successor run absent")?;
+    assert_eq!(run.wave.get().get(), 2);
+    assert_eq!(
+        run.battle
+            .as_ref()
+            .ok_or("Town successor battle absent")?
+            .enemy_party
+            .as_slice(),
+        [plan.shell.pokemon]
+    );
+    assert_eq!(live.as_ref(), kernel.state());
+    admit_wave_two_vine_whip(&mut kernel, content.as_ref(), &mut live, &mut ledger)?;
+    Ok(())
+}
+
+#[inline(never)]
+fn admit_wave_two_vine_whip(
+    kernel: &mut GameKernelV7,
+    content: &PreparedGameContentV2,
+    live: &mut Option<GameStateV6>,
+    ledger: &mut AppliedGameMaterialLedgerV1,
+) -> Result<()> {
+    navigate(kernel, "battle/command/fight")
+        .map_err(|error| format!("wave-two fight route: {error}"))?;
+    press(kernel, PhysicalKey::Space).map_err(|error| format!("wave-two fight open: {error}"))?;
+    navigate(kernel, "battle/move/0").map_err(|error| format!("wave-two move route: {error}"))?;
+    let frontier = Box::new(kernel.snapshot()?);
+    let mut canonical = active(&frontier)?.clone();
+    canonical.active_run.as_mut().ok_or("run absent")?.control = frontier
+        .private_battle_control
+        .as_ref()
+        .ok_or("wave-two private command absent")?
+        .canonical_control
+        .clone();
+    *live = Some(canonical);
+    *ledger = frontier.material_ledger.clone();
+    let step = press(kernel, PhysicalKey::Space)
+        .map_err(|error| format!("wave-two move submit: {error}"))?;
+    accept_material(live, ledger, kernel, content, &step)
+        .map_err(|error| format!("wave-two material replay: {error}"))?;
+    assert!(
+        kernel
+            .state()
+            .and_then(|state| state.current_turn_execution.as_ref())
+            .is_some()
+    );
+    for iteration in 0..128 {
+        let state = kernel.state().ok_or("wave-two battle state absent")?;
+        let battle = state
+            .active_run
+            .as_ref()
+            .and_then(|run| run.battle.as_ref())
+            .ok_or("wave-two battle absent")?;
+        if battle.outcome == er_types::battle_model::BattleOutcome::Victory {
+            assert_eq!(battle.enemy_party[0].hp, 0);
+            assert_eq!(live.as_ref(), kernel.state());
+            return Ok(());
+        }
+        let checkpoint = kernel.snapshot()?;
+        if !checkpoint.pending_presentations.is_empty() {
+            for pending in checkpoint.pending_presentations {
+                kernel.settle_presentation(pending.event_id)?;
+            }
+            continue;
+        }
+        let turn = state
+            .current_turn_execution
+            .as_ref()
+            .map(|turn| (turn.stage.clone(), turn.next_action, turn.actions.len()));
+        let enemy_hp = battle.enemy_party[0].hp;
+        let step = if let Some(pending) = checkpoint.pending_platform.first() {
+            match &pending.effect {
+                GamePlatformEffectV2::CurrentFriendshipClock { request } => kernel
+                    .apply_current_utc_clock_result(request.request, 0)
+                    .map_err(|error| Box::new(error) as Box<dyn Error>),
+                GamePlatformEffectV2::CurrentAchievementClock { request } => {
+                    accept_flash_test_clock(kernel, request)
+                }
+                GamePlatformEffectV2::CurrentFlashEgg { request } => {
+                    accept_flash_test_egg(kernel, request)
+                }
+                _ => return Err("unexpected wave-two platform request".into()),
+            }
+        } else {
+            kernel
+                .advance_time(SafeU53::ZERO)
+                .map_err(|error| Box::new(error) as Box<dyn Error>)
+        }
+        .map_err(|error| {
+            format!("wave-two turn drain {iteration}: turn={turn:?}, enemy_hp={enemy_hp}: {error}")
+        })?;
+        if !step
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. }))
+        {
+            return Err(format!(
+                "wave-two turn drain idle at {iteration}: turn={turn:?}, enemy_hp={enemy_hp}"
+            )
+            .into());
+        }
+        accept_material(live, ledger, kernel, content, &step)
+            .map_err(|error| format!("wave-two turn replay {iteration}: {error}"))?;
+    }
+    Err("wave-two Vine Whip never reached victory".into())
+}
+
+#[inline(never)]
+fn assert_skipped_reward_wave_two(
+    state: &GameStateV6,
+    content: &PreparedGameContentV2,
+    plan: &er_game::current_town_wild_spawn::CurrentTownPostrewardPlanV1,
+) -> Result<()> {
+    let (next, audit) =
+        er_game::m9e_new_run_v6::advance_current_town_day_wave_two_after_skipped_reward(
+            state, content,
+        )?;
+    let next = Box::new(next);
+    next.validate_with(content)?;
+    let run = next.active_run.as_ref().ok_or("next Town run absent")?;
+    let battle = run.battle.as_ref().ok_or("next Town battle absent")?;
+    assert_eq!(run.wave.get().get(), 2);
+    assert_eq!(
+        battle.enemy_party.as_slice(),
+        std::slice::from_ref(&plan.shell.pokemon)
+    );
+    assert_eq!(audit, plan.rng_audit);
+    assert_eq!(run.run_rng, plan.next_run_rng);
+    assert!(
+        next.current_battle_participation
+            .as_ref()
+            .and_then(|row| row.experience.as_ref())
+            .and_then(|owner| owner.first_reward_predecessor.as_ref())
+            .is_some_and(
+                |previous| serde_json::from_value::<GameStateV6>((**previous).clone())
+                    .is_ok_and(|restored| &restored == state)
+            )
+    );
     Ok(())
 }
 

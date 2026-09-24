@@ -264,6 +264,21 @@ impl GameKernelV7 {
                     output.internal_events.extend(step.internal_events);
                     return Ok(());
                 }
+                if tail.reward.as_ref().is_some_and(|reward| {
+                    reward.stage
+                        == er_state::current_reward_selection::CurrentRewardStageV1::Skipped
+                }) {
+                    if self.pending_current_phase_ack.is_some() {
+                        return Err(GameKernelV7Error::Invalid);
+                    }
+                    let step = self.execute_owned_phase(GameOwnedPhaseV1::RewardNextEncounter {
+                        pending: pending.id,
+                        menu_instance: self.next_menu_instance_id,
+                    })?;
+                    output.effects.extend(step.effects);
+                    output.internal_events.extend(step.internal_events);
+                    return Ok(());
+                }
                 if let Some(candy) = tail.reward.as_ref().and_then(|r| r.candy.as_ref()) {
                     use er_state::current_reward_candy::CurrentRewardCandyPhaseV1 as C;
                     let callback = match candy.phase {

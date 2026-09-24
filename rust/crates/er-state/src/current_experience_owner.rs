@@ -10,6 +10,7 @@ use crate::current_battle_participation::{
     CurrentBattleParticipantV1, CurrentBattleParticipationV1,
 };
 use crate::m7_state::RunStateV3;
+use crate::m9e_state_v6::GameStateV6;
 
 #[path = "current_friendship_phase.rs"]
 mod friendship_phase;
@@ -133,6 +134,10 @@ pub struct CurrentExperienceOwnerV1 {
     pub next_pending_id: SafeU53,
     /// Every entry is unresolved. There is deliberately no amount, applied marker or settlement API.
     pub pending: Vec<CurrentPendingExperienceV1>,
+    /// One bounded, exact predecessor for the first source reward-to-battle
+    /// handoff. The prior state must not itself carry a predecessor.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_reward_predecessor: Option<Box<serde_json::Value>>,
 }
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -176,6 +181,7 @@ impl CurrentExperienceOwnerV1 {
             next_observation: observation.next_occurrence,
             next_pending_id: SafeU53::new(1).map_err(|_| CurrentExperienceOwnerError::Invalid)?,
             pending: Vec::new(),
+            first_reward_predecessor: None,
         };
         value.validate(observation, run)?;
         Ok(value)
@@ -187,6 +193,56 @@ impl CurrentExperienceOwnerV1 {
         observation: &CurrentBattleParticipationV1,
         run: &RunStateV3,
     ) -> Result<(), CurrentExperienceOwnerError> {
+        if let Some(previous) = &self.first_reward_predecessor {
+            let previous_value = &**previous;
+            let previous: GameStateV6 = serde_json::from_value(previous_value.clone())
+                .map_err(|_| CurrentExperienceOwnerError::Invalid)?;
+            let canonical = serde_json::to_value(&previous)
+                .map_err(|_| CurrentExperienceOwnerError::Invalid)?;
+            if &canonical != previous_value {
+                return Err(CurrentExperienceOwnerError::Invalid);
+            }
+            let prior_run = previous
+                .active_run
+                .as_ref()
+                .ok_or(CurrentExperienceOwnerError::Invalid)?;
+            let prior_owner = previous
+                .current_battle_participation
+                .as_ref()
+                .and_then(|row| row.experience.as_ref())
+                .ok_or(CurrentExperienceOwnerError::Invalid)?;
+            let prior_battle = prior_run
+                .battle
+                .as_ref()
+                .ok_or(CurrentExperienceOwnerError::Invalid)?;
+            let prior_reward = prior_owner
+                .pending
+                .first()
+                .and_then(|pending| pending.victory_tail.as_ref())
+                .and_then(|tail| tail.reward.as_ref())
+                .ok_or(CurrentExperienceOwnerError::Invalid)?;
+            if prior_owner.first_reward_predecessor.is_some()
+                || self.source_progression.is_none()
+                || prior_run.run_id != run.run_id
+                || prior_run.wave.get().get() != 1
+                || run.wave.get().get() != 2
+                || prior_battle.outcome != BattleOutcome::Victory
+                || prior_owner.pending.len() != 1
+                || prior_reward.stage
+                    != crate::current_reward_selection::CurrentRewardStageV1::Skipped
+                || prior_owner.battle == self.battle
+                || prior_owner.authority != self.authority
+                || prior_owner.execution_origin
+                    != Some(CurrentExperienceExecutionOriginV1::FreshNormalClassic)
+                || self.execution_origin
+                    != Some(CurrentExperienceExecutionOriginV1::FreshNormalClassic)
+            {
+                return Err(CurrentExperienceOwnerError::Invalid);
+            }
+            previous
+                .validate()
+                .map_err(|_| CurrentExperienceOwnerError::Invalid)?;
+        }
         let battle = run
             .battle
             .as_ref()
@@ -194,6 +250,7 @@ impl CurrentExperienceOwnerV1 {
         if self.source_progression.as_ref().is_some_and(|source| {
             self.execution_origin != Some(CurrentExperienceExecutionOriginV1::FreshNormalClassic)
                 || source.profile_owner != self.authority
+                || (source.initial_wave.get().get() == 2) != self.first_reward_predecessor.is_some()
                 || !source.valid(run)
         }) {
             return Err(CurrentExperienceOwnerError::Invalid);

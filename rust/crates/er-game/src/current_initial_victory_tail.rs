@@ -1,4 +1,4 @@
-//! Candidate-only execution of the source-neutral first-wave Victory tail.
+//! Candidate-only execution of the source-neutral early-wave Victory tail.
 //! No generic reward chooser or next-wave provenance is fabricated here.
 use crate::m9e_content_v2::PreparedGameContentV2;
 use crate::m9e_runtime_v6::GameRuntimeV6Error;
@@ -92,8 +92,16 @@ fn neutral_context(
     crate::current_source_progression::current_source_progression(state, content)?;
     let run = state.active_run.as_ref().ok_or_else(failure)?;
     let battle = run.battle.as_ref().ok_or_else(failure)?;
+    let has_predecessor = state
+        .current_battle_participation
+        .as_ref()
+        .and_then(|row| row.experience.as_ref())
+        .is_some_and(|owner| owner.first_reward_predecessor.is_some());
     if run.party.len() != 1
-        || run.wave.get().get() != 1
+        || !matches!(
+            (run.wave.get().get(), has_predecessor),
+            (1, false) | (2, true)
+        )
         || battle.mechanics != MechanicStateStoreV2::default()
         || !battle
             .field
@@ -181,10 +189,11 @@ pub(crate) fn claim(
     if neutral_context(before, content).is_err() {
         return Ok(None);
     }
+    let expected_defeated_total = before.active_run.as_ref().ok_or_else(failure)?.wave.get();
     let pending = pending(before, id)?;
     if pending.victory_tail.is_some()
         || pending.victory.is_some()
-        || pending.victory_defeated_total != Some(one()?)
+        || pending.victory_defeated_total != Some(expected_defeated_total)
         || !pending.friendship.as_ref().is_some_and(|p| p.complete)
     {
         return Err(failure());

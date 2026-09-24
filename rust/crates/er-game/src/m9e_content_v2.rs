@@ -676,6 +676,85 @@ impl PreparedGameContentV2 {
 }
 
 impl GameStateV6ContentContext for PreparedGameContentV2 {
+    fn current_postreward_successor_matches(
+        &self,
+        state: &er_state::m9e_state_v6::GameStateV6,
+    ) -> bool {
+        let Some(owner) = state
+            .current_battle_participation
+            .as_ref()
+            .and_then(|row| row.experience.as_ref())
+        else {
+            return false;
+        };
+        let Some(previous) = owner.first_reward_predecessor.as_ref() else {
+            return false;
+        };
+        let Ok(previous) =
+            serde_json::from_value::<er_state::m9e_state_v6::GameStateV6>((**previous).clone())
+        else {
+            return false;
+        };
+        let Ok(plan) =
+            crate::current_town_wild_spawn::plan_current_town_day_wave_two_after_skipped_reward(
+                &previous, self,
+            )
+        else {
+            return false;
+        };
+        let Some(run) = state.active_run.as_ref() else {
+            return false;
+        };
+        let Some(battle) = run.battle.as_ref() else {
+            return false;
+        };
+        let Some(source) = owner.source_progression.as_ref() else {
+            return false;
+        };
+        let mut identities = plan.next_identities;
+        let Ok(expected_battle) = identities.allocate_battle_id() else {
+            return false;
+        };
+        let [enemy] = battle.enemy_party.as_slice() else {
+            return false;
+        };
+        let mut expected_enemy = plan.shell.pokemon;
+        expected_enemy.hp = enemy.hp;
+        expected_enemy.fainted = enemy.fainted;
+        previous.active_run.as_ref().is_some_and(|prior_run| {
+            prior_run.run_id == run.run_id
+                && prior_run.world.encounter_sequence.get().checked_add(1)
+                    == Some(run.world.encounter_sequence.get())
+                && battle.battle_id == expected_battle
+                && battle.wave == run.wave
+                && run.wave.get().get() == 2
+                && enemy.hp <= expected_enemy.max_hp
+                && enemy == &expected_enemy
+                && matches!(
+                    battle.outcome,
+                    er_types::battle_model::BattleOutcome::Ongoing
+                        | er_types::battle_model::BattleOutcome::Victory
+                )
+                && (battle.outcome != er_types::battle_model::BattleOutcome::Victory
+                    || enemy.hp == 0)
+                && run.run_rng == plan.next_run_rng
+                && state.identities.next_run_id == identities.next_run_id
+                && state.identities.next_pokemon_id == identities.next_pokemon_id
+                && state.identities.next_battle_id == identities.next_battle_id
+                && state.identities.next_storage_slot_id == identities.next_storage_slot_id
+                && state.identities.next_modifier_instance_id
+                    == identities.next_modifier_instance_id
+                && state.identities.next_scenario_instance_id
+                    == identities.next_scenario_instance_id
+                // Friendship and later owned phases allocate external clock
+                // requests after battle admission. Their exact increments are
+                // checked by each material transition and replay ledger.
+                && state.identities.next_platform_request_id
+                    >= identities.next_platform_request_id
+                && source.initial_battle == battle.battle_id
+                && source.initial_wave == run.wave
+        })
+    }
     fn current_random_target_commands_match(
         &self,
         state: &er_state::m9e_state_v6::GameStateV6,
