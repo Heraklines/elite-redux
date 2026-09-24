@@ -17,17 +17,70 @@ use er_game::current_town_wild_spawn::{
     source_town_wave_cycle_offset, source_town_weighted_level_move_pool,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
+use er_game::m9e_new_run_v6::{
+    CurrentSourceStarterInputV1, construct_current_source_starter_v1,
+    current_fresh_starter_account_v1,
+};
 use er_rng::audit::{RngCallsiteId, RngPublicApi, RngReason};
 use er_rng::battle::RngRuntime;
 use er_rng::phaser::{PhaserRdg, PhaserRdgState, RunRngState, shift_char_codes};
 use er_state::m9e_state_v6::GameIdentityAllocatorStateV1;
-use er_types::battle_ids::SpeciesId;
+use er_types::battle_ids::{MoveId, SpeciesId};
 use er_types::battle_model::PokemonType;
 use er_types::run_ids::BiomeId;
-use er_types::{RunDifficultyV1, SafeU53};
+use er_types::{RunDifficultyV1, SafeU53, SeatId};
 
 const BUNDLE: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/game-content-bundle-v2.json");
+
+#[test]
+fn fresh_source_account_catalog_matches_pinned_ui_observation() -> Result<(), Box<dyn Error>> {
+    // Pinned399d source run35967546131 observed these 27 rows identically in
+    // four fresh processes; natureAttr is the source's (nature + 1) bit.
+    let expected = [
+        (1, 128),
+        (4, 33_554_432),
+        (7, 2),
+        (152, 128),
+        (155, 8_192),
+        (158, 8_192),
+        (252, 128),
+        (255, 8_192),
+        (258, 524_288),
+        (387, 524_288),
+        (390, 2),
+        (393, 8_192),
+        (495, 33_554_432),
+        (498, 8_192),
+        (501, 8_192),
+        (650, 524_288),
+        (653, 524_288),
+        (656, 2),
+        (722, 33_554_432),
+        (725, 524_288),
+        (728, 524_288),
+        (810, 2),
+        (813, 33_554_432),
+        (816, 8_192),
+        (906, 2),
+        (909, 524_288),
+        (912, 524_288),
+    ];
+    let actual = current_fresh_starter_account_v1()?;
+    assert_eq!(actual.len(), expected.len());
+    for (entry, (species, nature_attr)) in actual.iter().zip(expected) {
+        assert_eq!(entry.species.get().get(), species);
+        assert_eq!(entry.nature_attr, nature_attr);
+        assert_eq!(entry.seen_attr, 157);
+        assert_eq!(entry.caught_attr, 157);
+        assert_eq!(entry.ivs, [15; 6]);
+        assert_eq!(entry.ability_attr, 1);
+        assert_eq!(entry.passive_attr, 0);
+        assert_eq!(entry.egg_moves, 0);
+        assert!(!entry.has_saved_moveset);
+    }
+    Ok(())
+}
 const SOURCE_GENDER: &[u8] = include_bytes!("../../../fixtures/m9/engineering/town-gender-v1.json");
 const SOURCE_FORM_FLAGS: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/town-form-flags-v1.json");
@@ -79,6 +132,27 @@ const SOURCE_AFTER_WAVE_RESET: &str =
     "!rnd,1,0.3782209656201303,0.3772894029971212,0.5761283298488706";
 const SOURCE_AFTER_SELECTION: &str =
     "!rnd,1012145,0.09734400571323931,0.1575480371247977,0.15997060341760516";
+
+fn observed_title_route_prefix(rng: &mut RngRuntime) -> Result<usize, Box<dyn Error>> {
+    let mut successes = 0;
+    let mut attempts = 0;
+    while successes < 3 && attempts < 10 {
+        let roll = rng.run_rand_seed_int(
+            SafeU53::new(100)?,
+            SafeU53::ZERO,
+            RngReason::RandomSelector,
+            RngCallsiteId::mechanics(RngReason::RandomSelector),
+        )?;
+        attempts += 1;
+        if roll.get() < 50 {
+            successes += 1;
+        }
+    }
+    if successes != 3 {
+        return Err("observed Title route prefix did not reach three extras".into());
+    }
+    Ok(attempts)
+}
 
 #[test]
 fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Box<dyn Error>> {
@@ -1294,9 +1368,13 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
     // The later explicit-starter probe (run35948078136) captured this exact
     // pre-constructor RNG state and the source-chosen Bulbasaur identity. It
     // does not prove that the full raw starter UI reaches this state.
-    let starter_state = PhaserRdgState::from_state_string(
-        "!rnd,1,0.16302004898898304,0.7822124343365431,0.41194894444197416",
-    )?;
+    let seed = "m9e-town-handoff-5042";
+    let before_starter = "!rnd,1,0.16302004898898304,0.7822124343365431,0.41194894444197416";
+    assert_eq!(
+        RngRuntime::from_run_seed(seed).run_state().rdg.state_string,
+        before_starter
+    );
+    let starter_state = PhaserRdgState::from_state_string(before_starter)?;
     let mut starter_rng = RngRuntime::from_states(RunRngState { rdg: starter_state }, None)?;
     let starter_id = starter_rng.run_rand_seed_int(
         SafeU53::new(1_u64 << 32)?,
@@ -1317,22 +1395,13 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
         starter_rng.run_state().rdg.state_string,
         "!rnd,192947,0.03402264299802482,0.47858460200950503,0.9830058687366545"
     );
-    let seed = "m9e-town-handoff-5042";
     // The actual starter UI path is distinct from the explicit test injection.
     // Pinned-source run35962688517 traced three TitlePhase.end draws from
     // rollErNextBiomeNodes. Starter launch then clears those pending nodes,
     // but the run RNG stays advanced. Run35963530932 confirmed the empty
     // pending graph at Command while preserving the same constructor frontier.
     let mut ui_rng = RngRuntime::from_run_seed(seed);
-    for _ in 0..3 {
-        let route_roll = ui_rng.run_rand_seed_int(
-            SafeU53::new(100)?,
-            SafeU53::ZERO,
-            RngReason::RandomSelector,
-            RngCallsiteId::mechanics(RngReason::RandomSelector),
-        )?;
-        assert!(route_roll.get() < 50);
-    }
+    assert_eq!(observed_title_route_prefix(&mut ui_rng)?, 3);
     assert_eq!(
         ui_rng.run_state().rdg.state_string,
         "!rnd,1001026,0.9830058687366545,0.08702266961336136,0.2183791280258447"
@@ -1356,6 +1425,113 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
     );
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = PreparedGameContentV2::prepare(Arc::new(bundle))?;
+    let selected = CurrentSourceStarterInputV1 {
+        species: SpeciesId::new(SafeU53::new(1)?),
+        form_index: 0,
+        ability_index: 0,
+        level: 5,
+        owner: SeatId::new(SafeU53::new(1)?),
+        gender: 0,
+        shiny: false,
+        variant: 0,
+        ivs: [15; 6],
+        nature_index: 6,
+        moves: [22, 33, 45, 74]
+            .map(|value| MoveId::new(SafeU53::new(value).expect("source move ID")))
+            .to_vec(),
+        tera_type: PokemonType::Grass,
+        pokerus: false,
+    };
+    let mut before_constructor = RngRuntime::from_run_seed(seed);
+    for _ in 0..3 {
+        before_constructor.run_rand_seed_int(
+            SafeU53::new(100)?,
+            SafeU53::ZERO,
+            RngReason::RandomSelector,
+            RngCallsiteId::mechanics(RngReason::RandomSelector),
+        )?;
+    }
+    let before_rejection = before_constructor.run_state();
+    let mut duplicate_move = selected.clone();
+    duplicate_move.moves[1] = duplicate_move.moves[0];
+    let duplicate_result =
+        construct_current_source_starter_v1(&content, &duplicate_move, &mut before_constructor);
+    assert!(duplicate_result.is_err());
+    assert_eq!(before_constructor.run_state(), before_rejection);
+    let mut impossible_ivs = selected.clone();
+    impossible_ivs.ivs[0] = 32;
+    let impossible_result =
+        construct_current_source_starter_v1(&content, &impossible_ivs, &mut before_constructor);
+    assert!(impossible_result.is_err());
+    assert_eq!(before_constructor.run_state(), before_rejection);
+    let mut unavailable_tera = selected.clone();
+    unavailable_tera.tera_type = PokemonType::Fire;
+    let unavailable_result =
+        construct_current_source_starter_v1(&content, &unavailable_tera, &mut before_constructor);
+    assert!(unavailable_result.is_err());
+    assert_eq!(before_constructor.run_state(), before_rejection);
+    let starter =
+        construct_current_source_starter_v1(&content, &selected, &mut before_constructor)?;
+    assert_eq!(starter.id.get().get(), 1_771_723_560);
+    assert_eq!(starter.ivs.map(|iv| iv.get()), [15; 6]);
+    assert_eq!(starter.nature.get(), 6);
+    assert_eq!(starter.gender, Some(0));
+    assert_eq!(starter.abilities.active.get().get(), 5006);
+    assert_eq!(starter.tera_type, Some(PokemonType::Grass));
+    assert_eq!(starter.pokerus, Some(false));
+    assert_eq!(
+        [
+            starter.stats.hp,
+            starter.stats.attack,
+            starter.stats.defense,
+            starter.stats.special_attack,
+            starter.stats.special_defense,
+            starter.stats.speed
+        ],
+        [20, 10, 10, 12, 12, 10]
+    );
+    assert_eq!(
+        starter
+            .moves
+            .into_iter()
+            .flatten()
+            .map(|slot| slot.move_id.get().get())
+            .collect::<Vec<_>>(),
+        vec![22, 33, 45, 74]
+    );
+    assert_eq!(before_constructor.run_state(), ui_rng.run_state());
+    // An independent source UI run on seed774 needed five candidate rolls to
+    // accept three extras. Its starter constructor begins at that frontier;
+    // the selected fresh-account inputs are otherwise the same Bulbasaur.
+    let mut alternate_rng = RngRuntime::from_run_seed("m9e-town-handoff-774");
+    assert_eq!(observed_title_route_prefix(&mut alternate_rng)?, 5);
+    assert_eq!(
+        alternate_rng.run_state().rdg.state_string,
+        "!rnd,969360,0.42243809276260436,0.04841565107926726,0.6655898890458047"
+    );
+    let mut random_tera_probe = alternate_rng.clone();
+    random_tera_probe.run_rand_seed_int(
+        SafeU53::new(1_u64 << 32)?,
+        SafeU53::ZERO,
+        RngReason::RandomSelector,
+        RngCallsiteId::mechanics(RngReason::RandomSelector),
+    )?;
+    assert_eq!(
+        random_tera_probe.run_pick_index(
+            2,
+            RngReason::RandomSelector,
+            RngCallsiteId::mechanics(RngReason::RandomSelector),
+        )?,
+        1
+    );
+    let alternate_starter =
+        construct_current_source_starter_v1(&content, &selected, &mut alternate_rng)?;
+    assert_eq!(alternate_starter.id.get().get(), 4_252_591_335);
+    assert_eq!(alternate_starter.tera_type, Some(PokemonType::Grass));
+    assert_eq!(
+        alternate_rng.run_state().rdg.state_string,
+        "!rnd,2071002,0.064213513629511,0.7699574562720954,0.006703111808747053"
+    );
     let mode = content
         .bundle()
         .world

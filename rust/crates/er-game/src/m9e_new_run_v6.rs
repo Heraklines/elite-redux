@@ -35,6 +35,13 @@ use thiserror::Error;
 use crate::m9e_content_v2::PreparedGameContentV2;
 use crate::m72_bootstrap::{RunBootstrapMachineV1, RunBootstrapStageV1};
 
+#[path = "current_source_starter.rs"]
+mod current_source_starter;
+pub use current_source_starter::{
+    CurrentFreshStarterAccountEntryV1, CurrentSourceStarterInputV1,
+    construct_current_source_starter_v1, current_fresh_starter_account_v1,
+};
+
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum NaturalRunV6Error {
     #[error("natural V6 bootstrap selection or content is invalid")]

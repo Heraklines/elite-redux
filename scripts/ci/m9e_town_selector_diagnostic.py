@@ -15,6 +15,7 @@ COMPACT = OUT / "compact"
 SHA = os.environ["GITHUB_SHA"]
 TARGET = "m9e_current_town_wild_spawn"
 TEST_IDS = ["entire_town_day_pool_and_actual_wave_two_source_draw_match",
+            "fresh_source_account_catalog_matches_pinned_ui_observation",
             "naturally_admitted_day_seed_matches_pinned_postreward_enemy",
             "source_single_width_successor_with_matching_natural_opening",
             "source_single_width_town_successor_matches_pinned_shell",
@@ -70,6 +71,8 @@ def main():
         if head != SHA or status:
             raise RuntimeError("exact clean source candidate required")
         files = ["rust/crates/er-game/src/current_town_wild_spawn.rs",
+                 "rust/crates/er-game/src/current_source_starter.rs",
+                 "rust/crates/er-game/src/m9e_new_run_v6.rs",
                  "rust/crates/er-cli/src/current_agent.rs",
                  "rust/crates/er-cli/tests/m9e_current_entry.rs",
                  "rust/crates/er-game/src/current_town_level_two_forms.json",
@@ -128,7 +131,7 @@ def main():
             raise RuntimeError("whole Town selector test inventory differs")
         output = run("execute", base + ["--format", "terse"], 900)
         counts = re.findall(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", output)
-        if counts != [("5", "0", "0", "0", "0")]:
+        if counts != [("6", "0", "0", "0", "0")]:
             raise RuntimeError("Town selector result count differs")
         rng_base = ["cargo", "test", "--locked", "-p", "er-rng", "--test", "m3_rng", "--"]
         rng_listing = run("rng-list", rng_base + ["--list", "--format", "terse"])
@@ -143,7 +146,7 @@ def main():
                        "--no-deps", "--", "-D", "warnings"], 300)
         run("rng-clippy", ["cargo", "clippy", "--locked", "-p", "er-rng", "--test", "m3_rng",
                            "--no-deps", "--", "-D", "warnings"], 300)
-        result["tests"] = {"passed": 30, "failed": 0, "ignored": 0,
+        result["tests"] = {"passed": 31, "failed": 0, "ignored": 0,
                            "town_ids": TEST_IDS, "rng_ids": rng_ids}
         result["status"] = "passed"
     except Exception as error:
@@ -152,6 +155,7 @@ def main():
             subprocess.run(["cargo", "fmt", "--manifest-path", "Cargo.toml", "--all"],
                            cwd=RUST, timeout=120, check=False)
             patch = subprocess.check_output(["git", "diff", "--", files[0],
+                                             "rust/crates/er-game/src/current_source_starter.rs",
                                              "rust/crates/er-cli/src/current_agent.rs",
                                              "rust/crates/er-cli/tests/m9e_current_entry.rs",
                                              "rust/crates/er-game/tests/m9e_current_town_wild_spawn.rs",
