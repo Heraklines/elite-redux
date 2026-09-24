@@ -484,6 +484,81 @@ def execute_prepared(summary, *, install_chromium=True):
             or worker_import.get("executable_sha256") != digest(witness)):
         raise RuntimeError("native worker runtime did not preserve and continue browser capsule")
     summary["native_worker_import"] = worker_import
+    early_attachments = [item for item in account_results[0].get("attachments", [])
+                         if item.get("name") == "m9e-fresh-account-cross-entry-early"]
+    if len(early_attachments) != 1 or early_attachments[0].get("contentType") != "application/json":
+        raise RuntimeError("sole early browser-to-native causal prefix required")
+    early_attachment = early_attachments[0]
+    if "body" in early_attachment:
+        encoded = early_attachment["body"]
+        if not isinstance(encoded, str) or not 0 < len(encoded) <= 6 << 20:
+            raise RuntimeError("early browser-to-native encoded witness exceeds its bound")
+        early_raw = base64.b64decode(encoded, validate=True)
+    else:
+        original = Path(early_attachment["path"])
+        if not original.is_absolute():
+            original = ROOT / original
+        if original.is_symlink():
+            raise RuntimeError("early browser-to-native witness symlink forbidden")
+        path = original.resolve(strict=True)
+        if (not path.is_relative_to((ROOT / "test-results/rust-browser").resolve(strict=True))
+                or not 0 < path.stat().st_size <= 4 << 20):
+            raise RuntimeError("early browser-to-native witness path invalid")
+        early_raw = path.read_bytes()
+    if not 0 < len(early_raw) <= 4 << 20:
+        raise RuntimeError("early browser-to-native witness exceeds its bound")
+    early = json.loads(early_raw)
+    if not isinstance(early, dict) or set(early) != {"capsule", "snapshot"}:
+        raise RuntimeError("early browser-to-native witness shape differs")
+    early_capsule = early["capsule"]
+    if (not isinstance(early_capsule, dict) or not isinstance(early["snapshot"], dict)
+            or type(early_capsule.get("base_position")) is not int
+            or early_capsule["base_position"] != 0
+            or type(early_capsule.get("final_position")) is not int
+            or early_capsule["final_position"] < 1
+            or not isinstance(early_capsule.get("attempts"), list)
+            or len(early_capsule["attempts"]) != early_capsule["final_position"]):
+        raise RuntimeError("first browser raw input did not retain its complete causal prefix")
+    early_capsule_path = REPORT / "fresh-account-early-capsule.json"
+    early_capsule_bytes = json.dumps(early_capsule, separators=(",", ":")).encode()
+    if not 0 < len(early_capsule_bytes) <= 2 << 20:
+        raise RuntimeError("early browser capsule exceeds its bound")
+    early_capsule_path.write_bytes(early_capsule_bytes)
+    early_replay_log = run([str(cli), "capsule-validate", "--content", str(OUTPUT / "game-content-bundle-v2.json"),
+                            "--capsule", str(early_capsule_path)], "native-cli-early-replay", 120, 4 << 20)
+    early_replay = json.loads(early_replay_log.read_text())
+    if (early_replay.get("validation") != "ISOLATED_CURRENT_CAPSULE_REPLAY"
+            or early_replay.get("schema_valid") is not True or early_replay.get("replay_valid") is not True
+            or early_replay.get("processed_attempts") != len(early_capsule["attempts"])
+            or early_replay.get("final_position") != early_capsule["final_position"]
+            or early_replay.get("snapshot") != early["snapshot"]):
+        raise RuntimeError("native CLI early causal prefix differs from actual browser Worker")
+    early_snapshot_path = REPORT / "fresh-account-early-snapshot.json"
+    early_snapshot_bytes = json.dumps(early["snapshot"], separators=(",", ":")).encode()
+    if not 0 < len(early_snapshot_bytes) <= 8 << 20:
+        raise RuntimeError("early browser snapshot exceeds native worker import bound")
+    early_snapshot_path.write_bytes(early_snapshot_bytes)
+    early_worker_log = run([str(witness), str(OUTPUT / "game-content-bundle-v2.json"),
+                            str(early_capsule_path), str(early_snapshot_path), sha],
+                           "native-worker-early-import", 120, 1 << 20)
+    early_worker = json.loads(early_worker_log.read_text())
+    if (early_worker.get("source_sha") != sha
+            or early_worker.get("browser_frontier") != early_capsule["final_position"]
+            or early_worker.get("native_frontier") != early_capsule["final_position"] + 1
+            or early_worker.get("native_suffix_attempts") != 1
+            or early_worker.get("full_snapshot_equal") is not True
+            or early_worker.get("executable_sha256") != digest(witness)):
+        raise RuntimeError("native worker did not preserve and continue the early browser causal prefix")
+    summary["early_cross_entry"] = {
+        "base_position": 0, "final_position": early_capsule["final_position"],
+        "attempts": len(early_capsule["attempts"]),
+        "capsule_bytes": len(early_capsule_bytes),
+        "capsule_sha256": hashlib.sha256(early_capsule_bytes).hexdigest(),
+        "snapshot_sha256": hashlib.sha256(json.dumps(early["snapshot"], sort_keys=True,
+                                                 separators=(",", ":")).encode()).hexdigest(),
+        "cli_sha256": digest(cli), "worker_sha256": digest(witness),
+        "full_snapshot_equal": True, "native_suffix_attempts": 1,
+    }
     summary["tests"] = {"passed": 4, "failed": 0, "skipped": 0, "ids": IDS + [WORKER_ID]}
 
 
