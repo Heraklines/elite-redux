@@ -964,6 +964,12 @@ fn source_vine_whip_enters_the_owned_single_target_turn() -> Result<()> {
     let content = content()?;
     let mut snapshot = natural(content.clone(), 2, "m9e-target-execution-v2-7")?.snapshot()?;
     assign_move(active_mut(&mut snapshot)?, 22)?;
+    active(&snapshot)?.validate_with(content.as_ref())?;
+    // This controlled moveset edit changes the saved preimage. Start a fresh
+    // material ledger at the authentic next revision, as other fixtures do.
+    snapshot.material_ledger = er_game::m9e_material_v6::AppliedGameMaterialLedgerV1::new(
+        snapshot.material_ledger.next_authority_revision,
+    )?;
     let before = active(&snapshot)?;
     let run = active_run(before)?;
     let actor = run.party[0].id;
