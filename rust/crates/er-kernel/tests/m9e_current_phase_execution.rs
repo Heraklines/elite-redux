@@ -434,6 +434,14 @@ fn fresh_account_town_opening_retains_source_enemy_shell() -> Result<()> {
     assert_eq!(enemy.id.get().get(), 1173608932);
     assert_eq!(enemy.species_id.get().get(), 915);
     assert_eq!(enemy.abilities.active.get().get(), 268);
+    assert_eq!(
+        enemy.tera_type,
+        Some(er_types::battle_model::PokemonType::Normal)
+    );
+    assert_eq!(
+        enemy.mechanics,
+        er_state::mechanic_state_v2::MechanicStateStoreV2::default()
+    );
     assert_eq!(enemy.ivs.map(|iv| iv.get()), [2, 31, 7, 22, 15, 4]);
     assert_eq!(
         [
