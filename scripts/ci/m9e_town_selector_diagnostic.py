@@ -15,7 +15,9 @@ COMPACT = OUT / "compact"
 SHA = os.environ["GITHUB_SHA"]
 TARGET = "m9e_current_town_wild_spawn"
 TEST_IDS = ["entire_town_day_pool_and_actual_wave_two_source_draw_match",
-            "naturally_admitted_day_seed_matches_pinned_postreward_enemy"]
+            "naturally_admitted_day_seed_matches_pinned_postreward_enemy",
+            "source_single_width_successor_with_matching_natural_opening",
+            "source_single_width_town_successor_matches_pinned_shell"]
 SOURCE_GENDER_SHA256 = "a27f86e31feccd821f35aecaf9eb496faf120127e3df3d2c7c0b14f6593928fb"
 SOURCE_FORM_FLAGS_SHA256 = "e03db62cf3982e03fbb5a25045e15407abd12010aefcbca8fa8cf5585881f446"
 SOURCE_ABILITY_SLOTS_SHA256 = "c7564ac254fee378288b8cd8a10a1ca27dda01c6775045871feb3f6799a5f558"
@@ -59,7 +61,7 @@ def run(name, argv, seconds=600):
 def main():
     COMPACT.mkdir(parents=True, exist_ok=False)
     result = {"schema": 1, "status": "failed", "source_sha": SHA,
-              "scope": "Ace/Town/day wave-two full-root, constructor prefix, level-two ability-profile moveset and pinned level-three successor shell; no enemy settlement or next-wave receipt",
+              "scope": "Ace/Town/day wave-one root and wave-two full-root, constructor prefix, level-two ability-profile moveset and pinned single/double successor shells; no enemy settlement or next-wave receipt",
               "commands": COMMANDS}
     try:
         head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
@@ -67,6 +69,8 @@ def main():
         if head != SHA or status:
             raise RuntimeError("exact clean source candidate required")
         files = ["rust/crates/er-game/src/current_town_wild_spawn.rs",
+                 "rust/crates/er-cli/src/current_agent.rs",
+                 "rust/crates/er-cli/tests/m9e_current_entry.rs",
                  "rust/crates/er-game/src/current_town_level_two_forms.json",
                  "rust/crates/er-game/src/current_town_level_two_meta.json",
                  "rust/crates/er-game/src/current_town_level_two_movegen.json",
@@ -123,7 +127,7 @@ def main():
             raise RuntimeError("whole Town selector test inventory differs")
         output = run("execute", base + ["--format", "terse"], 900)
         counts = re.findall(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", output)
-        if counts != [("2", "0", "0", "0", "0")]:
+        if counts != [("4", "0", "0", "0", "0")]:
             raise RuntimeError("Town selector result count differs")
         rng_base = ["cargo", "test", "--locked", "-p", "er-rng", "--test", "m3_rng", "--"]
         rng_listing = run("rng-list", rng_base + ["--list", "--format", "terse"])
@@ -138,7 +142,7 @@ def main():
                        "--no-deps", "--", "-D", "warnings"], 300)
         run("rng-clippy", ["cargo", "clippy", "--locked", "-p", "er-rng", "--test", "m3_rng",
                            "--no-deps", "--", "-D", "warnings"], 300)
-        result["tests"] = {"passed": 27, "failed": 0, "ignored": 0,
+        result["tests"] = {"passed": 29, "failed": 0, "ignored": 0,
                            "town_ids": TEST_IDS, "rng_ids": rng_ids}
         result["status"] = "passed"
     except Exception as error:
@@ -147,6 +151,8 @@ def main():
             subprocess.run(["cargo", "fmt", "--manifest-path", "Cargo.toml", "--all"],
                            cwd=RUST, timeout=120, check=False)
             patch = subprocess.check_output(["git", "diff", "--", files[0],
+                                             "rust/crates/er-cli/src/current_agent.rs",
+                                             "rust/crates/er-cli/tests/m9e_current_entry.rs",
                                              "rust/crates/er-game/tests/m9e_current_town_wild_spawn.rs",
                                              "rust/crates/er-state/src/m9e_state_v6.rs",
                                              "rust/crates/er-game/tests/m9e_town_seed_search.rs",
