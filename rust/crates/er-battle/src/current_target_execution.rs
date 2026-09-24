@@ -813,11 +813,13 @@ fn source_move(id: u64) -> Result<(MoveTarget, bool), CurrentTargetExecutionErro
     let target = match id {
         // Pinned source defines Vine Whip (22) as a plain AttackMove with
         // NEAR_OTHER targeting; the level-five Town trace executes it twice.
+        // Its wave-two Lillipup carries Hyper Fang (158), Stuff Cheeks (747),
+        // Focus Energy (116), and Hypnosis (95) in the same registry.
         10 | 22 | 33 | 40 | 61 | 64 | 78 | 79 | 95 | 98 | 103 | 158 | 310 | 331 | 448 | 458
-        | 497 | 541 | 747 => NearOther,
+        | 497 | 541 => NearOther,
         39 | 43 | 45 | 230 => AllNearEnemies,
         57 => AllNearOthers,
-        105 | 110 | 116 | 336 => User,
+        105 | 110 | 116 | 336 | 747 => User,
         108 | 501 => UserSide,
         580 => BothSides,
         165 => RandomNearEnemy,

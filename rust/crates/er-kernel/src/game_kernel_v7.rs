@@ -725,15 +725,9 @@ impl GameKernelV7 {
                         er_types::battle_model::MovePower::Value(power) => power,
                     };
                     let targets = if let Some(owner) = &targeting {
-                        if battle.wave.get().get() == 2 {
-                            eprintln!("m9e-wave2 ai-plan move {}", slot.move_id.get().get());
-                        }
                         let plan = owner
                             .plan(run, actor.id, definition)
                             .map_err(|_| GameKernelV7Error::Invalid)?;
-                        if battle.wave.get().get() == 2 {
-                            eprintln!("m9e-wave2 ai-plan accepted");
-                        }
                         let choices = plan.selections().map_err(|_| GameKernelV7Error::Invalid)?;
                         let mut ordinals = Vec::new();
                         for (index, selection) in choices.into_iter().enumerate() {
@@ -3171,10 +3165,6 @@ impl GameKernelV7 {
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
         let state = self.state().cloned().ok_or(GameKernelV7Error::Invalid)?;
         let (battle, actor, field) = local_battle_actor(&state, command_seat)?;
-        let wave_two = battle.wave.get().get() == 2;
-        if wave_two {
-            eprintln!("m9e-wave2 local actor accepted");
-        }
         let run = state
             .active_run
             .as_ref()
@@ -3238,9 +3228,6 @@ impl GameKernelV7 {
             )?
             .retain(targets)
             .map_err(|_| GameKernelV7Error::Invalid)?;
-            if wave_two {
-                eprintln!("m9e-wave2 player target accepted");
-            }
         }
         let proposal = BattleCommandProposalV1::new(
             action_context.operation_id.clone(),
@@ -3301,13 +3288,7 @@ impl GameKernelV7 {
                 self.content.as_ref(),
             )
             .map_err(runtime_error)?;
-            if wave_two {
-                eprintln!("m9e-wave2 human command staged");
-            }
             entries.extend(self.prepare_authority_ai_commands_for_state(&ai_state)?);
-            if wave_two {
-                eprintln!("m9e-wave2 ai commands accepted");
-            }
             entries.sort_by_key(|entry| entry.field_slot());
             let commands = er_types::battle_command::CommandSet::new(entries)
                 .map_err(|_| GameKernelV7Error::Invalid)?;
@@ -3358,9 +3339,6 @@ impl GameKernelV7 {
             authority: true,
         };
         let mut step = execute_action_transaction(&mut staged, action, context)?;
-        if wave_two {
-            eprintln!("m9e-wave2 transaction accepted");
-        }
         self.install_step_effects(&step.effects)?;
         self.lifecycle = GameKernelLifecycleV7::Active(staged);
         self.private_battle_control = None;
