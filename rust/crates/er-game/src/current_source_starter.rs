@@ -15,8 +15,8 @@ use er_types::{FormId, SafeU53, SeatId};
 
 // Pinned source constants.ts defaultStarterSpecies, in UI order.
 const FRESH_STARTER_SPECIES: [u32; 27] = [
-    1, 4, 7, 152, 155, 158, 252, 255, 258, 387, 390, 393, 495, 498, 501, 650, 653, 656,
-    722, 725, 728, 810, 813, 816, 906, 909, 912,
+    1, 4, 7, 152, 155, 158, 252, 255, 258, 387, 390, 393, 495, 498, 501, 650, 653, 656, 722, 725,
+    728, 810, 813, 816, 906, 909, 912,
 ];
 const NEUTRAL_NATURES: [u8; 5] = [0, 6, 12, 18, 24];
 
@@ -36,8 +36,8 @@ pub struct CurrentFreshStarterAccountEntryV1 {
 /// Reproduce the source's fresh dex and starter-data defaults in their UI order.
 /// executeWithSeedOffset(0, "default") uses an isolated Phaser stream, so
 /// these draws never change the owned run RNG.
-pub fn current_fresh_starter_account_v1(
-) -> Result<Vec<CurrentFreshStarterAccountEntryV1>, NaturalRunV6Error> {
+pub fn current_fresh_starter_account_v1()
+-> Result<Vec<CurrentFreshStarterAccountEntryV1>, NaturalRunV6Error> {
     let mut rng = PhaserRdg::from_seed("default");
     FRESH_STARTER_SPECIES
         .into_iter()
