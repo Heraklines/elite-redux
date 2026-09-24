@@ -42,7 +42,9 @@ fn send(
         return Err("native worker did not accept the exact request sequence".into());
     }
     match response.response {
-        KernelWorkerResponseV2::Fault(fault) => Err(format!("native worker fault: {fault:?}").into()),
+        KernelWorkerResponseV2::Fault(fault) => {
+            Err(format!("native worker fault: {fault:?}").into())
+        }
         response => Ok(response),
     }
 }
@@ -131,8 +133,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     if *snapshot != expected {
         return Err("native worker snapshot differs from actual browser Worker".into());
     }
-    let KernelWorkerResponseV2::Repro { capsule: initial_suffix } =
-        send(&mut worker, &identity, 3, KernelWorkerRequestV2::ExportRepro)?
+    let KernelWorkerResponseV2::Repro {
+        capsule: initial_suffix,
+    } = send(
+        &mut worker,
+        &identity,
+        3,
+        KernelWorkerRequestV2::ExportRepro,
+    )?
     else {
         return Err("native worker did not declare a browser-origin suffix".into());
     };
@@ -153,8 +161,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     if !matches!(applied, KernelWorkerResponseV2::Effects { .. }) {
         return Err("native worker did not continue after browser import".into());
     }
-    let KernelWorkerResponseV2::Repro { capsule: continued } =
-        send(&mut worker, &identity, 5, KernelWorkerRequestV2::ExportRepro)?
+    let KernelWorkerResponseV2::Repro { capsule: continued } = send(
+        &mut worker,
+        &identity,
+        5,
+        KernelWorkerRequestV2::ExportRepro,
+    )?
     else {
         return Err("native worker did not export its continued suffix".into());
     };
