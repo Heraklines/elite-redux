@@ -1265,6 +1265,20 @@ fn source_single_width_successor_with_matching_natural_opening() -> Result<(), B
 fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Box<dyn Error>> {
     // Pinned-source run35942477027 observed the opening before the actual
     // level-five Bulbasaur's two-turn victory and reward-CANCEL handoff.
+    // The later explicit-starter probe (run35948078136) captured this exact
+    // pre-constructor RNG state and the source-chosen Bulbasaur identity. It
+    // does not prove that the full raw starter UI reaches this state.
+    let starter_state = PhaserRdgState::from_state_string(
+        "!rnd,1,0.16302004898898304,0.7822124343365431,0.41194894444197416",
+    )?;
+    let mut starter_rng = RngRuntime::from_states(RunRngState { rdg: starter_state }, None)?;
+    let starter_id = starter_rng.run_rand_seed_int(
+        SafeU53::new(1_u64 << 32)?,
+        SafeU53::ZERO,
+        RngReason::RandomSelector,
+        RngCallsiteId::mechanics(RngReason::RandomSelector),
+    )?;
+    assert_eq!(starter_id.get(), 396_198_998);
     let seed = "m9e-town-handoff-5042";
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = PreparedGameContentV2::prepare(Arc::new(bundle))?;
