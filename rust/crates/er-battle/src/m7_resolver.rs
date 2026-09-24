@@ -1441,7 +1441,11 @@ fn calculate_current_source_damage_with_variance(
         || target.status.kind != er_types::battle_model::StatusKind::None
         || actor.mechanics != er_state::mechanic_state_v2::MechanicStateStoreV2::default()
         || target.mechanics != er_state::mechanic_state_v2::MechanicStateStoreV2::default()
-        || actor.tera_type.is_some()
+        // The selected primary Tera type is inert until the mechanics owner
+        // records an active transformation; ordinary fresh starters retain it.
+        || actor
+            .tera_type
+            .is_some_and(|tera| tera != actor.types.primary)
         // A selected Tera type is not an active Tera form. The default
         // mechanics guards above exclude the active overlay; the source Town
         // opening retains its ordinary monotype Normal selection.
