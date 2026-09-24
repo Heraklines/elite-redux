@@ -20,7 +20,7 @@ import Phaser from "phaser";
 import { afterAll, expect, test, vi } from "vitest";
 
 const PIN = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7";
-const SEED = "m9e-town-handoff-5042";
+const SEED = process.env.M9_TOWN_STARTER_UI_SEED ?? "m9e-town-handoff-5042";
 let game: Phaser.Game | undefined;
 let manager: GameManager | undefined;
 
@@ -38,7 +38,7 @@ test("Title and actual starter controls construct a source-owned Classic starter
   const output = process.env.M9_TOWN_STARTER_UI_OUTPUT;
   const ordinal = process.env.M9_TOWN_STARTER_UI_ORDINAL;
   expect(output).toBeTruthy();
-  expect(["one", "two"]).toContain(ordinal);
+  expect(["one", "two", "alt-one", "alt-two"]).toContain(ordinal);
   expect(execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim()).toBe(PIN);
   const mark = (stage: string) =>
     writeFileSync(join(output!, `starter-ui-stage-${ordinal}.json`), `${JSON.stringify({ stage })}\n`);
@@ -261,6 +261,10 @@ test("Title and actual starter controls construct a source-owned Classic starter
       source: node.source ?? null,
     })),
   };
+  if (SEED !== "m9e-town-handoff-5042") {
+    writeFileSync(join(output!, `starter-ui-${ordinal}.json`), `${JSON.stringify(observation)}\n`);
+    return;
+  }
   const firstEnemy = enemy;
   let attackingTurns = 0;
   while (!manager.isVictory() && attackingTurns < 12) {

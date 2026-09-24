@@ -117,7 +117,7 @@ def main():
     result = {
         "schema": 1, "status": "failed", "source_pin": PIN,
         "candidate_sha": os.environ["GITHUB_SHA"],
-        "scope": "two fresh explicit-starter and two fresh actual-UI reward-to-wave-two observations; no Rust settlement qualification",
+        "scope": "two fresh explicit-starter and two fresh actual-UI reward-to-wave-two observations plus two alternate-seed starter UI observations; no Rust settlement qualification",
         "commands": COMMANDS,
     }
     try:
@@ -264,6 +264,50 @@ def main():
         (COMPACT / "starter-ui-candidate.json").unlink()
         result["starter_ui"] = {"bytes": len(ui_observations[0]),
                                 "sha256": sha(ui_observations[0])}
+        alternate_ui = []
+        for ordinal in ("alt-one", "alt-two"):
+            report = OUT / ("vitest-ui-" + ordinal + ".json")
+            environment = os.environ.copy()
+            environment["M9_TOWN_STARTER_UI_OUTPUT"] = str(OUT)
+            environment["M9_TOWN_STARTER_UI_ORDINAL"] = ordinal
+            environment["M9_TOWN_STARTER_UI_SEED"] = "m9e-town-handoff-774"
+            run(
+                "source-ui-" + ordinal,
+                ["pnpm", "exec", "vitest", "run", UI_INJECTED, "--pool=forks",
+                 "--isolate", "--no-file-parallelism", "--reporter=json",
+                 "--outputFile=" + str(report)],
+                cwd=SOURCE, seconds=300, env=environment,
+            )
+            vitest = json.loads(report.read_bytes())
+            require(
+                all(vitest.get(key) == value for key, value in {
+                    "numTotalTests": 1, "numPassedTests": 1,
+                    "numFailedTests": 0, "numPendingTests": 0,
+                    "numTodoTests": 0, "success": True,
+                }.items()),
+                "one alternate starter UI source test: " + ordinal,
+            )
+            raw = (OUT / ("starter-ui-" + ordinal + ".json")).read_bytes()
+            require(0 < len(raw) <= 8192, "bounded alternate starter UI observation")
+            (COMPACT / "starter-ui-alternate-candidate.json").write_bytes(raw)
+            value = json.loads(raw)
+            require(
+                raw == (json.dumps(value, separators=(",", ":")) + "\n").encode()
+                and value["source"] == PIN
+                and value["seed"] == "m9e-town-handoff-774"
+                and len(value["constructor"]) == 1
+                and value["player"]["species"] == 1
+                and value["player"]["id"] == value["constructor"][0]["id"]
+                and "successor" not in value,
+                "canonical alternate starter UI observation",
+            )
+            alternate_ui.append(raw)
+        require(alternate_ui[0] == alternate_ui[1],
+                "two fresh alternate starter UI observations differ")
+        (COMPACT / "starter-ui-alternate-observation.json").write_bytes(alternate_ui[0])
+        (COMPACT / "starter-ui-alternate-candidate.json").unlink()
+        result["starter_ui_alternate"] = {"bytes": len(alternate_ui[0]),
+                                          "sha256": sha(alternate_ui[0])}
         result["status"] = "passed"
     except Exception as error:
         result["first_failure"] = str(error)[:1024]
