@@ -191,7 +191,8 @@ fn address(
     // The pinned Town trace carries Vine Whip through Faint and reward.
     if !matches!(
         move_id.get().get(),
-        10 | 22 | 33
+        10 | 22
+            | 33
             | 39
             | 40
             | 43
