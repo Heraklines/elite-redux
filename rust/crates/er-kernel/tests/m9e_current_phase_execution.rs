@@ -1916,6 +1916,10 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
         content.as_ref(),
         &to_confirm,
     )?;
+    for pending in kernel.snapshot()?.pending_presentations {
+        kernel.settle_presentation(pending.event_id)?;
+    }
+    navigate(&mut kernel, "reward/skip/yes")?;
     let skipped = press(&mut kernel, PhysicalKey::Space)
         .map_err(|error| format!("Town reward skip confirm: {error}"))?;
     assert!(
@@ -1923,8 +1927,9 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
             .effects
             .iter()
             .any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. })),
-        "reward confirm produced no material; control={:?}",
-        kernel.current_control().map(|control| control.kind)
+        "reward confirm produced no material; control={:?}, pending={}",
+        kernel.current_control().map(|control| control.kind),
+        kernel.snapshot()?.pending_presentations.len()
     );
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &skipped)?;
     let state = kernel.state().ok_or("skipped reward state absent")?;
