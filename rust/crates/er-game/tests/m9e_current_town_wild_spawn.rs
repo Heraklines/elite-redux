@@ -1386,6 +1386,25 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
             RngCallsiteId::mechanics(RngReason::RandomSelector),
         )?;
     }
+    let before_rejection = before_constructor.run_state();
+    let mut duplicate_move = selected.clone();
+    duplicate_move.moves[1] = duplicate_move.moves[0];
+    let duplicate_result = construct_current_source_starter_v1(
+        &content,
+        &duplicate_move,
+        &mut before_constructor,
+    );
+    assert!(duplicate_result.is_err());
+    assert_eq!(before_constructor.run_state(), before_rejection);
+    let mut impossible_ivs = selected.clone();
+    impossible_ivs.ivs[0] = 32;
+    let impossible_result = construct_current_source_starter_v1(
+        &content,
+        &impossible_ivs,
+        &mut before_constructor,
+    );
+    assert!(impossible_result.is_err());
+    assert_eq!(before_constructor.run_state(), before_rejection);
     let starter =
         construct_current_source_starter_v1(&content, &selected, &mut before_constructor)?;
     assert_eq!(starter.id.get().get(), 1_771_723_560);
