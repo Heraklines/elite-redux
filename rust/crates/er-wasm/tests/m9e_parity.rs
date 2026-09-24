@@ -30,6 +30,14 @@ fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("test value is safe")
 }
 
+#[cfg(target_arch = "wasm32")]
+fn wasm_stage(stage: &str) {
+    wasm_bindgen_test::console_log!("M9E_STAGE={stage}");
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn wasm_stage(_stage: &str) {}
+
 fn profile() -> ProfileStateV1 {
     ProfileStateV1 {
         schema_version: PROFILE_STATE_SCHEMA_VERSION_V1,
@@ -629,8 +637,10 @@ fn wasm_replays_v7_raw_inputs_eventwise() -> Result<(), wasm_bindgen::JsValue> {
 // snapshots. Separate its frames and heap-own both kernels on Wasm.
 #[inline(never)]
 fn timer_request() -> Result<(M9EParityRequestV1, Arc<PreparedGameContentV2>), Box<dyn Error>> {
+    wasm_stage("timer-request-start");
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle.clone()))?);
+    wasm_stage("timer-content-ready");
     let seat = SeatId::new(safe(1));
     let mut kernel = Box::new(GameKernelV7::natural_start(
         profile(),
@@ -642,20 +652,25 @@ fn timer_request() -> Result<(M9EParityRequestV1, Arc<PreparedGameContentV2>), B
         scheduler(),
         None,
     )?);
+    wasm_stage("timer-kernel-started");
     let mut setup = Vec::new();
     for _ in 0..3 {
         press(&mut kernel, &mut setup, PhysicalKey::Space)?;
     }
+    wasm_stage("timer-first-presses");
     navigate_down_to(&mut kernel, &mut setup, "bootstrap/starter/confirm")?;
+    wasm_stage("timer-starter-confirm");
     for _ in 0..4 {
         press(&mut kernel, &mut setup, PhysicalKey::Space)?;
     }
+    wasm_stage("timer-run-bootstrapped");
     assert_eq!(
         kernel.current_control().map(|control| control.kind),
         Some(GameControlKindV2::BattleCommand)
     );
     assert_eq!(timer_cursor(&kernel)?, "battle/command/fight");
     let snapshot = kernel.snapshot()?;
+    wasm_stage("timer-snapshot-ready");
     assert!(snapshot.input_router.repeats.is_empty());
     assert!(snapshot.scheduler.timers.is_empty());
     let events = vec![
@@ -722,7 +737,9 @@ fn apply_timer_event(
 fn assert_timer_eventwise_parity_contract(
     replay: impl Fn(M9EParityRequestV1) -> Result<M9EParityReportV1, Box<dyn Error>>,
 ) -> Result<String, Box<dyn Error>> {
+    wasm_stage("timer-contract-start");
     let (request, content) = timer_request()?;
+    wasm_stage("timer-request-ready");
     let mut driver = Box::new(GameKernelV7::from_snapshot(
         request
             .initial_snapshot
@@ -732,6 +749,7 @@ fn assert_timer_eventwise_parity_contract(
         request.role,
         content.clone(),
     )?);
+    wasm_stage("timer-driver-restored");
     let expected_cursors = [
         "battle/command/party",
         "battle/command/party",
@@ -744,6 +762,7 @@ fn assert_timer_eventwise_parity_contract(
     let mut midpoint = None;
     let mut restored: Option<Box<GameKernelV7>> = None;
     for (index, event) in request.events.iter().enumerate() {
+        wasm_stage(&format!("timer-event-{index}"));
         let step = apply_timer_event(&mut driver, event.clone())?;
         let snapshot = driver.snapshot()?;
         assert_eq!(timer_cursor(&driver)?, expected_cursors[index]);
@@ -814,11 +833,14 @@ fn assert_timer_eventwise_parity_contract(
         final_snapshot_digest: er_canonical::content_digest(&driver.snapshot()?)?,
     };
     let mut resumed_request = request.clone();
+    wasm_stage("timer-expected-ready");
     resumed_request.initial_snapshot = Some(midpoint.ok_or("midpoint missing")?);
     resumed_request.events = request.events[2..].to_vec();
     let actual = replay(request)?;
+    wasm_stage("timer-replay-first-ready");
     assert_eq!(actual, expected);
     let resumed = replay(resumed_request)?;
+    wasm_stage("timer-replay-resumed-ready");
     let mut expected_resumed = expected.clone();
     expected_resumed.observations = expected.observations[2..].to_vec();
     for (index, observation) in expected_resumed.observations.iter_mut().enumerate() {

@@ -4,6 +4,7 @@ on:
     branches:
       - codex/m9e-wasm-parity-20260923
       - codex/m9e-current-phase-focused-20260910
+      - codex/m9e-parity-stack-20260924
 permissions:
   contents: read
 concurrency:
