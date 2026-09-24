@@ -2037,10 +2037,8 @@ fn admit_wave_two_vine_whip(
 ) -> Result<()> {
     navigate(kernel, "battle/command/fight")
         .map_err(|error| format!("wave-two fight route: {error}"))?;
-    press(kernel, PhysicalKey::Space)
-        .map_err(|error| format!("wave-two fight open: {error}"))?;
-    navigate(kernel, "battle/move/0")
-        .map_err(|error| format!("wave-two move route: {error}"))?;
+    press(kernel, PhysicalKey::Space).map_err(|error| format!("wave-two fight open: {error}"))?;
+    navigate(kernel, "battle/move/0").map_err(|error| format!("wave-two move route: {error}"))?;
     let step = press(kernel, PhysicalKey::Space)
         .map_err(|error| format!("wave-two move submit: {error}"))?;
     accept_material(live, ledger, kernel, content, &step)
