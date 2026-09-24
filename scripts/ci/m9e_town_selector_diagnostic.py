@@ -15,6 +15,7 @@ COMPACT = OUT / "compact"
 SHA = os.environ["GITHUB_SHA"]
 TARGET = "m9e_current_town_wild_spawn"
 TEST_IDS = ["entire_town_day_pool_and_actual_wave_two_source_draw_match",
+            "fresh_source_account_catalog_matches_pinned_ui_observation",
             "naturally_admitted_day_seed_matches_pinned_postreward_enemy",
             "source_single_width_successor_with_matching_natural_opening",
             "source_single_width_town_successor_matches_pinned_shell",
