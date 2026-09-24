@@ -17,6 +17,7 @@ COMPACT = REPORT / "compact"
 OUTPUT = REPORT / "web"
 DEADLINE = time.monotonic() + 1800
 EXAMPLE = "rust/crates/er-web/examples/m9e_v7_coop_startup.rs"
+WORKER_IMPORT_EXAMPLE = "rust/crates/er-kernel-worker/examples/m9e_browser_capsule_import.rs"
 SPEC = "test/browser/rust-browser/m9e-v7-coop-startup.spec.ts"
 WORKER_SPEC = "test/browser/rust-browser/m9e-v7-worker.spec.ts"
 WORKER_ID = "current V7 Worker preserves fresh account IDs through snapshot restore"
@@ -38,7 +39,9 @@ SOURCES = [EXAMPLE, SPEC, WORKER_SPEC, "scripts/ci/m9e_coop_rtc_diagnostic.py", 
            "rust/crates/er-game/src/m72_bootstrap.rs", "rust/crates/er-env/src/current.rs",
            "rust/crates/er-repro/src/current.rs", "rust/rust-toolchain.toml", "rust/Cargo.lock", "rust/Cargo.toml",
            "rust/crates/er-cli/Cargo.toml", "rust/crates/er-cli/src/main.rs",
-           "rust/crates/er-cli/src/current_commands.rs",
+           "rust/crates/er-cli/src/current_commands.rs", WORKER_IMPORT_EXAMPLE,
+           "rust/crates/er-kernel-worker/Cargo.toml", "rust/crates/er-kernel-worker/src/protocol_v2.rs",
+           "rust/crates/er-kernel-worker/src/runtime_v2.rs",
            "rust/crates/er-web/Cargo.toml", "pnpm-lock.yaml", "package.json", ".nvmrc",
            "playwright.rust-browser.config.ts", "scripts/ci/m9e_current_cost.py"]
 logs = {}
@@ -86,8 +89,22 @@ def main(summary):
         summary["format_patch_bytes"] = patch.stat().st_size
         summary["format_patch_sha256"] = digest(patch)
         raise RuntimeError("remote pinned formatting required; no qualification")
+    try:
+        run([*formatter, "--check", WORKER_IMPORT_EXAMPLE], "worker-import-format", 60, 262144)
+    except Exception:
+        run([*formatter, WORKER_IMPORT_EXAMPLE], "worker-import-format-repair", 60, 262144)
+        patch = run(["git", "diff", "--binary", "--", WORKER_IMPORT_EXAMPLE],
+                    "worker-import-format-patch", 30, 262144)
+        shutil.copyfile(patch, COMPACT / "worker-import-format.patch")
+        summary["formatted_hashes"] = {WORKER_IMPORT_EXAMPLE: digest(ROOT / WORKER_IMPORT_EXAMPLE)}
+        summary["format_patch_bytes"] = patch.stat().st_size
+        summary["format_patch_sha256"] = digest(patch)
+        raise RuntimeError("remote pinned worker import formatting required; no qualification")
     run(["cargo", "clippy", "--manifest-path", "rust/Cargo.toml", "--locked", "-p", "er-web",
          "--example", "m9e_v7_coop_startup", "--no-deps", "--", "-D", "warnings"], "clippy")
+    run(["cargo", "clippy", "--manifest-path", "rust/Cargo.toml", "--locked", "-p", "er-kernel-worker",
+         "--example", "m9e_browser_capsule_import", "--no-deps", "--", "-D", "warnings"],
+        "worker-import-clippy")
     run(["pnpm", "install", "--frozen-lockfile"], "dependencies")
     run(["pnpm", "exec", "tsc", "--ignoreConfig", "--noEmit", "--skipLibCheck", "--strict", "--target", "ESNext", "--module", "ESNext",
          "--moduleResolution", "bundler", "--lib", "ESNext,DOM", "--types", "node,vite/client",
@@ -444,6 +461,29 @@ def execute_prepared(summary, *, install_chromium=True):
                                                separators=(",", ":")).encode()).hexdigest(),
         "cli_sha256": digest(cli), "full_snapshot_equal": True,
     }
+    snapshot_path = REPORT / "fresh-account-snapshot.json"
+    snapshot_bytes = json.dumps(cross["snapshot"], separators=(",", ":")).encode()
+    if not 0 < len(snapshot_bytes) <= 8 << 20:
+        raise RuntimeError("browser snapshot exceeds native worker import bound")
+    snapshot_path.write_bytes(snapshot_bytes)
+    run(["cargo", "build", "--manifest-path", "rust/Cargo.toml", "--locked", "-p",
+         "er-kernel-worker", "--example", "m9e_browser_capsule_import"],
+        "native-worker-import-build", 360)
+    witness = ROOT / "rust/target/debug/examples/m9e_browser_capsule_import"
+    if witness.is_symlink() or not witness.is_file() or not 0 < witness.stat().st_size <= 128 << 20:
+        raise RuntimeError("actual native worker import witness executable required")
+    worker_log = run([str(witness), str(OUTPUT / "game-content-bundle-v2.json"),
+                      str(capsule_path), str(snapshot_path), sha],
+                     "native-worker-import", 120, 1 << 20)
+    worker_import = json.loads(worker_log.read_text())
+    if (worker_import.get("source_sha") != sha
+            or worker_import.get("browser_frontier") != capsule["final_position"]
+            or worker_import.get("native_frontier") != capsule["final_position"] + 1
+            or worker_import.get("native_suffix_attempts") != 1
+            or worker_import.get("full_snapshot_equal") is not True
+            or worker_import.get("executable_sha256") != digest(witness)):
+        raise RuntimeError("native worker runtime did not preserve and continue browser capsule")
+    summary["native_worker_import"] = worker_import
     summary["tests"] = {"passed": 4, "failed": 0, "skipped": 0, "ids": IDS + [WORKER_ID]}
 
 
