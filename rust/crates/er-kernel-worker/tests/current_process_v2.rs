@@ -556,7 +556,7 @@ fn actual_abi2_process_exports_complete_causal_repro() -> Result<(), Box<dyn Err
     let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle.clone()))?);
     let mut worker = WorkerProcess::spawn(identity.clone())?;
     worker.accepted(0, KernelWorkerRequestV2::Hello)?;
-    worker.accepted(1, initialization(bundle)?)?;
+    worker.accepted(1, initialization(bundle.clone())?)?;
     worker.accepted(
         2,
         KernelWorkerRequestV2::Apply(raw_key(PhysicalKey::Enter, true)),
