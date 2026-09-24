@@ -71,7 +71,7 @@ impl CurrentSourceProgressionV1 {
                 .as_ref()
                 .is_some_and(|progress| progress.valid(run))
             && self.run_id == run.run_id
-            && self.initial_wave.get().get() == 1
+            && (1..=2).contains(&self.initial_wave.get().get())
             && self.initial_enemy.pokemon.get().get() != 0
             && self.initial_enemy.species.get().get() != 0
             && self.initial_enemy.level > 0

@@ -676,6 +676,52 @@ impl PreparedGameContentV2 {
 }
 
 impl GameStateV6ContentContext for PreparedGameContentV2 {
+    fn current_postreward_successor_matches(
+        &self,
+        state: &er_state::m9e_state_v6::GameStateV6,
+    ) -> bool {
+        let Some(owner) = state
+            .current_battle_participation
+            .as_ref()
+            .and_then(|row| row.experience.as_ref())
+        else {
+            return false;
+        };
+        let Some(previous) = owner.first_reward_predecessor.as_ref() else {
+            return false;
+        };
+        let Ok(plan) = crate::current_town_wild_spawn::plan_current_town_day_wave_two_after_skipped_reward(previous, self) else {
+            return false;
+        };
+        let Some(run) = state.active_run.as_ref() else {
+            return false;
+        };
+        let Some(battle) = run.battle.as_ref() else {
+            return false;
+        };
+        let Some(source) = owner.source_progression.as_ref() else {
+            return false;
+        };
+        let mut identities = plan.next_identities;
+        let Ok(expected_battle) = identities.allocate_battle_id() else {
+            return false;
+        };
+        previous.active_run.as_ref().is_some_and(|prior_run| {
+            prior_run.run_id == run.run_id
+                && prior_run.world.encounter_sequence.get().checked_add(1)
+                    == Some(run.world.encounter_sequence.get())
+                && battle.battle_id == expected_battle
+                && battle.wave == run.wave
+                && run.wave.get().get() == 2
+                && battle.enemy_party.as_slice() == [plan.shell.pokemon]
+                && battle.outcome == er_types::battle_model::BattleOutcome::Ongoing
+                && run.run_rng == plan.next_run_rng
+                && state.identities == identities
+                && source.initial_battle == battle.battle_id
+                && source.initial_wave == run.wave
+                && owner.pending.is_empty()
+        })
+    }
     fn current_random_target_commands_match(
         &self,
         state: &er_state::m9e_state_v6::GameStateV6,

@@ -58,6 +58,8 @@ jobs:
         run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy
       - name: Qualify exact source-bound Town root selector
         run: python3 scripts/ci/m9e_town_selector_diagnostic.py
+      - name: Compile postreward state construction remotely
+        run: cargo check --manifest-path rust/Cargo.toml --locked -p er-game -p er-kernel
       - name: Qualify skipped reward Town plan
         run: |
           cargo fmt --manifest-path rust/Cargo.toml --all -- --check

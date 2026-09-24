@@ -1998,6 +1998,34 @@ fn actual_reward_skip_inner(
     );
     assert_eq!(canonical_bytes(state)?, before);
     assert_eq!(live.as_ref(), kernel.state());
+    assert_skipped_reward_wave_two(state, content.as_ref(), &plan)?;
+    Ok(())
+}
+
+#[inline(never)]
+fn assert_skipped_reward_wave_two(
+    state: &GameStateV6,
+    content: &PreparedGameContentV2,
+    plan: &er_game::current_town_wild_spawn::CurrentTownPostrewardPlanV1,
+) -> Result<()> {
+    let (next, audit) =
+        er_game::m9e_new_run_v6::advance_current_town_day_wave_two_after_skipped_reward(
+            state, content,
+        )?;
+    let next = Box::new(next);
+    next.validate_with(content)?;
+    let run = next.active_run.as_ref().ok_or("next Town run absent")?;
+    let battle = run.battle.as_ref().ok_or("next Town battle absent")?;
+    assert_eq!(run.wave.get().get(), 2);
+    assert_eq!(battle.enemy_party.as_slice(), [plan.shell.pokemon.clone()]);
+    assert_eq!(audit, plan.rng_audit);
+    assert_eq!(run.run_rng, plan.next_run_rng);
+    assert!(next
+        .current_battle_participation
+        .as_ref()
+        .and_then(|row| row.experience.as_ref())
+        .and_then(|owner| owner.first_reward_predecessor.as_ref())
+        .is_some_and(|previous| previous.as_ref() == state));
     Ok(())
 }
 

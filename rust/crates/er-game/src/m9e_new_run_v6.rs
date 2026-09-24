@@ -1048,6 +1048,169 @@ fn expand_selected_cooperative_topology_v7(
         .map_err(|error| NaturalRunV6Error::State(error.to_string()))
 }
 
+/// Settle the first skipped source reward into one retained Town wave-two
+/// battle. The complete preimage remains owned by the new experience owner,
+/// so restore and material replay can reject a fabricated reward history.
+#[inline(never)]
+pub fn advance_current_town_day_wave_two_after_skipped_reward(
+    state: &GameStateV6,
+    content: &PreparedGameContentV2,
+) -> Result<(GameStateV6, Vec<RngDraw>), NaturalRunV6Error> {
+    let plan =
+        crate::current_town_wild_spawn::plan_current_town_day_wave_two_after_skipped_reward(
+            state, content,
+        )
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    let prior_participation = state
+        .current_battle_participation
+        .as_ref()
+        .ok_or(NaturalRunV6Error::Invalid)?;
+    let prior_owner = prior_participation
+        .experience
+        .as_ref()
+        .ok_or(NaturalRunV6Error::Invalid)?;
+    let mut source = prior_owner
+        .source_progression
+        .clone()
+        .ok_or(NaturalRunV6Error::Invalid)?;
+    let mut next = Box::new(state.clone());
+    let wave = WaveIndex::new(safe(2)?)
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    next.identities = plan.next_identities.clone();
+    let battle_id = next
+        .identities
+        .allocate_battle_id()
+        .map_err(|_| NaturalRunV6Error::Exhausted)?;
+    let run = next.active_run.as_mut().ok_or(NaturalRunV6Error::Invalid)?;
+    let prior_battle = run.battle.as_ref().ok_or(NaturalRunV6Error::Invalid)?;
+    if prior_battle.battle_id != plan.prior_battle
+        || prior_owner.pending.len() != 1
+        || prior_owner.pending[0].id != plan.reward_pending
+        || run.party.len() != 1
+        || run.party[0].fainted
+    {
+        return Err(NaturalRunV6Error::Invalid);
+    }
+    let authority = prior_battle.authority_seat;
+    let player = run.party[0].id;
+    let format = BattleFormat::single();
+    let field = FieldState::new_for_format(
+        &format,
+        vec![
+            FieldSlotState::new(
+                FieldSlot::new(BattleSide::Player, 0)
+                    .map_err(|_| NaturalRunV6Error::Invalid)?,
+                Some(player),
+            ),
+            FieldSlotState::new(
+                FieldSlot::new(BattleSide::Enemy, 0)
+                    .map_err(|_| NaturalRunV6Error::Invalid)?,
+                Some(plan.shell.pokemon.id),
+            ),
+        ],
+    )
+    .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    let battle_seed = er_rng::phaser::shift_char_codes(&run.seed, 2)
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    let mut battle_rng_runtime = RngRuntime::from_states(plan.next_run_rng.clone(), None)
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    let battle_rng = battle_rng_runtime
+        .initialize_battle(&battle_seed, wave)
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    run.run_rng = plan.next_run_rng;
+    run.wave = wave;
+    run.world.encounter_sequence = safe(
+        run.world
+            .encounter_sequence
+            .get()
+            .checked_add(1)
+            .ok_or(NaturalRunV6Error::Exhausted)?,
+    )?;
+    run.battle = Some(BattleStateV5 {
+        schema_version: BATTLE_STATE_SCHEMA_VERSION_V5,
+        battle_id,
+        wave,
+        wave_seed: battle_seed,
+        turn: battle_rng.turn,
+        format,
+        authority_seat: authority,
+        enemy_party: vec![plan.shell.pokemon],
+        field,
+        weather: WeatherState {
+            kind: WeatherKind::None,
+            remaining_turns: 0,
+        },
+        terrain: TerrainState {
+            kind: TerrainKind::None,
+            remaining_turns: 0,
+        },
+        arena_conditions: Vec::new(),
+        global_ability_suppression: GlobalAbilitySuppressionState {
+            ignore_abilities: false,
+            source: None,
+        },
+        battle_rng,
+        command_state: CommandCollectionState {
+            frontier: Vec::new(),
+            tombstones: Vec::new(),
+        },
+        mechanics: MechanicStateStoreV2::default(),
+        faint_queue: Vec::new(),
+        next_faint_occurrence: FaintOccurrenceId::new(safe(1)?),
+        outcome: BattleOutcome::Ongoing,
+    });
+    next.current_turn_execution = None;
+    next.current_random_target_commands = None;
+    next.current_defender_dispatch = None;
+    next.current_achievement_tracker
+        .as_mut()
+        .ok_or(NaturalRunV6Error::Invalid)?
+        .battle = None;
+    let enemy = &run
+        .battle
+        .as_ref()
+        .ok_or(NaturalRunV6Error::Invalid)?
+        .enemy_party[0];
+    source.initial_battle = battle_id;
+    source.initial_wave = wave;
+    source.initial_enemy = er_state::current_source_progression::CurrentSourceInitialEnemyV1 {
+        pokemon: enemy.id,
+        species: enemy.species_id,
+        form_index: enemy.form_index,
+        level: enemy.level,
+    };
+    source.initial_faint =
+        er_state::current_faint_execution::CurrentInitialEnemyFaintV1::fresh();
+    source.turn_progress =
+        er_state::current_source_progression::CurrentSourceTurnProgressV1::fresh(run);
+    next.current_battle_participation = Some(
+        er_state::current_battle_participation::CurrentBattleParticipationV1::fresh(
+            run,
+            prior_participation.next_occurrence,
+        )
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?,
+    );
+    if next.profile.statistics.highest_wave < wave {
+        next.profile.statistics.highest_wave = wave;
+    }
+    install_pending_experience(
+        &mut next,
+        content,
+        er_state::current_experience_owner::CurrentExperienceCapPolicyV1::NormalClassic,
+    )?;
+    let owner = next
+        .current_battle_participation
+        .as_mut()
+        .and_then(|row| row.experience.as_mut())
+        .ok_or(NaturalRunV6Error::Invalid)?;
+    owner.next_pending_id = prior_owner.next_pending_id;
+    owner.source_progression = Some(source);
+    owner.first_reward_predecessor = Some(Box::new(state.clone()));
+    next.validate_with(content)
+        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    Ok((*next, plan.rng_audit))
+}
+
 pub fn advance_to_next_encounter_v6(
     state: &GameStateV6,
     content: &PreparedGameContentV2,
