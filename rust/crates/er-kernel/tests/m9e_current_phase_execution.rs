@@ -20,7 +20,7 @@ use er_types::battle_ids::{MoveId, WaveIndex};
 use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
 use er_types::run_ids::Experience;
 use er_types::{GameControlKindV2, SafeU53, SeatId};
-use std::{error::Error, sync::Arc};
+use std::{error::Error, io::Write, sync::Arc};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 const BUNDLE: &[u8] =
@@ -357,13 +357,15 @@ fn bounded_town_candidates_admit_natural_first_battle() -> Result<()> {
                     .ok_or("natural first enemy absent")?;
                 let player = run.party.first().ok_or("natural starter absent")?;
                 if enemy.species_id.get().get() != source_first {
-                    println!(
+                    writeln!(
+                        std::io::stdout().lock(),
                         "rejected={seed} reason=source first enemy {source_first} differs from natural {}",
                         enemy.species_id.get().get()
-                    );
+                    )?;
                     continue;
                 }
-                println!(
+                writeln!(
+                    std::io::stdout().lock(),
                     "admitted={seed} first_enemy={} enemy_id={} enemy_level={} enemy_ability={} enemy_hp={} enemy_stats={:?} enemy_moves={:?} player_id={} player_level={} player_hp={} player_stats={:?} player_moves={:?}",
                     enemy.species_id.get().get(),
                     enemy.id.get().get(),
@@ -377,11 +379,11 @@ fn bounded_town_candidates_admit_natural_first_battle() -> Result<()> {
                     player.hp,
                     player.stats,
                     player.moves,
-                );
+                )?;
                 admitted += 1;
                 break;
             }
-            Err(error) => println!("rejected={seed} reason={error}"),
+            Err(error) => writeln!(std::io::stdout().lock(), "rejected={seed} reason={error}")?,
         }
     }
     assert!(
