@@ -328,7 +328,7 @@ fn bounded_town_candidates_admit_natural_first_battle() -> Result<()> {
         Err(std::env::VarError::NotPresent) => {
             // The integrated whole-target lane has no separate search artifact.
             // This exact source-DAY seed was admitted by the focused search.
-            "candidate=m9e-town-handoff-308 first=915".to_owned()
+            "candidate=m9e-town-handoff-5042 first=915".to_owned()
         }
         Err(error) => return Err(error.into()),
     };
