@@ -84,9 +84,9 @@ fn address(
     // active form overlay. Unrepresented volatile/form interactions stay closed.
     for pokemon in run.party.iter().chain(&battle.enemy_party) {
         if pokemon.mechanics != MechanicStateStoreV2::default()
-            || pokemon.tera_type.is_some_and(|tera| {
-                tera != pokemon.types.primary || pokemon.types.secondary.is_some()
-            })
+            || pokemon
+                .tera_type
+                .is_some_and(|tera| tera != pokemon.types.primary)
         {
             return Err(failure());
         }

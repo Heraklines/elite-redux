@@ -34,7 +34,9 @@ pub(crate) fn apply_level(
         || before.fainted
         || before.mechanics != er_state::mechanic_state_v2::MechanicStateStoreV2::default()
         || before.status.kind != er_types::battle_model::StatusKind::None
-        || before.tera_type.is_some()
+        || before
+            .tera_type
+            .is_some_and(|tera| tera != before.types.primary)
         || before.max_hp != before.stats.hp
     {
         return Err(E::Action);

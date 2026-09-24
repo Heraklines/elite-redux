@@ -482,8 +482,19 @@ fn fresh_account_town_opening_retains_source_enemy_shell() -> Result<()> {
             .collect::<Vec<_>>(),
         vec![158, 230, 39, 98]
     );
-    assert_eq!(run.party[0].id.get().get(), 1);
-    assert_eq!(state.identities.next_pokemon_id.get(), 1173608933);
+    assert_eq!(run.party[0].id.get().get(), 1_771_723_560);
+    assert_eq!(run.party[0].ivs.map(|iv| iv.get()), [15; 6]);
+    assert_eq!(run.party[0].nature.get(), 6);
+    assert_eq!(
+        run.party[0]
+            .moves
+            .iter()
+            .flatten()
+            .map(|slot| slot.move_id.get().get())
+            .collect::<Vec<_>>(),
+        vec![22, 33, 45, 74]
+    );
+    assert_eq!(state.identities.next_pokemon_id.get(), 1_771_723_561);
     Ok(())
 }
 
@@ -1819,10 +1830,8 @@ fn current_reward(
 
 #[test]
 fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
-    use er_state::current_reward_selection::CurrentRewardStageV1;
-
     let content = content()?;
-    let mut kernel = Box::new(
+    let kernel = Box::new(
         controlled_before_knockout_with_seed_and_account(
             content.clone(),
             5,
@@ -1835,6 +1844,16 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
         )
         .map_err(|error| format!("Town controlled checkpoint: {error}"))?,
     );
+    actual_reward_skip_inner(kernel, content)
+}
+
+#[inline(never)]
+fn actual_reward_skip_inner(
+    mut kernel: Box<GameKernelV7>,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<()> {
+    use er_state::current_reward_selection::CurrentRewardStageV1;
+
     let (mut live, mut ledger) = admit_knockout(&mut kernel, content.as_ref())
         .map_err(|error| format!("Town knockout admission: {error}"))?;
     for iteration in 0..128 {

@@ -32,7 +32,10 @@ use er_game::m9e_material_v6::{
     GameMaterialV6, GamePlatformEffectV2, GamePresentationEffectV2,
     MAX_APPLIED_MATERIAL_RECORDS_V1,
 };
-use er_game::m9e_new_run_v6::{construct_natural_run_v6, expand_cooperative_topology_v6};
+use er_game::m9e_new_run_v6::{
+    NaturalRunV6Error, construct_current_fresh_town_run_v1, construct_natural_run_v6,
+    expand_cooperative_topology_v6,
+};
 use er_game::m9e_runtime_v6::{
     GameActionDispatchContextV1, GameDomainExecutionInputV1, GameRuntimeSnapshotV6, GameRuntimeV6,
     InventoryUseEffectV1,
@@ -2459,8 +2462,40 @@ impl GameKernelV7 {
         &mut self,
         bootstrap: RunBootstrapMachineV1,
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
-        let mut candidate = construct_natural_run_v6(&bootstrap, self.content.as_ref(), safe_one())
-            .map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
+        let source_town_candidate = bootstrap.current_account_identity.is_some()
+            && bootstrap.current_friendship_profile.is_some()
+            && bootstrap.current_starter_pokerus.is_some()
+            && bootstrap.current_title_open_count == 1
+            && bootstrap.selections.difficulty == Some(er_types::RunDifficultyV1::Ace)
+            && bootstrap.selections.choices.is_empty()
+            && bootstrap.selections.starters.len() == 1
+            && bootstrap.selections.starters[0].species_id.get() == 1
+            && bootstrap.selections.starters[0].form_index == 0
+            && bootstrap.selections.starters[0].ability_index == 0
+            && bootstrap
+                .selections
+                .mode
+                .and_then(|id| self.content.world.mode(id))
+                .is_some_and(|mode| {
+                    mode.key == "CLASSIC"
+                        && mode.supported
+                        && !mode.cooperative
+                        && !mode.challenge_selection
+                        && mode.starting_biome.get().get() == 0
+                });
+        let constructed = if source_town_candidate {
+            match construct_current_fresh_town_run_v1(&bootstrap, self.content.as_ref(), safe_one())
+            {
+                Err(NaturalRunV6Error::NotQualified) => {
+                    construct_natural_run_v6(&bootstrap, self.content.as_ref(), safe_one())
+                }
+                result => result,
+            }
+        } else {
+            construct_natural_run_v6(&bootstrap, self.content.as_ref(), safe_one())
+        };
+        let mut candidate =
+            constructed.map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
         if let Some(daily) = &bootstrap.current_starter_pokerus {
             candidate.identities.next_platform_request_id = candidate
                 .identities

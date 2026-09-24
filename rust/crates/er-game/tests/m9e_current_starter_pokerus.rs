@@ -407,6 +407,40 @@ fn source_fresh_town_starter_and_enemy_share_one_valid_natural_state() -> Result
 }
 
 #[test]
+fn title_reentry_does_not_claim_the_single_open_source_frontier() -> Result<()> {
+    let content = content()?;
+    let mut state = bootstrap(&content, true)?;
+    state.seed = "m9e-town-handoff-5042".to_owned();
+    state.current_account_identity = Some(CurrentAccountIdentityV1 {
+        trainer_id: 12345,
+        secret_id: 23456,
+    });
+    enter(&mut state, &content)?;
+    assert_eq!(state.current_title_open_count, 1);
+    choose(&mut state, BootstrapActionV1::Cancel)?;
+    assert_eq!(state.stage, RunBootstrapStageV1::Title);
+    enter(&mut state, &content)?;
+    assert_eq!(state.current_title_open_count, 2);
+    let restored: RunBootstrapMachineV1 = serde_json::from_slice(&serde_json::to_vec(&state)?)?;
+    assert_eq!(restored.current_title_open_count, 2);
+    sample(&mut state, 1, 1_468_800_000)?;
+    pick(&mut state, 1)?;
+    choose(&mut state, BootstrapActionV1::ConfirmStarters)?;
+    choose(&mut state, BootstrapActionV1::Confirm)?;
+    choose(
+        &mut state,
+        BootstrapActionV1::SelectDifficulty(RunDifficultyV1::Ace),
+    )?;
+    choose(
+        &mut state,
+        BootstrapActionV1::SelectSaveSlot("daily-owned".to_owned()),
+    )?;
+    state.validate()?;
+    assert!(construct_current_fresh_town_run_v1(&state, &content, safe(1)?).is_err());
+    Ok(())
+}
+
+#[test]
 fn clock_counter_overflow_and_forged_restore_fail_atomically() -> Result<()> {
     let content = content()?;
     let mut state = bootstrap(&content, true)?;
