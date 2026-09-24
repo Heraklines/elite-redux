@@ -178,7 +178,11 @@ def main():
                 and isinstance(value.get("wave_cycle_offset"), int)
                 and value["wave_cycle_offset"] in range(0, 40, 5)
                 and value["current_time"] == value["effective_pool_time"] == 1
-                and value["next"]["wave"] == 2,
+                and value["next"]["wave"] == 2
+                and isinstance(value["next"]["battle_double"], bool)
+                and value["next"]["enemy_party_count"] == len(value["next"]["enemy_species"])
+                and value["next"]["enemy_party_count"] in (1, 2)
+                and value["next"]["enemy_species"][0] == value["next"]["species"],
                 "canonical causal observation",
             )
             observations.append(raw)

@@ -170,6 +170,9 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   const nextRng = Phaser.Math.RND.state();
   const nextObservation = {
     wave: scene.currentBattle.waveIndex,
+    battle_double: scene.currentBattle.double,
+    enemy_party_count: scene.currentBattle.enemyParty.length,
+    enemy_species: scene.currentBattle.enemyParty.map(pokemon => pokemon.species.speciesId),
     enemy_id: enemy.id,
     species: enemy.species.speciesId,
     form: enemy.formIndex,
