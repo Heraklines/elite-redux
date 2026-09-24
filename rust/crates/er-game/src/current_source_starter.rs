@@ -57,8 +57,12 @@ pub fn construct_current_source_starter_v1(
         .battle
         .species(input.species)
         .map_err(|_| NaturalRunV6Error::Invalid)?;
-    let form_id = FormId::parse(format!("{}:{}", input.species.get().get(), input.form_index))
-        .map_err(|_| NaturalRunV6Error::Invalid)?;
+    let form_id = FormId::parse(format!(
+        "{}:{}",
+        input.species.get().get(),
+        input.form_index
+    ))
+    .map_err(|_| NaturalRunV6Error::Invalid)?;
     let form = content
         .battle
         .form(&form_id)
@@ -136,10 +140,9 @@ pub fn construct_current_source_starter_v1(
         })
     });
     let base = form.stat_override.unwrap_or(species.base_stats);
-    let stats = er_progression::current_stats::calculate_current_unmodified_stats(
-        &pokemon, base, nature,
-    )
-    .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    let stats =
+        er_progression::current_stats::calculate_current_unmodified_stats(&pokemon, base, nature)
+            .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
     pokemon.stats = stats;
     pokemon.max_hp = stats.hp;
     pokemon.hp = stats.hp;

@@ -154,6 +154,7 @@ def main():
             subprocess.run(["cargo", "fmt", "--manifest-path", "Cargo.toml", "--all"],
                            cwd=RUST, timeout=120, check=False)
             patch = subprocess.check_output(["git", "diff", "--", files[0],
+                                             "rust/crates/er-game/src/current_source_starter.rs",
                                              "rust/crates/er-cli/src/current_agent.rs",
                                              "rust/crates/er-cli/tests/m9e_current_entry.rs",
                                              "rust/crates/er-game/tests/m9e_current_town_wild_spawn.rs",

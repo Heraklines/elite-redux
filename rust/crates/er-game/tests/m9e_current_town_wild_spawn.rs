@@ -17,9 +17,7 @@ use er_game::current_town_wild_spawn::{
     source_town_wave_cycle_offset, source_town_weighted_level_move_pool,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
-use er_game::m9e_new_run_v6::{
-    CurrentSourceStarterInputV1, construct_current_source_starter_v1,
-};
+use er_game::m9e_new_run_v6::{CurrentSourceStarterInputV1, construct_current_source_starter_v1};
 use er_rng::audit::{RngCallsiteId, RngPublicApi, RngReason};
 use er_rng::battle::RngRuntime;
 use er_rng::phaser::{PhaserRdg, PhaserRdgState, RunRngState, shift_char_codes};
@@ -1388,11 +1386,8 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
             RngCallsiteId::mechanics(RngReason::RandomSelector),
         )?;
     }
-    let starter = construct_current_source_starter_v1(
-        &content,
-        &selected,
-        &mut before_constructor,
-    )?;
+    let starter =
+        construct_current_source_starter_v1(&content, &selected, &mut before_constructor)?;
     assert_eq!(starter.id.get().get(), 1_771_723_560);
     assert_eq!(starter.ivs.map(|iv| iv.get()), [15; 6]);
     assert_eq!(starter.nature.get(), 6);
@@ -1401,12 +1396,23 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
     assert_eq!(starter.tera_type, Some(PokemonType::Grass));
     assert_eq!(starter.pokerus, Some(false));
     assert_eq!(
-        [starter.stats.hp, starter.stats.attack, starter.stats.defense,
-            starter.stats.special_attack, starter.stats.special_defense, starter.stats.speed],
+        [
+            starter.stats.hp,
+            starter.stats.attack,
+            starter.stats.defense,
+            starter.stats.special_attack,
+            starter.stats.special_defense,
+            starter.stats.speed
+        ],
         [20, 10, 10, 12, 12, 10]
     );
     assert_eq!(
-        starter.moves.into_iter().flatten().map(|slot| slot.move_id.get().get()).collect::<Vec<_>>(),
+        starter
+            .moves
+            .into_iter()
+            .flatten()
+            .map(|slot| slot.move_id.get().get())
+            .collect::<Vec<_>>(),
         vec![22, 33, 45, 74]
     );
     assert_eq!(before_constructor.run_state(), ui_rng.run_state());
