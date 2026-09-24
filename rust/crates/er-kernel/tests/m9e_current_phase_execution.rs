@@ -2059,7 +2059,52 @@ fn admit_wave_two_vine_whip(
             .and_then(|state| state.current_turn_execution.as_ref())
             .is_some()
     );
-    Ok(())
+    for iteration in 0..128 {
+        let state = kernel.state().ok_or("wave-two battle state absent")?;
+        let battle = state
+            .active_run
+            .as_ref()
+            .and_then(|run| run.battle.as_ref())
+            .ok_or("wave-two battle absent")?;
+        if battle.outcome == er_types::battle_model::BattleOutcome::Victory {
+            assert_eq!(battle.enemy_party[0].hp, 0);
+            assert_eq!(live.as_ref(), kernel.state());
+            return Ok(());
+        }
+        let checkpoint = kernel.snapshot()?;
+        if !checkpoint.pending_presentations.is_empty() {
+            for pending in checkpoint.pending_presentations {
+                kernel.settle_presentation(pending.event_id)?;
+            }
+            continue;
+        }
+        let turn = state.current_turn_execution.as_ref().map(|turn| {
+            (
+                turn.stage.clone(),
+                turn.next_action,
+                turn.actions.len(),
+            )
+        });
+        let enemy_hp = battle.enemy_party[0].hp;
+        let step = kernel.advance_time(SafeU53::ZERO).map_err(|error| {
+            format!(
+                "wave-two turn drain {iteration}: turn={turn:?}, enemy_hp={enemy_hp}: {error}"
+            )
+        })?;
+        if !step
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. }))
+        {
+            return Err(format!(
+                "wave-two turn drain idle at {iteration}: turn={turn:?}, enemy_hp={enemy_hp}"
+            )
+            .into());
+        }
+        accept_material(live, ledger, kernel, content, &step)
+            .map_err(|error| format!("wave-two turn replay {iteration}: {error}"))?;
+    }
+    Err("wave-two Vine Whip never reached victory".into())
 }
 
 #[inline(never)]
