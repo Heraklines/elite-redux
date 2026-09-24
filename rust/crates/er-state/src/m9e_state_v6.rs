@@ -205,10 +205,7 @@ impl GameIdentityAllocatorStateV1 {
     /// installed. Their draw order need not be numeric order, so stage the
     /// entire batch before advancing the high-water frontier. The operation is
     /// atomic and still rejects duplicates or IDs below a prior frontier.
-    pub fn adopt_source_pokemon_ids(
-        &mut self,
-        ids: &[PokemonId],
-    ) -> Result<(), GameStateV6Error> {
+    pub fn adopt_source_pokemon_ids(&mut self, ids: &[PokemonId]) -> Result<(), GameStateV6Error> {
         let mut sorted = ids.to_vec();
         sorted.sort_unstable();
         if sorted.windows(2).any(|pair| pair[0] == pair[1]) {
