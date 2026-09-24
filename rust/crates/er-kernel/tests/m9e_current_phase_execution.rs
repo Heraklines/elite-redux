@@ -524,9 +524,7 @@ fn controlled_before_knockout_with_seed_and_account(
     assert!((1..10).contains(&level));
     let source_account = account.is_some();
     assert!(
-        !moves.is_empty()
-            && moves.len() <= 4
-            && moves[0] == (if source_account { 22 } else { 33 })
+        !moves.is_empty() && moves.len() <= 4 && moves[0] == (if source_account { 22 } else { 33 })
     );
     let mut snapshot = natural_with_seed_and_account(content.clone(), seed, account)?.snapshot()?;
     let GameKernelLifecycleSnapshotV7::Active(state) = &mut snapshot.lifecycle else {
