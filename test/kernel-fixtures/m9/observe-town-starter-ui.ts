@@ -133,6 +133,17 @@ test("Title and actual starter controls construct a source-owned Classic starter
       const handler = manager!.scene.ui.getHandler() as StarterSelectUiHandler;
       handler.processInput(Button.ACTION);
     });
+    manager!.onNextPrompt("SelectStarterPhase", UiMode.OPTION_SELECT, () => {
+      mark("difficulty-options");
+      const handler = manager!.scene.ui.getHandler() as OptionSelectUiHandler;
+      handler.processInput(Button.DOWN);
+      handler.processInput(Button.ACTION);
+    });
+    manager!.onNextPrompt("SelectStarterPhase", UiMode.MENU_OPTION_SELECT, () => {
+      mark("pacing-options");
+      const handler = manager!.scene.ui.getHandler() as OptionSelectUiHandler;
+      handler.processInput(Button.ACTION);
+    });
     manager!.onNextPrompt("SelectStarterPhase", UiMode.SAVE_SLOT, () => {
       mark("save-slot");
       const handler = manager!.scene.ui.getHandler() as SaveSlotSelectUiHandler;
