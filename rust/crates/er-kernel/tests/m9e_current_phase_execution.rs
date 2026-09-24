@@ -239,6 +239,25 @@ fn natural_with_seed_and_account(
         Some(account) => GameKernelV7::natural_start_with_fresh_account(start, account)?,
         None => GameKernelV7::natural_start_with_fresh_friendship(start)?,
     };
+    if source_account {
+        let snapshot = kernel.snapshot()?;
+        let GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) = &snapshot.lifecycle else {
+            return Err("fresh account bootstrap absent".into());
+        };
+        let expected: std::collections::BTreeSet<_> =
+            er_game::m9e_new_run_v6::current_fresh_starter_account_v1()?
+                .into_iter()
+                .map(|entry| entry.species.get())
+                .collect();
+        let actual: std::collections::BTreeSet<_> = bootstrap
+            .catalog
+            .starters
+            .iter()
+            .map(|entry| entry.species_id)
+            .collect();
+        assert_eq!(bootstrap.catalog.starters.len(), 27);
+        assert_eq!(actual, expected);
+    }
     press(&mut kernel, PhysicalKey::Space)?;
     let mode = content
         .bundle()
