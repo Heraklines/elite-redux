@@ -1792,17 +1792,19 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
     use er_state::current_reward_selection::CurrentRewardStageV1;
 
     let content = content()?;
-    let mut kernel = Box::new(controlled_before_knockout_with_seed_and_account(
-        content.clone(),
-        5,
-        &[33],
-        "m9e-town-handoff-5042",
-        Some(CurrentAccountIdentityV1 {
-            trainer_id: 12345,
-            secret_id: 23456,
-        }),
-    )
-    .map_err(|error| format!("Town controlled checkpoint: {error}"))?);
+    let mut kernel = Box::new(
+        controlled_before_knockout_with_seed_and_account(
+            content.clone(),
+            5,
+            &[33],
+            "m9e-town-handoff-5042",
+            Some(CurrentAccountIdentityV1 {
+                trainer_id: 12345,
+                secret_id: 23456,
+            }),
+        )
+        .map_err(|error| format!("Town controlled checkpoint: {error}"))?,
+    );
     let (mut live, mut ledger) = admit_knockout(&mut kernel, content.as_ref())
         .map_err(|error| format!("Town knockout admission: {error}"))?;
     for iteration in 0..128 {
@@ -1825,11 +1827,9 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
         let checkpoint = kernel.snapshot()?;
         let step = if let Some(pending) = checkpoint.pending_platform.first() {
             match &pending.effect {
-                GamePlatformEffectV2::CurrentFriendshipClock { request } => {
-                    kernel
-                        .apply_current_utc_clock_result(request.request, 0)
-                        .map_err(|error| Box::new(error) as Box<dyn Error>)
-                }
+                GamePlatformEffectV2::CurrentFriendshipClock { request } => kernel
+                    .apply_current_utc_clock_result(request.request, 0)
+                    .map_err(|error| Box::new(error) as Box<dyn Error>),
                 GamePlatformEffectV2::CurrentAchievementClock { request } => {
                     accept_flash_test_clock(&mut kernel, request)
                 }
