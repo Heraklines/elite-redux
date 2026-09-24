@@ -68,6 +68,10 @@ def run(name, argv, *, cwd, seconds=600, env=None):
                     [message for message in messages if message],
                     separators=(",", ":"),
                 ).encode()[:12288]
+        if name.startswith("source-ui-"):
+            stage = OUT / ("starter-ui-stage-" + name.removeprefix("source-ui-") + ".json")
+            if stage.is_file() and stage.stat().st_size <= 256:
+                excerpt += b"\nLast starter UI stage:\n" + stage.read_bytes()
         (COMPACT / "failure.txt").write_bytes(name.encode() + b" failed\n" + excerpt)
         raise RuntimeError(name + " failed")
     return raw

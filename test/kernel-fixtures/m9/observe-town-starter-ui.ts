@@ -38,6 +38,9 @@ test("Title and actual starter controls construct a source-owned Classic starter
   expect(output).toBeTruthy();
   expect(["one", "two"]).toContain(ordinal);
   expect(execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim()).toBe(PIN);
+  const mark = (stage: string) =>
+    writeFileSync(join(output!, `starter-ui-stage-${ordinal}.json`), `${JSON.stringify({ stage })}\n`);
+  mark("start");
 
   game = new Phaser.Game({ type: Phaser.HEADLESS, seed: [SEED] });
   await new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -59,6 +62,7 @@ test("Title and actual starter controls construct a source-owned Classic starter
     .seed(SEED);
   manager.scene.gameData.trainerId = 12345;
   manager.scene.gameData.secretId = 23456;
+  mark("manager-ready");
 
   const constructor: { before: string; after: string; id: number }[] = [];
   const constructorDraws: string[] = [];
@@ -82,16 +86,19 @@ test("Title and actual starter controls construct a source-owned Classic starter
 
   const rngBeforeTitle = Phaser.Math.RND.state();
   await manager.runToTitle();
+  mark("title-ready");
   const rngAtTitle = Phaser.Math.RND.state();
   let rngBeforeTitleEnd: string | undefined;
   let rngAtStarterSelect: string | undefined;
   manager.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
+    mark("title-prompt");
     rngBeforeTitleEnd = Phaser.Math.RND.state();
     const phase = manager!.scene.phaseManager.getCurrentPhase() as TitlePhase;
     phase.gameMode = GameModes.CLASSIC;
     phase.end();
   });
   manager.onNextPrompt("SelectStarterPhase", UiMode.STARTER_SELECT, () => {
+    mark("starter-prompt");
     rngAtStarterSelect = Phaser.Math.RND.state();
     const handler = manager!.scene.ui.getHandler() as StarterSelectUiHandler;
     handler.processInput(Button.RIGHT);
@@ -99,11 +106,13 @@ test("Title and actual starter controls construct a source-owned Classic starter
     handler.processInput(Button.ACTION);
   });
   await manager.phaseInterceptor.to("SelectStarterPhase");
+  mark("starter-phase-seen");
 
   let optionCount = 0;
   let optionHandler: OptionSelectUiHandler | undefined;
   await new Promise<void>(resolve => {
     manager!.onNextPrompt("SelectStarterPhase", UiMode.OPTION_SELECT, () => {
+      mark("starter-options");
       optionHandler = manager!.scene.ui.getHandler() as OptionSelectUiHandler;
       optionCount = optionHandler.getOptionsWithScroll().length;
       resolve();
@@ -111,24 +120,30 @@ test("Title and actual starter controls construct a source-owned Classic starter
   });
   expect(optionCount).toBeGreaterThan(0);
   optionHandler?.processInput(Button.ACTION);
+  mark("added-to-party");
 
   await new Promise<void>(resolve => {
     manager!.onNextPrompt("SelectStarterPhase", UiMode.STARTER_SELECT, () => {
+      mark("starter-submit");
       const handler = manager!.scene.ui.getHandler() as StarterSelectUiHandler;
       handler.processInput(Button.SUBMIT);
     });
     manager!.onNextPrompt("SelectStarterPhase", UiMode.CONFIRM, () => {
+      mark("starter-confirm");
       const handler = manager!.scene.ui.getHandler() as StarterSelectUiHandler;
       handler.processInput(Button.ACTION);
     });
     manager!.onNextPrompt("SelectStarterPhase", UiMode.SAVE_SLOT, () => {
+      mark("save-slot");
       const handler = manager!.scene.ui.getHandler() as SaveSlotSelectUiHandler;
       handler.processInput(Button.ACTION);
       resolve();
     });
   });
   await manager.phaseInterceptor.to("EncounterPhase", false);
+  mark("encounter-phase-seen");
   await manager.phaseInterceptor.to("CommandPhase");
+  mark("command-phase-seen");
 
   const scene = globalScene;
   const player = scene.getPlayerPokemon();
