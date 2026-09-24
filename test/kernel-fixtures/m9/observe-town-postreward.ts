@@ -97,6 +97,25 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   expect(player.level).toBe(5);
   // Use a retained natural Bulbasaur move without rewriting its moveset.
   expect(player.getMoveset().map(move => move.moveId)).toContain(MoveId.VINE_WHIP);
+  const firstShell = {
+    form: firstEnemy.formIndex,
+    level: firstEnemy.level,
+    exp: firstEnemy.exp,
+    ability_index: firstEnemy.abilityIndex,
+    ability: firstEnemy.getAbility().id,
+    ivs: [...firstEnemy.ivs],
+    nature: firstEnemy.nature,
+    stats: [...firstEnemy.stats],
+    hp: firstEnemy.hp,
+    moves: firstEnemy.moveset.map(move => [move.moveId, move.ppUsed]),
+  };
+  const firstPlayer = {
+    id: player.id,
+    level: player.level,
+    stats: [...player.stats],
+    hp: player.hp,
+    moves: player.getMoveset().map(move => [move.moveId, move.ppUsed]),
+  };
 
   const actualNewBattle = scene.newBattle.bind(scene);
   const beforeNewBattle: string[] = [];
@@ -224,8 +243,8 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
       reward_multiplier: getCurrentErRewardRates().totalShiny,
       xor: shinyXor,
     },
-    first: { wave: 1, enemy_id: firstEnemyId, species: firstEnemySpecies, attacking_turns: attackingTurns,
-      selections: firstSpeciesCalls },
+    first: { wave: 1, enemy_id: firstEnemyId, species: firstEnemySpecies, shell: firstShell,
+      player: firstPlayer, attacking_turns: attackingTurns, selections: firstSpeciesCalls },
     reward: {
       choice: "cancel",
       new_battle_calls: newBattle.mock.calls.length,
