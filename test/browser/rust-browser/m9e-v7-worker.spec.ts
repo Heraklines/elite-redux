@@ -375,7 +375,7 @@ test("current V7 Worker preserves fresh account IDs through snapshot restore", a
     try {
       const started = await first.dispatch({ kind: "INITIALIZE", initialization: {
         kind: "FRESH_ACCOUNT_START", context: template.context, profile: template.profile,
-        seed: "m9e-fresh-friendship-v6", save_slots: ["browser-account"],
+        seed: "m9e-town-handoff-5042", save_slots: ["phase-source-slot"],
         account_identity: account,
       } });
       if (started.response.kind !== "READY") throw new Error("fresh-account Worker did not initialize");
@@ -405,10 +405,132 @@ test("current V7 Worker preserves fresh account IDs through snapshot restore", a
       const checkpointHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",
         new TextEncoder().encode(JSON.stringify(checkpoint)))))
         .map(byte => byte.toString(16).padStart(2, "0")).join("");
+      stage = "source Town opening after restore";
+      const followups: Promise<any>[] = [];
+      let authorityMaterials = 0;
+      const router = new module.BrowserEffectRouterV2({
+        completeExternalRequest: (request: any) => {
+          if (request.kind !== "UTC_CLOCK_RESULT") throw new Error("unexpected bootstrap external request");
+          followups.push(second!.dispatch({ ...request, utc_milliseconds: 0 }));
+        },
+        renderUi: () => {},
+        present: (effect: any) => {
+          followups.push(second!.dispatch({ kind: "PRESENTATION_SETTLED", event_id: effect.event_id,
+            outcome: { kind: "SETTLED" } }));
+        },
+        changePresentationScene: () => {},
+        sendNetworkFrame: (generation: number, bytes: Uint8Array) => {
+          if (generation !== 1 || bytes.length === 0) throw new Error("source opening authority frame invalid");
+          authorityMaterials++;
+        },
+        handleStorageRequest: () => { throw new Error("unexpected bootstrap storage request"); },
+        requestAsset: () => {}, playAudioCue: () => {},
+        showTerminal: () => { throw new Error("unexpected bootstrap terminal"); },
+        recordTelemetry: () => {}, publishRepro: () => {}, publishCurrentRepro: () => {}, dispose: () => {},
+      });
+      const send = async (request: any) => {
+        const result = await second!.dispatch(request);
+        if (result.response.kind === "EFFECTS") await router.dispatch(result.response.batch);
+        while (followups.length > 0) {
+          const followup = await followups.shift()!;
+          if (followup.response.kind !== "EFFECTS") throw new Error("bootstrap external result missing effects");
+          await router.dispatch(followup.response.batch);
+        }
+      };
+      const snapshot = async (): Promise<any> => {
+        const result = await second!.dispatch({ kind: "SNAPSHOT" });
+        if (result.response.kind !== "SNAPSHOT") throw new Error("source opening snapshot missing");
+        return result.response.snapshot;
+      };
+      const control = (state: any) => state.lifecycle.kind === "ACTIVE"
+        ? state.lifecycle.value.active_run.control : state.lifecycle.value.control;
+      const press = async (code: string) => {
+        await send({ kind: "RAW_INPUT", event: { kind: "KEY_DOWN",
+          data: { code: { kind: code }, printable: false, browser_repeat: false, focus: "GAME" } } });
+        await send({ kind: "RAW_INPUT", event: { kind: "KEY_UP", data: { code: { kind: code } } } });
+      };
+      const navigate = async (target: string) => {
+        const menu = control(await snapshot()).menu;
+        if (menu == null || !menu.options.some((option: any) => option.option_id === target)) {
+          throw new Error("source option absent: " + target);
+        }
+        const queue = [menu.selected_option_id];
+        const seen = new Set(queue);
+        const previous = new Map<string, { from: string; key: string }>();
+        for (let index = 0; index < queue.length && !seen.has(target); index++) {
+          for (const edge of menu.navigation) {
+            if (edge.from !== queue[index] || (edge.direction !== "UP" && edge.direction !== "DOWN")
+              || seen.has(edge.to)) continue;
+            seen.add(edge.to);
+            previous.set(edge.to, { from: edge.from, key: edge.direction === "UP" ? "ARROW_UP" : "ARROW_DOWN" });
+            queue.push(edge.to);
+          }
+        }
+        if (!seen.has(target) || seen.size > menu.options.length) throw new Error("source option unreachable: " + target);
+        const route: { option: string; key: string }[] = [];
+        for (let cursor = target; cursor !== menu.selected_option_id;) {
+          const edge = previous.get(cursor);
+          if (edge == null) throw new Error("source navigation route incomplete");
+          route.unshift({ option: cursor, key: edge.key });
+          cursor = edge.from;
+        }
+        for (const edge of route) {
+          await press(edge.key);
+          if (control(await snapshot()).menu?.selected_option_id !== edge.option) {
+            throw new Error("source navigation did not follow offered edge");
+          }
+        }
+      };
+      await press("SPACE");
+      const modeState = await snapshot();
+      const contentResponse = await fetch(assets.content_url);
+      if (!contentResponse.ok) throw new Error("source content unavailable for mode identity");
+      const content = await contentResponse.json();
+      const classic = content.bootstrap.modes.find((row: any) => row.key === "CLASSIC"
+        && row.supported && !row.cooperative && !row.challenge_selection);
+      if (classic == null || !modeState.lifecycle.value.catalog.modes.some((row: any) =>
+        row.mode === classic.mode && row.supported && !row.cooperative && !row.challenge_selection)) {
+        throw new Error("ordinary Classic mode absent");
+      }
+      await navigate("bootstrap/mode/" + classic.mode);
+      await press("SPACE");
+      const starterState = await snapshot();
+      const starter = starterState.lifecycle.value.catalog.starters.find((row: any) =>
+        row.species_id === 1 && row.form_index === 0 && row.ability_index === 0);
+      if (starter == null || starterState.lifecycle.value.catalog.starters.length !== 27) {
+        throw new Error("source Bulbasaur catalog absent");
+      }
+      await navigate("bootstrap/starter/" + starter.pokemon_id);
+      await press("SPACE");
+      await navigate("bootstrap/starter/confirm");
+      await press("SPACE");
+      await press("SPACE");
+      await navigate("bootstrap/difficulty/ace");
+      await press("SPACE");
+      await press("SPACE");
+      const opened = await snapshot();
+      if (opened.lifecycle.kind !== "ACTIVE" || control(opened).kind !== "BATTLE_COMMAND") {
+        throw new Error("source Town battle command absent");
+      }
+      const run = opened.lifecycle.value.active_run;
+      const enemy = run.battle?.enemy_party[0];
+      const player = run.party[0];
+      const opening = { wave: run.wave, player_id: player?.id, enemy_id: enemy?.id,
+        enemy_species: enemy?.species_id, enemy_moves: enemy?.moves.filter((move: any) => move != null)
+          .map((move: any) => move.move_id), source_progression:
+          opened.lifecycle.value.current_battle_participation?.experience?.source_progression != null,
+        authority_material_count: authorityMaterials };
+      if (opening.wave !== 1 || opening.player_id !== 1771723560 || opening.enemy_id !== 1173608932
+        || opening.enemy_species !== 915 || JSON.stringify(opening.enemy_moves) !== "[158,230,39,98]"
+        || !opening.source_progression || authorityMaterials === 0) {
+        throw new Error("source Town opening differs from qualified native shell");
+      }
+      await router.dispose();
       stage = "restored Worker disposal";
       await second.dispose();
       return { account, exact_snapshot_restore: true, disposed_workers: 2,
-        first_closed: first.status.closed, second_closed: second.status.closed, checkpoint_sha256: checkpointHash };
+        first_closed: first.status.closed, second_closed: second.status.closed, checkpoint_sha256: checkpointHash,
+        opening };
     } catch (error) {
       throw new Error(`fresh-account ${stage}: ${String(error)}`);
     } finally { first.terminate(); second?.terminate(); }
@@ -416,7 +538,10 @@ test("current V7 Worker preserves fresh account IDs through snapshot restore", a
   expect(observed).toHaveLength(2);
   expect(evidence).toEqual({ account: { trainer_id: 12345, secret_id: 23456 },
     exact_snapshot_restore: true, disposed_workers: 2, first_closed: true, second_closed: true,
-    checkpoint_sha256: expect.stringMatching(/^[0-9a-f]{64}$/u) });
+    checkpoint_sha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+    opening: { wave: 1, player_id: 1771723560, enemy_id: 1173608932, enemy_species: 915,
+      enemy_moves: [158, 230, 39, 98], source_progression: true,
+      authority_material_count: expect.any(Number) } });
   const bytes = Buffer.from(JSON.stringify({ ...binding(observed), ...evidence }));
   expect(bytes.length).toBeLessThanOrEqual(4096);
   await testInfo.attach("m9e-fresh-account-worker", { body: bytes, contentType: "application/json" });

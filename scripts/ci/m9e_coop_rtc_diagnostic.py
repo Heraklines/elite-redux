@@ -354,6 +354,7 @@ def execute_prepared(summary, *, install_chromium=True):
     if not 0 < len(raw) <= 4096:
         raise RuntimeError("fresh-account Worker evidence bound exceeded")
     account = json.loads(raw)
+    opening = account.get("opening")
     if (account.get("source_sha") != sha or account.get("manifest_sha256") != digest(OUTPUT / "m9e-v7-worker-assets.json")
             or account.get("entry_sha256") != worker["assets"][worker["entry"]]["sha256"]
             or account.get("worker_sha256") != worker["assets"][worker["worker"]]["sha256"]
@@ -366,6 +367,16 @@ def execute_prepared(summary, *, install_chromium=True):
             or account.get("exact_snapshot_restore") is not True
             or account.get("first_closed") is not True or account.get("second_closed") is not True):
         raise RuntimeError("fresh-account Worker evidence differs from actual source/assets or restored identity")
+    if (not isinstance(opening, dict)
+            or opening.get("wave") != 1
+            or opening.get("player_id") != 1771723560
+            or opening.get("enemy_id") != 1173608932
+            or opening.get("enemy_species") != 915
+            or opening.get("enemy_moves") != [158, 230, 39, 98]
+            or opening.get("source_progression") is not True
+            or type(opening.get("authority_material_count")) is not int
+            or not 0 < opening["authority_material_count"] <= 64):
+        raise RuntimeError("fresh-account Worker did not retain the qualified source Town opening")
     if any(digest(ROOT / path) != expected for path, expected in summary["source_hashes"].items()):
         raise RuntimeError("bound source changed during fresh-account Worker execution")
     if any(digest(OUTPUT / path) != expected for path, expected in retained.items()):
@@ -378,7 +389,7 @@ if __name__ == "__main__":
     FULL.mkdir(parents=True, exist_ok=False)
     COMPACT.mkdir(parents=True, exist_ok=False)
     summary = {"status": "failed", "source_sha": os.environ["GITHUB_SHA"], "run_id": os.environ["GITHUB_RUN_ID"],
-               "qualification": "same-SHA focused natural RTC startup, complete capsule replay, public pending retry and actual fresh-account Worker snapshot restore; not aggregate M9 qualification"}
+               "qualification": "same-SHA focused natural RTC startup, complete capsule replay, public pending retry and fresh-account Worker restore through source-qualified Town opening; not aggregate M9 qualification"}
     try:
         main(summary)
         if time.monotonic() > DEADLINE:
