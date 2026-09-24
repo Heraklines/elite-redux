@@ -39,7 +39,8 @@ use crate::m72_bootstrap::{RunBootstrapMachineV1, RunBootstrapStageV1};
 mod current_source_starter;
 pub use current_source_starter::{
     CurrentFreshStarterAccountEntryV1, CurrentSourceStarterInputV1,
-    construct_current_source_starter_v1, current_fresh_starter_account_v1,
+    advance_current_town_title_routes_v1, construct_current_source_starter_v1,
+    current_fresh_starter_account_v1,
 };
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]

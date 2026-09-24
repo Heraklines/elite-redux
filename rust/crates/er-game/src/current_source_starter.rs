@@ -19,6 +19,39 @@ const FRESH_STARTER_SPECIES: [u32; 27] = [
     728, 810, 813, 816, 906, 909, 912,
 ];
 const NEUTRAL_NATURES: [u8; 5] = [0, 6, 12, 18, 24];
+// Source initBiomes has 36 entries. Fresh Town routing excludes Town itself,
+// End (non-travel), and Plains (Town's sole base link).
+const FRESH_TOWN_EXTRA_CANDIDATES: usize = 33;
+
+/// Consume the actual TitlePhase.end Town route rolls before starter selection.
+/// The graph is cleared at new-run launch, but these run-stream draws persist.
+/// This is only the fresh Town / no-previous-biome source configuration.
+pub fn advance_current_town_title_routes_v1(
+    rng: &mut RngRuntime,
+) -> Result<usize, NaturalRunV6Error> {
+    let mut staged = rng.clone();
+    let mut extras = 0;
+    let mut attempts = 0;
+    for _ in 0..FRESH_TOWN_EXTRA_CANDIDATES {
+        if extras == 3 {
+            break;
+        }
+        let roll = staged
+            .run_rand_seed_int(
+                SafeU53::new(100).map_err(|_| NaturalRunV6Error::Invalid)?,
+                SafeU53::ZERO,
+                RngReason::RandomSelector,
+                RngCallsiteId::mechanics(RngReason::RandomSelector),
+            )
+            .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+        attempts += 1;
+        if roll.get() < 50 {
+            extras += 1;
+        }
+    }
+    *rng = staged;
+    Ok(attempts)
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CurrentFreshStarterAccountEntryV1 {
