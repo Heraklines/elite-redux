@@ -142,6 +142,11 @@ pub enum KernelWorkerRequestV2 {
         local_seat: SeatId,
         role: GameKernelRoleV7,
     },
+    /// Imports a verified causal capsule after content initialization, keeping
+    /// the content bundle and capsule in separate bounded transport frames.
+    ImportRepro {
+        capsule: Box<CurrentReproCapsuleV1>,
+    },
     /// Reuses the current event schema, including its existing nested-field serde behavior.
     /// This ABI does not tighten that shared event type's unknown-field handling.
     Apply(CurrentExternalEvent),
