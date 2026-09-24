@@ -117,7 +117,7 @@ def main():
     result = {
         "schema": 1, "status": "failed", "source_pin": PIN,
         "candidate_sha": os.environ["GITHUB_SHA"],
-        "scope": "two fresh explicit-starter reward-to-wave-two observations plus two fresh Title-to-starter-UI observations; no Rust settlement qualification",
+        "scope": "two fresh explicit-starter and two fresh actual-UI reward-to-wave-two observations; no Rust settlement qualification",
         "commands": COMMANDS,
     }
     try:
@@ -248,7 +248,13 @@ def main():
                 and value["player"]["level"] == 5
                 and isinstance(value["pending_routes_ready"], bool)
                 and isinstance(value["pending_routes"], list)
-                and len(value["pending_routes"]) <= 16,
+                and len(value["pending_routes"]) <= 16
+                and value["successor"]["wave"] == 2
+                and value["successor"]["player_id"] == value["player"]["id"]
+                and value["successor"]["enemy_species"] == 504
+                and value["successor"]["enemy_id"] == 3273058121
+                and value["successor"]["vine_whip_pp_after"]
+                    == value["successor"]["vine_whip_pp_before"] + 1,
                 "canonical starter UI observation",
             )
             ui_observations.append(raw)

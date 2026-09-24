@@ -4,6 +4,7 @@ import { BattleStyle } from "#enums/battle-style";
 import { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
 import { GameModes } from "#enums/game-modes";
+import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import type { TitlePhase } from "#phases/title-phase";
@@ -260,5 +261,46 @@ test("Title and actual starter controls construct a source-owned Classic starter
       source: node.source ?? null,
     })),
   };
+  const firstEnemy = enemy;
+  let attackingTurns = 0;
+  while (!manager.isVictory() && attackingTurns < 12) {
+    manager.move.select(MoveId.VINE_WHIP);
+    await manager.toEndOfTurn();
+    attackingTurns++;
+    if (!manager.isVictory()) {
+      await manager.toNextTurn();
+    }
+  }
+  expect(manager.isVictory()).toBe(true);
+  expect(firstEnemy.isFainted()).toBe(true);
+  await manager.toNextWave();
+  expect(scene.currentBattle.waveIndex).toBe(2);
+  expect(scene.phaseManager.getCurrentPhase().phaseName).toBe("CommandPhase");
+  const nextEnemy = scene.currentBattle.enemyParty[0];
+  expect(nextEnemy).toBeDefined();
+  const secondMove = player.getMoveset().find(move => move.moveId === MoveId.VINE_WHIP);
+  expect(secondMove).toBeDefined();
+  const beforePp = secondMove!.ppUsed;
+  const beforeHp = nextEnemy.hp;
+  manager.move.select(MoveId.VINE_WHIP);
+  await manager.toEndOfTurn();
+  expect(secondMove!.ppUsed).toBe(beforePp + 1);
+  Object.assign(observation, {
+    successor: {
+      attacking_turns: attackingTurns,
+      player_id: player.id,
+      wave: scene.currentBattle.waveIndex,
+      enemy_species: nextEnemy.species.speciesId,
+      enemy_id: nextEnemy.id,
+      enemy_level: nextEnemy.level,
+      enemy_hp_before: beforeHp,
+      enemy_hp_after: nextEnemy.hp,
+      player_hp: player.hp,
+      vine_whip_pp_before: beforePp,
+      vine_whip_pp_after: secondMove!.ppUsed,
+      pending_routes_ready: erPendingNodesReady(),
+      pending_routes: getErPendingNodes().length,
+    },
+  });
   writeFileSync(join(output!, `starter-ui-${ordinal}.json`), `${JSON.stringify(observation)}\n`);
 });
