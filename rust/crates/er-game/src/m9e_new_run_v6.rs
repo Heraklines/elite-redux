@@ -170,21 +170,84 @@ pub fn construct_natural_run_v6(
     } else {
         None
     };
-    let enemy_species = select_encounter_species(biome, &mut rng)?;
-    let enemy_id = identities
-        .allocate_pokemon_id()
-        .map_err(|_| NaturalRunV6Error::Exhausted)?;
-    let enemy = pokemon(
-        content,
-        &mut rng,
-        enemy_id,
-        None,
-        enemy_species,
-        0,
-        current_initial
-            .as_ref()
-            .map_or(mode.starting_level, |value| value.enemy_level),
-    )?;
+    let source_opening = if current_initial
+        .as_ref()
+        .is_some_and(|initial| initial.enemy_level == 2)
+        && difficulty == er_types::RunDifficultyV1::Ace
+        && let Some(account) = bootstrap.current_account_identity
+    {
+        use crate::current_town_wild_spawn as town;
+        let offset = town::source_town_wave_cycle_offset(&bootstrap.seed)
+            .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+        let time = town::source_town_time_of_day(1, offset)
+            .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+        if time == 1 {
+            let context = town::CurrentTownDayWildContextV1 {
+                mode: mode_id,
+                biome: biome.id,
+                difficulty,
+                wave: 1,
+                level: 2,
+                luck: 0,
+                forced_tier: None,
+                encounter_boss_segments: 0,
+                regional_boost: false,
+                time_override: None,
+                effective_pool_time: time,
+                override_species: None,
+                golden_bug_net: false,
+                excluded_species: &[],
+            };
+            let reset = town::source_town_reset_seed(&bootstrap.seed, 1)
+                .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+            let mut root_rng = RngRuntime::from_states(reset.clone(), None)
+                .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+            let root = town::select_current_town_day_wave_one_root(content, context, &mut root_rng)
+                .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+            if root.source_root.get().get() == 915 {
+                let mut source_rng = RngRuntime::from_states(reset, None)
+                    .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+                let shell = town::select_current_town_day_wave_one_shell(
+                    content,
+                    context,
+                    account.trainer_id,
+                    account.secret_id,
+                    &mut source_rng,
+                )
+                .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+                identities
+                    .adopt_source_pokemon_id(shell.pokemon.id)
+                    .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+                Some((shell.pokemon, source_rng))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    let enemy = if let Some((enemy, source_rng)) = source_opening {
+        rng = source_rng;
+        enemy
+    } else {
+        let enemy_species = select_encounter_species(biome, &mut rng)?;
+        let enemy_id = identities
+            .allocate_pokemon_id()
+            .map_err(|_| NaturalRunV6Error::Exhausted)?;
+        pokemon(
+            content,
+            &mut rng,
+            enemy_id,
+            None,
+            enemy_species,
+            0,
+            current_initial
+                .as_ref()
+                .map_or(mode.starting_level, |value| value.enemy_level),
+        )?
+    };
     let battle_id = identities
         .allocate_battle_id()
         .map_err(|_| NaturalRunV6Error::Exhausted)?;

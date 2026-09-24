@@ -80,9 +80,14 @@ fn address(
     // All source Faint/KO/victory ability families for the admitted24 IDs and
     // post-victory move families for27 IDs are observed empty. The source live
     // helper validates those IDs, modifiers, suppression and selected slots.
-    // Unrepresented volatile/form/tera interactions remain unsupported here.
+    // A selected matching Tera type is inert while the mechanics store has no
+    // active form overlay. Unrepresented volatile/form interactions stay closed.
     for pokemon in run.party.iter().chain(&battle.enemy_party) {
-        if pokemon.mechanics != MechanicStateStoreV2::default() || pokemon.tera_type.is_some() {
+        if pokemon.mechanics != MechanicStateStoreV2::default()
+            || pokemon.tera_type.is_some_and(|tera| {
+                tera != pokemon.types.primary || pokemon.types.secondary.is_some()
+            })
+        {
             return Err(failure());
         }
     }
@@ -183,9 +188,11 @@ fn address(
             }
         }
     }
+    // The pinned Town trace carries Vine Whip through Faint and reward.
     if !matches!(
         move_id.get().get(),
-        10 | 33
+        10 | 22
+            | 33
             | 39
             | 40
             | 43

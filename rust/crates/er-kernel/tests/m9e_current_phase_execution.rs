@@ -15,7 +15,7 @@ use er_state::current_victory_execution::CurrentVictoryDescendantV1;
 use er_state::m7_state::{
     DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
 };
-use er_state::m9e_state_v6::GameStateV6;
+use er_state::m9e_state_v6::{CurrentAccountIdentityV1, GameStateV6};
 use er_types::battle_ids::{MoveId, WaveIndex};
 use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
 use er_types::run_ids::Experience;
@@ -197,10 +197,14 @@ fn active(snapshot: &CoreGameKernelSnapshotV7) -> Result<&GameStateV6> {
         _ => Err("actual active lifecycle required".into()),
     }
 }
-fn natural(content: Arc<PreparedGameContentV2>) -> Result<GameKernelV7> {
-    natural_with_seed(content, "m9e-phase-execution-18")
-}
 fn natural_with_seed(content: Arc<PreparedGameContentV2>, seed: &str) -> Result<GameKernelV7> {
+    natural_with_seed_and_account(content, seed, None)
+}
+fn natural_with_seed_and_account(
+    content: Arc<PreparedGameContentV2>,
+    seed: &str,
+    account: Option<CurrentAccountIdentityV1>,
+) -> Result<GameKernelV7> {
     let profile = ProfileStateV1 {
         schema_version: PROFILE_STATE_SCHEMA_VERSION_V1,
         unlocks: vec![],
@@ -217,7 +221,7 @@ fn natural_with_seed(content: Arc<PreparedGameContentV2>, seed: &str) -> Result<
             highest_wave: WaveIndex::new(safe(1)?)?,
         },
     };
-    let mut kernel = GameKernelV7::natural_start_with_fresh_friendship(FreshFriendshipStartV7 {
+    let start = FreshFriendshipStartV7 {
         profile,
         seed: seed.to_owned(),
         local_seat: seat()?,
@@ -229,7 +233,12 @@ fn natural_with_seed(content: Arc<PreparedGameContentV2>, seed: &str) -> Result<
             pauses: vec![],
             disposed: false,
         },
-    })?;
+    };
+    let source_account = account.is_some();
+    let mut kernel = match account {
+        Some(account) => GameKernelV7::natural_start_with_fresh_account(start, account)?,
+        None => GameKernelV7::natural_start_with_fresh_friendship(start)?,
+    };
     press(&mut kernel, PhysicalKey::Space)?;
     let mode = content
         .bundle()
@@ -303,8 +312,16 @@ fn natural_with_seed(content: Arc<PreparedGameContentV2>, seed: &str) -> Result<
     )?;
     press(&mut kernel, PhysicalKey::Space)?;
     navigate(&mut kernel, "bootstrap/starter/confirm")?;
-    for _ in 0..4 {
+    if source_account {
         press(&mut kernel, PhysicalKey::Space)?;
+        press(&mut kernel, PhysicalKey::Space)?;
+        navigate(&mut kernel, "bootstrap/difficulty/ace")?;
+        press(&mut kernel, PhysicalKey::Space)?;
+        press(&mut kernel, PhysicalKey::Space)?;
+    } else {
+        for _ in 0..4 {
+            press(&mut kernel, PhysicalKey::Space)?;
+        }
     }
     assert_eq!(
         kernel.current_control().map(|control| control.kind),
@@ -393,6 +410,64 @@ fn bounded_town_candidates_admit_natural_first_battle() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn fresh_account_town_opening_retains_source_enemy_shell() -> Result<()> {
+    let content = content()?;
+    let kernel = Box::new(natural_with_seed_and_account(
+        content,
+        "m9e-town-handoff-5042",
+        Some(CurrentAccountIdentityV1 {
+            trainer_id: 12345,
+            secret_id: 23456,
+        }),
+    )?);
+    let state = kernel.state().ok_or("source opening state absent")?;
+    let run = state
+        .active_run
+        .as_ref()
+        .ok_or("source opening run absent")?;
+    let enemy = run
+        .battle
+        .as_ref()
+        .and_then(|battle| battle.enemy_party.first())
+        .ok_or("source opening enemy absent")?;
+    assert_eq!(enemy.id.get().get(), 1173608932);
+    assert_eq!(enemy.species_id.get().get(), 915);
+    assert_eq!(enemy.abilities.active.get().get(), 268);
+    assert_eq!(
+        enemy.tera_type,
+        Some(er_types::battle_model::PokemonType::Normal)
+    );
+    assert_eq!(
+        enemy.mechanics,
+        er_state::mechanic_state_v2::MechanicStateStoreV2::default()
+    );
+    assert_eq!(enemy.ivs.map(|iv| iv.get()), [2, 31, 7, 22, 15, 4]);
+    assert_eq!(
+        [
+            enemy.stats.hp,
+            enemy.stats.attack,
+            enemy.stats.defense,
+            enemy.stats.special_attack,
+            enemy.stats.special_defense,
+            enemy.stats.speed,
+        ],
+        [14, 9, 6, 6, 7, 6]
+    );
+    assert_eq!(
+        enemy
+            .moves
+            .iter()
+            .flatten()
+            .map(|slot| slot.move_id.get().get())
+            .collect::<Vec<_>>(),
+        vec![158, 230, 39, 98]
+    );
+    assert_eq!(run.party[0].id.get().get(), 1);
+    assert_eq!(state.identities.next_pokemon_id.get(), 1173608933);
+    Ok(())
+}
+
 fn accept_material(
     live: &mut Option<GameStateV6>,
     ledger: &mut AppliedGameMaterialLedgerV1,
@@ -438,9 +513,28 @@ fn controlled_before_knockout(
     level: u16,
     moves: &[u64],
 ) -> Result<GameKernelV7> {
+    controlled_before_knockout_with_seed_and_account(
+        content,
+        level,
+        moves,
+        "m9e-phase-execution-18",
+        None,
+    )
+}
+
+fn controlled_before_knockout_with_seed_and_account(
+    content: Arc<PreparedGameContentV2>,
+    level: u16,
+    moves: &[u64],
+    seed: &str,
+    account: Option<CurrentAccountIdentityV1>,
+) -> Result<GameKernelV7> {
     assert!((1..10).contains(&level));
-    assert!(!moves.is_empty() && moves.len() <= 4 && moves[0] == 33);
-    let mut snapshot = natural(content.clone())?.snapshot()?;
+    let source_account = account.is_some();
+    assert!(
+        !moves.is_empty() && moves.len() <= 4 && moves[0] == (if source_account { 22 } else { 33 })
+    );
+    let mut snapshot = natural_with_seed_and_account(content.clone(), seed, account)?.snapshot()?;
     let GameKernelLifecycleSnapshotV7::Active(state) = &mut snapshot.lifecycle else {
         return Err("natural active state absent".into());
     };
@@ -484,7 +578,7 @@ fn controlled_before_knockout(
     )?;
     pokemon.max_hp = pokemon.stats.hp;
     pokemon.hp = pokemon.max_hp;
-    pokemon.stats.speed = 1;
+    pokemon.stats.speed = if source_account { 500 } else { 1 };
     pokemon.stats.attack = 500;
     let mut tackle = pokemon.moves[0].ok_or("source move absent")?;
     tackle.move_id = MoveId::new(safe(33)?);
@@ -501,7 +595,7 @@ fn controlled_before_knockout(
     assert_eq!(battle.enemy_party.len(), 1);
     let enemy = &mut battle.enemy_party[0];
     enemy.hp = 1;
-    enemy.stats.speed = 500;
+    enemy.stats.speed = if source_account { 1 } else { 500 };
     enemy.stats.attack = 1;
     enemy.moves = [Some(tackle), None, None, None];
     state.validate_with(content.as_ref())?;
@@ -1702,6 +1796,171 @@ fn current_reward(
         .and_then(|p| p.victory_tail.as_ref())
         .and_then(|tail| tail.reward.as_deref())
         .ok_or_else(|| "actual reward receipt absent".into())
+}
+
+#[test]
+fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
+    use er_state::current_reward_selection::CurrentRewardStageV1;
+
+    let content = content()?;
+    let mut kernel = Box::new(
+        controlled_before_knockout_with_seed_and_account(
+            content.clone(),
+            5,
+            &[22],
+            "m9e-town-handoff-5042",
+            Some(CurrentAccountIdentityV1 {
+                trainer_id: 12345,
+                secret_id: 23456,
+            }),
+        )
+        .map_err(|error| format!("Town controlled checkpoint: {error}"))?,
+    );
+    let (mut live, mut ledger) = admit_knockout(&mut kernel, content.as_ref())
+        .map_err(|error| format!("Town knockout admission: {error}"))?;
+    for iteration in 0..128 {
+        if kernel
+            .state()
+            .and_then(|state| current_reward(state).ok())
+            .is_some()
+        {
+            break;
+        }
+        let checkpoint = kernel.snapshot()?;
+        if !checkpoint.pending_presentations.is_empty() {
+            for pending in checkpoint.pending_presentations {
+                kernel
+                    .settle_presentation(pending.event_id)
+                    .map_err(|error| format!("Town presentation {iteration}: {error}"))?;
+            }
+            continue;
+        }
+        let checkpoint = kernel.snapshot()?;
+        let turn_frontier = kernel
+            .state()
+            .and_then(|state| state.current_turn_execution.as_ref())
+            .map(|turn| (turn.stage.clone(), turn.next_action, turn.actions.len()));
+        let next_action = kernel
+            .state()
+            .and_then(|state| state.current_turn_execution.as_ref())
+            .and_then(|turn| turn.actions.get(usize::from(turn.next_action)))
+            .map(|action| format!("{action:?}"));
+        let hp = kernel
+            .state()
+            .and_then(|state| state.active_run.as_ref())
+            .and_then(|run| {
+                run.battle
+                    .as_ref()
+                    .map(|battle| (run.party[0].hp, battle.enemy_party[0].hp))
+            });
+        let pending_platform = checkpoint.pending_platform.len();
+        let step = if let Some(pending) = checkpoint.pending_platform.first() {
+            match &pending.effect {
+                GamePlatformEffectV2::CurrentFriendshipClock { request } => kernel
+                    .apply_current_utc_clock_result(request.request, 0)
+                    .map_err(|error| Box::new(error) as Box<dyn Error>),
+                GamePlatformEffectV2::CurrentAchievementClock { request } => {
+                    accept_flash_test_clock(&mut kernel, request)
+                }
+                GamePlatformEffectV2::CurrentFlashEgg { request } => {
+                    accept_flash_test_egg(&mut kernel, request)
+                }
+                _ => return Err("unexpected source request before Town reward".into()),
+            }
+        } else {
+            kernel
+                .advance_time(SafeU53::ZERO)
+                .map_err(|error| Box::new(error) as Box<dyn Error>)
+        }
+        .map_err(|error| {
+            format!(
+                "Town reward drain iteration {iteration}: turn={turn_frontier:?}, action={next_action:?}, hp={hp:?}, platform={pending_platform}: {error}"
+            )
+        })?;
+        if !step
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. }))
+        {
+            let checkpoint = kernel.snapshot()?;
+            return Err(format!(
+                "Town reward drain idle at {iteration}: control={:?}, platform={}, presentations={}, current_turn={:?}, reward={:?}",
+                kernel.current_control().map(|control| control.kind),
+                checkpoint.pending_platform.len(),
+                checkpoint.pending_presentations.len(),
+                kernel.state().and_then(|state| state.current_turn_execution.as_ref()).map(|turn| &turn.stage),
+                kernel.state().and_then(|state| current_reward(state).ok()).map(|reward| &reward.stage),
+            ).into());
+        }
+        accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)
+            .map_err(|error| format!("Town material replay iteration {iteration}: {error}"))?;
+    }
+    assert!(current_reward(kernel.state().ok_or("reward state absent")?).is_ok());
+    for pending in kernel.snapshot()?.pending_presentations {
+        kernel.settle_presentation(pending.event_id)?;
+    }
+    let to_confirm = press(&mut kernel, PhysicalKey::Escape)
+        .map_err(|error| format!("Town reward Escape: {error}"))?;
+    assert!(
+        to_confirm
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. })),
+        "reward Escape produced no material; control={:?}",
+        kernel.current_control().map(|control| control.kind)
+    );
+    accept_material(
+        &mut live,
+        &mut ledger,
+        &kernel,
+        content.as_ref(),
+        &to_confirm,
+    )?;
+    for pending in kernel.snapshot()?.pending_presentations {
+        kernel.settle_presentation(pending.event_id)?;
+    }
+    navigate(&mut kernel, "reward/skip/yes")?;
+    let skipped = press(&mut kernel, PhysicalKey::Space)
+        .map_err(|error| format!("Town reward skip confirm: {error}"))?;
+    assert!(
+        skipped
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. })),
+        "reward confirm produced no material; control={:?}, pending={}",
+        kernel.current_control().map(|control| control.kind),
+        kernel.snapshot()?.pending_presentations.len()
+    );
+    accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &skipped)?;
+    let state = kernel.state().ok_or("skipped reward state absent")?;
+    assert_eq!(current_reward(state)?.stage, CurrentRewardStageV1::Skipped);
+    let before = canonical_bytes(state)?;
+    let plan =
+        er_game::current_town_wild_spawn::plan_current_town_day_wave_two_after_skipped_reward(
+            state,
+            content.as_ref(),
+        )?;
+    assert_eq!(plan.shell.pokemon.species_id.get().get(), 504);
+    assert_eq!(plan.shell.pokemon.id.get().get(), 3273058121);
+    assert_eq!(plan.shell.pokemon.stats.hp, 13);
+    assert_eq!(
+        plan.shell.pokemon.moves[0]
+            .ok_or("first successor move absent")?
+            .move_id
+            .get()
+            .get(),
+        158
+    );
+    assert_eq!(
+        er_game::current_town_wild_spawn::plan_current_town_day_wave_two_after_skipped_reward(
+            state,
+            content.as_ref(),
+        )?,
+        plan
+    );
+    assert_eq!(canonical_bytes(state)?, before);
+    assert_eq!(live.as_ref(), kernel.state());
+    Ok(())
 }
 
 // Same controlled combat and generator-probed reward seed. The test consumes

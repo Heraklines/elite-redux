@@ -9,10 +9,10 @@ use er_rng::audit::{RngCallsiteId, RngDraw, RngReason};
 use er_rng::battle::RngRuntime;
 use er_rng::phaser::{PhaserRdg, RunRngState, shift_char_codes};
 use er_state::m7_state::{POKEMON_STATE_SCHEMA_VERSION_V5, PokemonStateV5};
-use er_state::m9e_state_v6::GameIdentityAllocatorStateV1;
+use er_state::m9e_state_v6::{GameIdentityAllocatorStateV1, GameStateV6};
 use er_state::mechanic_state_v2::MechanicStateStoreV2;
 use er_state::pokemon_v2::{Iv, PermanentStatBonuses};
-use er_types::battle_ids::{AbilityId, GameModeId, MoveId, SpeciesId};
+use er_types::battle_ids::{AbilityId, BattleId, GameModeId, MoveId, SpeciesId};
 use er_types::battle_model::{
     AbilityLoadout, BattleStats, MoveAccuracy, MoveCategory, MovePower, MoveSlotState, PokemonType,
     PokemonTyping, StatStages, StatusKind, StatusState,
@@ -1928,4 +1928,118 @@ pub fn select_current_town_day_wave_two_shell_with_identity(
     *rng = staged_rng;
     *identities = staged_identities;
     Ok(shell)
+}
+
+/// Source wave-two construction proposed by an actual skipped first reward.
+/// This is a read-only admission plan: settling the old participation receipt,
+/// installing the new battle, and publishing material remain separate work.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CurrentTownPostrewardPlanV1 {
+    pub prior_battle: BattleId,
+    pub reward_pending: SafeU53,
+    pub shell: CurrentTownWildShellV1,
+    pub rng_audit: Vec<RngDraw>,
+    pub next_run_rng: RunRngState,
+    pub next_identities: GameIdentityAllocatorStateV1,
+}
+
+pub fn plan_current_town_day_wave_two_after_skipped_reward(
+    state: &GameStateV6,
+    content: &PreparedGameContentV2,
+) -> Result<CurrentTownPostrewardPlanV1, CurrentTownWildErrorV1> {
+    use er_state::current_initial_victory_tail::CurrentInitialVictoryTailPhaseV1;
+    use er_state::current_reward_selection::CurrentRewardStageV1;
+    use er_types::battle_model::BattleOutcome;
+
+    state
+        .validate_with(content)
+        .map_err(|_| CurrentTownWildErrorV1::UnsupportedContext)?;
+    let source = crate::current_source_progression::current_source_progression(state, content)
+        .map_err(|_| CurrentTownWildErrorV1::UnsupportedContext)?;
+    let run = state
+        .active_run
+        .as_ref()
+        .ok_or(CurrentTownWildErrorV1::UnsupportedContext)?;
+    let battle = run
+        .battle
+        .as_ref()
+        .ok_or(CurrentTownWildErrorV1::UnsupportedContext)?;
+    let pending = state
+        .current_battle_participation
+        .as_ref()
+        .and_then(|owner| owner.experience.as_ref())
+        .and_then(|owner| owner.pending.first())
+        .ok_or(CurrentTownWildErrorV1::UnsupportedContext)?;
+    let tail = pending
+        .victory_tail
+        .as_ref()
+        .ok_or(CurrentTownWildErrorV1::UnsupportedContext)?;
+    let reward = tail
+        .reward
+        .as_ref()
+        .ok_or(CurrentTownWildErrorV1::UnsupportedContext)?;
+    let account = state
+        .current_account_identity
+        .ok_or(CurrentTownWildErrorV1::UnsupportedContext)?;
+    let difficulty = state
+        .current_run_difficulty
+        .filter(|owner| owner.run_id == run.run_id)
+        .ok_or(CurrentTownWildErrorV1::UnsupportedContext)?
+        .difficulty;
+    if run.wave.get().get() != 1
+        || source.initial_battle != battle.battle_id
+        || battle.outcome != BattleOutcome::Victory
+        || battle.enemy_party.iter().any(|enemy| !enemy.fainted)
+        || !matches!(
+            tail.phase,
+            CurrentInitialVictoryTailPhaseV1::RewardSelectionPending { .. }
+        )
+        || reward.stage != CurrentRewardStageV1::Skipped
+        || battle.wave_seed
+            != shift_char_codes(&run.seed, 1)
+                .map_err(|_| CurrentTownWildErrorV1::UnsupportedContext)?
+    {
+        return Err(CurrentTownWildErrorV1::UnsupportedContext);
+    }
+    let wave = 2;
+    let cycle_offset = source_town_wave_cycle_offset(&run.seed)?;
+    let effective_pool_time = source_town_time_of_day(wave, cycle_offset)?;
+    let mut rng = RngRuntime::from_states(source_town_reset_seed(&run.seed, wave)?, None)
+        .map_err(|_| CurrentTownWildErrorV1::RandomDraw)?;
+    if source_town_unboosted_wild_double_roll(&mut rng)? {
+        return Err(CurrentTownWildErrorV1::UnsupportedContext);
+    }
+    let context = CurrentTownDayWaveTwoContextV1 {
+        mode: run.mode,
+        biome: run.world.biome,
+        difficulty,
+        wave,
+        level: 2,
+        luck: 0,
+        forced_tier: None,
+        encounter_boss_segments: 0,
+        regional_boost: false,
+        time_override: None,
+        effective_pool_time,
+        override_species: None,
+        golden_bug_net: false,
+        excluded_species: &[],
+    };
+    let mut identities = state.identities.clone();
+    let shell = select_current_town_day_wave_two_shell_with_identity(
+        content,
+        context,
+        account.trainer_id,
+        account.secret_id,
+        &mut identities,
+        &mut rng,
+    )?;
+    Ok(CurrentTownPostrewardPlanV1 {
+        prior_battle: battle.battle_id,
+        reward_pending: pending.id,
+        shell,
+        rng_audit: rng.audit_entries().to_vec(),
+        next_run_rng: rng.run_state(),
+        next_identities: identities,
+    })
 }

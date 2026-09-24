@@ -1442,7 +1442,12 @@ fn calculate_current_source_damage_with_variance(
         || actor.mechanics != er_state::mechanic_state_v2::MechanicStateStoreV2::default()
         || target.mechanics != er_state::mechanic_state_v2::MechanicStateStoreV2::default()
         || actor.tera_type.is_some()
-        || target.tera_type.is_some()
+        // A selected Tera type is not an active Tera form. The default
+        // mechanics guards above exclude the active overlay; the source Town
+        // opening retains its ordinary monotype Normal selection.
+        || target
+            .tera_type
+            .is_some_and(|tera| tera != target.types.primary || target.types.secondary.is_some())
     {
         return Err(BattleV5Error::UnsupportedContent);
     }
