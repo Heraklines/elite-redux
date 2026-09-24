@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { defaultStarterSpecies } from "#app/constants";
 import { erPendingNodesReady, getErPendingNodes } from "#data/elite-redux/er-biome-routing";
 import { BattleStyle } from "#enums/battle-style";
 import { BiomeId } from "#enums/biome-id";
@@ -64,6 +65,26 @@ test("Title and actual starter controls construct a source-owned Classic starter
     .seed(SEED);
   manager.scene.gameData.trainerId = 12345;
   manager.scene.gameData.secretId = 23456;
+  const freshStarters = defaultStarterSpecies.map(species => {
+    const dex = manager!.scene.gameData.dexData[species];
+    const starter = manager!.scene.gameData.getStarterDataEntry(species);
+    return {
+      species,
+      seen_attr: dex.seenAttr.toString(),
+      caught_attr: dex.caughtAttr.toString(),
+      nature_attr: dex.natureAttr,
+      ivs: [...dex.ivs],
+      ability_attr: starter.abilityAttr,
+      passive_attr: starter.passiveAttr,
+      egg_moves: starter.eggMoves,
+      has_saved_moveset: starter.moveset != null,
+    };
+  });
+  writeFileSync(join(output!, `fresh-starters-${ordinal}.json`), `${JSON.stringify({
+    source: PIN,
+    account: "fresh",
+    starters: freshStarters,
+  })}\n`);
   mark("manager-ready");
 
   const constructor: { before: string; after: string; id: number; input: object }[] = [];

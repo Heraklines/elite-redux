@@ -117,7 +117,7 @@ def main():
     result = {
         "schema": 1, "status": "failed", "source_pin": PIN,
         "candidate_sha": os.environ["GITHUB_SHA"],
-        "scope": "two fresh explicit-starter and two fresh actual-UI reward-to-wave-two observations plus two alternate-seed starter UI observations; no Rust settlement qualification",
+        "scope": "two fresh explicit-starter and two fresh actual-UI reward-to-wave-two observations, two alternate-seed UI observations, and a four-process fresh starter account catalog; no Rust settlement qualification",
         "commands": COMMANDS,
     }
     try:
@@ -308,6 +308,30 @@ def main():
         (COMPACT / "starter-ui-alternate-candidate.json").unlink()
         result["starter_ui_alternate"] = {"bytes": len(alternate_ui[0]),
                                           "sha256": sha(alternate_ui[0])}
+        fresh_accounts = []
+        for ordinal in ("one", "two", "alt-one", "alt-two"):
+            raw = (OUT / ("fresh-starters-" + ordinal + ".json")).read_bytes()
+            require(0 < len(raw) <= 8192, "bounded fresh starter account")
+            (COMPACT / "fresh-starters-candidate.json").write_bytes(raw)
+            value = json.loads(raw)
+            rows = value["starters"]
+            require(
+                raw == (json.dumps(value, separators=(",", ":")) + "\n").encode()
+                and value["source"] == PIN and value["account"] == "fresh"
+                and len(rows) == 27
+                and len({row["species"] for row in rows}) == 27
+                and rows[0]["species"] == 1
+                and all(row["ivs"] == [15] * 6 for row in rows)
+                and all(not row["has_saved_moveset"] for row in rows),
+                "canonical fresh starter account",
+            )
+            fresh_accounts.append(raw)
+        require(all(raw == fresh_accounts[0] for raw in fresh_accounts[1:]),
+                "fresh starter accounts differ across processes or seeds")
+        (COMPACT / "fresh-starters-observation.json").write_bytes(fresh_accounts[0])
+        (COMPACT / "fresh-starters-candidate.json").unlink()
+        result["fresh_starters"] = {"bytes": len(fresh_accounts[0]),
+                                    "sha256": sha(fresh_accounts[0]), "rows": 27}
         result["status"] = "passed"
     except Exception as error:
         result["first_failure"] = str(error)[:1024]
