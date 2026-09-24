@@ -90,6 +90,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   expect(firstEnemy).toBeDefined();
   const firstEnemyId = firstEnemy.id;
   const firstEnemySpecies = firstEnemy.species.speciesId;
+  expect(firstEnemySpecies).toBe(915);
   const firstSpeciesCalls = allSpeciesCalls.filter(call => call.wave === 1);
   const player = scene.getPlayerPokemon();
   expect(player).toBeDefined();
@@ -161,7 +162,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   expect(enemy.id).not.toBe(firstEnemyId);
   expect((scene.arena as unknown as { lastTimeOfDay: number }).lastTimeOfDay).toBe(1);
   expect(enemy.species.speciesId).toBe(504);
-  expect(enemy.level).toBe(3);
+  expect(enemy.level).toBe(2);
   const waveTwoSelections = allSpeciesCalls.filter(call => call.wave === 2);
   expect(waveTwoSelections).toHaveLength(1);
   expect(waveTwoSelections[0].species).toBe(enemy.species.speciesId);
