@@ -104,9 +104,9 @@ pub fn current_fresh_starter_moves_v1(
     content: &PreparedGameContentV2,
     species: SpeciesId,
 ) -> Result<Vec<MoveId>, NaturalRunV6Error> {
-    if !FRESH_STARTER_SPECIES.contains(
-        &u32::try_from(species.get().get()).map_err(|_| NaturalRunV6Error::Invalid)?,
-    ) {
+    if !FRESH_STARTER_SPECIES
+        .contains(&u32::try_from(species.get().get()).map_err(|_| NaturalRunV6Error::Invalid)?)
+    {
         return Err(NaturalRunV6Error::Invalid);
     }
     let progression = content
