@@ -23,13 +23,27 @@ pub(crate) fn validate(state: &GameStateV6) -> Result<(), GameRuntimeV6Error> {
         .as_ref()
         .and_then(|profile| profile.rewards.as_ref())
         .ok_or_else(failure)?;
-    // This owner admits precisely the genuine first encounter of a fresh run.
-    // The complete fresh account initialized this durable counter to zero.
+    let baseline = if let Some(previous) = owner.first_reward_predecessor.as_ref() {
+        let previous: GameStateV6 =
+            serde_json::from_value((**previous).clone()).map_err(|_| failure())?;
+        let prior = previous
+            .current_friendship_profile
+            .as_ref()
+            .and_then(|profile| profile.rewards.as_ref())
+            .ok_or_else(failure)?
+            .pokemon_defeated;
+        if prior.get() != 1 {
+            return Err(failure());
+        }
+        prior
+    } else {
+        SafeU53::ZERO
+    };
     if owner.pending.len() > 1 {
         return Err(failure());
     }
     let Some(pending) = owner.pending.first() else {
-        return if rewards.pokemon_defeated == SafeU53::ZERO {
+        return if rewards.pokemon_defeated == baseline {
             Ok(())
         } else {
             Err(failure())
@@ -37,7 +51,7 @@ pub(crate) fn validate(state: &GameStateV6) -> Result<(), GameRuntimeV6Error> {
     };
     match pending.victory_defeated_total {
         None => {
-            if rewards.pokemon_defeated != SafeU53::ZERO
+            if rewards.pokemon_defeated != baseline
                 || pending.victory.is_some()
                 || pending
                     .friendship
@@ -48,7 +62,7 @@ pub(crate) fn validate(state: &GameStateV6) -> Result<(), GameRuntimeV6Error> {
             }
         }
         Some(total) => {
-            if total.get() != 1
+            if baseline.get().checked_add(1) != Some(total.get())
                 || rewards.pokemon_defeated != total
                 || !matches!(&source.initial_faint.phase, Some(CurrentFaintPhaseV1::ReadyForVictory { address })
                     if address.pending_id == pending.id)

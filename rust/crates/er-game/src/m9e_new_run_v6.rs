@@ -1193,7 +1193,8 @@ pub fn advance_current_town_day_wave_two_after_skipped_reward(
         &mut next,
         content,
         er_state::current_experience_owner::CurrentExperienceCapPolicyV1::NormalClassic,
-    )?;
+    )
+    .map_err(|error| NaturalRunV6Error::State(format!("wave-two experience install: {error}")))?;
     let owner = next
         .current_battle_participation
         .as_mut()
@@ -1206,7 +1207,7 @@ pub fn advance_current_town_day_wave_two_after_skipped_reward(
             NaturalRunV6Error::State(error.to_string())
         })?));
     next.validate_with(content)
-        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+        .map_err(|error| NaturalRunV6Error::State(format!("wave-two final validation: {error}")))?;
     Ok((*next, plan.rng_audit))
 }
 
