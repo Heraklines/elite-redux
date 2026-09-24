@@ -81,6 +81,27 @@ const SOURCE_AFTER_WAVE_RESET: &str =
 const SOURCE_AFTER_SELECTION: &str =
     "!rnd,1012145,0.09734400571323931,0.1575480371247977,0.15997060341760516";
 
+fn observed_title_route_prefix(rng: &mut RngRuntime) -> Result<usize, Box<dyn Error>> {
+    let mut successes = 0;
+    let mut attempts = 0;
+    while successes < 3 && attempts < 10 {
+        let roll = rng.run_rand_seed_int(
+            SafeU53::new(100)?,
+            SafeU53::ZERO,
+            RngReason::RandomSelector,
+            RngCallsiteId::mechanics(RngReason::RandomSelector),
+        )?;
+        attempts += 1;
+        if roll.get() < 50 {
+            successes += 1;
+        }
+    }
+    if successes != 3 {
+        return Err("observed Title route prefix did not reach three extras".into());
+    }
+    Ok(attempts)
+}
+
 #[test]
 fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Box<dyn Error>> {
     // Source run35892149923 established that the starter helper silently
@@ -1328,15 +1349,7 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
     // but the run RNG stays advanced. Run35963530932 confirmed the empty
     // pending graph at Command while preserving the same constructor frontier.
     let mut ui_rng = RngRuntime::from_run_seed(seed);
-    for _ in 0..3 {
-        let route_roll = ui_rng.run_rand_seed_int(
-            SafeU53::new(100)?,
-            SafeU53::ZERO,
-            RngReason::RandomSelector,
-            RngCallsiteId::mechanics(RngReason::RandomSelector),
-        )?;
-        assert!(route_roll.get() < 50);
-    }
+    assert_eq!(observed_title_route_prefix(&mut ui_rng)?, 3);
     assert_eq!(
         ui_rng.run_state().rdg.state_string,
         "!rnd,1001026,0.9830058687366545,0.08702266961336136,0.2183791280258447"
@@ -1429,6 +1442,22 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
         vec![22, 33, 45, 74]
     );
     assert_eq!(before_constructor.run_state(), ui_rng.run_state());
+    // An independent source UI run on seed774 needed five candidate rolls to
+    // accept three extras. Its starter constructor begins at that frontier;
+    // the selected fresh-account inputs are otherwise the same Bulbasaur.
+    let mut alternate_rng = RngRuntime::from_run_seed("m9e-town-handoff-774");
+    assert_eq!(observed_title_route_prefix(&mut alternate_rng)?, 5);
+    assert_eq!(
+        alternate_rng.run_state().rdg.state_string,
+        "!rnd,969360,0.42243809276260436,0.04841565107926726,0.6655898890458047"
+    );
+    let alternate_starter =
+        construct_current_source_starter_v1(&content, &selected, &mut alternate_rng)?;
+    assert_eq!(alternate_starter.id.get().get(), 4_252_591_335);
+    assert_eq!(
+        alternate_rng.run_state().rdg.state_string,
+        "!rnd,2071002,0.064213513629511,0.7699574562720954,0.006703111808747053"
+    );
     let mode = content
         .bundle()
         .world
