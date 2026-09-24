@@ -64,7 +64,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   await manager.runToTitle();
   manager.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
     manager!.scene.gameMode = getGameMode(GameModes.CLASSIC);
-    const starters = generateStarters(manager!.scene, [SpeciesId.CHARMANDER]);
+    const starters = generateStarters(manager!.scene, [SpeciesId.BULBASAUR]);
     manager!.scene.setSeed(SETUP_SEED);
     manager!.scene.phaseManager.pushNew("EncounterPhase", false);
     new SelectStarterPhase().initBattleFromCurrentPhase(starters);
@@ -83,9 +83,8 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   const firstEnemySpecies = firstEnemy.species.speciesId;
   const player = scene.getPlayerPokemon();
   expect(player).toBeDefined();
-  // The actual seeded starter construction selects Fire Fang here; use the
-  // retained move, without changing its moveset through a test helper.
-  expect(player.getMoveset().map(move => move.moveId)).toContain(MoveId.FIRE_FANG);
+  // Use a retained natural Bulbasaur move without rewriting its moveset.
+  expect(player.getMoveset().map(move => move.moveId)).toContain(MoveId.TACKLE);
 
   const actualNewBattle = scene.newBattle.bind(scene);
   const beforeNewBattle: string[] = [];
@@ -119,7 +118,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   let attackingTurns = 0;
   const firstEnemyHpTrace = [firstEnemy.hp];
   while (!manager.isVictory() && attackingTurns < 12) {
-    manager.move.select(MoveId.FIRE_FANG);
+    manager.move.select(MoveId.TACKLE);
     await manager.toEndOfTurn();
     attackingTurns++;
     firstEnemyHpTrace.push(firstEnemy.hp);
@@ -199,10 +198,10 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   };
   const secondEnemyHpBefore = enemy.hp;
   const secondPlayerHpBefore = player.hp;
-  const secondMove = player.getMoveset().find(move => move.moveId === MoveId.FIRE_FANG);
+  const secondMove = player.getMoveset().find(move => move.moveId === MoveId.TACKLE);
   expect(secondMove).toBeDefined();
   const secondPpBefore = secondMove!.ppUsed;
-  manager.move.select(MoveId.FIRE_FANG);
+  manager.move.select(MoveId.TACKLE);
   await manager.toEndOfTurn();
   expect(secondMove!.ppUsed).toBe(secondPpBefore + 1);
   expect(enemy.hp).toBeLessThanOrEqual(secondEnemyHpBefore);
@@ -231,7 +230,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
     },
     next: nextObservation,
     second_battle: {
-      action: MoveId.FIRE_FANG,
+      action: MoveId.TACKLE,
       enemy_hp_before: secondEnemyHpBefore,
       enemy_hp_after: enemy.hp,
       player_hp_before: secondPlayerHpBefore,
