@@ -197,9 +197,6 @@ fn active(snapshot: &CoreGameKernelSnapshotV7) -> Result<&GameStateV6> {
         _ => Err("actual active lifecycle required".into()),
     }
 }
-fn natural(content: Arc<PreparedGameContentV2>) -> Result<GameKernelV7> {
-    natural_with_seed(content, "m9e-phase-execution-18")
-}
 fn natural_with_seed(content: Arc<PreparedGameContentV2>, seed: &str) -> Result<GameKernelV7> {
     natural_with_seed_and_account(content, seed, None)
 }
@@ -1756,8 +1753,11 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
             break;
         }
         let checkpoint = kernel.snapshot()?;
-        for pending in checkpoint.pending_presentations {
-            kernel.settle_presentation(pending.event_id)?;
+        if !checkpoint.pending_presentations.is_empty() {
+            for pending in checkpoint.pending_presentations {
+                kernel.settle_presentation(pending.event_id)?;
+            }
+            continue;
         }
         let checkpoint = kernel.snapshot()?;
         let step = if let Some(pending) = checkpoint.pending_platform.first() {
