@@ -167,8 +167,12 @@ pub fn current_fresh_default_starter_input_v1(
         return Err(NaturalRunV6Error::Invalid);
     }
     let nature_bit = account.nature_attr.trailing_zeros();
-    let nature_index = u8::try_from(nature_bit.checked_sub(1).ok_or(NaturalRunV6Error::Invalid)?)
-        .map_err(|_| NaturalRunV6Error::Invalid)?;
+    let nature_index = u8::try_from(
+        nature_bit
+            .checked_sub(1)
+            .ok_or(NaturalRunV6Error::Invalid)?,
+    )
+    .map_err(|_| NaturalRunV6Error::Invalid)?;
     let tera_type = content
         .battle
         .species(species)
