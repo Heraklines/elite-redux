@@ -117,14 +117,6 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
     afterNewBattle.push(Phaser.Math.RND.state());
     return result;
   });
-  const actualRandomSpecies = scene.arena.randomSpecies.bind(scene.arena);
-  const speciesCalls: { wave: number; level: number; before: string; species: number }[] = [];
-  vi.spyOn(scene.arena, "randomSpecies").mockImplementation((...args) => {
-    const before = Phaser.Math.RND.state();
-    const species = actualRandomSpecies(...args);
-    speciesCalls.push({ wave: args[0], level: args[1], before, species: species.speciesId });
-    return species;
-  });
   let attackingTurns = 0;
   const firstEnemyHpTrace = [firstEnemy.hp];
   while (!manager.isVictory() && attackingTurns < 12) {
@@ -170,7 +162,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   expect((scene.arena as unknown as { lastTimeOfDay: number }).lastTimeOfDay).toBe(1);
   expect(enemy.species.speciesId).toBe(504);
   expect(enemy.level).toBe(3);
-  const waveTwoSelections = speciesCalls.filter(call => call.wave === 2);
+  const waveTwoSelections = allSpeciesCalls.filter(call => call.wave === 2);
   expect(waveTwoSelections).toHaveLength(1);
   expect(waveTwoSelections[0].species).toBe(enemy.species.speciesId);
   const shinyXor = (scene.gameData.trainerId ^ scene.gameData.secretId)
