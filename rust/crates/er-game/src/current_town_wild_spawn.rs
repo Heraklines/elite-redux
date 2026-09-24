@@ -1702,11 +1702,9 @@ pub fn select_current_town_day_wave_two_shell(
         .progression
         .growth_rate(progression.growth_rate)
         .ok_or(CurrentTownWildErrorV1::SourceContent)?;
-    let experience = er_progression::progression::current_growth_experience_for_level(
-        growth,
-        context.level,
-    )
-    .map_err(|_| CurrentTownWildErrorV1::SourceContent)?;
+    let experience =
+        er_progression::progression::current_growth_experience_for_level(growth, context.level)
+            .map_err(|_| CurrentTownWildErrorV1::SourceContent)?;
     let expected_experience = if context.level == 2 { 8 } else { 27 };
     if experience.get().get() != expected_experience || progression.base_friendship != 70 {
         return Err(CurrentTownWildErrorV1::SourceContent);
