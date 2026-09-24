@@ -78,9 +78,13 @@ test("Title and actual starter controls construct a source-owned Classic starter
     } else if (constructor.length === 0) {
       uiDrawCount++;
       if (uiDraws.length < 16) {
-        const callers = new Error().stack?.split("\n").slice(2, 6)
+        const callers = new Error().stack?.split("\n").slice(2, 10)
           .map(line => line.trim().split(" (")[0]).join("|") ?? "";
-        uiDraws.push({ after: Phaser.Math.RND.state(), stage: rngStage, callers: callers.slice(0, 120) });
+        uiDraws.push({
+          after: Phaser.Math.RND.state(),
+          stage: rngStage,
+          callers: callers.slice(0, uiDrawCount <= 3 ? 400 : 120),
+        });
       }
     }
     return value;
