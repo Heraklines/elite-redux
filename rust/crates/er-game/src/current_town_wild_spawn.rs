@@ -7,6 +7,7 @@ use std::sync::OnceLock;
 
 use er_rng::audit::{RngCallsiteId, RngDraw, RngReason};
 use er_rng::battle::RngRuntime;
+use er_rng::phaser::{PhaserRdg, RunRngState, shift_char_codes};
 use er_state::m7_state::{POKEMON_STATE_SCHEMA_VERSION_V5, PokemonStateV5};
 use er_state::m9e_state_v6::GameIdentityAllocatorStateV1;
 use er_state::mechanic_state_v2::MechanicStateStoreV2;
@@ -631,6 +632,74 @@ pub enum CurrentTownWildErrorV1 {
     RandomDraw,
     #[error("source Pokemon ID is behind the allocated identity frontier")]
     IdentityFrontier,
+}
+
+/// Source scene initialization draws one of eight five-wave cycle offsets
+/// under executeWithSeedOffset(seed, 0). The run stream is not consumed.
+pub fn source_town_wave_cycle_offset(seed: &str) -> Result<u8, CurrentTownWildErrorV1> {
+    let mut offset_rng = PhaserRdg::from_seed(seed);
+    let bucket = offset_rng
+        .rand_seed_int(
+            SafeU53::new(8).map_err(|_| CurrentTownWildErrorV1::RandomDraw)?,
+            SafeU53::ZERO,
+        )
+        .map_err(|_| CurrentTownWildErrorV1::RandomDraw)?;
+    u8::try_from(bucket.get() * 5).map_err(|_| CurrentTownWildErrorV1::RandomDraw)
+}
+
+/// Arena.getTimeOfDay for Town without an override. Its numeric values match
+/// source TimeOfDay (DAWN=0, DAY=1, DUSK=2, NIGHT=3).
+pub fn source_town_time_of_day(
+    wave: u16,
+    wave_cycle_offset: u8,
+) -> Result<i16, CurrentTownWildErrorV1> {
+    if !(1..=200).contains(&wave) || wave_cycle_offset > 35 || !wave_cycle_offset.is_multiple_of(5)
+    {
+        return Err(CurrentTownWildErrorV1::UnsupportedContext);
+    }
+    let cycle = (u32::from(wave) + u32::from(wave_cycle_offset)) % 40;
+    Ok(if cycle < 15 {
+        1
+    } else if cycle < 20 {
+        2
+    } else if cycle < 35 {
+        3
+    } else {
+        0
+    })
+}
+
+/// Source scene.resetSeed(wave) replaces the global run stream with the
+/// wave-shifted seed before constructing the next encounter.
+pub fn source_town_reset_seed(
+    seed: &str,
+    wave: u16,
+) -> Result<RunRngState, CurrentTownWildErrorV1> {
+    if !(1..=200).contains(&wave) {
+        return Err(CurrentTownWildErrorV1::UnsupportedContext);
+    }
+    let wave_seed =
+        shift_char_codes(seed, i64::from(wave)).map_err(|_| CurrentTownWildErrorV1::RandomDraw)?;
+    Ok(RunRngState {
+        rdg: PhaserRdg::from_seed(&wave_seed).state(),
+    })
+}
+
+/// The ordinary wild checkIsDouble roll with source base chance eight. Only
+/// valid when no lure, ability, biome multiplier or battle-style override
+/// changes that chance; its audited draw precedes Town species selection.
+pub fn source_town_unboosted_wild_double_roll(
+    rng: &mut RngRuntime,
+) -> Result<bool, CurrentTownWildErrorV1> {
+    let roll = rng
+        .run_rand_seed_int(
+            SafeU53::new(8).map_err(|_| CurrentTownWildErrorV1::RandomDraw)?,
+            SafeU53::ZERO,
+            RngReason::RandomSelector,
+            RngCallsiteId::current_wild_double(),
+        )
+        .map_err(|_| CurrentTownWildErrorV1::RandomDraw)?;
+    Ok(roll == SafeU53::ZERO)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
