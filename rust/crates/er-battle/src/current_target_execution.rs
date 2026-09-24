@@ -643,6 +643,18 @@ impl<'a> CurrentTargetExecution<'a> {
         if user.hp == 0 || user.fainted {
             return Err(CurrentTargetExecutionError);
         }
+        // These four slots come from the pinned single-enemy Town wave-two
+        // shell. Target selection alone does not qualify their battle effects.
+        if matches!(definition.id.get().get(), 95 | 116 | 158 | 747)
+            && !(self.source_damage
+                && battle.wave.get().get() == 2
+                && battle.format == er_types::battle_ids::BattleFormat::single()
+                && field.slot.side == BattleSide::Enemy
+                && user.species_id.get().get() == 504
+                && battle.enemy_party.len() == 1)
+        {
+            return Err(CurrentTargetExecutionError);
+        }
         let (source_target, multi_hit) = source_move(definition.id.get().get())?;
         if source_target != definition.target {
             return Err(CurrentTargetExecutionError);
@@ -801,12 +813,13 @@ fn source_move(id: u64) -> Result<(MoveTarget, bool), CurrentTargetExecutionErro
     let target = match id {
         // Pinned source defines Vine Whip (22) as a plain AttackMove with
         // NEAR_OTHER targeting; the level-five Town trace executes it twice.
-        10 | 22 | 33 | 40 | 61 | 64 | 78 | 79 | 98 | 103 | 310 | 331 | 448 | 458 | 497 | 541 => {
+        10 | 22 | 33 | 40 | 61 | 64 | 78 | 79 | 95 | 98 | 103 | 158 | 310 | 331 | 448
+        | 458 | 497 | 541 | 747 => {
             NearOther
         }
         39 | 43 | 45 | 230 => AllNearEnemies,
         57 => AllNearOthers,
-        105 | 110 | 336 => User,
+        105 | 110 | 116 | 336 => User,
         108 | 501 => UserSide,
         580 => BothSides,
         165 => RandomNearEnemy,
