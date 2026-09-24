@@ -2025,7 +2025,8 @@ fn assert_skipped_reward_wave_two(
             .as_ref()
             .and_then(|row| row.experience.as_ref())
             .and_then(|owner| owner.first_reward_predecessor.as_ref())
-            .is_some_and(|previous| previous.as_ref() == state)
+            .is_some_and(|previous| serde_json::from_value::<GameStateV6>((**previous).clone())
+                .is_ok_and(|restored| &restored == state))
     );
     Ok(())
 }

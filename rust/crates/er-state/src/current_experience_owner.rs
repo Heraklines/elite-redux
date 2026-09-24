@@ -137,7 +137,7 @@ pub struct CurrentExperienceOwnerV1 {
     /// One bounded, exact predecessor for the first source reward-to-battle
     /// handoff. The prior state must not itself carry a predecessor.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub first_reward_predecessor: Option<Box<GameStateV6>>,
+    pub first_reward_predecessor: Option<Box<serde_json::Value>>,
 }
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -194,6 +194,14 @@ impl CurrentExperienceOwnerV1 {
         run: &RunStateV3,
     ) -> Result<(), CurrentExperienceOwnerError> {
         if let Some(previous) = &self.first_reward_predecessor {
+            let previous_value = &**previous;
+            let previous: GameStateV6 = serde_json::from_value(previous_value.clone())
+                .map_err(|_| CurrentExperienceOwnerError::Invalid)?;
+            let canonical = serde_json::to_value(&previous)
+                .map_err(|_| CurrentExperienceOwnerError::Invalid)?;
+            if &canonical != previous_value {
+                return Err(CurrentExperienceOwnerError::Invalid);
+            }
             let prior_run = previous
                 .active_run
                 .as_ref()

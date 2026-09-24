@@ -1201,7 +1201,9 @@ pub fn advance_current_town_day_wave_two_after_skipped_reward(
         .ok_or(NaturalRunV6Error::Invalid)?;
     owner.next_pending_id = prior_owner.next_pending_id;
     owner.source_progression = Some(source);
-    owner.first_reward_predecessor = Some(Box::new(state.clone()));
+    owner.first_reward_predecessor = Some(Box::new(
+        serde_json::to_value(state).map_err(|error| NaturalRunV6Error::State(error.to_string()))?,
+    ));
     next.validate_with(content)
         .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
     Ok((*next, plan.rng_audit))

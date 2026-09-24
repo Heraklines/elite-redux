@@ -690,9 +690,14 @@ impl GameStateV6ContentContext for PreparedGameContentV2 {
         let Some(previous) = owner.first_reward_predecessor.as_ref() else {
             return false;
         };
+        let Ok(previous) = serde_json::from_value::<er_state::m9e_state_v6::GameStateV6>(
+            (**previous).clone(),
+        ) else {
+            return false;
+        };
         let Ok(plan) =
             crate::current_town_wild_spawn::plan_current_town_day_wave_two_after_skipped_reward(
-                previous, self,
+                &previous, self,
             )
         else {
             return false;
