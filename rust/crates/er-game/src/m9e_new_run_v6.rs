@@ -48,6 +48,8 @@ pub use current_source_starter::{
 pub enum NaturalRunV6Error {
     #[error("natural V6 bootstrap selection or content is invalid")]
     Invalid,
+    #[error("source Town opening is outside the qualified day/root scope")]
+    NotQualified,
     #[error("natural V6 identity or arithmetic exhausted")]
     Exhausted,
     #[error("natural V6 state failed validation: {0}")]
@@ -73,6 +75,7 @@ pub fn construct_current_fresh_town_run_v1(
 ) -> Result<GameStateV6, NaturalRunV6Error> {
     if bootstrap.current_friendship_profile.is_none()
         || bootstrap.current_account_identity.is_none()
+        || bootstrap.current_title_open_count != 1
         || bootstrap.selections.starters.len() != 1
         || bootstrap.selections.difficulty != Some(er_types::RunDifficultyV1::Ace)
     {
@@ -299,7 +302,7 @@ fn construct_natural_run_v6_inner(
         None
     };
     if source_starter.is_some() && source_opening.is_none() {
-        return Err(NaturalRunV6Error::Invalid);
+        return Err(NaturalRunV6Error::NotQualified);
     }
     let enemy = if let Some((enemy, source_rng)) = source_opening {
         rng = source_rng;

@@ -17,6 +17,10 @@ use thiserror::Error;
 
 pub const RUN_BOOTSTRAP_SCHEMA_VERSION_V1: u32 = 1;
 
+fn zero_title_open_count(value: &u8) -> bool {
+    *value == 0
+}
+
 #[path = "current_starter_pokerus.rs"]
 pub mod current_pokerus;
 pub use current_pokerus::CurrentStarterPokerusOwnerV1;
@@ -84,6 +88,8 @@ pub struct RunBootstrapMachineV1 {
     pub profile: ProfileStateV1,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_account_identity: Option<er_state::m9e_state_v6::CurrentAccountIdentityV1>,
+    #[serde(default, skip_serializing_if = "zero_title_open_count")]
+    pub current_title_open_count: u8,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_friendship_profile:
         Option<er_state::current_friendship_profile::CurrentFriendshipProfileV1>,
@@ -168,6 +174,7 @@ impl RunBootstrapMachineV1 {
             schema_version: RUN_BOOTSTRAP_SCHEMA_VERSION_V1,
             profile,
             current_account_identity: None,
+            current_title_open_count: 0,
             current_friendship_profile: None,
             seed,
             stage: RunBootstrapStageV1::Title,
@@ -186,6 +193,11 @@ impl RunBootstrapMachineV1 {
 
     pub fn validate(&self) -> Result<(), RunBootstrapErrorV1> {
         if self.schema_version != RUN_BOOTSTRAP_SCHEMA_VERSION_V1 || self.seed.is_empty() {
+            return Err(RunBootstrapErrorV1::Invalid);
+        }
+        if self.current_title_open_count > 2
+            || (self.current_title_open_count > 0 && self.current_account_identity.is_none())
+        {
             return Err(RunBootstrapErrorV1::Invalid);
         }
         self.control
@@ -344,6 +356,10 @@ impl RunBootstrapMachineV1 {
         }
         match (self.stage, action) {
             (RunBootstrapStageV1::Title, BootstrapActionV1::OpenNewGame) => {
+                if self.current_account_identity.is_some() {
+                    self.current_title_open_count =
+                        self.current_title_open_count.saturating_add(1).min(2);
+                }
                 self.stage = RunBootstrapStageV1::ModeSelect;
             }
             (RunBootstrapStageV1::ModeSelect, BootstrapActionV1::SelectMode(mode)) => {

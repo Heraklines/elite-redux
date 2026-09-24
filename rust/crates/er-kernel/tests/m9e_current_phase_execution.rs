@@ -482,8 +482,19 @@ fn fresh_account_town_opening_retains_source_enemy_shell() -> Result<()> {
             .collect::<Vec<_>>(),
         vec![158, 230, 39, 98]
     );
-    assert_eq!(run.party[0].id.get().get(), 1);
-    assert_eq!(state.identities.next_pokemon_id.get(), 1173608933);
+    assert_eq!(run.party[0].id.get().get(), 1_771_723_560);
+    assert_eq!(run.party[0].ivs.map(|iv| iv.get()), [15; 6]);
+    assert_eq!(run.party[0].nature.get(), 6);
+    assert_eq!(
+        run.party[0]
+            .moves
+            .iter()
+            .flatten()
+            .map(|slot| slot.move_id.get().get())
+            .collect::<Vec<_>>(),
+        vec![22, 33, 45, 74]
+    );
+    assert_eq!(state.identities.next_pokemon_id.get(), 1_771_723_561);
     Ok(())
 }
 
