@@ -557,11 +557,20 @@ fn actual_abi2_process_exports_complete_causal_repro() -> Result<(), Box<dyn Err
     let mut worker = WorkerProcess::spawn(identity)?;
     worker.accepted(0, KernelWorkerRequestV2::Hello)?;
     worker.accepted(1, initialization(bundle)?)?;
-    worker.accepted(2, KernelWorkerRequestV2::Apply(raw_key(PhysicalKey::Enter, true)))?;
-    worker.accepted(3, KernelWorkerRequestV2::Apply(raw_key(PhysicalKey::Enter, false)))?;
-    worker.accepted(4, KernelWorkerRequestV2::Apply(CurrentExternalEvent::AdvanceTime {
-        milliseconds: safe(25),
-    }))?;
+    worker.accepted(
+        2,
+        KernelWorkerRequestV2::Apply(raw_key(PhysicalKey::Enter, true)),
+    )?;
+    worker.accepted(
+        3,
+        KernelWorkerRequestV2::Apply(raw_key(PhysicalKey::Enter, false)),
+    )?;
+    worker.accepted(
+        4,
+        KernelWorkerRequestV2::Apply(CurrentExternalEvent::AdvanceTime {
+            milliseconds: safe(25),
+        }),
+    )?;
     let invalid = CurrentExternalEvent::PresentationOutcome {
         event_id: PresentationEventId::new(safe(999_999)),
         outcome: KernelPresentationOutcomeV2::Settled,
@@ -578,7 +587,12 @@ fn actual_abi2_process_exports_complete_causal_repro() -> Result<(), Box<dyn Err
     };
     assert_eq!(capsule.attempts.len(), 4);
     assert_eq!(capsule.final_position, 4);
-    assert!(capsule.attempts.iter().all(|attempt| attempt.origin.as_deref() == Some("worker.apply")));
+    assert!(
+        capsule
+            .attempts
+            .iter()
+            .all(|attempt| attempt.origin.as_deref() == Some("worker.apply"))
+    );
     let replayed = replay_current_capsule_v1(&capsule, content, CurrentReproLimitsV1::default())?;
     assert_eq!(replayed.snapshot()?, worker.snapshot(6)?);
     let KernelWorkerResponseV2::Repro { capsule: second } =
