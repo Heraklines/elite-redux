@@ -401,6 +401,53 @@ fn bounded_town_candidates_admit_natural_first_battle() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn fresh_account_town_opening_retains_source_enemy_shell() -> Result<()> {
+    let content = content()?;
+    let kernel = Box::new(natural_with_seed_and_account(
+        content,
+        "m9e-town-handoff-5042",
+        Some(CurrentAccountIdentityV1 {
+            trainer_id: 12345,
+            secret_id: 23456,
+        }),
+    )?);
+    let state = kernel.state().ok_or("source opening state absent")?;
+    let run = state.active_run.as_ref().ok_or("source opening run absent")?;
+    let enemy = run
+        .battle
+        .as_ref()
+        .and_then(|battle| battle.enemy_party.first())
+        .ok_or("source opening enemy absent")?;
+    assert_eq!(enemy.id.get().get(), 1173608932);
+    assert_eq!(enemy.species_id.get().get(), 915);
+    assert_eq!(enemy.abilities.active.get().get(), 268);
+    assert_eq!(enemy.ivs.map(|iv| iv.get()), [2, 31, 7, 22, 15, 4]);
+    assert_eq!(
+        [
+            enemy.stats.hp,
+            enemy.stats.attack,
+            enemy.stats.defense,
+            enemy.stats.special_attack,
+            enemy.stats.special_defense,
+            enemy.stats.speed,
+        ],
+        [14, 9, 6, 6, 7, 6]
+    );
+    assert_eq!(
+        enemy
+            .moves
+            .iter()
+            .flatten()
+            .map(|slot| slot.move_id.get().get())
+            .collect::<Vec<_>>(),
+        vec![158, 230, 39, 98]
+    );
+    assert_eq!(run.party[0].id.get().get(), 1);
+    assert_eq!(state.identities.next_pokemon_id.get(), 1173608933);
+    Ok(())
+}
+
 fn accept_material(
     live: &mut Option<GameStateV6>,
     ledger: &mut AppliedGameMaterialLedgerV1,
@@ -1744,7 +1791,7 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
         }),
     )?);
     let (mut live, mut ledger) = admit_knockout(&mut kernel, content.as_ref())?;
-    for _ in 0..128 {
+    for iteration in 0..128 {
         if kernel
             .state()
             .and_then(|state| current_reward(state).ok())
@@ -1776,6 +1823,21 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
         } else {
             kernel.advance_time(SafeU53::ZERO)?
         };
+        if !step
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. }))
+        {
+            let checkpoint = kernel.snapshot()?;
+            return Err(format!(
+                "Town reward drain idle at {iteration}: control={:?}, platform={}, presentations={}, current_turn={:?}, reward={:?}",
+                kernel.current_control().map(|control| control.kind),
+                checkpoint.pending_platform.len(),
+                checkpoint.pending_presentations.len(),
+                kernel.state().and_then(|state| state.current_turn_execution.as_ref()).map(|turn| &turn.stage),
+                kernel.state().and_then(|state| current_reward(state).ok()).map(|reward| &reward.stage),
+            ).into());
+        }
         accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
     }
     assert!(current_reward(kernel.state().ok_or("reward state absent")?).is_ok());
@@ -1783,6 +1845,7 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
         kernel.settle_presentation(pending.event_id)?;
     }
     let to_confirm = press(&mut kernel, PhysicalKey::Escape)?;
+    assert!(to_confirm.effects.iter().any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. })), "reward Escape produced no material; control={:?}", kernel.current_control().map(|control| control.kind));
     accept_material(
         &mut live,
         &mut ledger,
@@ -1791,6 +1854,7 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
         &to_confirm,
     )?;
     let skipped = press(&mut kernel, PhysicalKey::Space)?;
+    assert!(skipped.effects.iter().any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. })), "reward confirm produced no material; control={:?}", kernel.current_control().map(|control| control.kind));
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &skipped)?;
     let state = kernel.state().ok_or("skipped reward state absent")?;
     assert_eq!(current_reward(state)?.stage, CurrentRewardStageV1::Skipped);
