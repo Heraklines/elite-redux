@@ -413,7 +413,10 @@ fn fresh_account_town_opening_retains_source_enemy_shell() -> Result<()> {
         }),
     )?);
     let state = kernel.state().ok_or("source opening state absent")?;
-    let run = state.active_run.as_ref().ok_or("source opening run absent")?;
+    let run = state
+        .active_run
+        .as_ref()
+        .ok_or("source opening run absent")?;
     let enemy = run
         .battle
         .as_ref()
@@ -1845,7 +1848,14 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
         kernel.settle_presentation(pending.event_id)?;
     }
     let to_confirm = press(&mut kernel, PhysicalKey::Escape)?;
-    assert!(to_confirm.effects.iter().any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. })), "reward Escape produced no material; control={:?}", kernel.current_control().map(|control| control.kind));
+    assert!(
+        to_confirm
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. })),
+        "reward Escape produced no material; control={:?}",
+        kernel.current_control().map(|control| control.kind)
+    );
     accept_material(
         &mut live,
         &mut ledger,
@@ -1854,7 +1864,14 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
         &to_confirm,
     )?;
     let skipped = press(&mut kernel, PhysicalKey::Space)?;
-    assert!(skipped.effects.iter().any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. })), "reward confirm produced no material; control={:?}", kernel.current_control().map(|control| control.kind));
+    assert!(
+        skipped
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. })),
+        "reward confirm produced no material; control={:?}",
+        kernel.current_control().map(|control| control.kind)
+    );
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &skipped)?;
     let state = kernel.state().ok_or("skipped reward state absent")?;
     assert_eq!(current_reward(state)?.stage, CurrentRewardStageV1::Skipped);
