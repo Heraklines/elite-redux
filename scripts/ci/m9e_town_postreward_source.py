@@ -229,6 +229,7 @@ def main():
             path = OUT / ("starter-ui-" + ordinal + ".json")
             raw = path.read_bytes()
             require(0 < len(raw) <= 8192, "bounded starter UI observation")
+            (COMPACT / "starter-ui-candidate.json").write_bytes(raw)
             value = json.loads(raw)
             require(
                 raw == (json.dumps(value, separators=(",", ":")) + "\n").encode()
@@ -241,14 +242,16 @@ def main():
                 and len(value["constructor_draws"]) <= 8
                 and value["player"]["species"] == 1
                 and value["player"]["level"] == 5
+                and isinstance(value["pending_routes_ready"], bool)
                 and isinstance(value["pending_routes"], list)
-                and 0 < len(value["pending_routes"]) <= 16,
+                and len(value["pending_routes"]) <= 16,
                 "canonical starter UI observation",
             )
             ui_observations.append(raw)
         require(ui_observations[0] == ui_observations[1],
                 "two fresh starter UI observations differ")
         (COMPACT / "starter-ui-observation.json").write_bytes(ui_observations[0])
+        (COMPACT / "starter-ui-candidate.json").unlink()
         result["starter_ui"] = {"bytes": len(ui_observations[0]),
                                 "sha256": sha(ui_observations[0])}
         result["status"] = "passed"
