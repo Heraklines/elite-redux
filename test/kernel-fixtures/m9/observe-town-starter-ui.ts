@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { getErPendingNodes } from "#data/elite-redux/er-biome-routing";
 import { BattleStyle } from "#enums/battle-style";
 import { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
@@ -239,6 +240,11 @@ test("Title and actual starter controls construct a source-owned Classic starter
       moves: player.getMoveset().map(move => [move.moveId, move.ppUsed]),
     },
     enemy: { id: enemy.id, species: enemy.species.speciesId, level: enemy.level },
+    pending_routes: getErPendingNodes().map(node => ({
+      biome: node.biome,
+      revealed: node.revealed,
+      source: node.source ?? null,
+    })),
   };
   writeFileSync(join(output!, `starter-ui-${ordinal}.json`), `${JSON.stringify(observation)}\n`);
 });

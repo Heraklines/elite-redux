@@ -240,7 +240,9 @@ def main():
                 and len(value["ui_draws"]) <= 16
                 and len(value["constructor_draws"]) <= 8
                 and value["player"]["species"] == 1
-                and value["player"]["level"] == 5,
+                and value["player"]["level"] == 5
+                and isinstance(value["pending_routes"], list)
+                and 0 < len(value["pending_routes"]) <= 16,
                 "canonical starter UI observation",
             )
             ui_observations.append(raw)
