@@ -131,7 +131,7 @@ def main():
             raise RuntimeError("whole Town selector test inventory differs")
         output = run("execute", base + ["--format", "terse"], 900)
         counts = re.findall(r"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", output)
-        if counts != [("5", "0", "0", "0", "0")]:
+        if counts != [("6", "0", "0", "0", "0")]:
             raise RuntimeError("Town selector result count differs")
         rng_base = ["cargo", "test", "--locked", "-p", "er-rng", "--test", "m3_rng", "--"]
         rng_listing = run("rng-list", rng_base + ["--list", "--format", "terse"])
@@ -146,7 +146,7 @@ def main():
                        "--no-deps", "--", "-D", "warnings"], 300)
         run("rng-clippy", ["cargo", "clippy", "--locked", "-p", "er-rng", "--test", "m3_rng",
                            "--no-deps", "--", "-D", "warnings"], 300)
-        result["tests"] = {"passed": 30, "failed": 0, "ignored": 0,
+        result["tests"] = {"passed": 31, "failed": 0, "ignored": 0,
                            "town_ids": TEST_IDS, "rng_ids": rng_ids}
         result["status"] = "passed"
     except Exception as error:
