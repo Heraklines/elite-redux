@@ -2462,40 +2462,8 @@ impl GameKernelV7 {
         &mut self,
         bootstrap: RunBootstrapMachineV1,
     ) -> Result<GameKernelStepV7, GameKernelV7Error> {
-        let source_town_candidate = bootstrap.current_account_identity.is_some()
-            && bootstrap.current_friendship_profile.is_some()
-            && bootstrap.current_starter_pokerus.is_some()
-            && bootstrap.current_title_open_count == 1
-            && bootstrap.selections.difficulty == Some(er_types::RunDifficultyV1::Ace)
-            && bootstrap.selections.choices.is_empty()
-            && bootstrap.selections.starters.len() == 1
-            && bootstrap.selections.starters[0].species_id.get() == 1
-            && bootstrap.selections.starters[0].form_index == 0
-            && bootstrap.selections.starters[0].ability_index == 0
-            && bootstrap
-                .selections
-                .mode
-                .and_then(|id| self.content.world.mode(id))
-                .is_some_and(|mode| {
-                    mode.key == "CLASSIC"
-                        && mode.supported
-                        && !mode.cooperative
-                        && !mode.challenge_selection
-                        && mode.starting_biome.get().get() == 0
-                });
-        let constructed = if source_town_candidate {
-            match construct_current_fresh_town_run_v1(&bootstrap, self.content.as_ref(), safe_one())
-            {
-                Err(NaturalRunV6Error::NotQualified) => {
-                    construct_natural_run_v6(&bootstrap, self.content.as_ref(), safe_one())
-                }
-                result => result,
-            }
-        } else {
-            construct_natural_run_v6(&bootstrap, self.content.as_ref(), safe_one())
-        };
-        let mut candidate =
-            constructed.map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
+        let mut candidate = construct_bootstrap_run_state(&bootstrap, self.content.as_ref())
+            .map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
         if let Some(daily) = &bootstrap.current_starter_pokerus {
             candidate.identities.next_platform_request_id = candidate
                 .identities
@@ -4359,6 +4327,47 @@ fn local_battle_actor(
         field.occupant.ok_or(GameKernelV7Error::Invalid)?,
         field.slot,
     ))
+}
+
+// Keep the source-qualified and generic constructors in a separate frame.
+// A V6 state is large in debug Wasm, and the caller also owns the kernel,
+// bootstrap snapshot, runtime, and eventual material.
+#[inline(never)]
+fn construct_bootstrap_run_state(
+    bootstrap: &RunBootstrapMachineV1,
+    content: &PreparedGameContentV2,
+) -> Result<GameStateV6, NaturalRunV6Error> {
+    let source_town_candidate = bootstrap.current_account_identity.is_some()
+        && bootstrap.current_friendship_profile.is_some()
+        && bootstrap.current_starter_pokerus.is_some()
+        && bootstrap.current_title_open_count == 1
+        && bootstrap.selections.difficulty == Some(er_types::RunDifficultyV1::Ace)
+        && bootstrap.selections.choices.is_empty()
+        && bootstrap.selections.starters.len() == 1
+        && bootstrap.selections.starters[0].species_id.get() == 1
+        && bootstrap.selections.starters[0].form_index == 0
+        && bootstrap.selections.starters[0].ability_index == 0
+        && bootstrap
+            .selections
+            .mode
+            .and_then(|id| content.world.mode(id))
+            .is_some_and(|mode| {
+                mode.key == "CLASSIC"
+                    && mode.supported
+                    && !mode.cooperative
+                    && !mode.challenge_selection
+                    && mode.starting_biome.get().get() == 0
+            });
+    if source_town_candidate {
+        match construct_current_fresh_town_run_v1(bootstrap, content, safe_one()) {
+            Err(NaturalRunV6Error::NotQualified) => {
+                construct_natural_run_v6(bootstrap, content, safe_one())
+            }
+            result => result,
+        }
+    } else {
+        construct_natural_run_v6(bootstrap, content, safe_one())
+    }
 }
 
 fn bootstrap_catalog(

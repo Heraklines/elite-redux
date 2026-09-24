@@ -660,8 +660,10 @@ fn timer_request() -> Result<(M9EParityRequestV1, Arc<PreparedGameContentV2>), B
     wasm_stage("timer-first-presses");
     navigate_down_to(&mut kernel, &mut setup, "bootstrap/starter/confirm")?;
     wasm_stage("timer-starter-confirm");
-    for _ in 0..4 {
+    for index in 0..4 {
+        wasm_stage(&format!("timer-final-press-{index}-before"));
         press(&mut kernel, &mut setup, PhysicalKey::Space)?;
+        wasm_stage(&format!("timer-final-press-{index}-after"));
     }
     wasm_stage("timer-run-bootstrapped");
     assert_eq!(
