@@ -105,9 +105,12 @@ pub fn construct_current_source_starter_v1(
         return Err(NaturalRunV6Error::Invalid);
     }
     if types.len() > 1 {
-        staged
+        let selected_index = staged
             .run_pick_index(types.len(), reason, callsite)
             .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+        if types[selected_index] != input.tera_type {
+            return Err(NaturalRunV6Error::Invalid);
+        }
     }
     let id = er_types::battle_ids::PokemonId::new(id);
     // The generic constructor fills stable state fields. Its own IV/nature

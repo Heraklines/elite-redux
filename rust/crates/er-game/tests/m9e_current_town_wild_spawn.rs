@@ -1412,6 +1412,12 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
         construct_current_source_starter_v1(&content, &impossible_ivs, &mut before_constructor);
     assert!(impossible_result.is_err());
     assert_eq!(before_constructor.run_state(), before_rejection);
+    let mut mismatched_tera = selected.clone();
+    mismatched_tera.tera_type = PokemonType::Poison;
+    let mismatched_result =
+        construct_current_source_starter_v1(&content, &mismatched_tera, &mut before_constructor);
+    assert!(mismatched_result.is_err());
+    assert_eq!(before_constructor.run_state(), before_rejection);
     let starter =
         construct_current_source_starter_v1(&content, &selected, &mut before_constructor)?;
     assert_eq!(starter.id.get().get(), 1_771_723_560);
