@@ -990,15 +990,7 @@ fn source_vine_whip_enters_the_owned_single_target_turn() -> Result<()> {
             .pp_used,
         1
     );
-    assert!(
-        after
-            .battle
-            .as_ref()
-            .ok_or("battle absent")?
-            .enemy_party[0]
-            .hp
-            < enemy_hp
-    );
+    assert!(after.battle.as_ref().ok_or("battle absent")?.enemy_party[0].hp < enemy_hp);
     Ok(())
 }
 
