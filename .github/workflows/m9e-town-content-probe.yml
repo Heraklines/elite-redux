@@ -62,7 +62,7 @@ jobs:
         run: |
           set -euo pipefail
           cargo test --manifest-path rust/Cargo.toml --locked -p er-game --test m9e_town_seed_search -- --nocapture 2>&1 | tee "$RUNNER_TEMP/m9e-town-seed.log"
-          grep -o 'candidate=m9e-town-handoff-[0-9]* before=!rnd,[^[:space:]]* time_offset=[0-9]*' "$RUNNER_TEMP/m9e-town-seed.log" > "$RUNNER_TEMP/m9e-town-seed-candidates.txt"
+          grep -o 'candidate=m9e-town-handoff-[0-9]* before=!rnd,[^[:space:]]* time_offset=[0-9]* first=[0-9]*' "$RUNNER_TEMP/m9e-town-seed.log" > "$RUNNER_TEMP/m9e-town-seed-candidates.txt"
           test "$(wc -l < "$RUNNER_TEMP/m9e-town-seed-candidates.txt")" -eq 24
       - name: Publish bounded seed candidates
         if: always()
