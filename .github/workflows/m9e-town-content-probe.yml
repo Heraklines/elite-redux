@@ -79,6 +79,11 @@ jobs:
           result=${PIPESTATUS[0]}
           grep -E 'admitted=m9e-town-handoff-|rejected=m9e-town-handoff-' "$RUNNER_TEMP/m9e-town-natural.log" > "$RUNNER_TEMP/m9e-town-natural-candidates.txt" || true
           exit "$result"
+      - name: Qualify source Vine Whip owned turn
+        run: |
+          cargo test --manifest-path rust/Cargo.toml --locked -p er-kernel --test m9e_current_target_execution source_vine_whip_enters_the_owned_single_target_turn -- --exact
+          cargo clippy --manifest-path rust/Cargo.toml --locked -p er-battle --lib -- -D warnings
+          cargo clippy --manifest-path rust/Cargo.toml --locked -p er-kernel --test m9e_current_target_execution -- -D warnings
       - name: Publish bounded natural admission
         if: always()
         uses: actions/upload-artifact@v6

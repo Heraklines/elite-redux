@@ -768,7 +768,9 @@ fn source_ability(id: u64) -> Result<SourceAbility, CurrentTargetExecutionError>
 fn source_move(id: u64) -> Result<(MoveTarget, bool), CurrentTargetExecutionError> {
     use MoveTarget::*;
     let target = match id {
-        10 | 33 | 40 | 61 | 64 | 78 | 79 | 98 | 103 | 310 | 331 | 448 | 458 | 497 | 541 => {
+        // Pinned source defines Vine Whip (22) as a plain AttackMove with
+        // NEAR_OTHER targeting; the level-five Town trace executes it twice.
+        10 | 22 | 33 | 40 | 61 | 64 | 78 | 79 | 98 | 103 | 310 | 331 | 448 | 458 | 497 | 541 => {
             NearOther
         }
         39 | 43 | 45 | 230 => AllNearEnemies,

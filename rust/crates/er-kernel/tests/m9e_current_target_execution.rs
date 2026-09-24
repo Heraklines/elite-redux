@@ -957,6 +957,52 @@ fn natural_raw_turn_uses_current_targets_and_preserves_save_material() -> Result
 }
 
 #[test]
+fn source_vine_whip_enters_the_owned_single_target_turn() -> Result<()> {
+    // The pinned Classic level-five Town trace uses Vine Whip (22). Assign
+    // only that move to this existing natural fixture; its roster and RNG are
+    // controlled, so this checks owned targeting/execution, not damage parity.
+    let content = content()?;
+    let mut snapshot = natural(content.clone(), 2, "m9e-target-execution-v2-7")?.snapshot()?;
+    assign_move(active_mut(&mut snapshot)?, 22)?;
+    let before = active(&snapshot)?;
+    let run = active_run(before)?;
+    let actor = run.party[0].id;
+    let enemy_hp = run.battle.as_ref().ok_or("battle absent")?.enemy_party[0].hp;
+    let plan = CurrentTargetExecution::from_state(before)?.plan(
+        run,
+        actor,
+        content.battle.move_definition(MoveId::new(safe(22)))?,
+    )?;
+    assert_eq!(plan.selections()?, vec![BattleTargetSelection::implicit()]);
+    let mut kernel = restore(snapshot, content.clone())?;
+    navigate(&mut kernel, "battle/command/fight")?;
+    press(&mut kernel, PhysicalKey::Space)?;
+    let mut journal = MaterialJournal::before_command(&kernel.snapshot()?)?;
+    navigate(&mut kernel, "battle/move/0")?;
+    let step = press(&mut kernel, PhysicalKey::Space)?;
+    journal.accept(&kernel, content.as_ref(), &step)?;
+    journal.drain_non_fainting_turn(&mut kernel, content.as_ref())?;
+    let after = active_run(kernel.state().ok_or("state absent")?)?;
+    assert_eq!(
+        after.party[0].moves[0]
+            .as_ref()
+            .ok_or("move absent")?
+            .pp_used,
+        1
+    );
+    assert!(
+        after
+            .battle
+            .as_ref()
+            .ok_or("battle absent")?
+            .enemy_party[0]
+            .hp
+            < enemy_hp
+    );
+    Ok(())
+}
+
+#[test]
 fn actual_target_menu_retains_move_restore_and_cancel_owner() -> Result<()> {
     let content = content()?;
     let snapshot = two_enemies(content.clone())?;
