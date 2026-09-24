@@ -9,6 +9,7 @@ use er_kernel::game_kernel_v7::{GameKernelRoleV7, GameKernelStepV7};
 use er_kernel::snapshot::KernelSchedulerSnapshotV2;
 use er_kernel::snapshot_v7::CoreGameKernelSnapshotV7;
 use er_protocol::ProtocolRuntimeSnapshotV2;
+use er_repro::current::CurrentReproCapsuleV1;
 use er_state::m7_state::ProfileStateV1;
 use er_types::{GameContentIdentityV2, SeatId};
 use serde::{Deserialize, Serialize};
@@ -229,6 +230,9 @@ pub enum KernelWorkerResponseV2 {
     Observation(Box<CurrentGameObservation>),
     Snapshot {
         snapshot: Box<CoreGameKernelSnapshotV7>,
+    },
+    Repro {
+        capsule: Box<CurrentReproCapsuleV1>,
     },
     Health(KernelWorkerHealthV2),
     Fault(KernelWorkerFaultV2),

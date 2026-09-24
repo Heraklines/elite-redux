@@ -20,6 +20,7 @@ use er_kernel_worker::{
     KernelWorkerResponseEnvelopeV2, KernelWorkerResponseV2, MAXIMUM_WORKER_FRAME_BYTES_V2,
     read_frame_v1, write_frame_v1,
 };
+use er_repro::current::{CurrentReproLimitsV1, replay_current_capsule_v1};
 use er_types::{
     GameControlKindV2, InputFocus, PhysicalKey, PresentationEventId, RawInputEvent, SafeU53, SeatId,
 };
@@ -547,6 +548,46 @@ fn actual_abi2_process_runs_current_natural_controls_and_non_key_time() -> Resul
     expected.replay_sequence = safe(expected.replay_sequence.get() + 1);
     assert_eq!(after, expected);
     worker.dispose(7)
+}
+
+#[test]
+fn actual_abi2_process_exports_complete_causal_repro() -> Result<(), Box<dyn Error>> {
+    let (bundle, identity) = fixture()?;
+    let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle.clone()))?);
+    let mut worker = WorkerProcess::spawn(identity)?;
+    worker.accepted(0, KernelWorkerRequestV2::Hello)?;
+    worker.accepted(1, initialization(bundle)?)?;
+    worker.accepted(2, KernelWorkerRequestV2::Apply(raw_key(PhysicalKey::Enter, true)))?;
+    worker.accepted(3, KernelWorkerRequestV2::Apply(raw_key(PhysicalKey::Enter, false)))?;
+    worker.accepted(4, KernelWorkerRequestV2::Apply(CurrentExternalEvent::AdvanceTime {
+        milliseconds: safe(25),
+    }))?;
+    let invalid = CurrentExternalEvent::PresentationOutcome {
+        event_id: PresentationEventId::new(safe(999_999)),
+        outcome: KernelPresentationOutcomeV2::Settled,
+    };
+    assert_fault(
+        worker.exchange(5, KernelWorkerRequestV2::Apply(invalid.clone()))?,
+        KernelWorkerFaultCodeV2::KernelFailure,
+        Some(4),
+    );
+    let KernelWorkerResponseV2::Repro { capsule } =
+        worker.accepted(5, KernelWorkerRequestV2::ExportRepro)?
+    else {
+        return Err("worker did not export a current causal capsule".into());
+    };
+    assert_eq!(capsule.attempts.len(), 4);
+    assert_eq!(capsule.final_position, 4);
+    assert!(capsule.attempts.iter().all(|attempt| attempt.origin.as_deref() == Some("worker.apply")));
+    let replayed = replay_current_capsule_v1(&capsule, content, CurrentReproLimitsV1::default())?;
+    assert_eq!(replayed.snapshot()?, worker.snapshot(6)?);
+    let KernelWorkerResponseV2::Repro { capsule: second } =
+        worker.accepted(7, KernelWorkerRequestV2::ExportRepro)?
+    else {
+        return Err("second worker export absent".into());
+    };
+    assert_eq!(capsule, second);
+    worker.dispose(8)
 }
 
 #[test]
