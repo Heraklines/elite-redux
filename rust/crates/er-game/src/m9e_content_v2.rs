@@ -690,7 +690,11 @@ impl GameStateV6ContentContext for PreparedGameContentV2 {
         let Some(previous) = owner.first_reward_predecessor.as_ref() else {
             return false;
         };
-        let Ok(plan) = crate::current_town_wild_spawn::plan_current_town_day_wave_two_after_skipped_reward(previous, self) else {
+        let Ok(plan) =
+            crate::current_town_wild_spawn::plan_current_town_day_wave_two_after_skipped_reward(
+                previous, self,
+            )
+        else {
             return false;
         };
         let Some(run) = state.active_run.as_ref() else {

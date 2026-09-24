@@ -242,8 +242,7 @@ impl CurrentExperienceOwnerV1 {
         if self.source_progression.as_ref().is_some_and(|source| {
             self.execution_origin != Some(CurrentExperienceExecutionOriginV1::FreshNormalClassic)
                 || source.profile_owner != self.authority
-                || (source.initial_wave.get().get() == 2)
-                    != self.first_reward_predecessor.is_some()
+                || (source.initial_wave.get().get() == 2) != self.first_reward_predecessor.is_some()
                 || !source.valid(run)
         }) {
             return Err(CurrentExperienceOwnerError::Invalid);

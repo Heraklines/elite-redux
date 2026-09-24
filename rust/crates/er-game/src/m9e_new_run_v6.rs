@@ -1056,11 +1056,10 @@ pub fn advance_current_town_day_wave_two_after_skipped_reward(
     state: &GameStateV6,
     content: &PreparedGameContentV2,
 ) -> Result<(GameStateV6, Vec<RngDraw>), NaturalRunV6Error> {
-    let plan =
-        crate::current_town_wild_spawn::plan_current_town_day_wave_two_after_skipped_reward(
-            state, content,
-        )
-        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    let plan = crate::current_town_wild_spawn::plan_current_town_day_wave_two_after_skipped_reward(
+        state, content,
+    )
+    .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
     let prior_participation = state
         .current_battle_participation
         .as_ref()
@@ -1074,8 +1073,8 @@ pub fn advance_current_town_day_wave_two_after_skipped_reward(
         .clone()
         .ok_or(NaturalRunV6Error::Invalid)?;
     let mut next = Box::new(state.clone());
-    let wave = WaveIndex::new(safe(2)?)
-        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+    let wave =
+        WaveIndex::new(safe(2)?).map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
     next.identities = plan.next_identities.clone();
     let battle_id = next
         .identities
@@ -1098,13 +1097,11 @@ pub fn advance_current_town_day_wave_two_after_skipped_reward(
         &format,
         vec![
             FieldSlotState::new(
-                FieldSlot::new(BattleSide::Player, 0)
-                    .map_err(|_| NaturalRunV6Error::Invalid)?,
+                FieldSlot::new(BattleSide::Player, 0).map_err(|_| NaturalRunV6Error::Invalid)?,
                 Some(player),
             ),
             FieldSlotState::new(
-                FieldSlot::new(BattleSide::Enemy, 0)
-                    .map_err(|_| NaturalRunV6Error::Invalid)?,
+                FieldSlot::new(BattleSide::Enemy, 0).map_err(|_| NaturalRunV6Error::Invalid)?,
                 Some(plan.shell.pokemon.id),
             ),
         ],
@@ -1179,8 +1176,7 @@ pub fn advance_current_town_day_wave_two_after_skipped_reward(
         form_index: enemy.form_index,
         level: enemy.level,
     };
-    source.initial_faint =
-        er_state::current_faint_execution::CurrentInitialEnemyFaintV1::fresh();
+    source.initial_faint = er_state::current_faint_execution::CurrentInitialEnemyFaintV1::fresh();
     source.turn_progress =
         er_state::current_source_progression::CurrentSourceTurnProgressV1::fresh(run);
     next.current_battle_participation = Some(
