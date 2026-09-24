@@ -515,10 +515,10 @@ def execute_prepared(summary, *, install_chromium=True):
             or type(early_capsule.get("base_position")) is not int
             or early_capsule["base_position"] != 0
             or type(early_capsule.get("final_position")) is not int
-            or early_capsule["final_position"] < 1
+            or early_capsule["final_position"] != 3
             or not isinstance(early_capsule.get("attempts"), list)
-            or len(early_capsule["attempts"]) != early_capsule["final_position"]):
-        raise RuntimeError("first browser raw input did not retain its complete causal prefix")
+            or len(early_capsule["attempts"]) != 3):
+        raise RuntimeError("browser raw keys and time event did not retain their complete causal prefix")
     early_capsule_path = REPORT / "fresh-account-early-capsule.json"
     early_capsule_bytes = json.dumps(early_capsule, separators=(",", ":")).encode()
     if not 0 < len(early_capsule_bytes) <= 2 << 20:
