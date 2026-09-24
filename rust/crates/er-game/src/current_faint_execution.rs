@@ -15,6 +15,7 @@ use er_types::battle_command::BattleCommand;
 use er_types::battle_ids::BattleSide;
 use er_types::battle_model::{StatStages, StatusKind, StatusState};
 use er_types::{PresentationEventId, SafeU53};
+use std::io::Write;
 
 fn failure() -> GameRuntimeV6Error {
     GameRuntimeV6Error::Action
@@ -58,11 +59,11 @@ fn address(
         .as_ref()
         .is_some_and(|run| run.wave.get().get() == 2);
     if wave_two {
-        eprintln!("m9e-wave2 faint address entry");
+        let _ = writeln!(std::io::stderr(), "m9e-wave2 faint address entry");
     }
     let source = current_source_progression(state, content)?;
     if wave_two {
-        eprintln!("m9e-wave2 faint source accepted");
+        let _ = writeln!(std::io::stderr(), "m9e-wave2 faint source accepted");
     }
     let run = state.active_run.as_ref().ok_or_else(failure)?;
     let battle = run.battle.as_ref().ok_or_else(failure)?;
@@ -88,7 +89,7 @@ fn address(
         return Err(failure());
     }
     if wave_two {
-        eprintln!("m9e-wave2 faint shell accepted");
+        let _ = writeln!(std::io::stderr(), "m9e-wave2 faint shell accepted");
     }
     // All source Faint/KO/victory ability families for the admitted24 IDs and
     // post-victory move families for27 IDs are observed empty. The source live
@@ -134,7 +135,7 @@ fn address(
         return Err(failure());
     }
     if wave_two {
-        eprintln!("m9e-wave2 faint observation accepted");
+        let _ = writeln!(std::io::stderr(), "m9e-wave2 faint observation accepted");
     }
     let selected = turn
         .actions
@@ -232,7 +233,7 @@ fn address(
         return Err(failure());
     }
     if wave_two {
-        eprintln!("m9e-wave2 faint move accepted");
+        let _ = writeln!(std::io::stderr(), "m9e-wave2 faint move accepted");
     }
     let tracker = state
         .current_achievement_tracker
@@ -251,7 +252,7 @@ fn address(
         return Err(failure());
     }
     if wave_two {
-        eprintln!("m9e-wave2 faint achievement accepted");
+        let _ = writeln!(std::io::stderr(), "m9e-wave2 faint achievement accepted");
     }
     for slot in battle
         .field
@@ -285,7 +286,7 @@ fn address(
         return Err(failure());
     }
     if wave_two {
-        eprintln!("m9e-wave2 faint compiled experience accepted");
+        let _ = writeln!(std::io::stderr(), "m9e-wave2 faint compiled experience accepted");
     }
     let cap = er_progression::current_experience::normal_classic_level_cap(
         u16::try_from(run.wave.get().get()).map_err(|_| failure())?,
