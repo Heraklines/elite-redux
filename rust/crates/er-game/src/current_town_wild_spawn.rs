@@ -1990,7 +1990,10 @@ pub fn plan_current_town_day_wave_two_after_skipped_reward(
         || source.initial_battle != battle.battle_id
         || battle.outcome != BattleOutcome::Victory
         || battle.enemy_party.iter().any(|enemy| !enemy.fainted)
-        || !matches!(tail.phase, CurrentInitialVictoryTailPhaseV1::RewardSelectionPending { .. })
+        || !matches!(
+            tail.phase,
+            CurrentInitialVictoryTailPhaseV1::RewardSelectionPending { .. }
+        )
         || reward.stage != CurrentRewardStageV1::Skipped
         || battle.wave_seed
             != shift_char_codes(&run.seed, 1)

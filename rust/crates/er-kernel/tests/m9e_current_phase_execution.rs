@@ -1795,14 +1795,22 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
     let state = kernel.state().ok_or("skipped reward state absent")?;
     assert_eq!(current_reward(state)?.stage, CurrentRewardStageV1::Skipped);
     let before = canonical_bytes(state)?;
-    let plan = er_game::current_town_wild_spawn::plan_current_town_day_wave_two_after_skipped_reward(
-        state,
-        content.as_ref(),
-    )?;
+    let plan =
+        er_game::current_town_wild_spawn::plan_current_town_day_wave_two_after_skipped_reward(
+            state,
+            content.as_ref(),
+        )?;
     assert_eq!(plan.shell.pokemon.species_id.get().get(), 504);
     assert_eq!(plan.shell.pokemon.id.get().get(), 3273058121);
     assert_eq!(plan.shell.pokemon.stats.hp, 13);
-    assert_eq!(plan.shell.pokemon.moves[0].ok_or("first successor move absent")?.move_id.get().get(), 158);
+    assert_eq!(
+        plan.shell.pokemon.moves[0]
+            .ok_or("first successor move absent")?
+            .move_id
+            .get()
+            .get(),
+        158
+    );
     assert_eq!(
         er_game::current_town_wild_spawn::plan_current_town_day_wave_two_after_skipped_reward(
             state,
