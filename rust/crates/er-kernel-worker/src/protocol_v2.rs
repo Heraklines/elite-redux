@@ -95,9 +95,6 @@ pub enum KernelWorkerInitializationV2 {
         local_seat: SeatId,
         role: GameKernelRoleV7,
     },
-    Capsule {
-        capsule: Box<CurrentReproCapsuleV1>,
-    },
 }
 
 impl KernelWorkerInitializationV2 {
@@ -123,7 +120,6 @@ impl KernelWorkerInitializationV2 {
             Self::Snapshot {
                 local_seat, role, ..
             } => (*local_seat, *role),
-            Self::Capsule { capsule } => (capsule.local_seat, capsule.role),
         }
     }
 }
@@ -145,6 +141,11 @@ pub enum KernelWorkerRequestV2 {
         snapshot_bytes: Vec<u8>,
         local_seat: SeatId,
         role: GameKernelRoleV7,
+    },
+    /// Imports a verified causal capsule after content initialization, keeping
+    /// the content bundle and capsule in separate bounded transport frames.
+    ImportRepro {
+        capsule: Box<CurrentReproCapsuleV1>,
     },
     /// Reuses the current event schema, including its existing nested-field serde behavior.
     /// This ABI does not tighten that shared event type's unknown-field handling.

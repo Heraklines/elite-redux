@@ -191,22 +191,6 @@ impl KernelWorkerRuntimeV2 {
                         let capture = capture_for_session(&session, 0).ok();
                         (session, capture)
                     }
-                    KernelWorkerInitializationV2::Capsule { capsule } => {
-                        let browser_origin = capsule.browser_transport.is_some();
-                        let position = capsule.final_position;
-                        let (recorder, session) = CurrentReproRecorderV1::from_capsule(
-                            *capsule,
-                            Arc::clone(&content),
-                            CurrentReproLimitsV1::default(),
-                        )
-                        .map_err(|error| KernelWorkerRuntimeErrorV2::Repro(error.to_string()))?;
-                        let capture = if browser_origin {
-                            capture_for_session(&session, position).ok()
-                        } else {
-                            Some(recorder)
-                        };
-                        (session, capture)
-                    }
                 };
                 let observation = session.observe()?;
                 let bytes = encode_response(
@@ -256,6 +240,39 @@ impl KernelWorkerRuntimeV2 {
                 });
                 self.capture =
                     next_position.and_then(|position| capture_for_session(&session, position).ok());
+                self.session = Some(session);
+                Ok(bytes)
+            }
+            KernelWorkerRequestV2::ImportRepro { capsule } => {
+                let content = self
+                    .content
+                    .as_ref()
+                    .ok_or(KernelWorkerRuntimeErrorV2::NotInitialized)?;
+                let browser_origin = capsule.browser_transport.is_some();
+                let position = capsule.final_position;
+                let (recorder, session) = CurrentReproRecorderV1::from_capsule(
+                    *capsule,
+                    Arc::clone(content),
+                    CurrentReproLimitsV1::default(),
+                )
+                .map_err(|error| KernelWorkerRuntimeErrorV2::Repro(error.to_string()))?;
+                let capture = if browser_origin {
+                    capture_for_session(&session, position).ok()
+                } else {
+                    Some(recorder)
+                };
+                let observation = session.observe()?;
+                let bytes = encode_response(
+                    &self.identity,
+                    request_id,
+                    accepted,
+                    observation.mechanical_digest.clone(),
+                    KernelWorkerResponseV2::Restored {
+                        observation: Box::new(observation),
+                    },
+                    self.maximum_success_response_bytes,
+                )?;
+                self.capture = capture;
                 self.session = Some(session);
                 Ok(bytes)
             }
