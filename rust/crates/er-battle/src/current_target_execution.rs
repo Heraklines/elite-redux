@@ -124,6 +124,36 @@ impl<'a> CurrentTargetExecution<'a> {
         ) {
             return Err(CurrentTargetExecutionError);
         }
+        // The source Town wave-two shell carries Stakeout. With exactly one
+        // player and one enemy, no replacement can switch the target in during
+        // this battle, so its switch-in damage condition remains false.
+        let has_stakeout = run.party.iter().chain(&battle.enemy_party).any(|pokemon| {
+            pokemon.abilities.active.get().get() == 198
+                || pokemon
+                    .abilities
+                    .passives
+                    .iter()
+                    .flatten()
+                    .any(|ability| ability.get().get() == 198)
+        });
+        if has_stakeout
+            && !(self.source_damage
+                && battle.wave.get().get() == 2
+                && battle.format == er_types::battle_ids::BattleFormat::single()
+                && run.party.len() == 1
+                && battle.enemy_party.len() == 1
+                && battle.enemy_party[0].species_id.get().get() == 504
+                && battle.enemy_party[0].abilities.active.get().get() == 198
+                && run.party[0].abilities.active.get().get() != 198
+                && run.party[0]
+                    .abilities
+                    .passives
+                    .iter()
+                    .flatten()
+                    .all(|ability| ability.get().get() != 198))
+        {
+            return Err(CurrentTargetExecutionError);
+        }
         // The current schema explicitly represents these fields. Nonempty weather,
         // field effects and suppression require their own source queries before
         // admission; they are not interpreted as neutral merely for being unhandled.
@@ -744,6 +774,7 @@ fn source_ability(id: u64) -> Result<SourceAbility, CurrentTargetExecutionError>
             | 113
             | 172
             | 192
+            | 198
             | 257
             | 268
             | 5006

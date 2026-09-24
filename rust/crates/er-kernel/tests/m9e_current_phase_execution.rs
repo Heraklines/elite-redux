@@ -2039,6 +2039,16 @@ fn admit_wave_two_vine_whip(
         .map_err(|error| format!("wave-two fight route: {error}"))?;
     press(kernel, PhysicalKey::Space).map_err(|error| format!("wave-two fight open: {error}"))?;
     navigate(kernel, "battle/move/0").map_err(|error| format!("wave-two move route: {error}"))?;
+    let frontier = Box::new(kernel.snapshot()?);
+    let mut canonical = active(&frontier)?.clone();
+    canonical.active_run.as_mut().ok_or("run absent")?.control = frontier
+        .private_battle_control
+        .as_ref()
+        .ok_or("wave-two private command absent")?
+        .canonical_control
+        .clone();
+    *live = Some(canonical);
+    *ledger = frontier.material_ledger.clone();
     let step = press(kernel, PhysicalKey::Space)
         .map_err(|error| format!("wave-two move submit: {error}"))?;
     accept_material(live, ledger, kernel, content, &step)
