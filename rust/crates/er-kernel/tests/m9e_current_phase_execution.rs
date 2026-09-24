@@ -2040,10 +2040,12 @@ fn admit_wave_two_vine_whip(
     navigate(kernel, "battle/move/0")?;
     let step = press(kernel, PhysicalKey::Space)?;
     accept_material(live, ledger, kernel, content, &step)?;
-    assert!(kernel
-        .state()
-        .and_then(|state| state.current_turn_execution.as_ref())
-        .is_some());
+    assert!(
+        kernel
+            .state()
+            .and_then(|state| state.current_turn_execution.as_ref())
+            .is_some()
+    );
     Ok(())
 }
 
