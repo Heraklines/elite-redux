@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 import { getGameMode } from "#app/game-mode";
 import { BASE_SHINY_CHANCE } from "#balance/rates";
 import { getCurrentErRewardRates } from "#data/elite-redux/er-reward-rates";
+import { Arena } from "#field/arena";
 import { BattleStyle } from "#enums/battle-style";
 import { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
@@ -40,6 +41,14 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   expect(output).toBeTruthy();
   expect(["one", "two"]).toContain(ordinal);
   expect(execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim()).toBe(PIN);
+  const allSpeciesCalls: { wave: number; level: number; before: string; species: number }[] = [];
+  const sourceRandomSpecies = Arena.prototype.randomSpecies;
+  vi.spyOn(Arena.prototype, "randomSpecies").mockImplementation(function(this: Arena, ...args) {
+    const before = Phaser.Math.RND.state();
+    const species = sourceRandomSpecies.apply(this, args);
+    allSpeciesCalls.push({ wave: args[0], level: args[1], before, species: species.speciesId });
+    return species;
+  });
 
   game = new Phaser.Game({ type: Phaser.HEADLESS, seed: [SETUP_SEED] });
   await new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -81,6 +90,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   expect(firstEnemy).toBeDefined();
   const firstEnemyId = firstEnemy.id;
   const firstEnemySpecies = firstEnemy.species.speciesId;
+  const firstSpeciesCalls = allSpeciesCalls.filter(call => call.wave === 1);
   const player = scene.getPlayerPokemon();
   expect(player).toBeDefined();
   // Use a retained natural Bulbasaur move without rewriting its moveset.
@@ -220,7 +230,8 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
       reward_multiplier: getCurrentErRewardRates().totalShiny,
       xor: shinyXor,
     },
-    first: { wave: 1, enemy_id: firstEnemyId, species: firstEnemySpecies, attacking_turns: attackingTurns },
+    first: { wave: 1, enemy_id: firstEnemyId, species: firstEnemySpecies, attacking_turns: attackingTurns,
+      selections: firstSpeciesCalls },
     reward: {
       choice: "cancel",
       new_battle_calls: newBattle.mock.calls.length,

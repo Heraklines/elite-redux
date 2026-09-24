@@ -174,6 +174,8 @@ def main():
             require(
                 raw == (json.dumps(value, separators=(",", ":")) + "\n").encode()
                 and value["source"] == PIN and value["first"]["attacking_turns"] > 0
+                and isinstance(value["first"]["selections"], list)
+                and len(value["first"]["selections"]) <= 8
                 and value["reward"]["new_battle_calls"] == 1
                 and isinstance(value.get("wave_cycle_offset"), int)
                 and value["wave_cycle_offset"] in range(0, 40, 5)
@@ -188,6 +190,7 @@ def main():
             observations.append(raw)
             result[ordinal] = {"bytes": len(raw), "sha256": sha(raw),
                                "next_species": value["next"]["species"],
+                               "first_species": value["first"]["species"],
                                "first_attacking_turns": value["first"]["attacking_turns"]}
         require(observations[0] == observations[1], "two fresh source observations differ")
         (COMPACT / "observation.json").write_bytes(observations[0])
