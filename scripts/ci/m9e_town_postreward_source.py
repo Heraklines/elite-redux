@@ -236,6 +236,10 @@ def main():
                 and value["source"] == PIN and value["seed"] == "m9e-town-handoff-5042"
                 and value["path"] == "title-starter-select-confirm-save-slot-encounter"
                 and len(value["constructor"]) == 1
+                and value["constructor"][0]["input"]["species"] == value["player"]["species"]
+                and value["constructor"][0]["input"]["level"] == value["player"]["level"]
+                and value["constructor"][0]["input"]["ivs"] == value["player"]["ivs"]
+                and not value["constructor"][0]["input"]["has_data_source"]
                 and isinstance(value["ui_draw_count"], int)
                 and value["ui_draw_count"] >= len(value["ui_draws"])
                 and len(value["ui_draws"]) <= 16

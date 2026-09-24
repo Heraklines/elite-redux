@@ -65,7 +65,7 @@ test("Title and actual starter controls construct a source-owned Classic starter
   manager.scene.gameData.secretId = 23456;
   mark("manager-ready");
 
-  const constructor: { before: string; after: string; id: number }[] = [];
+  const constructor: { before: string; after: string; id: number; input: object }[] = [];
   const constructorDraws: string[] = [];
   const uiDraws: { after: string; stage: string; callers: string }[] = [];
   let uiDrawCount = 0;
@@ -93,10 +93,23 @@ test("Title and actual starter controls construct a source-owned Classic starter
   const actualAddPlayerPokemon = manager.scene.addPlayerPokemon.bind(manager.scene);
   vi.spyOn(manager.scene, "addPlayerPokemon").mockImplementation((...args) => {
     const before = Phaser.Math.RND.state();
+    const input = {
+      species: args[0].speciesId,
+      level: args[1],
+      ability_index: args[2] ?? null,
+      form_index: args[3] ?? null,
+      gender: args[4] ?? null,
+      shiny: args[5] ?? null,
+      variant: args[6] ?? null,
+      ivs: args[7] ? [...args[7]] : null,
+      nature: args[8] ?? null,
+      has_data_source: args[9] != null,
+      has_post_process: args[10] != null,
+    };
     inConstructor = true;
     try {
       const pokemon = actualAddPlayerPokemon(...args);
-      constructor.push({ before, after: Phaser.Math.RND.state(), id: pokemon.id });
+      constructor.push({ before, after: Phaser.Math.RND.state(), id: pokemon.id, input });
       return pokemon;
     } finally {
       inConstructor = false;
