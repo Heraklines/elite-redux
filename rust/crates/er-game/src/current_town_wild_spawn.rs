@@ -1670,7 +1670,7 @@ pub fn select_current_town_day_wave_two_core(
     })
 }
 
-/// The first source-observed level-three Town successor in V5 state shape.
+/// Source-observed level-two and level-three Town successors in V5 state shape.
 /// Admission is limited to ordinary nonshiny species504 with no shiny/reward
 /// modifiers (base threshold64). The caller still owns reward settlement,
 /// identity-frontier rebasing, enemy modifiers, battle creation and replay.
@@ -1681,7 +1681,7 @@ pub fn select_current_town_day_wave_two_shell(
     secret_id: u16,
     rng: &mut RngRuntime,
 ) -> Result<CurrentTownWildShellV1, CurrentTownWildErrorV1> {
-    if context.level != 3 {
+    if !matches!(context.level, 2 | 3) {
         return Err(CurrentTownWildErrorV1::UnsupportedContext);
     }
     let mut staged = rng.clone();
@@ -1702,9 +1702,13 @@ pub fn select_current_town_day_wave_two_shell(
         .progression
         .growth_rate(progression.growth_rate)
         .ok_or(CurrentTownWildErrorV1::SourceContent)?;
-    let experience = er_progression::progression::current_growth_experience_for_level(growth, 3)
-        .map_err(|_| CurrentTownWildErrorV1::SourceContent)?;
-    if experience.get().get() != 27 || progression.base_friendship != 70 {
+    let experience = er_progression::progression::current_growth_experience_for_level(
+        growth,
+        context.level,
+    )
+    .map_err(|_| CurrentTownWildErrorV1::SourceContent)?;
+    let expected_experience = if context.level == 2 { 8 } else { 27 };
+    if experience.get().get() != expected_experience || progression.base_friendship != 70 {
         return Err(CurrentTownWildErrorV1::SourceContent);
     }
     let nature = content
@@ -1751,7 +1755,7 @@ pub fn select_current_town_day_wave_two_shell(
         owner_seat: None,
         species_id: prefix.root.effective_species,
         form_index: prefix.form_index,
-        level: 3,
+        level: context.level,
         experience,
         types: PokemonTyping {
             primary: types[0],
