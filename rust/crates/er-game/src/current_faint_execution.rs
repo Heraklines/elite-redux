@@ -286,7 +286,10 @@ fn address(
         return Err(failure());
     }
     if wave_two {
-        let _ = writeln!(std::io::stderr(), "m9e-wave2 faint compiled experience accepted");
+        let _ = writeln!(
+            std::io::stderr(),
+            "m9e-wave2 faint compiled experience accepted"
+        );
     }
     let cap = er_progression::current_experience::normal_classic_level_cap(
         u16::try_from(run.wave.get().get()).map_err(|_| failure())?,
