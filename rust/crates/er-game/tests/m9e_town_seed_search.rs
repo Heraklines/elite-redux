@@ -58,7 +58,12 @@ fn bounded_source_wave_two_seed_candidates() -> Result<(), Box<dyn Error>> {
             continue;
         }
         let mut wave_rng = PhaserRdg::from_seed(&shift_char_codes(&seed, 2)?);
-        wave_rng.rnd();
+        // The first source wave-two draw is the ordinary 1-in-8 wild width
+        // roll. The currently observed seed chooses a double battle, which
+        // cannot carry the existing 1v1 participation and XP owner.
+        if wave_rng.rand_seed_int(SafeU53::new(8)?, SafeU53::ZERO)? == SafeU53::ZERO {
+            continue;
+        }
         wave_rng.rnd();
         let mut rng = RngRuntime::from_states(
             RunRngState {
