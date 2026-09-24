@@ -169,7 +169,7 @@ def main():
             )
             path = OUT / ("observation-" + ordinal + ".json")
             raw = path.read_bytes()
-            require(0 < len(raw) <= 4096, "bounded source observation")
+            require(0 < len(raw) <= 8192, "bounded source observation")
             value = json.loads(raw)
             require(
                 raw == (json.dumps(value, separators=(",", ":")) + "\n").encode()

@@ -73,12 +73,25 @@ test("explicit starter attack and reward skip reach a source-owned second encoun
   manager.scene.gameData.trainerId = 12345;
   manager.scene.gameData.secretId = 23456;
   const starterConstructorRng: { before: string; after: string; id: number }[] = [];
+  const starterConstructorDraws: { after: string; callers: string }[] = [];
   const actualAddPlayerPokemon = manager.scene.addPlayerPokemon.bind(manager.scene);
   vi.spyOn(manager.scene, "addPlayerPokemon").mockImplementation((...args) => {
     const before = Phaser.Math.RND.state();
-    const pokemon = actualAddPlayerPokemon(...args);
-    starterConstructorRng.push({ before, after: Phaser.Math.RND.state(), id: pokemon.id });
-    return pokemon;
+    const actualFrac = Phaser.Math.RND.frac.bind(Phaser.Math.RND);
+    const drawSpy = vi.spyOn(Phaser.Math.RND, "frac").mockImplementation(() => {
+      const value = actualFrac();
+      const callers = new Error().stack?.split("\n").slice(2, 6)
+        .map(line => line.trim().split(" (")[0]).join("|") ?? "";
+      starterConstructorDraws.push({ after: Phaser.Math.RND.state(), callers });
+      return value;
+    });
+    try {
+      const pokemon = actualAddPlayerPokemon(...args);
+      starterConstructorRng.push({ before, after: Phaser.Math.RND.state(), id: pokemon.id });
+      return pokemon;
+    } finally {
+      drawSpy.mockRestore();
+    }
   });
   const rngBeforeTitle = Phaser.Math.RND.state();
   await manager.runToTitle();
@@ -126,6 +139,8 @@ test("explicit starter attack and reward skip reach a source-owned second encoun
   const player = scene.getPlayerPokemon();
   expect(player).toBeDefined();
   expect(starterConstructorRng).toHaveLength(1);
+  expect(starterConstructorDraws.length).toBeGreaterThan(0);
+  expect(starterConstructorDraws.length).toBeLessThanOrEqual(8);
   expect(rngBeforeSetSeed).toBeDefined();
   expect(rngAfterSetSeed).toBeDefined();
   expect(rngBeforeStarterPhase).toBeDefined();
@@ -298,6 +313,7 @@ test("explicit starter attack and reward skip reach a source-owned second encoun
       before_set_seed: rngBeforeSetSeed,
       after_set_seed: rngAfterSetSeed,
       before_starter_phase: rngBeforeStarterPhase,
+      constructor_draws: starterConstructorDraws,
     },
     account: { trainer_id: scene.gameData.trainerId, secret_id: scene.gameData.secretId },
     shiny_context: {
