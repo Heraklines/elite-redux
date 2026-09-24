@@ -2083,7 +2083,25 @@ fn admit_wave_two_vine_whip(
             .as_ref()
             .map(|turn| (turn.stage.clone(), turn.next_action, turn.actions.len()));
         let enemy_hp = battle.enemy_party[0].hp;
-        let step = kernel.advance_time(SafeU53::ZERO).map_err(|error| {
+        let step = if let Some(pending) = checkpoint.pending_platform.first() {
+            match &pending.effect {
+                GamePlatformEffectV2::CurrentFriendshipClock { request } => kernel
+                    .apply_current_utc_clock_result(request.request, 0)
+                    .map_err(|error| Box::new(error) as Box<dyn Error>),
+                GamePlatformEffectV2::CurrentAchievementClock { request } => {
+                    accept_flash_test_clock(kernel, request)
+                }
+                GamePlatformEffectV2::CurrentFlashEgg { request } => {
+                    accept_flash_test_egg(kernel, request)
+                }
+                _ => return Err("unexpected wave-two platform request".into()),
+            }
+        } else {
+            kernel
+                .advance_time(SafeU53::ZERO)
+                .map_err(|error| Box::new(error) as Box<dyn Error>)
+        }
+        .map_err(|error| {
             format!("wave-two turn drain {iteration}: turn={turn:?}, enemy_hp={enemy_hp}: {error}")
         })?;
         if !step
