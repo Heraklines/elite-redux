@@ -66,21 +66,35 @@ test("Title and actual starter controls construct a source-owned Classic starter
 
   const constructor: { before: string; after: string; id: number }[] = [];
   const constructorDraws: string[] = [];
+  const uiDraws: { after: string; stage: string; callers: string }[] = [];
+  let uiDrawCount = 0;
+  let inConstructor = false;
+  let rngStage = "before-title";
+  const actualFrac = Phaser.Math.RND.frac.bind(Phaser.Math.RND);
+  vi.spyOn(Phaser.Math.RND, "frac").mockImplementation(() => {
+    const value = actualFrac();
+    if (inConstructor) {
+      constructorDraws.push(Phaser.Math.RND.state());
+    } else if (constructor.length === 0) {
+      uiDrawCount++;
+      if (uiDraws.length < 16) {
+        const callers = new Error().stack?.split("\n").slice(2, 6)
+          .map(line => line.trim().split(" (")[0]).join("|") ?? "";
+        uiDraws.push({ after: Phaser.Math.RND.state(), stage: rngStage, callers: callers.slice(0, 120) });
+      }
+    }
+    return value;
+  });
   const actualAddPlayerPokemon = manager.scene.addPlayerPokemon.bind(manager.scene);
   vi.spyOn(manager.scene, "addPlayerPokemon").mockImplementation((...args) => {
     const before = Phaser.Math.RND.state();
-    const actualFrac = Phaser.Math.RND.frac.bind(Phaser.Math.RND);
-    const drawSpy = vi.spyOn(Phaser.Math.RND, "frac").mockImplementation(() => {
-      const value = actualFrac();
-      constructorDraws.push(Phaser.Math.RND.state());
-      return value;
-    });
+    inConstructor = true;
     try {
       const pokemon = actualAddPlayerPokemon(...args);
       constructor.push({ before, after: Phaser.Math.RND.state(), id: pokemon.id });
       return pokemon;
     } finally {
-      drawSpy.mockRestore();
+      inConstructor = false;
     }
   });
 
@@ -92,6 +106,7 @@ test("Title and actual starter controls construct a source-owned Classic starter
   let rngAtStarterSelect: string | undefined;
   manager.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
     mark("title-prompt");
+    rngStage = "title-prompt";
     rngBeforeTitleEnd = Phaser.Math.RND.state();
     const phase = manager!.scene.phaseManager.getCurrentPhase() as TitlePhase;
     phase.gameMode = GameModes.CLASSIC;
@@ -99,6 +114,7 @@ test("Title and actual starter controls construct a source-owned Classic starter
   });
   manager.onNextPrompt("SelectStarterPhase", UiMode.STARTER_SELECT, () => {
     mark("starter-prompt");
+    rngStage = "starter-grid";
     rngAtStarterSelect = Phaser.Math.RND.state();
     const handler = manager!.scene.ui.getHandler() as StarterSelectUiHandler;
     handler.processInput(Button.RIGHT);
@@ -113,6 +129,7 @@ test("Title and actual starter controls construct a source-owned Classic starter
   await new Promise<void>(resolve => {
     manager!.onNextPrompt("SelectStarterPhase", UiMode.OPTION_SELECT, () => {
       mark("starter-options");
+      rngStage = "starter-options";
       optionHandler = manager!.scene.ui.getHandler() as OptionSelectUiHandler;
       optionCount = optionHandler.getOptionsWithScroll().length;
       resolve();
@@ -125,27 +142,32 @@ test("Title and actual starter controls construct a source-owned Classic starter
   await new Promise<void>(resolve => {
     manager!.onNextPrompt("SelectStarterPhase", UiMode.STARTER_SELECT, () => {
       mark("starter-submit");
+      rngStage = "starter-submit";
       const handler = manager!.scene.ui.getHandler() as StarterSelectUiHandler;
       handler.processInput(Button.SUBMIT);
     });
     manager!.onNextPrompt("SelectStarterPhase", UiMode.CONFIRM, () => {
       mark("starter-confirm");
+      rngStage = "starter-confirm";
       const handler = manager!.scene.ui.getHandler() as StarterSelectUiHandler;
       handler.processInput(Button.ACTION);
     });
     manager!.onNextPrompt("SelectStarterPhase", UiMode.OPTION_SELECT, () => {
       mark("difficulty-options");
+      rngStage = "difficulty-options";
       const handler = manager!.scene.ui.getHandler() as OptionSelectUiHandler;
       handler.processInput(Button.DOWN);
       handler.processInput(Button.ACTION);
     });
     manager!.onNextPrompt("SelectStarterPhase", UiMode.MENU_OPTION_SELECT, () => {
       mark("pacing-options");
+      rngStage = "pacing-options";
       const handler = manager!.scene.ui.getHandler() as OptionSelectUiHandler;
       handler.processInput(Button.ACTION);
     });
     manager!.onNextPrompt("SelectStarterPhase", UiMode.SAVE_SLOT, () => {
       mark("save-slot");
+      rngStage = "save-slot";
       const handler = manager!.scene.ui.getHandler() as SaveSlotSelectUiHandler;
       const accepted = handler.processInput(Button.ACTION);
       mark(`save-slot-action-returned:${accepted}`);
@@ -153,6 +175,7 @@ test("Title and actual starter controls construct a source-owned Classic starter
     });
     manager!.onNextPrompt("SelectStarterPhase", UiMode.CONFIRM, () => {
       mark("save-overwrite-confirm");
+      rngStage = "save-overwrite-confirm";
       const handler = manager!.scene.ui.getHandler() as StarterSelectUiHandler;
       handler.processInput(Button.ACTION);
     });
@@ -186,6 +209,8 @@ test("Title and actual starter controls construct a source-owned Classic starter
     rng_at_title: rngAtTitle,
     rng_before_title_end: rngBeforeTitleEnd,
     rng_at_starter_select: rngAtStarterSelect,
+    ui_draw_count: uiDrawCount,
+    ui_draws: uiDraws,
     constructor,
     constructor_draws: constructorDraws,
     player: {
