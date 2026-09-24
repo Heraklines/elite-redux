@@ -34,6 +34,10 @@ pub enum GameOwnedPhaseV1 {
         pending: SafeU53,
         menu_instance: MenuInstanceId,
     },
+    RewardNextEncounter {
+        pending: SafeU53,
+        menu_instance: MenuInstanceId,
+    },
     RewardCandy {
         pending: SafeU53,
         callback: Option<PresentationEventId>,
@@ -374,6 +378,16 @@ fn phase_transition(
             phase,
         );
     }
+    if matches!(phase, GameOwnedPhaseV1::RewardNextEncounter { .. }) {
+        return current_postreward_transition::transition(
+            before,
+            content,
+            operation_id,
+            authority_seat,
+            revision,
+            phase,
+        );
+    }
     let candy_phase = match &phase {
         GameOwnedPhaseV1::RewardCandy { .. } => true,
         GameOwnedPhaseV1::FriendshipClock { request, .. } => {
@@ -494,6 +508,7 @@ fn phase_transition(
         | GameOwnedPhaseV1::VictoryPresentation { .. }
         | GameOwnedPhaseV1::VictoryTail { .. }
         | GameOwnedPhaseV1::RewardBegin { .. }
+        | GameOwnedPhaseV1::RewardNextEncounter { .. }
         | GameOwnedPhaseV1::RewardTmLearn { .. }
         | GameOwnedPhaseV1::RewardCandy { .. }
         | GameOwnedPhaseV1::RewardTmPresentation { .. }
@@ -610,6 +625,8 @@ fn phase_transition(
 mod current_faint_transition;
 #[path = "current_reward_transition.rs"]
 mod current_reward_transition;
+#[path = "current_postreward_transition.rs"]
+mod current_postreward_transition;
 #[path = "current_victory_transition.rs"]
 mod current_victory_transition;
 

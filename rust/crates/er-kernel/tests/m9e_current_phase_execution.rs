@@ -1999,6 +1999,21 @@ fn actual_reward_skip_inner(
     assert_eq!(canonical_bytes(state)?, before);
     assert_eq!(live.as_ref(), kernel.state());
     assert_skipped_reward_wave_two(state, content.as_ref(), &plan)?;
+    for pending in kernel.snapshot()?.pending_presentations {
+        kernel.settle_presentation(pending.event_id)?;
+    }
+    let next = kernel.advance_time(SafeU53::ZERO)?;
+    assert!(
+        next.effects
+            .iter()
+            .any(|effect| matches!(effect, GameKernelEffectV7::AuthorityMaterial { .. }))
+    );
+    accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &next)?;
+    let successor = kernel.state().ok_or("Town successor state absent")?;
+    let run = successor.active_run.as_ref().ok_or("Town successor run absent")?;
+    assert_eq!(run.wave.get().get(), 2);
+    assert_eq!(run.battle.as_ref().ok_or("Town successor battle absent")?.enemy_party.as_slice(), [plan.shell.pokemon]);
+    assert_eq!(live.as_ref(), kernel.state());
     Ok(())
 }
 
@@ -2025,8 +2040,10 @@ fn assert_skipped_reward_wave_two(
             .as_ref()
             .and_then(|row| row.experience.as_ref())
             .and_then(|owner| owner.first_reward_predecessor.as_ref())
-            .is_some_and(|previous| serde_json::from_value::<GameStateV6>((**previous).clone())
-                .is_ok_and(|restored| &restored == state))
+            .is_some_and(
+                |previous| serde_json::from_value::<GameStateV6>((**previous).clone())
+                    .is_ok_and(|restored| &restored == state)
+            )
     );
     Ok(())
 }
