@@ -2035,11 +2035,16 @@ fn admit_wave_two_vine_whip(
     live: &mut Option<GameStateV6>,
     ledger: &mut AppliedGameMaterialLedgerV1,
 ) -> Result<()> {
-    navigate(kernel, "battle/command/fight")?;
-    press(kernel, PhysicalKey::Space)?;
-    navigate(kernel, "battle/move/0")?;
-    let step = press(kernel, PhysicalKey::Space)?;
-    accept_material(live, ledger, kernel, content, &step)?;
+    navigate(kernel, "battle/command/fight")
+        .map_err(|error| format!("wave-two fight route: {error}"))?;
+    press(kernel, PhysicalKey::Space)
+        .map_err(|error| format!("wave-two fight open: {error}"))?;
+    navigate(kernel, "battle/move/0")
+        .map_err(|error| format!("wave-two move route: {error}"))?;
+    let step = press(kernel, PhysicalKey::Space)
+        .map_err(|error| format!("wave-two move submit: {error}"))?;
+    accept_material(live, ledger, kernel, content, &step)
+        .map_err(|error| format!("wave-two material replay: {error}"))?;
     assert!(
         kernel
             .state()
