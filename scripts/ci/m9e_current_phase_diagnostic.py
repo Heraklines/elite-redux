@@ -369,7 +369,7 @@ def main():
         for path, digest in result["source_hashes"].items():
             require(sha((ROOT/path).read_bytes()) == digest, "source changed during execution: "+path)
         require(not result["target_failures"], "whole target failures: " + ", ".join(row["target"] for row in result["target_failures"]))
-        require(result["tests_executed"] == 169, "all169 exact short tests across23 complete target inventories")
+        require(result["tests_executed"] == 170, "all170 exact short tests across23 complete target inventories")
         require(result["clippy"]["passed"], "mandatory Clippy check failed; whole-target results recorded independently")
         if result["formatting_required"]:
             result["first_failure"] = result["formatting_failure"]
