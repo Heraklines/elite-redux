@@ -201,6 +201,27 @@ impl GameIdentityAllocatorStateV1 {
         Ok(())
     }
 
+    /// Source constructors can draw several IDs before the resulting roster is
+    /// installed. Their draw order need not be numeric order, so stage the
+    /// entire batch before advancing the high-water frontier. The operation is
+    /// atomic and still rejects duplicates or IDs below a prior frontier.
+    pub fn adopt_source_pokemon_ids(
+        &mut self,
+        ids: &[PokemonId],
+    ) -> Result<(), GameStateV6Error> {
+        let mut sorted = ids.to_vec();
+        sorted.sort_unstable();
+        if sorted.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(GameStateV6Error::Invalid);
+        }
+        let mut candidate = self.clone();
+        for id in sorted {
+            candidate.adopt_source_pokemon_id(id)?;
+        }
+        *self = candidate;
+        Ok(())
+    }
+
     pub fn allocate_battle_id(&mut self) -> Result<BattleId, GameStateV6Error> {
         allocate(&mut self.next_battle_id).map(BattleId::new)
     }
