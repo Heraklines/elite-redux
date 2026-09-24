@@ -311,9 +311,11 @@ fn natural_with_seed_and_account(
     )?;
     press(&mut kernel, PhysicalKey::Space)?;
     navigate(&mut kernel, "bootstrap/starter/confirm")?;
-    for _ in 0..4 {
-        press(&mut kernel, PhysicalKey::Space)?;
-    }
+    press(&mut kernel, PhysicalKey::Space)?;
+    press(&mut kernel, PhysicalKey::Space)?;
+    navigate(&mut kernel, "bootstrap/difficulty/ace")?;
+    press(&mut kernel, PhysicalKey::Space)?;
+    press(&mut kernel, PhysicalKey::Space)?;
     assert_eq!(
         kernel.current_control().map(|control| control.kind),
         Some(GameControlKindV2::BattleCommand)
