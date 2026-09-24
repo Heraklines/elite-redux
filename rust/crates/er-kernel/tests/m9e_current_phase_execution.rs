@@ -1830,11 +1830,9 @@ fn current_reward(
 
 #[test]
 fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
-    use er_state::current_reward_selection::CurrentRewardStageV1;
-
     eprintln!("town-reward-stage: start");
     let content = content()?;
-    let mut kernel = Box::new(
+    let kernel = Box::new(
         controlled_before_knockout_with_seed_and_account(
             content.clone(),
             5,
@@ -1848,6 +1846,16 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
         .map_err(|error| format!("Town controlled checkpoint: {error}"))?,
     );
     eprintln!("town-reward-stage: controlled checkpoint");
+    actual_reward_skip_inner(kernel, content)
+}
+
+#[inline(never)]
+fn actual_reward_skip_inner(
+    mut kernel: Box<GameKernelV7>,
+    content: Arc<PreparedGameContentV2>,
+) -> Result<()> {
+    use er_state::current_reward_selection::CurrentRewardStageV1;
+
     let (mut live, mut ledger) = admit_knockout(&mut kernel, content.as_ref())
         .map_err(|error| format!("Town knockout admission: {error}"))?;
     eprintln!("town-reward-stage: knockout admitted");
