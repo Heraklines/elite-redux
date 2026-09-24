@@ -2484,7 +2484,8 @@ impl GameKernelV7 {
                         && mode.starting_biome.get().get() == 0
                 });
         let constructed = if source_town_candidate {
-            match construct_current_fresh_town_run_v1(&bootstrap, self.content.as_ref(), safe_one()) {
+            match construct_current_fresh_town_run_v1(&bootstrap, self.content.as_ref(), safe_one())
+            {
                 Err(NaturalRunV6Error::NotQualified) => {
                     construct_natural_run_v6(&bootstrap, self.content.as_ref(), safe_one())
                 }
