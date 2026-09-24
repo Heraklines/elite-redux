@@ -15,7 +15,7 @@ pub mod current_coop_rebind_v7;
 pub mod current_coop_setup_v7;
 use current_coop_setup_v7::CurrentCoopSetupSnapshotV1;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use er_ai::authority_v2::AuthorityAiV2;
@@ -277,6 +277,31 @@ impl GameKernelV7 {
         let GameKernelLifecycleV7::Bootstrap(bootstrap) = &mut value.lifecycle else {
             return Err(GameKernelV7Error::Invalid);
         };
+        if account.is_some() {
+            let fresh = er_game::m9e_new_run_v6::current_fresh_starter_account_v1()
+                .map_err(|_| GameKernelV7Error::Invalid)?;
+            let species: BTreeSet<_> = fresh.iter().map(|entry| entry.species.get()).collect();
+            let mut catalog = bootstrap.catalog.clone();
+            catalog.starters.retain(|starter| {
+                starter.form_index == 0
+                    && starter.ability_index == 0
+                    && species.contains(&starter.species_id)
+            });
+            if catalog.starters.len() != fresh.len() {
+                return Err(GameKernelV7Error::Invalid);
+            }
+            let selected = RunBootstrapMachineV1::new(
+                bootstrap.profile.clone(),
+                bootstrap.seed.clone(),
+                value.local_seat,
+                catalog,
+            )
+            .map_err(|error| GameKernelV7Error::Bootstrap(error.to_string()))?;
+            if selected.menu_instance_high_water != bootstrap.menu_instance_high_water {
+                return Err(GameKernelV7Error::Invalid);
+            }
+            *bootstrap = selected;
+        }
         bootstrap.current_account_identity = account;
         bootstrap.current_friendship_profile = Some(owner);
         bootstrap
