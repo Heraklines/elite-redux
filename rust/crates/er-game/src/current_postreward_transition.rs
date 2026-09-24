@@ -17,7 +17,10 @@ pub(super) fn transition(
     else {
         return Err(GameRuntimeV6Error::Action);
     };
-    let run = before.active_run.as_ref().ok_or(GameRuntimeV6Error::Action)?;
+    let run = before
+        .active_run
+        .as_ref()
+        .ok_or(GameRuntimeV6Error::Action)?;
     let battle = run.battle.as_ref().ok_or(GameRuntimeV6Error::Action)?;
     let owner = before
         .current_battle_participation

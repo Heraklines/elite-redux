@@ -623,10 +623,10 @@ fn phase_transition(
 
 #[path = "current_faint_transition.rs"]
 mod current_faint_transition;
-#[path = "current_reward_transition.rs"]
-mod current_reward_transition;
 #[path = "current_postreward_transition.rs"]
 mod current_postreward_transition;
+#[path = "current_reward_transition.rs"]
+mod current_reward_transition;
 #[path = "current_victory_transition.rs"]
 mod current_victory_transition;
 

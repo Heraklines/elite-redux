@@ -2010,9 +2010,19 @@ fn actual_reward_skip_inner(
     );
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &next)?;
     let successor = kernel.state().ok_or("Town successor state absent")?;
-    let run = successor.active_run.as_ref().ok_or("Town successor run absent")?;
+    let run = successor
+        .active_run
+        .as_ref()
+        .ok_or("Town successor run absent")?;
     assert_eq!(run.wave.get().get(), 2);
-    assert_eq!(run.battle.as_ref().ok_or("Town successor battle absent")?.enemy_party.as_slice(), [plan.shell.pokemon]);
+    assert_eq!(
+        run.battle
+            .as_ref()
+            .ok_or("Town successor battle absent")?
+            .enemy_party
+            .as_slice(),
+        [plan.shell.pokemon]
+    );
     assert_eq!(live.as_ref(), kernel.state());
     Ok(())
 }
