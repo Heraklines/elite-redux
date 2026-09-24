@@ -21,7 +21,7 @@ import { afterAll, expect, test, vi } from "vitest";
 
 const PIN = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7";
 // Install this seed after the starter helper's hardcoded "test" assignment.
-const SETUP_SEED = "m9e-town-handoff-774";
+const SETUP_SEED = "m9e-town-handoff-5042";
 let game: Phaser.Game | undefined;
 let manager: GameManager | undefined;
 
