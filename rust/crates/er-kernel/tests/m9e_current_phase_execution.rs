@@ -1825,6 +1825,16 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
             continue;
         }
         let checkpoint = kernel.snapshot()?;
+        let turn_frontier = kernel
+            .state()
+            .and_then(|state| state.current_turn_execution.as_ref())
+            .map(|turn| (turn.stage.clone(), turn.next_action, turn.actions.len()));
+        let hp = kernel.state().and_then(|state| state.active_run.as_ref()).and_then(|run| {
+            run.battle
+                .as_ref()
+                .map(|battle| (run.party[0].hp, battle.enemy_party[0].hp))
+        });
+        let pending_platform = checkpoint.pending_platform.len();
         let step = if let Some(pending) = checkpoint.pending_platform.first() {
             match &pending.effect {
                 GamePlatformEffectV2::CurrentFriendshipClock { request } => kernel
@@ -1843,7 +1853,11 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
                 .advance_time(SafeU53::ZERO)
                 .map_err(|error| Box::new(error) as Box<dyn Error>)
         }
-        .map_err(|error| format!("Town reward drain iteration {iteration}: {error}"))?;
+        .map_err(|error| {
+            format!(
+                "Town reward drain iteration {iteration}: turn={turn_frontier:?}, hp={hp:?}, platform={pending_platform}: {error}"
+            )
+        })?;
         if !step
             .effects
             .iter()
