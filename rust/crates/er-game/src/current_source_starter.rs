@@ -149,6 +149,49 @@ pub struct CurrentSourceStarterInputV1 {
     pub pokerus: bool,
 }
 
+/// Rebuild the untouched fresh starter-grid selection. The source defaults to
+/// male, first ability, its sole fresh-account nature, the first four early
+/// moves, and the species' primary Tera type. Alternate UI choices must be
+/// carried explicitly through CurrentSourceStarterInputV1 instead.
+pub fn current_fresh_default_starter_input_v1(
+    content: &PreparedGameContentV2,
+    species: SpeciesId,
+    owner: SeatId,
+    pokerus: bool,
+) -> Result<CurrentSourceStarterInputV1, NaturalRunV6Error> {
+    let account = current_fresh_starter_account_v1()?
+        .into_iter()
+        .find(|entry| entry.species == species)
+        .ok_or(NaturalRunV6Error::Invalid)?;
+    if !account.nature_attr.is_power_of_two() {
+        return Err(NaturalRunV6Error::Invalid);
+    }
+    let nature_bit = account.nature_attr.trailing_zeros();
+    let nature_index = u8::try_from(nature_bit.checked_sub(1).ok_or(NaturalRunV6Error::Invalid)?)
+        .map_err(|_| NaturalRunV6Error::Invalid)?;
+    let tera_type = content
+        .battle
+        .species(species)
+        .map_err(|_| NaturalRunV6Error::Invalid)?
+        .typing
+        .primary;
+    Ok(CurrentSourceStarterInputV1 {
+        species,
+        form_index: 0,
+        ability_index: 0,
+        level: 5,
+        owner,
+        gender: 0,
+        shiny: false,
+        variant: 0,
+        ivs: account.ivs,
+        nature_index,
+        moves: current_fresh_starter_moves_v1(content, species)?,
+        tera_type,
+        pokerus,
+    })
+}
+
 /// Consume the source Pokemon constructor's ID and type-pick draws atomically.
 /// For now this admits the fresh ordinary nonshiny, first-ability form-zero
 /// subset. It does not authenticate account unlocks or the prior UI route roll.

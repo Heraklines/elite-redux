@@ -18,9 +18,8 @@ use er_game::current_town_wild_spawn::{
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_game::m9e_new_run_v6::{
-    CurrentSourceStarterInputV1, advance_current_town_title_routes_v1,
-    construct_current_source_starter_v1, current_fresh_starter_account_v1,
-    current_fresh_starter_moves_v1,
+    advance_current_town_title_routes_v1, construct_current_source_starter_v1,
+    current_fresh_default_starter_input_v1, current_fresh_starter_account_v1,
 };
 use er_rng::audit::{RngCallsiteId, RngPublicApi, RngReason};
 use er_rng::battle::RngRuntime;
@@ -1406,29 +1405,30 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = PreparedGameContentV2::prepare(Arc::new(bundle))?;
     let bulbasaur = SpeciesId::new(SafeU53::new(1)?);
-    let fresh_moves = current_fresh_starter_moves_v1(&content, bulbasaur)?;
+    let selected = current_fresh_default_starter_input_v1(
+        &content,
+        bulbasaur,
+        SeatId::new(SafeU53::new(1)?),
+        false,
+    )?;
+    assert_eq!(selected.level, 5);
+    assert_eq!(selected.form_index, 0);
+    assert_eq!(selected.ability_index, 0);
+    assert_eq!(selected.ivs, [15; 6]);
+    assert_eq!(selected.nature_index, 6);
+    assert_eq!(selected.gender, 0);
+    assert!(!selected.shiny);
+    assert_eq!(selected.variant, 0);
+    assert!(!selected.pokerus);
+    assert_eq!(selected.tera_type, PokemonType::Grass);
     assert_eq!(
-        fresh_moves
+        selected
+            .moves
             .iter()
             .map(|id| id.get().get())
             .collect::<Vec<_>>(),
         vec![22, 33, 45, 74]
     );
-    let selected = CurrentSourceStarterInputV1 {
-        species: bulbasaur,
-        form_index: 0,
-        ability_index: 0,
-        level: 5,
-        owner: SeatId::new(SafeU53::new(1)?),
-        gender: 0,
-        shiny: false,
-        variant: 0,
-        ivs: [15; 6],
-        nature_index: 6,
-        moves: fresh_moves,
-        tera_type: PokemonType::Grass,
-        pokerus: false,
-    };
     let mut before_constructor = RngRuntime::from_run_seed(seed);
     for _ in 0..3 {
         before_constructor.run_rand_seed_int(
