@@ -522,8 +522,12 @@ fn controlled_before_knockout_with_seed_and_account(
     account: Option<CurrentAccountIdentityV1>,
 ) -> Result<GameKernelV7> {
     assert!((1..10).contains(&level));
-    assert!(!moves.is_empty() && moves.len() <= 4 && moves[0] == 33);
     let source_account = account.is_some();
+    assert!(
+        !moves.is_empty()
+            && moves.len() <= 4
+            && moves[0] == (if source_account { 22 } else { 33 })
+    );
     let mut snapshot = natural_with_seed_and_account(content.clone(), seed, account)?.snapshot()?;
     let GameKernelLifecycleSnapshotV7::Active(state) = &mut snapshot.lifecycle else {
         return Err("natural active state absent".into());
@@ -1797,7 +1801,7 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
         controlled_before_knockout_with_seed_and_account(
             content.clone(),
             5,
-            &[33],
+            &[22],
             "m9e-town-handoff-5042",
             Some(CurrentAccountIdentityV1 {
                 trainer_id: 12345,
@@ -1830,6 +1834,11 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
             .state()
             .and_then(|state| state.current_turn_execution.as_ref())
             .map(|turn| (turn.stage.clone(), turn.next_action, turn.actions.len()));
+        let next_action = kernel
+            .state()
+            .and_then(|state| state.current_turn_execution.as_ref())
+            .and_then(|turn| turn.actions.get(usize::from(turn.next_action)))
+            .map(|action| format!("{action:?}"));
         let hp = kernel
             .state()
             .and_then(|state| state.active_run.as_ref())
@@ -1859,7 +1868,7 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
         }
         .map_err(|error| {
             format!(
-                "Town reward drain iteration {iteration}: turn={turn_frontier:?}, hp={hp:?}, platform={pending_platform}: {error}"
+                "Town reward drain iteration {iteration}: turn={turn_frontier:?}, action={next_action:?}, hp={hp:?}, platform={pending_platform}: {error}"
             )
         })?;
         if !step
