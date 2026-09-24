@@ -957,6 +957,24 @@ fn naturally_admitted_day_seed_matches_pinned_postreward_enemy() -> Result<(), B
     let before_rejected = identities.clone();
     assert!(identities.adopt_source_pokemon_id(prior).is_err());
     assert_eq!(identities, before_rejected);
+    // The actual UI starter is constructed before this wave-one enemy, but
+    // its source ID is larger. Admit the two IDs as one source construction
+    // batch while retaining the allocator's strict prior-frontier rule.
+    let player_id = er_types::battle_ids::PokemonId::new(SafeU53::new(1_771_723_560)?);
+    let opening_enemy_id = er_types::battle_ids::PokemonId::new(SafeU53::new(1_173_608_932)?);
+    let mut opening_ids = identities.clone();
+    let opening_before = opening_ids.clone();
+    assert!(opening_ids
+        .adopt_source_pokemon_ids(&[player_id, player_id])
+        .is_err());
+    assert_eq!(opening_ids, opening_before);
+    assert!(opening_ids
+        .adopt_source_pokemon_ids(&[player_id, prior])
+        .is_err());
+    assert_eq!(opening_ids, opening_before);
+    opening_ids.adopt_source_pokemon_ids(&[player_id, opening_enemy_id])?;
+    assert_eq!(opening_ids.next_pokemon_id.get(), 1_771_723_561);
+    assert!(opening_ids.adopt_source_pokemon_id(opening_enemy_id).is_err());
     let mut reserved_rng = initial_rng.clone();
     let reserved = select_current_town_day_wave_two_shell_with_identity(
         &content,
