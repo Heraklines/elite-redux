@@ -1029,3 +1029,104 @@ fn naturally_admitted_day_seed_matches_pinned_postreward_enemy() -> Result<(), B
     );
     Ok(())
 }
+
+#[test]
+fn source_single_width_town_successor_matches_pinned_shell() -> Result<(), Box<dyn Error>> {
+    // Source run 35938474439 observed this controlled reward-CANCEL successor
+    // twice. It is one wild enemy, unlike the older seed's double encounter.
+    // Its controlled wave-one enemy differs from natural Rust bootstrap, so
+    // this witnesses the wave-two constructor only, not a connected campaign.
+    let seed = "m9e-town-handoff-774";
+    let offset = source_town_wave_cycle_offset(seed)?;
+    assert_eq!(offset, 10);
+    assert_eq!(source_town_time_of_day(2, offset)?, 1);
+    let mut rng = RngRuntime::from_states(source_town_reset_seed(seed, 2)?, None)?;
+    assert_eq!(
+        rng.run_state().rdg.state_string,
+        "!rnd,1,0.5938717131502926,0.8636611558031291,0.1503892035689205"
+    );
+    assert!(!source_town_unboosted_wild_double_roll(&mut rng)?);
+    assert_eq!(
+        rng.run_state().rdg.state_string,
+        "!rnd,1806467,0.1503892035689205,0.2362219651695341,0.35655211517587304"
+    );
+    let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
+    let content = PreparedGameContentV2::prepare(Arc::new(bundle))?;
+    let mode = content
+        .bundle()
+        .world
+        .modes
+        .iter()
+        .find(|mode| mode.key == "CLASSIC")
+        .ok_or("Classic mode absent")?;
+    let town = content
+        .bundle()
+        .world
+        .biomes
+        .iter()
+        .find(|biome| biome.key == "biome/0")
+        .ok_or("Town absent")?;
+    let context = CurrentTownDayWaveTwoContextV1 {
+        mode: mode.id,
+        biome: town.id,
+        difficulty: RunDifficultyV1::Ace,
+        wave: 2,
+        level: 3,
+        luck: 0,
+        forced_tier: None,
+        encounter_boss_segments: 0,
+        regional_boost: false,
+        time_override: None,
+        effective_pool_time: 1,
+        override_species: None,
+        golden_bug_net: false,
+        excluded_species: &[],
+    };
+    let shell =
+        select_current_town_day_wave_two_shell(&content, context, 12_345, 23_456, &mut rng)?;
+    let enemy = &shell.pokemon;
+    assert_eq!(enemy.id.get().get(), 3_131_808_768);
+    assert_eq!(enemy.species_id.get().get(), 504);
+    assert_eq!(enemy.form_index, 0);
+    assert_eq!(enemy.level, 3);
+    assert_eq!(enemy.experience.get().get(), 27);
+    assert_eq!(enemy.friendship, 70);
+    assert_eq!(shell.core.prefix.ability_index, 0);
+    assert_eq!(enemy.abilities.active.get().get(), 50);
+    assert_eq!(enemy.ivs.map(|iv| iv.get()), [29, 10, 23, 7, 0, 0]);
+    assert_eq!(enemy.nature.get(), 9);
+    assert_eq!(
+        [
+            enemy.stats.hp,
+            enemy.stats.attack,
+            enemy.stats.defense,
+            enemy.stats.special_attack,
+            enemy.stats.special_defense,
+            enemy.stats.speed,
+        ],
+        [16, 9, 9, 7, 6, 9]
+    );
+    assert_eq!(enemy.hp, 16);
+    assert_eq!(enemy.gender, Some(1));
+    assert!(!enemy.shiny);
+    assert_eq!(enemy.variant, 0);
+    assert_eq!(enemy.types.primary, PokemonType::Normal);
+    assert_eq!(enemy.types.secondary, None);
+    assert_eq!(enemy.tera_type, Some(PokemonType::Normal));
+    assert_eq!(
+        enemy
+            .moves
+            .iter()
+            .map(|slot| slot
+                .as_ref()
+                .map(|slot| (slot.move_id.get().get(), slot.pp_used)))
+            .collect::<Vec<_>>(),
+        vec![
+            Some((158, 0)),
+            Some((95, 0)),
+            Some((116, 0)),
+            Some((747, 0))
+        ]
+    );
+    Ok(())
+}
