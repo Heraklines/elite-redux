@@ -39,7 +39,9 @@ use crate::m72_bootstrap::{RunBootstrapMachineV1, RunBootstrapStageV1};
 mod current_source_starter;
 pub use current_source_starter::{
     CurrentFreshStarterAccountEntryV1, CurrentSourceStarterInputV1,
-    construct_current_source_starter_v1, current_fresh_starter_account_v1,
+    advance_current_town_title_routes_v1, construct_current_source_starter_v1,
+    current_fresh_default_starter_input_v1, current_fresh_starter_account_v1,
+    current_fresh_starter_moves_v1,
 };
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -56,6 +58,51 @@ pub fn construct_natural_run_v6(
     bootstrap: &RunBootstrapMachineV1,
     content: &PreparedGameContentV2,
     authority_revision: SafeU53,
+) -> Result<GameStateV6, NaturalRunV6Error> {
+    construct_natural_run_v6_inner(bootstrap, content, authority_revision, None)
+}
+
+/// Construct the bounded fresh Town opening from the owned starter selection.
+/// This replays the fresh Title route rolls and the selected source starter
+/// constructor before the ordinary source-bound wave-one enemy admission.
+/// The normal bootstrap entry remains unchanged until it owns this UI history.
+pub fn construct_current_fresh_town_run_v1(
+    bootstrap: &RunBootstrapMachineV1,
+    content: &PreparedGameContentV2,
+    authority_revision: SafeU53,
+) -> Result<GameStateV6, NaturalRunV6Error> {
+    if bootstrap.current_friendship_profile.is_none()
+        || bootstrap.current_account_identity.is_none()
+        || bootstrap.selections.starters.len() != 1
+        || bootstrap.selections.difficulty != Some(er_types::RunDifficultyV1::Ace)
+    {
+        return Err(NaturalRunV6Error::Invalid);
+    }
+    let starter = &bootstrap.selections.starters[0];
+    if starter.form_index != 0 || starter.ability_index != 0 {
+        return Err(NaturalRunV6Error::Invalid);
+    }
+    let selected = bootstrap
+        .current_starter_pokerus_selections()
+        .map_err(|_| NaturalRunV6Error::Invalid)?
+        .ok_or(NaturalRunV6Error::Invalid)?;
+    if selected.len() != 1 || selected[0].selection != *starter {
+        return Err(NaturalRunV6Error::Invalid);
+    }
+    let input = current_fresh_default_starter_input_v1(
+        content,
+        er_types::battle_ids::SpeciesId::new(starter.species_id),
+        starter.owner_seat,
+        selected[0].pokerus,
+    )?;
+    construct_natural_run_v6_inner(bootstrap, content, authority_revision, Some(&input))
+}
+
+fn construct_natural_run_v6_inner(
+    bootstrap: &RunBootstrapMachineV1,
+    content: &PreparedGameContentV2,
+    authority_revision: SafeU53,
+    source_starter: Option<&CurrentSourceStarterInputV1>,
 ) -> Result<GameStateV6, NaturalRunV6Error> {
     if bootstrap.stage != RunBootstrapStageV1::Complete || authority_revision == SafeU53::ZERO {
         return Err(NaturalRunV6Error::Invalid);
@@ -92,19 +139,29 @@ pub fn construct_natural_run_v6(
         .map_err(|_| NaturalRunV6Error::Exhausted)?;
     let mut rng = RngRuntime::from_run_seed(&bootstrap.seed);
     let mut party = Vec::with_capacity(bootstrap.selections.starters.len());
-    for starter in &bootstrap.selections.starters {
-        let pokemon_id = identities
-            .allocate_pokemon_id()
-            .map_err(|_| NaturalRunV6Error::Exhausted)?;
-        party.push(pokemon(
-            content,
-            &mut rng,
-            pokemon_id,
-            Some(starter.owner_seat),
-            er_types::battle_ids::SpeciesId::new(starter.species_id),
-            starter.form_index,
-            mode.starting_level,
+    if let Some(input) = source_starter {
+        if mode.starting_level != input.level || input.owner != owner {
+            return Err(NaturalRunV6Error::Invalid);
+        }
+        advance_current_town_title_routes_v1(&mut rng)?;
+        party.push(construct_current_source_starter_v1(
+            content, input, &mut rng,
         )?);
+    } else {
+        for starter in &bootstrap.selections.starters {
+            let pokemon_id = identities
+                .allocate_pokemon_id()
+                .map_err(|_| NaturalRunV6Error::Exhausted)?;
+            party.push(pokemon(
+                content,
+                &mut rng,
+                pokemon_id,
+                Some(starter.owner_seat),
+                er_types::battle_ids::SpeciesId::new(starter.species_id),
+                starter.form_index,
+                mode.starting_level,
+            )?);
+        }
     }
     if bootstrap.current_starter_pokerus.is_some() {
         let observed = bootstrap
@@ -222,9 +279,15 @@ pub fn construct_natural_run_v6(
                     &mut source_rng,
                 )
                 .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
-                identities
-                    .adopt_source_pokemon_id(shell.pokemon.id)
-                    .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+                if source_starter.is_some() {
+                    identities
+                        .adopt_source_pokemon_ids(&[party[0].id, shell.pokemon.id])
+                        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+                } else {
+                    identities
+                        .adopt_source_pokemon_id(shell.pokemon.id)
+                        .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+                }
                 Some((shell.pokemon, source_rng))
             } else {
                 None
@@ -235,6 +298,9 @@ pub fn construct_natural_run_v6(
     } else {
         None
     };
+    if source_starter.is_some() && source_opening.is_none() {
+        return Err(NaturalRunV6Error::Invalid);
+    }
     let enemy = if let Some((enemy, source_rng)) = source_opening {
         rng = source_rng;
         enemy

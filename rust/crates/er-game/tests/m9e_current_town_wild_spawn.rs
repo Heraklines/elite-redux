@@ -18,14 +18,14 @@ use er_game::current_town_wild_spawn::{
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_game::m9e_new_run_v6::{
-    CurrentSourceStarterInputV1, construct_current_source_starter_v1,
-    current_fresh_starter_account_v1,
+    advance_current_town_title_routes_v1, construct_current_source_starter_v1,
+    current_fresh_default_starter_input_v1, current_fresh_starter_account_v1,
 };
 use er_rng::audit::{RngCallsiteId, RngPublicApi, RngReason};
 use er_rng::battle::RngRuntime;
 use er_rng::phaser::{PhaserRdg, PhaserRdgState, RunRngState, shift_char_codes};
 use er_state::m9e_state_v6::GameIdentityAllocatorStateV1;
-use er_types::battle_ids::{MoveId, SpeciesId};
+use er_types::battle_ids::SpeciesId;
 use er_types::battle_model::PokemonType;
 use er_types::run_ids::BiomeId;
 use er_types::{RunDifficultyV1, SafeU53, SeatId};
@@ -132,27 +132,6 @@ const SOURCE_AFTER_WAVE_RESET: &str =
     "!rnd,1,0.3782209656201303,0.3772894029971212,0.5761283298488706";
 const SOURCE_AFTER_SELECTION: &str =
     "!rnd,1012145,0.09734400571323931,0.1575480371247977,0.15997060341760516";
-
-fn observed_title_route_prefix(rng: &mut RngRuntime) -> Result<usize, Box<dyn Error>> {
-    let mut successes = 0;
-    let mut attempts = 0;
-    while successes < 3 && attempts < 10 {
-        let roll = rng.run_rand_seed_int(
-            SafeU53::new(100)?,
-            SafeU53::ZERO,
-            RngReason::RandomSelector,
-            RngCallsiteId::mechanics(RngReason::RandomSelector),
-        )?;
-        attempts += 1;
-        if roll.get() < 50 {
-            successes += 1;
-        }
-    }
-    if successes != 3 {
-        return Err("observed Title route prefix did not reach three extras".into());
-    }
-    Ok(attempts)
-}
 
 #[test]
 fn entire_town_day_pool_and_actual_wave_two_source_draw_match() -> Result<(), Box<dyn Error>> {
@@ -1401,7 +1380,7 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
     // but the run RNG stays advanced. Run35963530932 confirmed the empty
     // pending graph at Command while preserving the same constructor frontier.
     let mut ui_rng = RngRuntime::from_run_seed(seed);
-    assert_eq!(observed_title_route_prefix(&mut ui_rng)?, 3);
+    assert_eq!(advance_current_town_title_routes_v1(&mut ui_rng)?, 3);
     assert_eq!(
         ui_rng.run_state().rdg.state_string,
         "!rnd,1001026,0.9830058687366545,0.08702266961336136,0.2183791280258447"
@@ -1425,23 +1404,31 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
     );
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = PreparedGameContentV2::prepare(Arc::new(bundle))?;
-    let selected = CurrentSourceStarterInputV1 {
-        species: SpeciesId::new(SafeU53::new(1)?),
-        form_index: 0,
-        ability_index: 0,
-        level: 5,
-        owner: SeatId::new(SafeU53::new(1)?),
-        gender: 0,
-        shiny: false,
-        variant: 0,
-        ivs: [15; 6],
-        nature_index: 6,
-        moves: [22, 33, 45, 74]
-            .map(|value| MoveId::new(SafeU53::new(value).expect("source move ID")))
-            .to_vec(),
-        tera_type: PokemonType::Grass,
-        pokerus: false,
-    };
+    let bulbasaur = SpeciesId::new(SafeU53::new(1)?);
+    let selected = current_fresh_default_starter_input_v1(
+        &content,
+        bulbasaur,
+        SeatId::new(SafeU53::new(1)?),
+        false,
+    )?;
+    assert_eq!(selected.level, 5);
+    assert_eq!(selected.form_index, 0);
+    assert_eq!(selected.ability_index, 0);
+    assert_eq!(selected.ivs, [15; 6]);
+    assert_eq!(selected.nature_index, 6);
+    assert_eq!(selected.gender, 0);
+    assert!(!selected.shiny);
+    assert_eq!(selected.variant, 0);
+    assert!(!selected.pokerus);
+    assert_eq!(selected.tera_type, PokemonType::Grass);
+    assert_eq!(
+        selected
+            .moves
+            .iter()
+            .map(|id| id.get().get())
+            .collect::<Vec<_>>(),
+        vec![22, 33, 45, 74]
+    );
     let mut before_constructor = RngRuntime::from_run_seed(seed);
     for _ in 0..3 {
         before_constructor.run_rand_seed_int(
@@ -1504,7 +1491,7 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
     // accept three extras. Its starter constructor begins at that frontier;
     // the selected fresh-account inputs are otherwise the same Bulbasaur.
     let mut alternate_rng = RngRuntime::from_run_seed("m9e-town-handoff-774");
-    assert_eq!(observed_title_route_prefix(&mut alternate_rng)?, 5);
+    assert_eq!(advance_current_town_title_routes_v1(&mut alternate_rng)?, 5);
     assert_eq!(
         alternate_rng.run_state().rdg.state_string,
         "!rnd,969360,0.42243809276260436,0.04841565107926726,0.6655898890458047"

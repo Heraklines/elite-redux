@@ -1,7 +1,7 @@
 //! Actual shared bootstrap controls and natural constructor; no CLI/Worker claim.
 use er_game::current_starter_pokerus::{DATE_TIME_CLIP_MILLISECONDS, daily_starter_species};
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
-use er_game::m9e_new_run_v6::construct_natural_run_v6;
+use er_game::m9e_new_run_v6::{construct_current_fresh_town_run_v1, construct_natural_run_v6};
 use er_game::m72_bootstrap::{
     BootstrapCatalogV1, BootstrapModePolicyV1, RunBootstrapMachineV1, RunBootstrapStageV1,
 };
@@ -351,6 +351,58 @@ fn picks_retain_their_source_day_through_reentry_and_natural_construction() -> R
             .collect::<Vec<_>>(),
         vec![(1, Some(true)), (4, Some(true))]
     );
+    Ok(())
+}
+
+#[test]
+fn source_fresh_town_starter_and_enemy_share_one_valid_natural_state() -> Result<()> {
+    let content = content()?;
+    let mut state = bootstrap(&content, true)?;
+    state.seed = "m9e-town-handoff-5042".to_owned();
+    state.current_account_identity = Some(CurrentAccountIdentityV1 {
+        trainer_id: 12345,
+        secret_id: 23456,
+    });
+    enter(&mut state, &content)?;
+    sample(&mut state, 1, 1_468_800_000)?;
+    pick(&mut state, 1)?;
+    choose(&mut state, BootstrapActionV1::ConfirmStarters)?;
+    choose(&mut state, BootstrapActionV1::Confirm)?;
+    choose(
+        &mut state,
+        BootstrapActionV1::SelectDifficulty(RunDifficultyV1::Ace),
+    )?;
+    choose(
+        &mut state,
+        BootstrapActionV1::SelectSaveSlot("daily-owned".to_owned()),
+    )?;
+    state.validate()?;
+    let source = construct_current_fresh_town_run_v1(&state, &content, safe(1)?)?;
+    source.validate_with(&content)?;
+    let run = source.active_run.as_ref().ok_or("source run absent")?;
+    let player = &run.party[0];
+    let enemy = &run.battle.as_ref().ok_or("battle absent")?.enemy_party[0];
+    assert_eq!(player.id.get().get(), 1_771_723_560);
+    assert_eq!(player.ivs.map(|iv| iv.get()), [15; 6]);
+    assert_eq!(player.nature.get(), 6);
+    assert_eq!(player.gender, Some(0));
+    assert_eq!(player.abilities.active.get().get(), 5006);
+    assert_eq!(player.pokerus, Some(true));
+    assert_eq!(
+        player
+            .moves
+            .iter()
+            .flatten()
+            .map(|slot| slot.move_id.get().get())
+            .collect::<Vec<_>>(),
+        vec![22, 33, 45, 74]
+    );
+    assert_eq!(enemy.id.get().get(), 1_173_608_932);
+    assert_eq!(enemy.species_id.get().get(), 915);
+    assert_eq!(source.identities.next_pokemon_id.get(), 1_771_723_561);
+    let mut altered = state.clone();
+    altered.current_account_identity = None;
+    assert!(construct_current_fresh_town_run_v1(&altered, &content, safe(1)?).is_err());
     Ok(())
 }
 
