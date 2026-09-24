@@ -1197,10 +1197,7 @@ fn source_single_width_successor_with_matching_natural_opening() -> Result<(), B
     );
     let opening = select_current_town_day_wave_one_root(
         &content,
-        CurrentTownDayWildContextV1 {
-            wave: 1,
-            ..context
-        },
+        CurrentTownDayWildContextV1 { wave: 1, ..context },
         &mut opening_rng,
     )?;
     assert_eq!(opening.source_root.get().get(), 915);
@@ -1215,9 +1212,8 @@ fn source_single_width_successor_with_matching_natural_opening() -> Result<(), B
         rng.run_state().rdg.state_string,
         "!rnd,1730656,0.9964935819152743,0.7156274577137083,0.33513971720822155"
     );
-    let shell = select_current_town_day_wave_two_shell(
-        &content, context, 12_345, 23_456, &mut rng,
-    )?;
+    let shell =
+        select_current_town_day_wave_two_shell(&content, context, 12_345, 23_456, &mut rng)?;
     let enemy = &shell.pokemon;
     assert_eq!(enemy.id.get().get(), 3_273_058_121);
     assert_eq!(enemy.species_id.get().get(), 504);
