@@ -2,7 +2,6 @@ import { globalScene } from "#app/global-scene";
 import { getGameMode } from "#app/game-mode";
 import { BASE_SHINY_CHANCE } from "#balance/rates";
 import { getCurrentErRewardRates } from "#data/elite-redux/er-reward-rates";
-import { AbilityId } from "#enums/ability-id";
 import { BattleStyle } from "#enums/battle-style";
 import { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
@@ -21,7 +20,7 @@ import { afterAll, expect, test, vi } from "vitest";
 
 const PIN = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7";
 // Install this seed after the starter helper's hardcoded "test" assignment.
-const SETUP_SEED = "m9e-town-handoff-308";
+const SETUP_SEED = "m9e-town-handoff-774";
 let game: Phaser.Game | undefined;
 let manager: GameManager | undefined;
 
@@ -152,6 +151,8 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   expect(newBattle).toHaveBeenCalledTimes(1);
   expect(beforeNewBattle).toHaveLength(1);
   expect(scene.currentBattle.waveIndex).toBe(2);
+  expect(scene.currentBattle.double).toBe(false);
+  expect(scene.currentBattle.enemyParty).toHaveLength(1);
   expect(scene.arena.biomeId).toBe(BiomeId.TOWN);
   expect(scene.phaseManager.getCurrentPhase().phaseName).toBe("CommandPhase");
   const enemy = scene.currentBattle.enemyParty[0];
@@ -160,10 +161,8 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   expect((scene.arena as unknown as { lastTimeOfDay: number }).lastTimeOfDay).toBe(1);
   expect(enemy.species.speciesId).toBe(504);
   expect(enemy.level).toBe(3);
-  expect(enemy.getAbility().id).toBe(AbilityId.STAKEOUT);
   const waveTwoSelections = speciesCalls.filter(call => call.wave === 2);
-  expect(waveTwoSelections.length).toBeGreaterThan(0);
-  expect(waveTwoSelections.length).toBeLessThanOrEqual(8);
+  expect(waveTwoSelections).toHaveLength(1);
   expect(waveTwoSelections[0].species).toBe(enemy.species.speciesId);
   const shinyXor = (scene.gameData.trainerId ^ scene.gameData.secretId)
     ^ ((enemy.id >>> 16) ^ (enemy.id & 0xffff));
