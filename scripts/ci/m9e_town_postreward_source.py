@@ -18,6 +18,8 @@ PIN = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7"
 BRANCH = "codex/m9e-town-postreward-source-20260923"
 HELPER = "test/kernel-fixtures/m9/observe-town-postreward.ts"
 INJECTED = "test/kernel-fixtures/m9-observe-town-postreward.test.ts"
+UI_HELPER = "test/kernel-fixtures/m9/observe-town-starter-ui.ts"
+UI_INJECTED = "test/kernel-fixtures/m9-observe-town-starter-ui.test.ts"
 ASSET_COMMIT = "d5f67989d02b7082ca32e7eaddf3b9421916ff12"
 ASSET_PATH = "battle-anims/tackle.json"
 START = time.monotonic()
@@ -111,7 +113,7 @@ def main():
     result = {
         "schema": 1, "status": "failed", "source_pin": PIN,
         "candidate_sha": os.environ["GITHUB_SHA"],
-        "scope": "actual attack by an explicit Classic level-five source starter, reward cancel and queued Town wave-two encounter; no full starter-UI run or Rust settlement qualification",
+        "scope": "two fresh explicit-starter reward-to-wave-two observations plus two fresh Title-to-starter-UI observations; no Rust settlement qualification",
         "commands": COMMANDS,
     }
     try:
@@ -138,10 +140,14 @@ def main():
             "clean pinned source",
         )
         injected = SOURCE / INJECTED
-        require(not injected.exists(), "fresh additive probe path")
+        ui_injected = SOURCE / UI_INJECTED
+        require(not injected.exists() and not ui_injected.exists(),
+                "fresh additive probe paths")
         injected.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / HELPER, injected)
+        shutil.copyfile(ROOT / UI_HELPER, ui_injected)
         result["probe_sha256"] = sha(injected.read_bytes())
+        result["ui_probe_sha256"] = sha(ui_injected.read_bytes())
         result["asset"] = asset()
         run("pinned-dependencies", ["pnpm", "install", "--frozen-lockfile"],
             cwd=SOURCE, seconds=700)
@@ -194,6 +200,48 @@ def main():
                                "first_attacking_turns": value["first"]["attacking_turns"]}
         require(observations[0] == observations[1], "two fresh source observations differ")
         (COMPACT / "observation.json").write_bytes(observations[0])
+        ui_observations = []
+        for ordinal in ("one", "two"):
+            report = OUT / ("vitest-ui-" + ordinal + ".json")
+            environment = os.environ.copy()
+            environment["M9_TOWN_STARTER_UI_OUTPUT"] = str(OUT)
+            environment["M9_TOWN_STARTER_UI_ORDINAL"] = ordinal
+            run(
+                "source-ui-" + ordinal,
+                ["pnpm", "exec", "vitest", "run", UI_INJECTED, "--pool=forks",
+                 "--isolate", "--no-file-parallelism", "--reporter=json",
+                 "--outputFile=" + str(report)],
+                cwd=SOURCE, seconds=300, env=environment,
+            )
+            vitest = json.loads(report.read_bytes())
+            require(
+                all(vitest.get(key) == value for key, value in {
+                    "numTotalTests": 1, "numPassedTests": 1,
+                    "numFailedTests": 0, "numPendingTests": 0,
+                    "numTodoTests": 0, "success": True,
+                }.items()),
+                "one complete starter UI source test: " + ordinal,
+            )
+            path = OUT / ("starter-ui-" + ordinal + ".json")
+            raw = path.read_bytes()
+            require(0 < len(raw) <= 8192, "bounded starter UI observation")
+            value = json.loads(raw)
+            require(
+                raw == (json.dumps(value, separators=(",", ":")) + "\n").encode()
+                and value["source"] == PIN and value["seed"] == "m9e-town-handoff-5042"
+                and value["path"] == "title-starter-select-confirm-save-slot-encounter"
+                and len(value["constructor"]) == 1
+                and len(value["constructor_draws"]) <= 8
+                and value["player"]["species"] == 1
+                and value["player"]["level"] == 5,
+                "canonical starter UI observation",
+            )
+            ui_observations.append(raw)
+        require(ui_observations[0] == ui_observations[1],
+                "two fresh starter UI observations differ")
+        (COMPACT / "starter-ui-observation.json").write_bytes(ui_observations[0])
+        result["starter_ui"] = {"bytes": len(ui_observations[0]),
+                                "sha256": sha(ui_observations[0])}
         result["status"] = "passed"
     except Exception as error:
         result["first_failure"] = str(error)[:1024]
