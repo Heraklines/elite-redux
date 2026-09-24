@@ -147,13 +147,17 @@ test("Title and actual starter controls construct a source-owned Classic starter
     manager!.onNextPrompt("SelectStarterPhase", UiMode.SAVE_SLOT, () => {
       mark("save-slot");
       const handler = manager!.scene.ui.getHandler() as SaveSlotSelectUiHandler;
-      handler.processInput(Button.ACTION);
-      mark("save-slot-action-returned");
+      const accepted = handler.processInput(Button.ACTION);
+      mark(`save-slot-action-returned:${accepted}`);
       resolve();
     });
   });
-  mark("awaiting-command-phase");
+  const phase = () => manager!.scene.phaseManager.getCurrentPhase().phaseName;
+  const mode = () => manager!.scene.ui.getMode();
+  mark(`awaiting-command-phase:${phase()}:${mode()}`);
+  const diagnostic = setTimeout(() => mark(`command-wait:${phase()}:${mode()}`), 2000);
   await manager.phaseInterceptor.to("CommandPhase");
+  clearTimeout(diagnostic);
   mark("command-phase-seen");
 
   const scene = globalScene;
