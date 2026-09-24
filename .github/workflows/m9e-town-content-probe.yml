@@ -62,8 +62,9 @@ jobs:
         run: |
           cargo fmt --manifest-path rust/Cargo.toml --all -- --check
           cargo test --manifest-path rust/Cargo.toml --locked -p er-game --test m9e_current_starter_pokerus source_fresh_town_starter_and_enemy_share_one_valid_natural_state -- --exact
+          cargo test --manifest-path rust/Cargo.toml --locked -p er-game --test m9e_current_starter_pokerus title_reentry_does_not_claim_the_single_open_source_frontier -- --exact
           cargo test --manifest-path rust/Cargo.toml --locked -p er-kernel --test m9e_current_phase_execution fresh_account_town_opening_retains_source_enemy_shell -- --exact
-          cargo test --manifest-path rust/Cargo.toml --locked -p er-kernel --test m9e_current_phase_execution actual_reward_skip_admits_read_only_town_wave_two_plan -- --exact
+          cargo test --manifest-path rust/Cargo.toml --locked -p er-kernel --test m9e_current_phase_execution actual_reward_skip_admits_read_only_town_wave_two_plan -- --exact --nocapture
           cargo clippy --manifest-path rust/Cargo.toml --locked -p er-game --lib --no-deps -- -D warnings
           cargo clippy --manifest-path rust/Cargo.toml --locked -p er-kernel --test m9e_current_phase_execution --no-deps -- -D warnings
       - name: Search bounded natural wave-two Town seeds remotely

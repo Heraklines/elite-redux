@@ -1832,6 +1832,7 @@ fn current_reward(
 fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
     use er_state::current_reward_selection::CurrentRewardStageV1;
 
+    eprintln!("town-reward-stage: start");
     let content = content()?;
     let mut kernel = Box::new(
         controlled_before_knockout_with_seed_and_account(
@@ -1846,8 +1847,10 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
         )
         .map_err(|error| format!("Town controlled checkpoint: {error}"))?,
     );
+    eprintln!("town-reward-stage: controlled checkpoint");
     let (mut live, mut ledger) = admit_knockout(&mut kernel, content.as_ref())
         .map_err(|error| format!("Town knockout admission: {error}"))?;
+    eprintln!("town-reward-stage: knockout admitted");
     for iteration in 0..128 {
         if kernel
             .state()
@@ -1926,6 +1929,7 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
             .map_err(|error| format!("Town material replay iteration {iteration}: {error}"))?;
     }
     assert!(current_reward(kernel.state().ok_or("reward state absent")?).is_ok());
+    eprintln!("town-reward-stage: reward ready");
     for pending in kernel.snapshot()?.pending_presentations {
         kernel.settle_presentation(pending.event_id)?;
     }
@@ -1962,6 +1966,7 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
         kernel.snapshot()?.pending_presentations.len()
     );
     accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &skipped)?;
+    eprintln!("town-reward-stage: skipped material applied");
     let state = kernel.state().ok_or("skipped reward state absent")?;
     assert_eq!(current_reward(state)?.stage, CurrentRewardStageV1::Skipped);
     let before = canonical_bytes(state)?;
@@ -1970,6 +1975,7 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
             state,
             content.as_ref(),
         )?;
+    eprintln!("town-reward-stage: successor plan");
     assert_eq!(plan.shell.pokemon.species_id.get().get(), 504);
     assert_eq!(plan.shell.pokemon.id.get().get(), 3273058121);
     assert_eq!(plan.shell.pokemon.stats.hp, 13);
