@@ -1268,9 +1268,14 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
     // The later explicit-starter probe (run35948078136) captured this exact
     // pre-constructor RNG state and the source-chosen Bulbasaur identity. It
     // does not prove that the full raw starter UI reaches this state.
-    let starter_state = PhaserRdgState::from_state_string(
-        "!rnd,1,0.16302004898898304,0.7822124343365431,0.41194894444197416",
-    )?;
+    let seed = "m9e-town-handoff-5042";
+    let before_starter =
+        "!rnd,1,0.16302004898898304,0.7822124343365431,0.41194894444197416";
+    assert_eq!(
+        RngRuntime::from_run_seed(seed).run_state().rdg.state_string,
+        before_starter
+    );
+    let starter_state = PhaserRdgState::from_state_string(before_starter)?;
     let mut starter_rng = RngRuntime::from_states(RunRngState { rdg: starter_state }, None)?;
     let starter_id = starter_rng.run_rand_seed_int(
         SafeU53::new(1_u64 << 32)?,
@@ -1281,7 +1286,6 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
     assert_eq!(starter_id.get(), 396_198_998);
     // The source addPlayerPokemon call continues beyond this one ID draw;
     // its full post-constructor RNG frontier needs separately owned draws.
-    let seed = "m9e-town-handoff-5042";
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = PreparedGameContentV2::prepare(Arc::new(bundle))?;
     let mode = content
