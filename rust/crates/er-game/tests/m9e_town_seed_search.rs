@@ -64,7 +64,6 @@ fn bounded_source_wave_two_seed_candidates() -> Result<(), Box<dyn Error>> {
         if wave_rng.rand_seed_int(SafeU53::new(8)?, SafeU53::ZERO)? == SafeU53::ZERO {
             continue;
         }
-        wave_rng.rnd();
         let mut rng = RngRuntime::from_states(
             RunRngState {
                 rdg: wave_rng.state(),
