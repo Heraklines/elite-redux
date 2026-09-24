@@ -70,6 +70,8 @@ def main():
         if head != SHA or status:
             raise RuntimeError("exact clean source candidate required")
         files = ["rust/crates/er-game/src/current_town_wild_spawn.rs",
+                 "rust/crates/er-game/src/current_source_starter.rs",
+                 "rust/crates/er-game/src/m9e_new_run_v6.rs",
                  "rust/crates/er-cli/src/current_agent.rs",
                  "rust/crates/er-cli/tests/m9e_current_entry.rs",
                  "rust/crates/er-game/src/current_town_level_two_forms.json",

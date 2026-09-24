@@ -17,14 +17,17 @@ use er_game::current_town_wild_spawn::{
     source_town_wave_cycle_offset, source_town_weighted_level_move_pool,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
+use er_game::m9e_new_run_v6::{
+    CurrentSourceStarterInputV1, construct_current_source_starter_v1,
+};
 use er_rng::audit::{RngCallsiteId, RngPublicApi, RngReason};
 use er_rng::battle::RngRuntime;
 use er_rng::phaser::{PhaserRdg, PhaserRdgState, RunRngState, shift_char_codes};
 use er_state::m9e_state_v6::GameIdentityAllocatorStateV1;
-use er_types::battle_ids::SpeciesId;
+use er_types::battle_ids::{MoveId, SpeciesId};
 use er_types::battle_model::PokemonType;
 use er_types::run_ids::BiomeId;
-use er_types::{RunDifficultyV1, SafeU53};
+use er_types::{RunDifficultyV1, SafeU53, SeatId};
 
 const BUNDLE: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/game-content-bundle-v2.json");
@@ -1359,6 +1362,54 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
     );
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = PreparedGameContentV2::prepare(Arc::new(bundle))?;
+    let selected = CurrentSourceStarterInputV1 {
+        species: SpeciesId::new(SafeU53::new(1)?),
+        form_index: 0,
+        ability_index: 0,
+        level: 5,
+        owner: SeatId::new(SafeU53::new(1)?),
+        gender: 0,
+        shiny: false,
+        variant: 0,
+        ivs: [15; 6],
+        nature_index: 6,
+        moves: [22, 33, 45, 74]
+            .map(|value| MoveId::new(SafeU53::new(value).expect("source move ID")))
+            .to_vec(),
+        tera_type: PokemonType::Grass,
+        pokerus: false,
+    };
+    let mut before_constructor = RngRuntime::from_run_seed(seed);
+    for _ in 0..3 {
+        before_constructor.run_rand_seed_int(
+            SafeU53::new(100)?,
+            SafeU53::ZERO,
+            RngReason::RandomSelector,
+            RngCallsiteId::mechanics(RngReason::RandomSelector),
+        )?;
+    }
+    let starter = construct_current_source_starter_v1(
+        &content,
+        &selected,
+        &mut before_constructor,
+    )?;
+    assert_eq!(starter.id.get().get(), 1_771_723_560);
+    assert_eq!(starter.ivs.map(|iv| iv.get()), [15; 6]);
+    assert_eq!(starter.nature.get(), 6);
+    assert_eq!(starter.gender, Some(0));
+    assert_eq!(starter.abilities.active.get().get(), 5006);
+    assert_eq!(starter.tera_type, Some(PokemonType::Grass));
+    assert_eq!(starter.pokerus, Some(false));
+    assert_eq!(
+        [starter.stats.hp, starter.stats.attack, starter.stats.defense,
+            starter.stats.special_attack, starter.stats.special_defense, starter.stats.speed],
+        [20, 10, 10, 12, 12, 10]
+    );
+    assert_eq!(
+        starter.moves.into_iter().flatten().map(|slot| slot.move_id.get().get()).collect::<Vec<_>>(),
+        vec![22, 33, 45, 74]
+    );
+    assert_eq!(before_constructor.run_state(), ui_rng.run_state());
     let mode = content
         .bundle()
         .world
