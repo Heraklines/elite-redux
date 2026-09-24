@@ -17,7 +17,10 @@ use er_game::current_town_wild_spawn::{
     source_town_wave_cycle_offset, source_town_weighted_level_move_pool,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
-use er_game::m9e_new_run_v6::{CurrentSourceStarterInputV1, construct_current_source_starter_v1};
+use er_game::m9e_new_run_v6::{
+    CurrentSourceStarterInputV1, construct_current_source_starter_v1,
+    current_fresh_starter_account_v1,
+};
 use er_rng::audit::{RngCallsiteId, RngPublicApi, RngReason};
 use er_rng::battle::RngRuntime;
 use er_rng::phaser::{PhaserRdg, PhaserRdgState, RunRngState, shift_char_codes};
@@ -29,6 +32,35 @@ use er_types::{RunDifficultyV1, SafeU53, SeatId};
 
 const BUNDLE: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/game-content-bundle-v2.json");
+
+#[test]
+fn fresh_source_account_catalog_matches_pinned_ui_observation() -> Result<(), Box<dyn Error>> {
+    // Pinned399d source run35967546131 observed these 27 rows identically in
+    // four fresh processes; natureAttr is the source's (nature + 1) bit.
+    let expected = [
+        (1, 128), (4, 33_554_432), (7, 2), (152, 128), (155, 8_192),
+        (158, 8_192), (252, 128), (255, 8_192), (258, 524_288),
+        (387, 524_288), (390, 2), (393, 8_192), (495, 33_554_432),
+        (498, 8_192), (501, 8_192), (650, 524_288), (653, 524_288),
+        (656, 2), (722, 33_554_432), (725, 524_288), (728, 524_288),
+        (810, 2), (813, 33_554_432), (816, 8_192), (906, 2),
+        (909, 524_288), (912, 524_288),
+    ];
+    let actual = current_fresh_starter_account_v1()?;
+    assert_eq!(actual.len(), expected.len());
+    for (entry, (species, nature_attr)) in actual.iter().zip(expected) {
+        assert_eq!(entry.species.get().get(), species);
+        assert_eq!(entry.nature_attr, nature_attr);
+        assert_eq!(entry.seen_attr, 157);
+        assert_eq!(entry.caught_attr, 157);
+        assert_eq!(entry.ivs, [15; 6]);
+        assert_eq!(entry.ability_attr, 1);
+        assert_eq!(entry.passive_attr, 0);
+        assert_eq!(entry.egg_moves, 0);
+        assert!(!entry.has_saved_moveset);
+    }
+    Ok(())
+}
 const SOURCE_GENDER: &[u8] = include_bytes!("../../../fixtures/m9/engineering/town-gender-v1.json");
 const SOURCE_FORM_FLAGS: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/town-form-flags-v1.json");
@@ -1412,11 +1444,11 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
         construct_current_source_starter_v1(&content, &impossible_ivs, &mut before_constructor);
     assert!(impossible_result.is_err());
     assert_eq!(before_constructor.run_state(), before_rejection);
-    let mut mismatched_tera = selected.clone();
-    mismatched_tera.tera_type = PokemonType::Poison;
-    let mismatched_result =
-        construct_current_source_starter_v1(&content, &mismatched_tera, &mut before_constructor);
-    assert!(mismatched_result.is_err());
+    let mut unavailable_tera = selected.clone();
+    unavailable_tera.tera_type = PokemonType::Fire;
+    let unavailable_result =
+        construct_current_source_starter_v1(&content, &unavailable_tera, &mut before_constructor);
+    assert!(unavailable_result.is_err());
     assert_eq!(before_constructor.run_state(), before_rejection);
     let starter =
         construct_current_source_starter_v1(&content, &selected, &mut before_constructor)?;
@@ -1457,9 +1489,25 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
         alternate_rng.run_state().rdg.state_string,
         "!rnd,969360,0.42243809276260436,0.04841565107926726,0.6655898890458047"
     );
+    let mut random_tera_probe = alternate_rng.clone();
+    random_tera_probe.run_rand_seed_int(
+        SafeU53::new(1_u64 << 32)?,
+        SafeU53::ZERO,
+        RngReason::RandomSelector,
+        RngCallsiteId::mechanics(RngReason::RandomSelector),
+    )?;
+    assert_eq!(
+        random_tera_probe.run_pick_index(
+            2,
+            RngReason::RandomSelector,
+            RngCallsiteId::mechanics(RngReason::RandomSelector),
+        )?,
+        1
+    );
     let alternate_starter =
         construct_current_source_starter_v1(&content, &selected, &mut alternate_rng)?;
     assert_eq!(alternate_starter.id.get().get(), 4_252_591_335);
+    assert_eq!(alternate_starter.tera_type, Some(PokemonType::Grass));
     assert_eq!(
         alternate_rng.run_state().rdg.state_string,
         "!rnd,2071002,0.064213513629511,0.7699574562720954,0.006703111808747053"

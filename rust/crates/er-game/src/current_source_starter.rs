@@ -6,11 +6,63 @@ use super::{NaturalRunV6Error, pokemon};
 use crate::m9e_content_v2::PreparedGameContentV2;
 use er_rng::audit::{RngCallsiteId, RngReason};
 use er_rng::battle::RngRuntime;
+use er_rng::phaser::PhaserRdg;
 use er_state::m7_state::PokemonStateV5;
 use er_state::pokemon_v2::Iv;
 use er_types::battle_ids::{MoveId, SpeciesId};
 use er_types::battle_model::{MoveSlotState, PokemonType};
 use er_types::{FormId, SafeU53, SeatId};
+
+// Pinned source constants.ts defaultStarterSpecies, in UI order.
+const FRESH_STARTER_SPECIES: [u32; 27] = [
+    1, 4, 7, 152, 155, 158, 252, 255, 258, 387, 390, 393, 495, 498, 501, 650, 653, 656,
+    722, 725, 728, 810, 813, 816, 906, 909, 912,
+];
+const NEUTRAL_NATURES: [u8; 5] = [0, 6, 12, 18, 24];
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CurrentFreshStarterAccountEntryV1 {
+    pub species: SpeciesId,
+    pub seen_attr: u64,
+    pub caught_attr: u64,
+    pub nature_attr: u32,
+    pub ivs: [u8; 6],
+    pub ability_attr: u8,
+    pub passive_attr: u8,
+    pub egg_moves: u8,
+    pub has_saved_moveset: bool,
+}
+
+/// Reproduce the source's fresh dex and starter-data defaults in their UI order.
+/// executeWithSeedOffset(0, "default") uses an isolated Phaser stream, so
+/// these draws never change the owned run RNG.
+pub fn current_fresh_starter_account_v1(
+) -> Result<Vec<CurrentFreshStarterAccountEntryV1>, NaturalRunV6Error> {
+    let mut rng = PhaserRdg::from_seed("default");
+    FRESH_STARTER_SPECIES
+        .into_iter()
+        .map(|species| {
+            let species = SpeciesId::new(
+                SafeU53::new(u64::from(species)).map_err(|_| NaturalRunV6Error::Invalid)?,
+            );
+            let nature_index = rng
+                .pick_index(NEUTRAL_NATURES.len())
+                .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
+            let nature = NEUTRAL_NATURES[nature_index];
+            Ok(CurrentFreshStarterAccountEntryV1 {
+                species,
+                seen_attr: 157,
+                caught_attr: 157,
+                nature_attr: 1_u32 << (nature + 1),
+                ivs: [15; 6],
+                ability_attr: 1,
+                passive_attr: 0,
+                egg_moves: 0,
+                has_saved_moveset: false,
+            })
+        })
+        .collect()
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CurrentSourceStarterInputV1 {
@@ -105,12 +157,11 @@ pub fn construct_current_source_starter_v1(
         return Err(NaturalRunV6Error::Invalid);
     }
     if types.len() > 1 {
-        let selected_index = staged
+        // The constructor's random Tera choice is consumed, then
+        // SelectStarterPhase overwrites it with the UI-selected type.
+        staged
             .run_pick_index(types.len(), reason, callsite)
             .map_err(|error| NaturalRunV6Error::State(error.to_string()))?;
-        if types[selected_index] != input.tera_type {
-            return Err(NaturalRunV6Error::Invalid);
-        }
     }
     let id = er_types::battle_ids::PokemonId::new(id);
     // The generic constructor fills stable state fields. Its own IV/nature
