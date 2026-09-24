@@ -498,13 +498,14 @@ test("current V7 Worker preserves fresh account IDs through snapshot restore", a
       };
       await send({ kind: "RAW_INPUT", event: { kind: "KEY_DOWN",
         data: { code: { kind: "SPACE" }, printable: false, browser_repeat: false, focus: "GAME" } } });
+      await send({ kind: "RAW_INPUT", event: { kind: "KEY_UP", data: { code: { kind: "SPACE" } } } });
+      await send({ kind: "ADVANCE_TIME", milliseconds: 1 });
       const earlySnapshot = await snapshot();
       const earlyCapsule = await exportCapsule();
-      if (earlyCapsule.base_position !== 0 || earlyCapsule.final_position < 1
-        || earlyCapsule.attempts.length !== earlyCapsule.final_position) {
-        throw new Error("first raw input did not retain a complete causal prefix");
+      if (earlyCapsule.base_position !== 0 || earlyCapsule.final_position !== 3
+        || earlyCapsule.attempts.length !== 3) {
+        throw new Error("raw key and time inputs did not retain a complete causal prefix");
       }
-      await send({ kind: "RAW_INPUT", event: { kind: "KEY_UP", data: { code: { kind: "SPACE" } } } });
       const modeState = await snapshot();
       const contentResponse = await fetch(assets.content_url);
       if (!contentResponse.ok) throw new Error("source content unavailable for mode identity");
