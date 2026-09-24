@@ -1778,7 +1778,10 @@ fn select_town_day_shell(
         er_progression::progression::current_growth_experience_for_level(growth, context.level)
             .map_err(|_| CurrentTownWildErrorV1::SourceContent)?;
     let expected_experience = if context.level == 2 { 8 } else { 27 };
-    if experience.get().get() != expected_experience || progression.base_friendship != 70 {
+    let expected_friendship = if context.wave == 1 { 50 } else { 70 };
+    if experience.get().get() != expected_experience
+        || progression.base_friendship != expected_friendship
+    {
         return Err(CurrentTownWildErrorV1::SourceContent);
     }
     let nature = content

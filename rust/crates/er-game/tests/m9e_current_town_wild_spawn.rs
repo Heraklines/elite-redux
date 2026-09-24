@@ -1307,6 +1307,7 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
     assert_eq!(enemy.form_index, 0);
     assert_eq!(enemy.level, 2);
     assert_eq!(enemy.experience.get().get(), 8);
+    assert_eq!(enemy.friendship, 50);
     assert_eq!(shell.core.prefix.ability_index, 0);
     assert_eq!(enemy.abilities.active.get().get(), 268);
     assert_eq!(enemy.ivs.map(|iv| iv.get()), [2, 31, 7, 22, 15, 4]);
@@ -1323,6 +1324,12 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
         [14, 9, 6, 6, 7, 6]
     );
     assert_eq!(enemy.hp, 14);
+    assert_eq!(enemy.gender, Some(0));
+    assert!(!enemy.shiny);
+    assert_eq!(enemy.variant, 0);
+    assert_eq!(enemy.types.primary, PokemonType::Normal);
+    assert_eq!(enemy.types.secondary, None);
+    assert_eq!(enemy.tera_type, Some(PokemonType::Normal));
     assert_eq!(
         enemy
             .moves
