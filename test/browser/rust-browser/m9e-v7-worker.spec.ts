@@ -442,6 +442,21 @@ test("current V7 Worker preserves fresh account IDs through snapshot restore", a
         if (result.response.kind !== "SNAPSHOT") throw new Error("source opening snapshot missing");
         return result.response.snapshot;
       };
+      const exportCapsule = async (): Promise<any> => {
+        const exported = await second!.dispatch({ kind: "EXPORT_REPRO" });
+        if (exported.response.kind !== "EFFECTS" || exported.response.batch.effects.length !== 1) {
+          throw new Error("restored source opening did not export a current causal capsule");
+        }
+        const effect = exported.response.batch.effects[0];
+        if (effect.kind !== "CURRENT_REPRO_READY") {
+          throw new Error("source opening repro effect has the wrong type");
+        }
+        const bytes = effect.capsule_bytes;
+        if (!Array.isArray(bytes) || bytes.length === 0 || bytes.length > (2 << 20)) {
+          throw new Error("source opening capsule bytes exceed the current bound");
+        }
+        return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(bytes)));
+      };
       const control = (state: any) => state.lifecycle.kind === "ACTIVE"
         ? state.lifecycle.value.active_run.control : state.lifecycle.value.control;
       const press = async (code: string) => {
@@ -481,7 +496,15 @@ test("current V7 Worker preserves fresh account IDs through snapshot restore", a
           }
         }
       };
-      await press("SPACE");
+      await send({ kind: "RAW_INPUT", event: { kind: "KEY_DOWN",
+        data: { code: { kind: "SPACE" }, printable: false, browser_repeat: false, focus: "GAME" } } });
+      const earlySnapshot = await snapshot();
+      const earlyCapsule = await exportCapsule();
+      if (earlyCapsule.base_position !== 0 || earlyCapsule.final_position < 1
+        || earlyCapsule.attempts.length !== earlyCapsule.final_position) {
+        throw new Error("first raw input did not retain a complete causal prefix");
+      }
+      await send({ kind: "RAW_INPUT", event: { kind: "KEY_UP", data: { code: { kind: "SPACE" } } } });
       const modeState = await snapshot();
       const contentResponse = await fetch(assets.content_url);
       if (!contentResponse.ok) throw new Error("source content unavailable for mode identity");
@@ -525,31 +548,20 @@ test("current V7 Worker preserves fresh account IDs through snapshot restore", a
         || !opening.source_progression || authorityMaterials === 0) {
         throw new Error("source Town opening differs from qualified native shell");
       }
-      const exported = await second.dispatch({ kind: "EXPORT_REPRO" });
-      if (exported.response.kind !== "EFFECTS" || exported.response.batch.effects.length !== 1) {
-        throw new Error("restored source opening did not export a current causal capsule");
-      }
-      const capsuleEffect = exported.response.batch.effects[0];
-      if (capsuleEffect.kind !== "CURRENT_REPRO_READY") {
-        throw new Error("source opening repro effect has the wrong type");
-      }
-      const capsuleBytes = capsuleEffect.capsule_bytes;
-      if (!Array.isArray(capsuleBytes) || capsuleBytes.length === 0 || capsuleBytes.length > (2 << 20)) {
-        throw new Error("source opening capsule bytes exceed the current bound");
-      }
-      const capsule = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(capsuleBytes)));
+      const capsule = await exportCapsule();
       await router.dispose();
       stage = "restored Worker disposal";
       await second.dispose();
       return { account, exact_snapshot_restore: true, disposed_workers: 2,
         first_closed: first.status.closed, second_closed: second.status.closed, checkpoint_sha256: checkpointHash,
-        opening, cross_entry: { capsule, snapshot: opened } };
+        opening, cross_entry: { capsule, snapshot: opened },
+        early_cross_entry: { capsule: earlyCapsule, snapshot: earlySnapshot } };
     } catch (error) {
       throw new Error(`fresh-account ${stage}: ${String(error)}`);
     } finally { first.terminate(); second?.terminate(); }
   }, { entry: `${address}/m9e-assets/${manifest.entry}`, assets: assets(), initialization });
   expect(observed).toHaveLength(2);
-  const { cross_entry: crossEntry, ...publicEvidence } = evidence;
+  const { cross_entry: crossEntry, early_cross_entry: earlyCrossEntry, ...publicEvidence } = evidence;
   expect(publicEvidence).toEqual({ account: { trainer_id: 12345, secret_id: 23456 },
     exact_snapshot_restore: true, disposed_workers: 2, first_closed: true, second_closed: true,
     checkpoint_sha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
@@ -562,4 +574,7 @@ test("current V7 Worker preserves fresh account IDs through snapshot restore", a
   const crossEntryBytes = Buffer.from(JSON.stringify(crossEntry));
   expect(crossEntryBytes.length).toBeLessThanOrEqual(4 << 20);
   await testInfo.attach("m9e-fresh-account-cross-entry", { body: crossEntryBytes, contentType: "application/json" });
+  const earlyCrossBytes = Buffer.from(JSON.stringify(earlyCrossEntry));
+  expect(earlyCrossBytes.length).toBeLessThanOrEqual(4 << 20);
+  await testInfo.attach("m9e-fresh-account-cross-entry-early", { body: earlyCrossBytes, contentType: "application/json" });
 });
