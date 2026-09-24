@@ -106,6 +106,7 @@ for (const capability of ["worker", "rtc"]) {
   const sourceHashes = Object.fromEntries(sourcePaths.map(path => [path, sha256(readFileSync(resolve(ROOT, path)))]));
   const scratch = mkdtempSync(join(out, `.m9e-${capability}-build-`));
   const ownedOutput = realpathSync(out);
+  let cleanupFailure = null;
   try {
     await build({
       configFile: false,
@@ -171,8 +172,10 @@ for (const capability of ["worker", "rtc"]) {
     if (dirname(scratch) !== out || !basename(scratch).startsWith(`.m9e-${capability}-build-`)
       || !metadata.isDirectory() || metadata.isSymbolicLink()
       || dirname(realpathSync(scratch)) !== ownedOutput) {
-      throw new Error("refusing cleanup outside owned Worker scratch directory");
+      cleanupFailure = new Error("refusing cleanup outside owned Worker scratch directory");
+    } else {
+      rmSync(scratch, { recursive: true, force: false });
     }
-    rmSync(scratch, { recursive: true, force: false });
   }
+  if (cleanupFailure != null) throw cleanupFailure;
 }

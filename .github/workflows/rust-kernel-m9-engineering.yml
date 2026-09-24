@@ -74,7 +74,8 @@ jobs:
           src/rust-browser/routes/browser-effects-v2.ts
           test/node/rust-browser/engineering/browser-effects-v2.test.ts
           test/browser/rust-browser/m9e-v7-corrective.spec.ts
-      - run: >-
+      - id: biome
+        run: >-
           pnpm exec biome ci --diagnostic-level=error
           scripts/check-kernel-m9-engineering.mjs
           src/rust-browser/contracts/browser-contracts-v2.ts
@@ -82,6 +83,33 @@ jobs:
           test/node/rust-browser/engineering/browser-effects-v2.test.ts
           scripts/build-kernel-m9e-v7-web.mjs
           test/browser/rust-browser/m9e-v7-corrective.spec.ts
+      - name: Retain the exact bounded remote Biome correction
+        if: failure() && steps.biome.conclusion == 'failure'
+        shell: bash
+        run: |
+          pnpm exec biome check --write \
+            scripts/check-kernel-m9-engineering.mjs \
+            src/rust-browser/contracts/browser-contracts-v2.ts \
+            src/rust-browser/routes/browser-effects-v2.ts \
+            test/node/rust-browser/engineering/browser-effects-v2.test.ts \
+            scripts/build-kernel-m9e-v7-web.mjs \
+            test/browser/rust-browser/m9e-v7-corrective.spec.ts || true
+          git diff --binary -- \
+            scripts/check-kernel-m9-engineering.mjs \
+            src/rust-browser/contracts/browser-contracts-v2.ts \
+            src/rust-browser/routes/browser-effects-v2.ts \
+            test/node/rust-browser/engineering/browser-effects-v2.test.ts \
+            scripts/build-kernel-m9e-v7-web.mjs \
+            test/browser/rust-browser/m9e-v7-corrective.spec.ts > "$RUNNER_TEMP/m9e-q-biome.patch"
+          test -s "$RUNNER_TEMP/m9e-q-biome.patch"
+          test "$(wc -c < "$RUNNER_TEMP/m9e-q-biome.patch")" -le 262144
+      - uses: actions/upload-artifact@v6
+        if: failure() && steps.biome.conclusion == 'failure'
+        with:
+          name: m9e-q-biome-${{ env.CANDIDATE_SHA }}
+          path: ${{ runner.temp }}/m9e-q-biome.patch
+          if-no-files-found: error
+          retention-days: 14
 
   browser-contract:
     name: Browser V2 typed effect contract
@@ -106,11 +134,48 @@ jobs:
           pnpm exec vitest run --config test/node/vitest.config.ts
           test/node/rust-browser/engineering/browser-effects-v2.test.ts
 
-  rust-shards:
-    name: Rust shard ${{ matrix.shard.id }} — ${{ matrix.shard.name }}
+  source-oracles:
+    name: Pinned current source observations
     needs: candidate-binding
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.CANDIDATE_SHA }}
+          fetch-depth: 1
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.9.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Generate and verify the complete pinned source cases
+        run: python3 scripts/ci/m9e_q_source_oracles.py "$RUNNER_TEMP/m9e-q-oracles"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: m9e-q-oracles-${{ env.CANDIDATE_SHA }}
+          path: ${{ runner.temp }}/m9e-q-oracles/
+          if-no-files-found: error
+          retention-days: 14
+
+  rust-shards:
+    name: Rust shard ${{ matrix.shard.id }} — ${{ matrix.shard.name }}
+    needs: [candidate-binding, source-oracles]
+    runs-on: ubuntu-latest
     timeout-minutes: 120
+    env:
+      M9E_CURRENT_MOVE_TARGETS_ORACLE: ${{ runner.temp }}/m9e-q-oracles/current-move-targets/source-cases.tsv
+      M9E_HELD_XP_ORACLE: ${{ runner.temp }}/m9e-q-oracles/held-xp/source-cases.tsv
+      M9E_PARTY_XP_ORACLE: ${{ runner.temp }}/m9e-q-oracles/party-xp/source-cases.tsv
+      M9E_PHASE_TREE_ORACLE: ${{ runner.temp }}/m9e-q-oracles/phase-tree/source-cases.tsv
+      M9E_PHASE_TREE_QUERIES_ORACLE: ${{ runner.temp }}/m9e-q-oracles/phase-tree-queries/source-cases.tsv
+      M9E_PHASE_XP_ORACLE: ${{ runner.temp }}/m9e-q-oracles/phase-xp/source-cases.tsv
+      M9E_STANDARD_SCORE_ORACLE: ${{ runner.temp }}/m9e-q-oracles/standard-score/source-cases.tsv
+      M9E_STARTER_POKERUS_ORACLE: ${{ runner.temp }}/m9e-q-oracles/starter-pokerus/source-cases.tsv
     strategy:
       fail-fast: false
       matrix:
@@ -149,6 +214,10 @@ jobs:
         with:
           ref: ${{ env.CANDIDATE_SHA }}
           fetch-depth: 1
+      - uses: actions/download-artifact@v6
+        with:
+          name: m9e-q-oracles-${{ env.CANDIDATE_SHA }}
+          path: ${{ runner.temp }}/m9e-q-oracles
       - name: Restore Cargo dependency downloads
         uses: actions/cache@v5
         with:
@@ -162,6 +231,18 @@ jobs:
         run: rustup target add wasm32-unknown-unknown
       - if: matrix.shard.wasm == true
         run: cargo install wasm-bindgen-cli --version 0.2.127 --locked
+      - name: Bind the actual native Worker executable for public entry tests
+        if: matrix.shard.id == '26' || matrix.shard.id == '28'
+        shell: bash
+        run: |
+          cargo build --manifest-path rust/Cargo.toml --locked -p er-kernel-worker --bin er-kernel-worker
+          worker="$PWD/rust/target/debug/er-kernel-worker"
+          test -s "$worker"
+          printf 'ER_M9E_WORKER_EXECUTABLE=%s\n' "$worker" >> "$GITHUB_ENV"
+          printf 'ER_M9E_WORKER_EXECUTABLE_SHA256=%s\n' "$(sha256sum "$worker" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+          printf 'ER_M9E_WORKER_SOURCE_SHA=%s\n' "$CANDIDATE_SHA" >> "$GITHUB_ENV"
+          printf 'ER_M9E_WORKER_BUILD_TARGET=%s\n' "$(rustc -vV | sed -n 's/^host: //p')" >> "$GITHUB_ENV"
+          printf 'ER_M9E_WORKER_BUILD_PROFILE=debug\n' >> "$GITHUB_ENV"
       - name: Run exact shard
         working-directory: rust
         env:
@@ -214,6 +295,16 @@ jobs:
       - run: rustup target add wasm32-unknown-unknown
       - run: cargo install wasm-bindgen-cli --version 0.2.127 --locked
       - run: node scripts/build-kernel-m9e-v7-web.mjs --out-dir "$RUNNER_TEMP/m9e-v7-web"
+      - name: Bind the actual CLI for browser-to-native capsule validation
+        shell: bash
+        run: |
+          cargo build --manifest-path rust/Cargo.toml --locked -p er-cli --bin er-cli
+          cli="$PWD/rust/target/debug/er-cli"
+          test -s "$cli"
+          printf 'ER_M9E_CLI_EXECUTABLE=%s\n' "$cli" >> "$GITHUB_ENV"
+          printf 'ER_M9E_CLI_ROOT=%s\n' "$PWD/rust/target/debug" >> "$GITHUB_ENV"
+          printf 'ER_M9E_CLI_SHA256=%s\n' "$(sha256sum "$cli" | cut -d' ' -f1)" >> "$GITHUB_ENV"
+          printf 'ER_M9E_CLI_SOURCE_SHA=%s\n' "$CANDIDATE_SHA" >> "$GITHUB_ENV"
       - run: pnpm exec playwright install --with-deps chromium
       - name: Run real V7 browser journey
         env:
@@ -238,6 +329,7 @@ jobs:
       - candidate-binding
       - static
       - browser-contract
+      - source-oracles
       - rust-shards
       - v7-browser-wasm
     runs-on: ubuntu-latest
@@ -248,12 +340,14 @@ jobs:
           BINDING: ${{ needs.candidate-binding.result }}
           STATIC: ${{ needs.static.result }}
           BROWSER: ${{ needs.browser-contract.result }}
+          SOURCE_ORACLES: ${{ needs.source-oracles.result }}
           RUST_SHARDS: ${{ needs.rust-shards.result }}
           V7_BROWSER_WASM: ${{ needs.v7-browser-wasm.result }}
         run: |
           test "$BINDING" = success
           test "$STATIC" = success
           test "$BROWSER" = success
+          test "$SOURCE_ORACLES" = success
           test "$RUST_SHARDS" = success
           test "$V7_BROWSER_WASM" = success
           printf '%s\n' "M9 Engineering candidate $CANDIDATE_SHA passed all 29 Rust shards, independent static checks, and the browser V2 contract."
