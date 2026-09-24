@@ -102,7 +102,9 @@ fn send_process(
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments: Vec<_> = std::env::args().skip(1).collect();
     if arguments.len() != 5 {
-        return Err("expected content, capsule, browser snapshot, source SHA and native worker".into());
+        return Err(
+            "expected content, capsule, browser snapshot, source SHA and native worker".into(),
+        );
     }
     let source_sha = &arguments[3];
     if source_sha.len() != 40 || !source_sha.bytes().all(|byte| byte.is_ascii_hexdigit()) {
@@ -272,7 +274,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             }),
         },
     )?;
-    if !matches!(process_initialized, KernelWorkerResponseV2::Initialized { .. }) {
+    if !matches!(
+        process_initialized,
+        KernelWorkerResponseV2::Initialized { .. }
+    ) {
         return Err("native worker process did not initialize".into());
     }
     let process_imported = send_process(
