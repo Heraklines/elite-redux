@@ -103,10 +103,17 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
     exp: firstEnemy.exp,
     ability_index: firstEnemy.abilityIndex,
     ability: firstEnemy.getAbility().id,
+    friendship: firstEnemy.friendship,
     ivs: [...firstEnemy.ivs],
     nature: firstEnemy.nature,
+    types: firstEnemy.getTypes(false, false, true),
+    tera_type: firstEnemy.teraType,
     stats: [...firstEnemy.stats],
     hp: firstEnemy.hp,
+    gender: firstEnemy.gender,
+    shiny: firstEnemy.shiny,
+    variant: firstEnemy.variant,
+    pokerus: firstEnemy.pokerus,
     moves: firstEnemy.moveset.map(move => [move.moveId, move.ppUsed]),
   };
   const firstPlayer = {
