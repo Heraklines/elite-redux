@@ -234,6 +234,7 @@ fn natural_with_seed_and_account(
             disposed: false,
         },
     };
+    let source_account = account.is_some();
     let mut kernel = match account {
         Some(account) => GameKernelV7::natural_start_with_fresh_account(start, account)?,
         None => GameKernelV7::natural_start_with_fresh_friendship(start)?,
@@ -311,11 +312,17 @@ fn natural_with_seed_and_account(
     )?;
     press(&mut kernel, PhysicalKey::Space)?;
     navigate(&mut kernel, "bootstrap/starter/confirm")?;
-    press(&mut kernel, PhysicalKey::Space)?;
-    press(&mut kernel, PhysicalKey::Space)?;
-    navigate(&mut kernel, "bootstrap/difficulty/ace")?;
-    press(&mut kernel, PhysicalKey::Space)?;
-    press(&mut kernel, PhysicalKey::Space)?;
+    if source_account {
+        press(&mut kernel, PhysicalKey::Space)?;
+        press(&mut kernel, PhysicalKey::Space)?;
+        navigate(&mut kernel, "bootstrap/difficulty/ace")?;
+        press(&mut kernel, PhysicalKey::Space)?;
+        press(&mut kernel, PhysicalKey::Space)?;
+    } else {
+        for _ in 0..4 {
+            press(&mut kernel, PhysicalKey::Space)?;
+        }
+    }
     assert_eq!(
         kernel.current_control().map(|control| control.kind),
         Some(GameControlKindV2::BattleCommand)
@@ -1794,8 +1801,10 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
             trainer_id: 12345,
             secret_id: 23456,
         }),
-    )?);
-    let (mut live, mut ledger) = admit_knockout(&mut kernel, content.as_ref())?;
+    )
+    .map_err(|error| format!("Town controlled checkpoint: {error}"))?);
+    let (mut live, mut ledger) = admit_knockout(&mut kernel, content.as_ref())
+        .map_err(|error| format!("Town knockout admission: {error}"))?;
     for iteration in 0..128 {
         if kernel
             .state()
@@ -1807,7 +1816,9 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
         let checkpoint = kernel.snapshot()?;
         if !checkpoint.pending_presentations.is_empty() {
             for pending in checkpoint.pending_presentations {
-                kernel.settle_presentation(pending.event_id)?;
+                kernel
+                    .settle_presentation(pending.event_id)
+                    .map_err(|error| format!("Town presentation {iteration}: {error}"))?;
             }
             continue;
         }
@@ -1815,19 +1826,24 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
         let step = if let Some(pending) = checkpoint.pending_platform.first() {
             match &pending.effect {
                 GamePlatformEffectV2::CurrentFriendshipClock { request } => {
-                    kernel.apply_current_utc_clock_result(request.request, 0)?
+                    kernel
+                        .apply_current_utc_clock_result(request.request, 0)
+                        .map_err(|error| Box::new(error) as Box<dyn Error>)
                 }
                 GamePlatformEffectV2::CurrentAchievementClock { request } => {
-                    accept_flash_test_clock(&mut kernel, request)?
+                    accept_flash_test_clock(&mut kernel, request)
                 }
                 GamePlatformEffectV2::CurrentFlashEgg { request } => {
-                    accept_flash_test_egg(&mut kernel, request)?
+                    accept_flash_test_egg(&mut kernel, request)
                 }
                 _ => return Err("unexpected source request before Town reward".into()),
             }
         } else {
-            kernel.advance_time(SafeU53::ZERO)?
-        };
+            kernel
+                .advance_time(SafeU53::ZERO)
+                .map_err(|error| Box::new(error) as Box<dyn Error>)
+        }
+        .map_err(|error| format!("Town reward drain iteration {iteration}: {error}"))?;
         if !step
             .effects
             .iter()
@@ -1843,13 +1859,15 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
                 kernel.state().and_then(|state| current_reward(state).ok()).map(|reward| &reward.stage),
             ).into());
         }
-        accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)?;
+        accept_material(&mut live, &mut ledger, &kernel, content.as_ref(), &step)
+            .map_err(|error| format!("Town material replay iteration {iteration}: {error}"))?;
     }
     assert!(current_reward(kernel.state().ok_or("reward state absent")?).is_ok());
     for pending in kernel.snapshot()?.pending_presentations {
         kernel.settle_presentation(pending.event_id)?;
     }
-    let to_confirm = press(&mut kernel, PhysicalKey::Escape)?;
+    let to_confirm = press(&mut kernel, PhysicalKey::Escape)
+        .map_err(|error| format!("Town reward Escape: {error}"))?;
     assert!(
         to_confirm
             .effects
@@ -1865,7 +1883,8 @@ fn actual_reward_skip_admits_read_only_town_wave_two_plan() -> Result<()> {
         content.as_ref(),
         &to_confirm,
     )?;
-    let skipped = press(&mut kernel, PhysicalKey::Space)?;
+    let skipped = press(&mut kernel, PhysicalKey::Space)
+        .map_err(|error| format!("Town reward skip confirm: {error}"))?;
     assert!(
         skipped
             .effects
