@@ -46,6 +46,14 @@ jobs:
           cargo test --locked -p er-kernel-worker --test current_process_v2 actual_abi2_process_exports_complete_causal_repro -- --exact --nocapture 2>&1 | tee "$RUNNER_TEMP/m9e-worker-repro.log"
       - name: Check Rust formatting
         run: cargo fmt --manifest-path rust/Cargo.toml --all -- --check
+      - name: Prepare bounded formatting patch
+        if: failure()
+        shell: bash
+        run: |
+          cargo fmt --manifest-path rust/Cargo.toml --all
+          mkdir -p "$RUNNER_TEMP/m9e-worker-repro"
+          git diff -- rust/crates/er-kernel-worker/src/runtime_v2.rs rust/crates/er-kernel-worker/tests/current_process_v2.rs > "$RUNNER_TEMP/m9e-worker-repro/format.patch"
+          test "$(wc -c < "$RUNNER_TEMP/m9e-worker-repro/format.patch")" -le 32768
       - name: Check worker Clippy
         working-directory: rust
         run: cargo clippy --locked -p er-kernel-worker --all-targets --no-deps -- -D warnings

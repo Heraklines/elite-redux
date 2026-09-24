@@ -251,7 +251,7 @@ impl KernelWorkerRuntimeV2 {
                     .as_mut()
                     .ok_or(KernelWorkerRuntimeErrorV2::NotInitialized)?
                     .apply_with(event.clone(), |candidate, step| {
-                        let observation = candidate.observe()?;
+                        let observation = candidate.observe().map_err(serialization)?;
                         let recorded = before.is_some().then(|| (step.clone(), observation.clone()));
                         let bytes = encode_response(
                             identity,
@@ -326,7 +326,7 @@ impl KernelWorkerRuntimeV2 {
                     .as_mut()
                     .ok_or(KernelWorkerRuntimeErrorV2::NotInitialized)?
                     .apply_rebind_with(control.clone(), |candidate, output| {
-                        let observation = candidate.observe()?;
+                        let observation = candidate.observe().map_err(serialization)?;
                         let recorded = before.is_some().then(|| (output.clone(), observation.clone()));
                         let result =
                             serde_json::json!({"rebind": &output, "observation": &observation});
