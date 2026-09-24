@@ -111,7 +111,7 @@ def main():
     result = {
         "schema": 1, "status": "failed", "source_pin": PIN,
         "candidate_sha": os.environ["GITHUB_SHA"],
-        "scope": "actual attack by a controlled level-ten source starter, reward cancel and queued Town wave-two encounter; no natural full-run or Rust settlement qualification",
+        "scope": "actual attack by a controlled Classic level-five source starter, reward cancel and queued Town wave-two encounter; no natural full-run or Rust settlement qualification",
         "commands": COMMANDS,
     }
     try:

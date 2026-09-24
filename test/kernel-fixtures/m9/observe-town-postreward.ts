@@ -66,7 +66,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
     .battleStyle(BattleStyle.SET)
     .startingBiome(BiomeId.TOWN)
     .startingWave(1)
-    .startingLevel(10)
+    .startingLevel(5)
     .seed(SETUP_SEED);
   manager.scene.gameData.trainerId = 12345;
   manager.scene.gameData.secretId = 23456;
@@ -94,6 +94,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   const firstSpeciesCalls = allSpeciesCalls.filter(call => call.wave === 1);
   const player = scene.getPlayerPokemon();
   expect(player).toBeDefined();
+  expect(player.level).toBe(5);
   // Use a retained natural Bulbasaur move without rewriting its moveset.
   expect(player.getMoveset().map(move => move.moveId)).toContain(MoveId.VINE_WHIP);
 
@@ -216,7 +217,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
     wave_cycle_offset: scene.waveCycleOffset,
     effective_pool_time: (scene.arena as unknown as { lastTimeOfDay: number }).lastTimeOfDay,
     current_time: scene.arena.getTimeOfDay(),
-    scope: "controlled level-ten starter attacks, victory reward cancel and queued Town wave-two encounter",
+    scope: "controlled level-five starter attacks, victory reward cancel and queued Town wave-two encounter",
     account: { trainer_id: scene.gameData.trainerId, secret_id: scene.gameData.secretId },
     shiny_context: {
       base_threshold: BASE_SHINY_CHANCE,
