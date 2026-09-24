@@ -1,7 +1,7 @@
 name: M9E Town V2 Content Source Probe
 on:
   push:
-    branches: [codex/m9e-next-encounter-source-20260923]
+    branches: [codex/m9e-next-encounter-source-20260923, codex/m9e-connected-successor-20260924]
 permissions:
   contents: read
 concurrency:
