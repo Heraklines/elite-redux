@@ -80,10 +80,17 @@ test("explicit starter attack and reward skip reach a source-owned second encoun
     starterConstructorRng.push({ before, after: Phaser.Math.RND.state(), id: pokemon.id });
     return pokemon;
   });
+  const rngBeforeTitle = Phaser.Math.RND.state();
   await manager.runToTitle();
+  const rngAtTitle = Phaser.Math.RND.state();
+  let rngBeforeSetSeed: string | undefined;
+  let rngAfterSetSeed: string | undefined;
+  let rngBeforeStarterPhase: string | undefined;
   manager.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
+    rngBeforeSetSeed = Phaser.Math.RND.state();
     manager!.scene.gameMode = getGameMode(GameModes.CLASSIC);
     manager!.scene.setSeed(SETUP_SEED);
+    rngAfterSetSeed = Phaser.Math.RND.state();
     const starters: Starter[] = [{
       speciesId: SpeciesId.BULBASAUR,
       shiny: false,
@@ -99,6 +106,7 @@ test("explicit starter attack and reward skip reach a source-owned second encoun
       ivs: [11, 4, 14, 7, 17, 0],
     }];
     manager!.scene.phaseManager.pushNew("EncounterPhase", false);
+    rngBeforeStarterPhase = Phaser.Math.RND.state();
     new SelectStarterPhase().initBattleFromCurrentPhase(starters);
   });
   await manager.phaseInterceptor.to("EncounterPhase");
@@ -118,6 +126,9 @@ test("explicit starter attack and reward skip reach a source-owned second encoun
   const player = scene.getPlayerPokemon();
   expect(player).toBeDefined();
   expect(starterConstructorRng).toHaveLength(1);
+  expect(rngBeforeSetSeed).toBeDefined();
+  expect(rngAfterSetSeed).toBeDefined();
+  expect(rngBeforeStarterPhase).toBeDefined();
   expect(starterConstructorRng[0].id).toBe(player.id);
   expect(player.level).toBe(5);
   // Use a retained natural Bulbasaur move without rewriting its moveset.
@@ -281,6 +292,13 @@ test("explicit starter attack and reward skip reach a source-owned second encoun
     effective_pool_time: (scene.arena as unknown as { lastTimeOfDay: number }).lastTimeOfDay,
     current_time: scene.arena.getTimeOfDay(),
     scope: "explicit Classic level-five starter selection, attack, reward cancel and queued Town wave-two encounter",
+    bootstrap_rng: {
+      before_title: rngBeforeTitle,
+      at_title: rngAtTitle,
+      before_set_seed: rngBeforeSetSeed,
+      after_set_seed: rngAfterSetSeed,
+      before_starter_phase: rngBeforeStarterPhase,
+    },
     account: { trainer_id: scene.gameData.trainerId, secret_id: scene.gameData.secretId },
     shiny_context: {
       base_threshold: BASE_SHINY_CHANCE,
