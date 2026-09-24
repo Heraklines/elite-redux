@@ -72,6 +72,14 @@ test("explicit starter attack and reward skip reach a source-owned second encoun
     .seed(SETUP_SEED);
   manager.scene.gameData.trainerId = 12345;
   manager.scene.gameData.secretId = 23456;
+  const starterConstructorRng: { before: string; after: string; id: number }[] = [];
+  const actualAddPlayerPokemon = manager.scene.addPlayerPokemon.bind(manager.scene);
+  vi.spyOn(manager.scene, "addPlayerPokemon").mockImplementation((...args) => {
+    const before = Phaser.Math.RND.state();
+    const pokemon = actualAddPlayerPokemon(...args);
+    starterConstructorRng.push({ before, after: Phaser.Math.RND.state(), id: pokemon.id });
+    return pokemon;
+  });
   await manager.runToTitle();
   manager.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
     manager!.scene.gameMode = getGameMode(GameModes.CLASSIC);
@@ -109,6 +117,8 @@ test("explicit starter attack and reward skip reach a source-owned second encoun
   const firstSpeciesCalls = allSpeciesCalls.filter(call => call.wave === 1);
   const player = scene.getPlayerPokemon();
   expect(player).toBeDefined();
+  expect(starterConstructorRng).toHaveLength(1);
+  expect(starterConstructorRng[0].id).toBe(player.id);
   expect(player.level).toBe(5);
   // Use a retained natural Bulbasaur move without rewriting its moveset.
   expect(player.getMoveset().map(move => move.moveId)).toContain(MoveId.VINE_WHIP);
@@ -278,7 +288,8 @@ test("explicit starter attack and reward skip reach a source-owned second encoun
       xor: shinyXor,
     },
     first: { wave: 1, enemy_id: firstEnemyId, species: firstEnemySpecies, shell: firstShell,
-      player: firstPlayer, attacking_turns: attackingTurns, selections: firstSpeciesCalls },
+      player: firstPlayer, starter_constructor_rng: starterConstructorRng[0],
+      attacking_turns: attackingTurns, selections: firstSpeciesCalls },
     reward: {
       choice: "cancel",
       new_battle_calls: newBattle.mock.calls.length,
