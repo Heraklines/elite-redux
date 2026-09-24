@@ -1,7 +1,7 @@
 name: M9E Current Browser Worker RTC Probe
 on:
   push:
-    branches: [codex/m9e-current-phase-focused-20260910]
+    branches: [codex/m9e-current-phase-focused-20260910, codex/m9e-browser-native-repro-20260924]
 permissions:
   contents: read
 concurrency:

@@ -525,24 +525,41 @@ test("current V7 Worker preserves fresh account IDs through snapshot restore", a
         || !opening.source_progression || authorityMaterials === 0) {
         throw new Error("source Town opening differs from qualified native shell");
       }
+      const exported = await second.dispatch({ kind: "EXPORT_REPRO" });
+      if (exported.response.kind !== "EFFECTS" || exported.response.batch.effects.length !== 1) {
+        throw new Error("restored source opening did not export a current causal capsule");
+      }
+      const capsuleEffect = exported.response.batch.effects[0];
+      if (capsuleEffect.kind !== "CURRENT_REPRO_READY") {
+        throw new Error("source opening repro effect has the wrong type");
+      }
+      const capsuleBytes = capsuleEffect.capsule_bytes;
+      if (!Array.isArray(capsuleBytes) || capsuleBytes.length === 0 || capsuleBytes.length > (2 << 20)) {
+        throw new Error("source opening capsule bytes exceed the current bound");
+      }
+      const capsule = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(capsuleBytes)));
       await router.dispose();
       stage = "restored Worker disposal";
       await second.dispose();
       return { account, exact_snapshot_restore: true, disposed_workers: 2,
         first_closed: first.status.closed, second_closed: second.status.closed, checkpoint_sha256: checkpointHash,
-        opening };
+        opening, cross_entry: { capsule, snapshot: opened } };
     } catch (error) {
       throw new Error(`fresh-account ${stage}: ${String(error)}`);
     } finally { first.terminate(); second?.terminate(); }
   }, { entry: `${address}/m9e-assets/${manifest.entry}`, assets: assets(), initialization });
   expect(observed).toHaveLength(2);
-  expect(evidence).toEqual({ account: { trainer_id: 12345, secret_id: 23456 },
+  const { cross_entry: crossEntry, ...publicEvidence } = evidence;
+  expect(publicEvidence).toEqual({ account: { trainer_id: 12345, secret_id: 23456 },
     exact_snapshot_restore: true, disposed_workers: 2, first_closed: true, second_closed: true,
     checkpoint_sha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
     opening: { wave: 1, player_id: 1771723560, enemy_id: 1173608932, enemy_species: 915,
       enemy_moves: [158, 230, 39, 98], source_progression: true,
       authority_material_count: expect.any(Number) } });
-  const bytes = Buffer.from(JSON.stringify({ ...binding(observed), ...evidence }));
+  const bytes = Buffer.from(JSON.stringify({ ...binding(observed), ...publicEvidence }));
   expect(bytes.length).toBeLessThanOrEqual(4096);
   await testInfo.attach("m9e-fresh-account-worker", { body: bytes, contentType: "application/json" });
+  const crossEntryBytes = Buffer.from(JSON.stringify(crossEntry));
+  expect(crossEntryBytes.length).toBeLessThanOrEqual(4 << 20);
+  await testInfo.attach("m9e-fresh-account-cross-entry", { body: crossEntryBytes, contentType: "application/json" });
 });
