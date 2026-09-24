@@ -186,7 +186,8 @@ impl KernelWorkerRuntimeV2 {
                         local_seat,
                         role,
                     } => {
-                        let session = restored(&snapshot_bytes, local_seat, role, Arc::clone(&content))?;
+                        let session =
+                            restored(&snapshot_bytes, local_seat, role, Arc::clone(&content))?;
                         let capture = capture_for_session(&session, 0).ok();
                         (session, capture)
                     }

@@ -609,19 +609,27 @@ fn actual_abi2_process_exports_complete_causal_repro() -> Result<(), Box<dyn Err
     let mut tampered = (*capsule).clone();
     tampered.final_snapshot_digest = "0".repeat(64);
     assert_fault(
-        imported.exchange(1, KernelWorkerRequestV2::Initialize {
-            content_bundle: Box::new(bundle.clone()),
-            initialization: Box::new(KernelWorkerInitializationV2::Capsule {
-                capsule: Box::new(tampered),
-            }),
-        })?,
+        imported.exchange(
+            1,
+            KernelWorkerRequestV2::Initialize {
+                content_bundle: Box::new(bundle.clone()),
+                initialization: Box::new(KernelWorkerInitializationV2::Capsule {
+                    capsule: Box::new(tampered),
+                }),
+            },
+        )?,
         KernelWorkerFaultCodeV2::KernelFailure,
         Some(0),
     );
-    imported.accepted(1, KernelWorkerRequestV2::Initialize {
-        content_bundle: Box::new(bundle),
-        initialization: Box::new(KernelWorkerInitializationV2::Capsule { capsule: capsule.clone() }),
-    })?;
+    imported.accepted(
+        1,
+        KernelWorkerRequestV2::Initialize {
+            content_bundle: Box::new(bundle),
+            initialization: Box::new(KernelWorkerInitializationV2::Capsule {
+                capsule: capsule.clone(),
+            }),
+        },
+    )?;
     assert_eq!(imported.snapshot(2)?, expected);
     let KernelWorkerResponseV2::Repro { capsule: restored } =
         imported.accepted(3, KernelWorkerRequestV2::ExportRepro)?
@@ -629,9 +637,12 @@ fn actual_abi2_process_exports_complete_causal_repro() -> Result<(), Box<dyn Err
         return Err("imported worker did not retain native causal capsule".into());
     };
     assert_eq!(capsule, restored);
-    imported.accepted(4, KernelWorkerRequestV2::Apply(CurrentExternalEvent::AdvanceTime {
-        milliseconds: safe(1),
-    }))?;
+    imported.accepted(
+        4,
+        KernelWorkerRequestV2::Apply(CurrentExternalEvent::AdvanceTime {
+            milliseconds: safe(1),
+        }),
+    )?;
     let KernelWorkerResponseV2::Repro { capsule: continued } =
         imported.accepted(5, KernelWorkerRequestV2::ExportRepro)?
     else {
@@ -639,7 +650,10 @@ fn actual_abi2_process_exports_complete_causal_repro() -> Result<(), Box<dyn Err
     };
     assert_eq!(continued.base_position, capsule.base_position);
     assert_eq!(continued.final_position, capsule.final_position + 1);
-    assert_eq!(&continued.attempts[..capsule.attempts.len()], capsule.attempts.as_slice());
+    assert_eq!(
+        &continued.attempts[..capsule.attempts.len()],
+        capsule.attempts.as_slice()
+    );
     imported.dispose(6)
 }
 
