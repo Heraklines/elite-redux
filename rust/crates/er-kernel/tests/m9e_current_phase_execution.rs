@@ -523,6 +523,7 @@ fn controlled_before_knockout_with_seed_and_account(
 ) -> Result<GameKernelV7> {
     assert!((1..10).contains(&level));
     assert!(!moves.is_empty() && moves.len() <= 4 && moves[0] == 33);
+    let source_account = account.is_some();
     let mut snapshot = natural_with_seed_and_account(content.clone(), seed, account)?.snapshot()?;
     let GameKernelLifecycleSnapshotV7::Active(state) = &mut snapshot.lifecycle else {
         return Err("natural active state absent".into());
@@ -567,7 +568,7 @@ fn controlled_before_knockout_with_seed_and_account(
     )?;
     pokemon.max_hp = pokemon.stats.hp;
     pokemon.hp = pokemon.max_hp;
-    pokemon.stats.speed = 1;
+    pokemon.stats.speed = if source_account { 500 } else { 1 };
     pokemon.stats.attack = 500;
     let mut tackle = pokemon.moves[0].ok_or("source move absent")?;
     tackle.move_id = MoveId::new(safe(33)?);
@@ -584,7 +585,7 @@ fn controlled_before_knockout_with_seed_and_account(
     assert_eq!(battle.enemy_party.len(), 1);
     let enemy = &mut battle.enemy_party[0];
     enemy.hp = 1;
-    enemy.stats.speed = 500;
+    enemy.stats.speed = if source_account { 1 } else { 500 };
     enemy.stats.attack = 1;
     enemy.moves = [Some(tackle), None, None, None];
     state.validate_with(content.as_ref())?;
