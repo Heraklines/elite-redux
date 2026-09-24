@@ -1292,6 +1292,42 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
         "!rnd,192947,0.03402264299802482,0.47858460200950503,0.9830058687366545"
     );
     let seed = "m9e-town-handoff-5042";
+    // The actual starter UI path is distinct from the explicit test injection.
+    // Pinned-source run35962688517 traced three TitlePhase.end draws from
+    // rollErNextBiomeNodes. Starter launch then clears those pending nodes,
+    // but the run RNG stays advanced. Run35963530932 confirmed the empty
+    // pending graph at Command while preserving the same constructor frontier.
+    let mut ui_rng = RngRuntime::from_run_seed(seed);
+    for _ in 0..3 {
+        let route_roll = ui_rng.run_rand_seed_int(
+            SafeU53::new(100)?,
+            SafeU53::ZERO,
+            RngReason::RandomSelector,
+            RngCallsiteId::mechanics(RngReason::RandomSelector),
+        )?;
+        assert!(route_roll.get() < 50);
+    }
+    assert_eq!(
+        ui_rng.run_state().rdg.state_string,
+        "!rnd,1001026,0.9830058687366545,0.08702266961336136,0.2183791280258447"
+    );
+    let ui_starter_id = ui_rng.run_rand_seed_int(
+        SafeU53::new(1_u64 << 32)?,
+        SafeU53::ZERO,
+        RngReason::RandomSelector,
+        RngCallsiteId::mechanics(RngReason::RandomSelector),
+    )?;
+    assert_eq!(ui_starter_id.get(), 1_771_723_560);
+    let ui_tera_index = ui_rng.run_pick_index(
+        2,
+        RngReason::RandomSelector,
+        RngCallsiteId::mechanics(RngReason::RandomSelector),
+    )?;
+    assert_eq!(ui_tera_index, 0);
+    assert_eq!(
+        ui_rng.run_state().rdg.state_string,
+        "!rnd,862825,0.01012614299543202,0.30100722960196435,0.21853493759408593"
+    );
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = PreparedGameContentV2::prepare(Arc::new(bundle))?;
     let mode = content
