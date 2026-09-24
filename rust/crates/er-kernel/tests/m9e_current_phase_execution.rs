@@ -2020,12 +2020,13 @@ fn assert_skipped_reward_wave_two(
     assert_eq!(battle.enemy_party.as_slice(), [plan.shell.pokemon.clone()]);
     assert_eq!(audit, plan.rng_audit);
     assert_eq!(run.run_rng, plan.next_run_rng);
-    assert!(next
-        .current_battle_participation
-        .as_ref()
-        .and_then(|row| row.experience.as_ref())
-        .and_then(|owner| owner.first_reward_predecessor.as_ref())
-        .is_some_and(|previous| previous.as_ref() == state));
+    assert!(
+        next.current_battle_participation
+            .as_ref()
+            .and_then(|row| row.experience.as_ref())
+            .and_then(|owner| owner.first_reward_predecessor.as_ref())
+            .is_some_and(|previous| previous.as_ref() == state)
+    );
     Ok(())
 }
 
