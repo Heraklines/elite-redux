@@ -3,6 +3,7 @@ use super::*;
 use er_state::current_experience_owner::CurrentFriendshipClockRequestV1;
 use er_state::current_turn_execution::CurrentTurnStageV1;
 use er_types::SeatId;
+use std::io::Write;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", deny_unknown_fields)]
@@ -205,6 +206,13 @@ impl GameRuntimeV6 {
         phase: GameOwnedPhaseV1,
     ) -> Result<PreparedGameTransitionV2, GameRuntimeV6Error> {
         let before = self.state.as_ref().ok_or(GameRuntimeV6Error::Action)?;
+        let wave_two = before
+            .active_run
+            .as_ref()
+            .is_some_and(|run| run.wave.get().get() == 2);
+        if wave_two {
+            let _ = writeln!(std::io::stderr(), "m9e-wave2 phase requested: {phase:?}");
+        }
         let transition = phase_transition(
             before,
             &self.content,
@@ -212,7 +220,16 @@ impl GameRuntimeV6 {
             authority_seat,
             self.material_ledger.next_authority_revision,
             phase,
-        )?;
+        )
+        .map_err(|error| {
+            if wave_two {
+                let _ = writeln!(std::io::stderr(), "m9e-wave2 phase transition: {error:?}");
+            }
+            error
+        })?;
+        if wave_two {
+            let _ = writeln!(std::io::stderr(), "m9e-wave2 phase material prepared");
+        }
         let material = GameMaterialV6::GameAction(transition.clone());
         let material_bytes = material.canonical_bytes().map_err(material_error)?;
         let mut state = self.state.clone();
@@ -224,7 +241,15 @@ impl GameRuntimeV6 {
             &material_bytes,
             self.material_retention,
         )
-        .map_err(material_error)?;
+        .map_err(|error| {
+            if wave_two {
+                let _ = writeln!(std::io::stderr(), "m9e-wave2 material apply: {error:?}");
+            }
+            material_error(error)
+        })?;
+        if wave_two {
+            let _ = writeln!(std::io::stderr(), "m9e-wave2 material applied");
+        }
         if outcome != GameMaterialApplyOutcomeV6::Applied
             || state.as_ref() != Some(&transition.after_state)
         {
