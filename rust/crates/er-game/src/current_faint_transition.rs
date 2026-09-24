@@ -2,6 +2,7 @@
 use super::*;
 use crate::m9e_material_v6::GamePresentationPayloadV1;
 use er_state::current_faint_execution::CurrentFaintPhaseV1 as F;
+use std::io::Write;
 
 pub(super) fn transition(
     before: &GameStateV6,
@@ -13,6 +14,7 @@ pub(super) fn transition(
 ) -> Result<GameTransitionMaterialV6, GameRuntimeV6Error> {
     let failure = || GameRuntimeV6Error::Action;
     let run = before.active_run.as_ref().ok_or_else(failure)?;
+    let wave_two = run.wave.get().get() == 2;
     let turn = before.current_turn_execution.as_ref().ok_or_else(failure)?;
     let pending = match &phase {
         GameOwnedPhaseV1::FaintBegin { pending }
@@ -34,6 +36,9 @@ pub(super) fn transition(
             let prelude = crate::current_faint_execution::prepare_current_enemy_faint(
                 before, content, pending,
             )?;
+            if wave_two {
+                let _ = writeln!(std::io::stderr(), "m9e-wave2 faint prelude accepted");
+            }
             if !prelude.achievements.is_empty() {
                 return Err(GameRuntimeV6Error::Domain(format!(
                     "Faint achievement requests require owned reward dispatch: {}",
@@ -93,6 +98,9 @@ pub(super) fn transition(
             payload: Some(payload),
         });
         assign_presentations(&mut candidate, &mut presentation)?;
+        if wave_two {
+            let _ = writeln!(std::io::stderr(), "m9e-wave2 faint presentation assigned");
+        }
         let event_id = presentation.first().ok_or_else(failure)?.event_id;
         let source = candidate
             .current_battle_participation
@@ -107,9 +115,15 @@ pub(super) fn transition(
         });
     }
     install_waiting(&mut candidate, revision)?;
-    candidate
-        .validate_with(content)
-        .map_err(|_| GameRuntimeV6Error::Invalid)?;
+    if wave_two {
+        let _ = writeln!(std::io::stderr(), "m9e-wave2 faint waiting installed");
+    }
+    candidate.validate_with(content).map_err(|error| {
+        if wave_two {
+            let _ = writeln!(std::io::stderr(), "m9e-wave2 faint validation: {error:?}");
+        }
+        GameRuntimeV6Error::Invalid
+    })?;
     let next_control = candidate
         .active_run
         .as_ref()
