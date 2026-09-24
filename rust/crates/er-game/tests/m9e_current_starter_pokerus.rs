@@ -1,9 +1,7 @@
 //! Actual shared bootstrap controls and natural constructor; no CLI/Worker claim.
 use er_game::current_starter_pokerus::{DATE_TIME_CLIP_MILLISECONDS, daily_starter_species};
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
-use er_game::m9e_new_run_v6::{
-    construct_current_fresh_town_run_v1, construct_natural_run_v6,
-};
+use er_game::m9e_new_run_v6::{construct_current_fresh_town_run_v1, construct_natural_run_v6};
 use er_game::m72_bootstrap::{
     BootstrapCatalogV1, BootstrapModePolicyV1, RunBootstrapMachineV1, RunBootstrapStageV1,
 };

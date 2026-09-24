@@ -144,7 +144,9 @@ fn construct_natural_run_v6_inner(
             return Err(NaturalRunV6Error::Invalid);
         }
         advance_current_town_title_routes_v1(&mut rng)?;
-        party.push(construct_current_source_starter_v1(content, input, &mut rng)?);
+        party.push(construct_current_source_starter_v1(
+            content, input, &mut rng,
+        )?);
     } else {
         for starter in &bootstrap.selections.starters {
             let pokemon_id = identities
