@@ -879,7 +879,10 @@ fn naturally_admitted_day_seed_matches_pinned_postreward_enemy() -> Result<(), B
     );
     let mut preselection_rng =
         RngRuntime::from_states(source_town_reset_seed("m9e-town-handoff-308", 2)?, None)?;
-    assert!(!source_town_unboosted_wild_double_roll(
+    // The pinned post-reward seed selects two wave-two wild enemies. This
+    // constructor witnesses the first shell only; it does not claim a full
+    // 1v1 battle or authorize a participation/XP owner for this encounter.
+    assert!(source_town_unboosted_wild_double_roll(
         &mut preselection_rng
     )?);
     assert_eq!(preselection_rng.audit_entries().len(), 1);
