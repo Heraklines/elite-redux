@@ -167,15 +167,6 @@ jobs:
     needs: [candidate-binding, source-oracles]
     runs-on: ubuntu-latest
     timeout-minutes: 120
-    env:
-      M9E_CURRENT_MOVE_TARGETS_ORACLE: ${{ runner.temp }}/m9e-q-oracles/current-move-targets/source-cases.tsv
-      M9E_HELD_XP_ORACLE: ${{ runner.temp }}/m9e-q-oracles/held-xp/source-cases.tsv
-      M9E_PARTY_XP_ORACLE: ${{ runner.temp }}/m9e-q-oracles/party-xp/source-cases.tsv
-      M9E_PHASE_TREE_ORACLE: ${{ runner.temp }}/m9e-q-oracles/phase-tree/source-cases.tsv
-      M9E_PHASE_TREE_QUERIES_ORACLE: ${{ runner.temp }}/m9e-q-oracles/phase-tree-queries/source-cases.tsv
-      M9E_PHASE_XP_ORACLE: ${{ runner.temp }}/m9e-q-oracles/phase-xp/source-cases.tsv
-      M9E_STANDARD_SCORE_ORACLE: ${{ runner.temp }}/m9e-q-oracles/standard-score/source-cases.tsv
-      M9E_STARTER_POKERUS_ORACLE: ${{ runner.temp }}/m9e-q-oracles/starter-pokerus/source-cases.tsv
     strategy:
       fail-fast: false
       matrix:
@@ -218,6 +209,24 @@ jobs:
         with:
           name: m9e-q-oracles-${{ env.CANDIDATE_SHA }}
           path: ${{ runner.temp }}/m9e-q-oracles
+      - name: Bind exact pinned source observations
+        shell: bash
+        run: |
+          for pair in \
+            M9E_CURRENT_MOVE_TARGETS_ORACLE:current-move-targets \
+            M9E_HELD_XP_ORACLE:held-xp \
+            M9E_PARTY_XP_ORACLE:party-xp \
+            M9E_PHASE_TREE_ORACLE:phase-tree \
+            M9E_PHASE_TREE_QUERIES_ORACLE:phase-tree-queries \
+            M9E_PHASE_XP_ORACLE:phase-xp \
+            M9E_STANDARD_SCORE_ORACLE:standard-score \
+            M9E_STARTER_POKERUS_ORACLE:starter-pokerus; do
+            variable="${pair%%:*}"
+            label="${pair#*:}"
+            path="$RUNNER_TEMP/m9e-q-oracles/$label/source-cases.tsv"
+            test -s "$path"
+            printf '%s=%s\n' "$variable" "$path" >> "$GITHUB_ENV"
+          done
       - name: Restore Cargo dependency downloads
         uses: actions/cache@v5
         with:
