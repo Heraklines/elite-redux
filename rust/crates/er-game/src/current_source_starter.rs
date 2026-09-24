@@ -97,6 +97,41 @@ pub fn current_fresh_starter_account_v1()
         .collect()
 }
 
+/// The fresh starter grid seeds its moves from the first four distinct level
+/// moves at levels 1–5, in source order. Fresh accounts have no saved moveset
+/// or unlocked egg moves to alter this initial choice.
+pub fn current_fresh_starter_moves_v1(
+    content: &PreparedGameContentV2,
+    species: SpeciesId,
+) -> Result<Vec<MoveId>, NaturalRunV6Error> {
+    if !FRESH_STARTER_SPECIES.contains(
+        &u32::try_from(species.get().get()).map_err(|_| NaturalRunV6Error::Invalid)?,
+    ) {
+        return Err(NaturalRunV6Error::Invalid);
+    }
+    let progression = content
+        .progression
+        .species(species, 0)
+        .ok_or(NaturalRunV6Error::Invalid)?;
+    let mut moves = Vec::new();
+    for entry in &progression.level_moves {
+        if entry.level > 0
+            && entry.level <= 5
+            && !moves.contains(&entry.move_id)
+            && content.battle.move_definition(entry.move_id).is_ok()
+        {
+            moves.push(entry.move_id);
+            if moves.len() == 4 {
+                break;
+            }
+        }
+    }
+    if moves.is_empty() {
+        return Err(NaturalRunV6Error::Invalid);
+    }
+    Ok(moves)
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CurrentSourceStarterInputV1 {
     pub species: SpeciesId,

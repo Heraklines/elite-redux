@@ -19,14 +19,14 @@ use er_game::current_town_wild_spawn::{
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_game::m9e_new_run_v6::{
     CurrentSourceStarterInputV1, advance_current_town_title_routes_v1,
-    construct_current_source_starter_v1,
-    current_fresh_starter_account_v1,
+    construct_current_source_starter_v1, current_fresh_starter_account_v1,
+    current_fresh_starter_moves_v1,
 };
 use er_rng::audit::{RngCallsiteId, RngPublicApi, RngReason};
 use er_rng::battle::RngRuntime;
 use er_rng::phaser::{PhaserRdg, PhaserRdgState, RunRngState, shift_char_codes};
 use er_state::m9e_state_v6::GameIdentityAllocatorStateV1;
-use er_types::battle_ids::{MoveId, SpeciesId};
+use er_types::battle_ids::SpeciesId;
 use er_types::battle_model::PokemonType;
 use er_types::run_ids::BiomeId;
 use er_types::{RunDifficultyV1, SafeU53, SeatId};
@@ -1405,8 +1405,17 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
     );
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = PreparedGameContentV2::prepare(Arc::new(bundle))?;
+    let bulbasaur = SpeciesId::new(SafeU53::new(1)?);
+    let fresh_moves = current_fresh_starter_moves_v1(&content, bulbasaur)?;
+    assert_eq!(
+        fresh_moves
+            .iter()
+            .map(|id| id.get().get())
+            .collect::<Vec<_>>(),
+        vec![22, 33, 45, 74]
+    );
     let selected = CurrentSourceStarterInputV1 {
-        species: SpeciesId::new(SafeU53::new(1)?),
+        species: bulbasaur,
         form_index: 0,
         ability_index: 0,
         level: 5,
@@ -1416,9 +1425,7 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
         variant: 0,
         ivs: [15; 6],
         nature_index: 6,
-        moves: [22, 33, 45, 74]
-            .map(|value| MoveId::new(SafeU53::new(value).expect("source move ID")))
-            .to_vec(),
+        moves: fresh_moves,
         tera_type: PokemonType::Grass,
         pokerus: false,
     };
