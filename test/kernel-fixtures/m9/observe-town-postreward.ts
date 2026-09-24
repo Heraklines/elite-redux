@@ -84,7 +84,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   const player = scene.getPlayerPokemon();
   expect(player).toBeDefined();
   // Use a retained natural Bulbasaur move without rewriting its moveset.
-  expect(player.getMoveset().map(move => move.moveId)).toContain(MoveId.TACKLE);
+  expect(player.getMoveset().map(move => move.moveId)).toContain(MoveId.VINE_WHIP);
 
   const actualNewBattle = scene.newBattle.bind(scene);
   const beforeNewBattle: string[] = [];
@@ -118,7 +118,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   let attackingTurns = 0;
   const firstEnemyHpTrace = [firstEnemy.hp];
   while (!manager.isVictory() && attackingTurns < 12) {
-    manager.move.select(MoveId.TACKLE);
+    manager.move.select(MoveId.VINE_WHIP);
     await manager.toEndOfTurn();
     attackingTurns++;
     firstEnemyHpTrace.push(firstEnemy.hp);
@@ -198,10 +198,10 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   };
   const secondEnemyHpBefore = enemy.hp;
   const secondPlayerHpBefore = player.hp;
-  const secondMove = player.getMoveset().find(move => move.moveId === MoveId.TACKLE);
+  const secondMove = player.getMoveset().find(move => move.moveId === MoveId.VINE_WHIP);
   expect(secondMove).toBeDefined();
   const secondPpBefore = secondMove!.ppUsed;
-  manager.move.select(MoveId.TACKLE);
+  manager.move.select(MoveId.VINE_WHIP);
   await manager.toEndOfTurn();
   expect(secondMove!.ppUsed).toBe(secondPpBefore + 1);
   expect(enemy.hp).toBeLessThanOrEqual(secondEnemyHpBefore);
@@ -230,7 +230,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
     },
     next: nextObservation,
     second_battle: {
-      action: MoveId.TACKLE,
+      action: MoveId.VINE_WHIP,
       enemy_hp_before: secondEnemyHpBefore,
       enemy_hp_after: enemy.hp,
       player_hp_before: secondPlayerHpBefore,
