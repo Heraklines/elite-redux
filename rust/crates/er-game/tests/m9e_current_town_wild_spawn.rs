@@ -2,7 +2,8 @@ use std::error::Error;
 use std::sync::Arc;
 
 use er_game::current_town_wild_spawn::{
-    CurrentTownDayWaveTwoContextV1, CurrentTownGenderV1, CurrentTownWildErrorV1,
+    CurrentTownDayWaveTwoContextV1, CurrentTownDayWildContextV1, CurrentTownGenderV1,
+    CurrentTownWildErrorV1, select_current_town_day_wave_one_root,
     select_current_town_day_wave_two_constructor_prefix, select_current_town_day_wave_two_core,
     select_current_town_day_wave_two_root, select_current_town_day_wave_two_shell,
     select_current_town_day_wave_two_shell_with_identity, source_town_ability_id,
@@ -1032,10 +1033,10 @@ fn naturally_admitted_day_seed_matches_pinned_postreward_enemy() -> Result<(), B
 
 #[test]
 fn source_single_width_town_successor_matches_pinned_shell() -> Result<(), Box<dyn Error>> {
-    // Source run 35938474439 observed this controlled reward-CANCEL successor
-    // twice. It is one wild enemy, unlike the older seed's double encounter.
-    // Its controlled wave-one enemy differs from natural Rust bootstrap, so
-    // this witnesses the wave-two constructor only, not a connected campaign.
+    // Source runs 35938474439 and 35939483631 observed this controlled
+    // reward-CANCEL successor twice. Its single wave-two enemy follows a
+    // wave-one Town root 440, unlike the old natural Rust bootstrap's 276.
+    // These are exact selector/constructor witnesses, not a connected campaign.
     let seed = "m9e-town-handoff-774";
     let offset = source_town_wave_cycle_offset(seed)?;
     assert_eq!(offset, 10);
@@ -1082,6 +1083,21 @@ fn source_single_width_town_successor_matches_pinned_shell() -> Result<(), Box<d
         golden_bug_net: false,
         excluded_species: &[],
     };
+    let mut wave_one_rng = RngRuntime::from_states(source_town_reset_seed(seed, 1)?, None)?;
+    assert_eq!(
+        wave_one_rng.run_state().rdg.state_string,
+        "!rnd,1,0.30521855875849724,0.8403703595977277,0.3762277467176318"
+    );
+    let opening_context = CurrentTownDayWildContextV1 {
+        wave: 1,
+        level: 2,
+        ..context
+    };
+    let opening =
+        select_current_town_day_wave_one_root(&content, opening_context, &mut wave_one_rng)?;
+    assert_eq!(opening.source_root.get().get(), 440);
+    assert_eq!(opening.effective_species.get().get(), 440);
+    assert_eq!(opening.audit.len(), 2);
     let shell =
         select_current_town_day_wave_two_shell(&content, context, 12_345, 23_456, &mut rng)?;
     let enemy = &shell.pokemon;

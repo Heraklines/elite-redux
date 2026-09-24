@@ -60,7 +60,7 @@ def run(name, argv, seconds=600):
 def main():
     COMPACT.mkdir(parents=True, exist_ok=False)
     result = {"schema": 1, "status": "failed", "source_sha": SHA,
-              "scope": "Ace/Town/day wave-two full-root, constructor prefix, level-two ability-profile moveset and pinned single/double level-three enemy shells; no enemy settlement or next-wave receipt",
+              "scope": "Ace/Town/day wave-one root and wave-two full-root, constructor prefix, level-two ability-profile moveset and pinned single/double level-three enemy shells; no enemy settlement or next-wave receipt",
               "commands": COMMANDS}
     try:
         head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()

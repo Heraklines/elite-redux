@@ -2,7 +2,9 @@
 use std::{error::Error, sync::Arc};
 
 use er_game::current_town_wild_spawn::{
-    CurrentTownDayWaveTwoContextV1, select_current_town_day_wave_two_root,
+    CurrentTownDayWaveTwoContextV1, CurrentTownDayWildContextV1,
+    select_current_town_day_wave_one_root, select_current_town_day_wave_two_root,
+    source_town_reset_seed,
 };
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
 use er_rng::battle::RngRuntime;
@@ -44,7 +46,7 @@ fn bounded_source_wave_two_seed_candidates() -> Result<(), Box<dyn Error>> {
         excluded_species: &[],
     };
     let mut found = 0;
-    for index in 0..4096 {
+    for index in 0..65_536 {
         let seed = format!("m9e-town-handoff-{index}");
         // Source BattleScene.setSeed computes a stable time-cycle offset from
         // randSeedInt(8) * 5 before the first encounter. Retain only seeds
@@ -55,6 +57,18 @@ fn bounded_source_wave_two_seed_candidates() -> Result<(), Box<dyn Error>> {
             .get()
             * 5;
         if (1 + time_offset) % 40 >= 15 || (2 + time_offset) % 40 >= 15 {
+            continue;
+        }
+        let mut opening_rng = RngRuntime::from_states(source_town_reset_seed(&seed, 1)?, None)?;
+        let opening_context = CurrentTownDayWildContextV1 {
+            wave: 1,
+            level: 2,
+            ..context
+        };
+        let opening =
+            select_current_town_day_wave_one_root(&content, opening_context, &mut opening_rng)?;
+        let first_species = opening.source_root.get().get();
+        if !matches!(first_species, 276 | 915) {
             continue;
         }
         let mut wave_rng = PhaserRdg::from_seed(&shift_char_codes(&seed, 2)?);
@@ -73,7 +87,7 @@ fn bounded_source_wave_two_seed_candidates() -> Result<(), Box<dyn Error>> {
         if let Ok(root) = select_current_town_day_wave_two_root(&content, context, &mut rng) {
             assert_eq!(root.source_root.get().get(), 504);
             println!(
-                "candidate={seed} before={} time_offset={time_offset}",
+                "candidate={seed} before={} time_offset={time_offset} first={first_species}",
                 wave_rng.state().state_string
             );
             found += 1;

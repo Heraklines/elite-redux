@@ -328,7 +328,7 @@ fn bounded_town_candidates_admit_natural_first_battle() -> Result<()> {
         Err(std::env::VarError::NotPresent) => {
             // The integrated whole-target lane has no separate search artifact.
             // This exact source-DAY seed was admitted by the focused search.
-            "candidate=m9e-town-handoff-308".to_owned()
+            "candidate=m9e-town-handoff-308 first=915".to_owned()
         }
         Err(error) => return Err(error.into()),
     };
@@ -339,6 +339,11 @@ fn bounded_town_candidates_admit_natural_first_battle() -> Result<()> {
             .next()
             .and_then(|part| part.strip_prefix("candidate="))
             .ok_or("source DAY candidate missing")?;
+        let source_first = line
+            .split_whitespace()
+            .find_map(|part| part.strip_prefix("first="))
+            .ok_or("source opening species missing")?
+            .parse::<u64>()?;
         match natural_with_seed(content.clone(), seed) {
             Ok(kernel) => {
                 let enemy = kernel
@@ -347,6 +352,13 @@ fn bounded_town_candidates_admit_natural_first_battle() -> Result<()> {
                     .and_then(|run| run.battle.as_ref())
                     .and_then(|battle| battle.enemy_party.first())
                     .ok_or("natural first enemy absent")?;
+                if enemy.species_id.get().get() != source_first {
+                    println!(
+                        "rejected={seed} reason=source first enemy {source_first} differs from natural {}",
+                        enemy.species_id.get().get()
+                    );
+                    continue;
+                }
                 println!(
                     "admitted={seed} first_enemy={}",
                     enemy.species_id.get().get()

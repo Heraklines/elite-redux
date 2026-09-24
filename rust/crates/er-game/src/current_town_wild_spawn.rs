@@ -604,7 +604,7 @@ fn source_level_two_useless() -> Result<&'static SourceTownLevelTwoUselessV1, Cu
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct CurrentTownDayWaveTwoContextV1<'a> {
+pub struct CurrentTownDayWildContextV1<'a> {
     pub mode: GameModeId,
     pub biome: BiomeId,
     pub difficulty: RunDifficultyV1,
@@ -621,6 +621,8 @@ pub struct CurrentTownDayWaveTwoContextV1<'a> {
     pub golden_bug_net: bool,
     pub excluded_species: &'a [SpeciesId],
 }
+
+pub use CurrentTownDayWildContextV1 as CurrentTownDayWaveTwoContextV1;
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum CurrentTownWildErrorV1 {
@@ -1374,7 +1376,8 @@ fn validated_pools(
 ) -> Result<[Vec<SpeciesId>; 5], CurrentTownWildErrorV1> {
     if content.identity().oracle_sha.as_str() != ORACLE
         || context.difficulty != RunDifficultyV1::Ace
-        || context.wave != 2
+        || !matches!(context.wave, 1 | 2)
+        || (context.wave == 1 && context.level != 2)
         || !matches!(context.level, 2 | 3)
         || context.luck != 0
         || context.forced_tier.is_some()
@@ -1419,6 +1422,30 @@ fn validated_pools(
 pub fn select_current_town_day_wave_two_root(
     content: &PreparedGameContentV2,
     context: CurrentTownDayWaveTwoContextV1<'_>,
+    rng: &mut RngRuntime,
+) -> Result<CurrentTownWildRootV1, CurrentTownWildErrorV1> {
+    if context.wave != 2 {
+        return Err(CurrentTownWildErrorV1::UnsupportedContext);
+    }
+    select_town_day_root(content, context, rng)
+}
+
+/// The same pinned Arena.randomSpecies call for the ordinary Town opening
+/// wave. It reads the wave-one reset stream without an opening width roll.
+pub fn select_current_town_day_wave_one_root(
+    content: &PreparedGameContentV2,
+    context: CurrentTownDayWildContextV1<'_>,
+    rng: &mut RngRuntime,
+) -> Result<CurrentTownWildRootV1, CurrentTownWildErrorV1> {
+    if context.wave != 1 || context.level != 2 {
+        return Err(CurrentTownWildErrorV1::UnsupportedContext);
+    }
+    select_town_day_root(content, context, rng)
+}
+
+fn select_town_day_root(
+    content: &PreparedGameContentV2,
+    context: CurrentTownDayWildContextV1<'_>,
     rng: &mut RngRuntime,
 ) -> Result<CurrentTownWildRootV1, CurrentTownWildErrorV1> {
     let pools = validated_pools(content, context)?;
