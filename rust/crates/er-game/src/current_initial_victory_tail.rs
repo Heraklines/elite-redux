@@ -98,7 +98,10 @@ fn neutral_context(
         .and_then(|row| row.experience.as_ref())
         .is_some_and(|owner| owner.first_reward_predecessor.is_some());
     if run.party.len() != 1
-        || !matches!((run.wave.get().get(), has_predecessor), (1, false) | (2, true))
+        || !matches!(
+            (run.wave.get().get(), has_predecessor),
+            (1, false) | (2, true)
+        )
         || battle.mechanics != MechanicStateStoreV2::default()
         || !battle
             .field
@@ -186,12 +189,7 @@ pub(crate) fn claim(
     if neutral_context(before, content).is_err() {
         return Ok(None);
     }
-    let expected_defeated_total = before
-        .active_run
-        .as_ref()
-        .ok_or_else(failure)?
-        .wave
-        .get();
+    let expected_defeated_total = before.active_run.as_ref().ok_or_else(failure)?.wave.get();
     let pending = pending(before, id)?;
     if pending.victory_tail.is_some()
         || pending.victory.is_some()
