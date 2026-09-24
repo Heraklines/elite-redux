@@ -3,6 +3,7 @@
 
 use std::error::Error;
 use std::fs;
+use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -176,16 +177,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     {
         return Err("native worker did not retain the new native attempt".into());
     }
-    println!(
-        "{}",
-        serde_json::json!({
+    let mut stdout = std::io::stdout().lock();
+    serde_json::to_writer(
+        &mut stdout,
+        &serde_json::json!({
             "source_sha": source_sha,
             "executable_sha256": executable_sha,
             "browser_frontier": position,
             "native_frontier": continued.final_position,
             "full_snapshot_equal": true,
             "native_suffix_attempts": continued.attempts.len()
-        })
-    );
+        }),
+    )?;
+    stdout.write_all(b"\n")?;
     Ok(())
 }
