@@ -2024,6 +2024,26 @@ fn actual_reward_skip_inner(
         [plan.shell.pokemon]
     );
     assert_eq!(live.as_ref(), kernel.state());
+    admit_wave_two_vine_whip(&mut kernel, content.as_ref(), &mut live, &mut ledger)?;
+    Ok(())
+}
+
+#[inline(never)]
+fn admit_wave_two_vine_whip(
+    kernel: &mut GameKernelV7,
+    content: &PreparedGameContentV2,
+    live: &mut Option<GameStateV6>,
+    ledger: &mut AppliedGameMaterialLedgerV1,
+) -> Result<()> {
+    navigate(kernel, "battle/command/fight")?;
+    press(kernel, PhysicalKey::Space)?;
+    navigate(kernel, "battle/move/0")?;
+    let step = press(kernel, PhysicalKey::Space)?;
+    accept_material(live, ledger, kernel, content, &step)?;
+    assert!(kernel
+        .state()
+        .and_then(|state| state.current_turn_execution.as_ref())
+        .is_some());
     Ok(())
 }
 
