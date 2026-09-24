@@ -37,6 +37,8 @@ SOURCES = [EXAMPLE, SPEC, WORKER_SPEC, "scripts/ci/m9e_coop_rtc_diagnostic.py", 
            "rust/crates/er-game/src/m9e_new_run_v6.rs",
            "rust/crates/er-game/src/m72_bootstrap.rs", "rust/crates/er-env/src/current.rs",
            "rust/crates/er-repro/src/current.rs", "rust/rust-toolchain.toml", "rust/Cargo.lock", "rust/Cargo.toml",
+           "rust/crates/er-cli/Cargo.toml", "rust/crates/er-cli/src/main.rs",
+           "rust/crates/er-cli/src/current_commands.rs",
            "rust/crates/er-web/Cargo.toml", "pnpm-lock.yaml", "package.json", ".nvmrc",
            "playwright.rust-browser.config.ts", "scripts/ci/m9e_current_cost.py"]
 logs = {}
@@ -382,6 +384,66 @@ def execute_prepared(summary, *, install_chromium=True):
     if any(digest(OUTPUT / path) != expected for path, expected in retained.items()):
         raise RuntimeError("actual platform inputs changed during fresh-account Worker execution")
     summary["fresh_account_worker_evidence"] = account
+
+    cross_attachments = [item for item in account_results[0].get("attachments", [])
+                         if item.get("name") == "m9e-fresh-account-cross-entry"]
+    if len(cross_attachments) != 1 or cross_attachments[0].get("contentType") != "application/json":
+        raise RuntimeError("sole complete browser-to-native witness required")
+    cross_attachment = cross_attachments[0]
+    if "body" in cross_attachment:
+        encoded = cross_attachment["body"]
+        if not isinstance(encoded, str) or not 0 < len(encoded) <= 6 << 20:
+            raise RuntimeError("browser-to-native encoded witness exceeds its bound")
+        cross_raw = base64.b64decode(encoded, validate=True)
+    else:
+        original = Path(cross_attachment["path"])
+        if not original.is_absolute():
+            original = ROOT / original
+        if original.is_symlink():
+            raise RuntimeError("browser-to-native witness symlink forbidden")
+        path = original.resolve(strict=True)
+        if (not path.is_relative_to((ROOT / "test-results/rust-browser").resolve(strict=True))
+                or not 0 < path.stat().st_size <= 4 << 20):
+            raise RuntimeError("browser-to-native witness path invalid")
+        cross_raw = path.read_bytes()
+    if not 0 < len(cross_raw) <= 4 << 20:
+        raise RuntimeError("browser-to-native witness exceeds its bound")
+    cross = json.loads(cross_raw)
+    if not isinstance(cross, dict) or set(cross) != {"capsule", "snapshot"}:
+        raise RuntimeError("browser-to-native witness shape differs")
+    capsule = cross["capsule"]
+    if (not isinstance(capsule, dict) or not isinstance(cross["snapshot"], dict)
+            or not isinstance(capsule.get("attempts"), list) or not capsule["attempts"]
+            or type(capsule.get("base_position")) is not int
+            or type(capsule.get("final_position")) is not int
+            or capsule["final_position"] <= capsule["base_position"]):
+        raise RuntimeError("browser-to-native capsule has no causal attempts")
+    capsule_path = REPORT / "fresh-account-capsule.json"
+    capsule_bytes = json.dumps(capsule, separators=(",", ":")).encode()
+    if not 0 < len(capsule_bytes) <= 2 << 20:
+        raise RuntimeError("browser-to-native capsule exceeds its bound")
+    capsule_path.write_bytes(capsule_bytes)
+    run(["cargo", "build", "--manifest-path", "rust/Cargo.toml", "--locked", "-p", "er-cli",
+         "--bin", "er-cli"], "native-cli-build", 360)
+    cli = ROOT / "rust/target/debug/er-cli"
+    if cli.is_symlink() or not cli.is_file() or not 0 < cli.stat().st_size <= 128 << 20:
+        raise RuntimeError("actual native current CLI binary required")
+    replay_log = run([str(cli), "capsule-validate", "--content", str(OUTPUT / "game-content-bundle-v2.json"),
+                      "--capsule", str(capsule_path)], "native-cli-replay", 120, 4 << 20)
+    replay = json.loads(replay_log.read_text())
+    if (replay.get("validation") != "ISOLATED_CURRENT_CAPSULE_REPLAY"
+            or replay.get("schema_valid") is not True or replay.get("replay_valid") is not True
+            or replay.get("processed_attempts") != len(capsule["attempts"])
+            or replay.get("final_position") != capsule["final_position"]
+            or replay.get("snapshot") != cross["snapshot"]):
+        raise RuntimeError("actual native CLI replay differs from complete browser Worker snapshot")
+    summary["native_cross_entry"] = {
+        "capsule_bytes": len(capsule_bytes), "capsule_sha256": hashlib.sha256(capsule_bytes).hexdigest(),
+        "attempts": len(capsule["attempts"]), "final_position": capsule["final_position"],
+        "snapshot_sha256": hashlib.sha256(json.dumps(cross["snapshot"], sort_keys=True,
+                                               separators=(",", ":")).encode()).hexdigest(),
+        "cli_sha256": digest(cli), "full_snapshot_equal": True,
+    }
     summary["tests"] = {"passed": 4, "failed": 0, "skipped": 0, "ids": IDS + [WORKER_ID]}
 
 
