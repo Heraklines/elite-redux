@@ -2042,7 +2042,10 @@ fn assert_skipped_reward_wave_two(
     let run = next.active_run.as_ref().ok_or("next Town run absent")?;
     let battle = run.battle.as_ref().ok_or("next Town battle absent")?;
     assert_eq!(run.wave.get().get(), 2);
-    assert_eq!(battle.enemy_party.as_slice(), [plan.shell.pokemon.clone()]);
+    assert_eq!(
+        battle.enemy_party.as_slice(),
+        std::slice::from_ref(&plan.shell.pokemon)
+    );
     assert_eq!(audit, plan.rng_audit);
     assert_eq!(run.run_rng, plan.next_run_rng);
     assert!(
