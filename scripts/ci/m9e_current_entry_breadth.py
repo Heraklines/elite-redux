@@ -47,7 +47,16 @@ TARGETS = {
         "current_control_queries_are_read_only_and_plans_drive_natural_raw_input",
         "worker_control_queries_bind_current_control_and_preserve_rejections",
     ],
+    "current_process_v2": [
+        "tiny_success_cap_reports_faults_without_initializing_or_disposing",
+        "invalid_success_cap_rejects_bootstrap_and_omission_keeps_transport_default",
+        "actual_abi2_generations_restore_active_v7_and_continue_identical_typed_trace",
+        "actual_abi2_process_runs_current_natural_controls_and_non_key_time",
+        "actual_abi2_process_exports_complete_causal_repro",
+        "actual_abi2_process_rejects_bad_content_events_sequence_and_historical_snapshot",
+    ],
 }
+PACKAGES = {"current_process_v2": "er-kernel-worker"}
 ROOT = Path(__file__).resolve().parents[2]
 OUT = Path(os.environ["RUNNER_TEMP"]).resolve() / "m9e-current-entry"
 COMMANDS = []
@@ -92,7 +101,7 @@ def main():
         "harness_sha256": sha(Path(__file__).read_bytes()),
         "targets": [], "tests_expected": sum(map(len, TARGETS.values())),
         "tests_passed": 0, "commands": COMMANDS,
-        "scope": "seven complete current er-cli test targets on the exact integration SHA",
+        "scope": "seven complete current er-cli targets plus the complete native V7 worker target on the exact integration SHA",
     }
     try:
         require(os.environ["GITHUB_REPOSITORY"] == "Heraklines/elite-redux", "repository")
@@ -160,7 +169,7 @@ def main():
             "ER_M9E_WORKER_BUILD_PROFILE": "debug",
         })
         for target, ids in TARGETS.items():
-            base = ["cargo", "test", "--locked", "-p", "er-cli", "--test", target, "--"]
+            base = ["cargo", "test", "--locked", "-p", PACKAGES.get(target, "er-cli"), "--test", target, "--"]
             listing, listed = command(target + "-list", base + ["--list", "--format", "terse"], ROOT / "rust")
             require(listed["returncode"] == 0, target + " list")
             actual = re.findall(rb"^([A-Za-z0-9_:]+): test$", listing, re.M)
@@ -178,7 +187,7 @@ def main():
             else:
                 result.setdefault("failures", []).append(target)
         require(not result.get("failures"), "whole current entry targets failed")
-        require(result["tests_passed"] == result["tests_expected"] == 22, "exact test count")
+        require(result["tests_passed"] == result["tests_expected"] == 28, "exact test count")
         result["status"] = "passed"
     except Exception as error:
         result["first_failure"] = str(error)[:2048]

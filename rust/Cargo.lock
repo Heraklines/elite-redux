@@ -447,6 +447,7 @@ dependencies = [
  "er-game",
  "er-kernel",
  "er-protocol",
+ "er-repro",
  "er-state",
  "er-types",
  "serde",

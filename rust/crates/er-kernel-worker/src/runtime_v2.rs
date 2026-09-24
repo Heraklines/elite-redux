@@ -6,6 +6,10 @@ use er_env::current::{CurrentGameSession, CurrentSessionError};
 use er_game::m9e_content_v2::PreparedGameContentV2;
 use er_kernel::game_kernel_v7::GameKernelRoleV7;
 use er_kernel::snapshot_v7::CoreGameKernelSnapshotV7;
+use er_repro::current::{
+    CurrentCaptureStatusV1, CurrentReproLimitsV1, CurrentReproRecorderV1,
+    MAXIMUM_CURRENT_REPRO_POSITION_V1,
+};
 use er_types::SeatId;
 use thiserror::Error;
 
@@ -37,6 +41,8 @@ pub enum KernelWorkerRuntimeErrorV2 {
     Serialization(String),
     #[error("current causal repro export is not implemented")]
     Unsupported,
+    #[error("current causal repro is unavailable: {0}")]
+    Repro(String),
     #[error("current worker is disposed")]
     Disposed,
     #[error("current worker applied-event counter exhausted")]
@@ -48,6 +54,7 @@ pub struct KernelWorkerRuntimeV2 {
     identity: KernelGenerationIdentityV2,
     content: Option<Arc<PreparedGameContentV2>>,
     session: Option<CurrentGameSession>,
+    capture: Option<CurrentReproRecorderV1>,
     accepted_sequence: Option<u64>,
     applied_events: u64,
     disposed: bool,
@@ -69,6 +76,7 @@ impl KernelWorkerRuntimeV2 {
             identity,
             content: None,
             session: None,
+            capture: None,
             accepted_sequence: None,
             applied_events: 0,
             disposed: false,
@@ -186,6 +194,7 @@ impl KernelWorkerRuntimeV2 {
                     },
                     self.maximum_success_response_bytes,
                 )?;
+                self.capture = capture_for_session(&session, 0).ok();
                 self.session = Some(session);
                 self.content = Some(content);
                 Ok(bytes)
@@ -211,6 +220,17 @@ impl KernelWorkerRuntimeV2 {
                     },
                     self.maximum_success_response_bytes,
                 )?;
+                let next_position = self.capture.as_ref().and_then(|capture| {
+                    let position = match capture.status() {
+                        CurrentCaptureStatusV1::Available { final_position, .. } => final_position,
+                        CurrentCaptureStatusV1::Unavailable { position, .. } => position,
+                    };
+                    position
+                        .checked_add(1)
+                        .filter(|value| *value <= MAXIMUM_CURRENT_REPRO_POSITION_V1)
+                });
+                self.capture =
+                    next_position.and_then(|position| capture_for_session(&session, position).ok());
                 self.session = Some(session);
                 Ok(bytes)
             }
@@ -219,15 +239,28 @@ impl KernelWorkerRuntimeV2 {
                     .applied_events
                     .checked_add(1)
                     .ok_or(KernelWorkerRuntimeErrorV2::Exhausted)?;
+                let before = if self.capture.is_some() {
+                    self.session()?.snapshot().ok()
+                } else {
+                    None
+                };
+                if before.is_none()
+                    && let Some(capture) = &mut self.capture
+                {
+                    capture.invalidate_attempt("worker pre-event snapshot unavailable");
+                }
                 let identity = &self.identity;
                 let maximum_success_response_bytes = self.maximum_success_response_bytes;
-                let bytes = self
+                let result = self
                     .session
                     .as_mut()
                     .ok_or(KernelWorkerRuntimeErrorV2::NotInitialized)?
-                    .apply_with(event, |candidate, step| {
-                        let observation = candidate.observe()?;
-                        encode_response(
+                    .apply_with(event.clone(), |candidate, step| {
+                        let observation = candidate.observe().map_err(serialization)?;
+                        let recorded = before
+                            .is_some()
+                            .then(|| (step.clone(), observation.clone()));
+                        let bytes = encode_response(
                             identity,
                             request_id,
                             accepted,
@@ -237,8 +270,61 @@ impl KernelWorkerRuntimeV2 {
                                 observation: Box::new(observation),
                             },
                             maximum_success_response_bytes,
-                        )
-                    })?;
+                        )?;
+                        Ok((bytes, recorded))
+                    });
+                let (bytes, recorded) = match result {
+                    Ok(value) => value,
+                    Err(error) => {
+                        if let (Some(before), Some(capture)) = (&before, &mut self.capture) {
+                            if let KernelWorkerRuntimeErrorV2::Session(rejected) = &error {
+                                if let Ok(observation) = self
+                                    .session
+                                    .as_ref()
+                                    .ok_or(KernelWorkerRuntimeErrorV2::NotInitialized)?
+                                    .observe()
+                                {
+                                    capture.record_with_origin(
+                                        before,
+                                        event,
+                                        Err(rejected),
+                                        before,
+                                        &observation,
+                                        Some("worker.apply"),
+                                    );
+                                } else {
+                                    capture.invalidate_attempt(
+                                        "worker rejection observation unavailable",
+                                    );
+                                }
+                            } else {
+                                capture.invalidate_attempt("worker response preparation rejected");
+                            }
+                        }
+                        return Err(error);
+                    }
+                };
+                if let (Some(before), Some((step, observation)), Some(capture)) =
+                    (&before, recorded, &mut self.capture)
+                {
+                    if let Ok(after) = self
+                        .session
+                        .as_ref()
+                        .ok_or(KernelWorkerRuntimeErrorV2::NotInitialized)?
+                        .snapshot()
+                    {
+                        capture.record_with_origin(
+                            before,
+                            event,
+                            Ok(&step),
+                            &after,
+                            &observation,
+                            Some("worker.apply"),
+                        );
+                    } else {
+                        capture.invalidate_attempt("worker post-event snapshot unavailable");
+                    }
+                }
                 self.applied_events = next_count;
                 Ok(bytes)
             }
@@ -253,14 +339,27 @@ impl KernelWorkerRuntimeV2 {
                     .applied_events
                     .checked_add(1)
                     .ok_or(KernelWorkerRuntimeErrorV2::Exhausted)?;
+                let before = if self.capture.is_some() {
+                    self.session()?.snapshot().ok()
+                } else {
+                    None
+                };
+                if before.is_none()
+                    && let Some(capture) = &mut self.capture
+                {
+                    capture.invalidate_attempt("worker pre-rebind snapshot unavailable");
+                }
                 let identity = &self.identity;
                 let maximum_success_response_bytes = self.maximum_success_response_bytes;
-                let bytes = self
+                let result = self
                     .session
                     .as_mut()
                     .ok_or(KernelWorkerRuntimeErrorV2::NotInitialized)?
-                    .apply_rebind_with(control, |candidate, output| {
-                        let observation = candidate.observe()?;
+                    .apply_rebind_with(control.clone(), |candidate, output| {
+                        let observation = candidate.observe().map_err(serialization)?;
+                        let recorded = before
+                            .is_some()
+                            .then(|| (output.clone(), observation.clone()));
                         let result =
                             serde_json::json!({"rebind": &output, "observation": &observation});
                         if serde_json::to_vec(&result).map_err(serialization)?.len()
@@ -268,7 +367,7 @@ impl KernelWorkerRuntimeV2 {
                         {
                             return Err(KernelWorkerRuntimeErrorV2::ResponseTooLarge);
                         }
-                        encode_response(
+                        let bytes = encode_response(
                             identity,
                             request_id,
                             accepted,
@@ -278,8 +377,63 @@ impl KernelWorkerRuntimeV2 {
                                 observation: Box::new(observation),
                             },
                             maximum_success_response_bytes,
-                        )
-                    })?;
+                        )?;
+                        Ok((bytes, recorded))
+                    });
+                let (bytes, recorded) = match result {
+                    Ok(value) => value,
+                    Err(error) => {
+                        if let (Some(before), Some(capture)) = (&before, &mut self.capture) {
+                            if let KernelWorkerRuntimeErrorV2::Session(rejected) = &error {
+                                if let Ok(observation) = self
+                                    .session
+                                    .as_ref()
+                                    .ok_or(KernelWorkerRuntimeErrorV2::NotInitialized)?
+                                    .observe()
+                                {
+                                    capture.record_rebind_with_origin(
+                                        before,
+                                        control,
+                                        Err(rejected),
+                                        before,
+                                        &observation,
+                                        Some("worker.apply_rebind"),
+                                    );
+                                } else {
+                                    capture.invalidate_attempt(
+                                        "worker rebind rejection observation unavailable",
+                                    );
+                                }
+                            } else {
+                                capture.invalidate_attempt(
+                                    "worker rebind response preparation rejected",
+                                );
+                            }
+                        }
+                        return Err(error);
+                    }
+                };
+                if let (Some(before), Some((output, observation)), Some(capture)) =
+                    (&before, recorded, &mut self.capture)
+                {
+                    if let Ok(after) = self
+                        .session
+                        .as_ref()
+                        .ok_or(KernelWorkerRuntimeErrorV2::NotInitialized)?
+                        .snapshot()
+                    {
+                        capture.record_rebind_with_origin(
+                            before,
+                            control,
+                            Ok(&output),
+                            &after,
+                            &observation,
+                            Some("worker.apply_rebind"),
+                        );
+                    } else {
+                        capture.invalidate_attempt("worker post-rebind snapshot unavailable");
+                    }
+                }
                 self.applied_events = next_count;
                 Ok(bytes)
             }
@@ -311,7 +465,26 @@ impl KernelWorkerRuntimeV2 {
                     self.maximum_success_response_bytes,
                 )
             }
-            KernelWorkerRequestV2::ExportRepro => Err(KernelWorkerRuntimeErrorV2::Unsupported),
+            KernelWorkerRequestV2::ExportRepro => {
+                let capsule = self
+                    .capture
+                    .as_ref()
+                    .ok_or_else(|| {
+                        KernelWorkerRuntimeErrorV2::Repro("recorder unavailable".to_owned())
+                    })?
+                    .export()
+                    .map_err(|error| KernelWorkerRuntimeErrorV2::Repro(error.to_string()))?;
+                encode_response(
+                    &self.identity,
+                    request_id,
+                    accepted,
+                    self.observation_digest()?,
+                    KernelWorkerResponseV2::Repro {
+                        capsule: Box::new(capsule),
+                    },
+                    self.maximum_success_response_bytes,
+                )
+            }
             KernelWorkerRequestV2::Health => encode_response(
                 &self.identity,
                 request_id,
@@ -339,6 +512,7 @@ impl KernelWorkerRuntimeV2 {
                     session.dispose();
                 }
                 self.session = None;
+                self.capture = None;
                 self.content = None;
                 self.disposed = true;
                 Ok(bytes)
@@ -360,6 +534,22 @@ impl KernelWorkerRuntimeV2 {
             .transpose()?
             .and_then(|observation| observation.mechanical_digest))
     }
+}
+
+fn capture_for_session(
+    session: &CurrentGameSession,
+    position: u64,
+) -> Result<CurrentReproRecorderV1, KernelWorkerRuntimeErrorV2> {
+    let (seat, role) = session.session_context()?;
+    CurrentReproRecorderV1::new_at_position(
+        session.snapshot()?,
+        seat,
+        role,
+        Arc::clone(session.content()),
+        CurrentReproLimitsV1::default(),
+        position,
+    )
+    .map_err(|error| KernelWorkerRuntimeErrorV2::Repro(error.to_string()))
 }
 
 fn restored(
@@ -433,6 +623,7 @@ fn error_code(error: &KernelWorkerRuntimeErrorV2) -> KernelWorkerFaultCodeV2 {
             KernelWorkerFaultCodeV2::SerializationFailure
         }
         KernelWorkerRuntimeErrorV2::Unsupported => KernelWorkerFaultCodeV2::UnsupportedOperation,
+        KernelWorkerRuntimeErrorV2::Repro(_) => KernelWorkerFaultCodeV2::KernelFailure,
         KernelWorkerRuntimeErrorV2::Disposed => KernelWorkerFaultCodeV2::Disposed,
         KernelWorkerRuntimeErrorV2::Exhausted => KernelWorkerFaultCodeV2::ResourceExhausted,
     }
