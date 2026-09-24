@@ -161,6 +161,7 @@ def main():
             "source_sha": result["source_sha"], "host": hosts[0].decode(),
             "profile": profile,
         }
+        print("Exact-SHA current Worker built; qualifying complete entry targets", flush=True)
         os.environ.update({
             "ER_M9E_WORKER_EXECUTABLE": str(worker),
             "ER_M9E_WORKER_EXECUTABLE_SHA256": worker_hash,
@@ -186,6 +187,8 @@ def main():
                 result["tests_passed"] += len(ids)
             else:
                 result.setdefault("failures", []).append(target)
+            print(f"{target}: {len(ids)} whole-target tests {'passed' if passed else 'failed'}; "
+                  f"{result['tests_passed']}/{result['tests_expected']} passed overall", flush=True)
         require(not result.get("failures"), "whole current entry targets failed")
         require(result["tests_passed"] == result["tests_expected"] == 28, "exact test count")
         result["status"] = "passed"
