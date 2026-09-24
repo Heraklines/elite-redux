@@ -735,8 +735,22 @@ impl GameStateV6ContentContext for PreparedGameContentV2 {
                     er_types::battle_model::BattleOutcome::Ongoing
                         | er_types::battle_model::BattleOutcome::Victory
                 )
+                && (battle.outcome != er_types::battle_model::BattleOutcome::Victory
+                    || enemy.hp == 0)
                 && run.run_rng == plan.next_run_rng
-                && state.identities == identities
+                && state.identities.next_run_id == identities.next_run_id
+                && state.identities.next_pokemon_id == identities.next_pokemon_id
+                && state.identities.next_battle_id == identities.next_battle_id
+                && state.identities.next_storage_slot_id == identities.next_storage_slot_id
+                && state.identities.next_modifier_instance_id
+                    == identities.next_modifier_instance_id
+                && state.identities.next_scenario_instance_id
+                    == identities.next_scenario_instance_id
+                // Friendship and later owned phases allocate external clock
+                // requests after battle admission. Their exact increments are
+                // checked by each material transition and replay ledger.
+                && state.identities.next_platform_request_id
+                    >= identities.next_platform_request_id
                 && source.initial_battle == battle.battle_id
                 && source.initial_wave == run.wave
         })
