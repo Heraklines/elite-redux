@@ -7,12 +7,14 @@ import { BattleStyle } from "#enums/battle-style";
 import { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
+import { Nature } from "#enums/nature";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { PromptHandler } from "#test/helpers/prompt-handler";
-import { generateStarters } from "#test/utils/game-manager-utils";
+import type { Starter } from "#types/save-data";
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -20,7 +22,7 @@ import Phaser from "phaser";
 import { afterAll, expect, test, vi } from "vitest";
 
 const PIN = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7";
-// Install this seed after the starter helper's hardcoded "test" assignment.
+// The starter is an explicit selection; no test helper rewrites this seed.
 const SETUP_SEED = "m9e-town-handoff-5042";
 let game: Phaser.Game | undefined;
 let manager: GameManager | undefined;
@@ -35,7 +37,7 @@ afterAll(() => {
   game?.destroy(true);
 });
 
-test("actual attack and reward skip reach a source-owned second encounter", async () => {
+test("explicit starter attack and reward skip reach a source-owned second encounter", async () => {
   const output = process.env.M9_TOWN_POSTREWARD_OUTPUT;
   const ordinal = process.env.M9_TOWN_POSTREWARD_ORDINAL;
   expect(output).toBeTruthy();
@@ -73,8 +75,21 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
   await manager.runToTitle();
   manager.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
     manager!.scene.gameMode = getGameMode(GameModes.CLASSIC);
-    const starters = generateStarters(manager!.scene, [SpeciesId.BULBASAUR]);
     manager!.scene.setSeed(SETUP_SEED);
+    const starters: Starter[] = [{
+      speciesId: SpeciesId.BULBASAUR,
+      shiny: false,
+      variant: 0,
+      formIndex: 0,
+      female: false,
+      abilityIndex: 0,
+      passive: false,
+      nature: Nature.RELAXED,
+      moveset: [MoveId.VINE_WHIP],
+      pokerus: false,
+      teraType: PokemonType.GRASS,
+      ivs: [11, 4, 14, 7, 17, 0],
+    }];
     manager!.scene.phaseManager.pushNew("EncounterPhase", false);
     new SelectStarterPhase().initBattleFromCurrentPhase(starters);
   });
@@ -255,7 +270,7 @@ test("actual attack and reward skip reach a source-owned second encounter", asyn
     wave_cycle_offset: scene.waveCycleOffset,
     effective_pool_time: (scene.arena as unknown as { lastTimeOfDay: number }).lastTimeOfDay,
     current_time: scene.arena.getTimeOfDay(),
-    scope: "controlled level-five starter attacks, victory reward cancel and queued Town wave-two encounter",
+    scope: "explicit Classic level-five starter selection, attack, reward cancel and queued Town wave-two encounter",
     account: { trainer_id: scene.gameData.trainerId, secret_id: scene.gameData.secretId },
     shiny_context: {
       base_threshold: BASE_SHINY_CHANCE,
