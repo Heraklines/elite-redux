@@ -1269,8 +1269,7 @@ fn source_town_opening_shell_matches_classic_level_five_trace() -> Result<(), Bo
     // pre-constructor RNG state and the source-chosen Bulbasaur identity. It
     // does not prove that the full raw starter UI reaches this state.
     let seed = "m9e-town-handoff-5042";
-    let before_starter =
-        "!rnd,1,0.16302004898898304,0.7822124343365431,0.41194894444197416";
+    let before_starter = "!rnd,1,0.16302004898898304,0.7822124343365431,0.41194894444197416";
     assert_eq!(
         RngRuntime::from_run_seed(seed).run_state().rdg.state_string,
         before_starter
