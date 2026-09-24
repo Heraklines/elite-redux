@@ -175,7 +175,12 @@ def main():
             require(listed["returncode"] == 0, target + " list")
             actual = re.findall(rb"^([A-Za-z0-9_:]+): test$", listing, re.M)
             require(sorted(row.decode() for row in actual) == sorted(ids), target + " exact whole-target IDs")
-            output, execution = command(target + "-execute", base + ["--format", "terse"], ROOT / "rust")
+            # The complete reload target drives nearly 2,900 actual worker
+            # requests. Its healthy run can approach ten minutes on a cold
+            # runner; keep the whole target and its assertions intact.
+            seconds = 900 if target == "m9e_current_reload" else 600
+            output, execution = command(target + "-execute", base + ["--format", "terse"],
+                                        ROOT / "rust", seconds=seconds)
             counts = re.findall(rb"test result: .*? (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", output)
             passed = execution["returncode"] == 0 and counts == [(str(len(ids)).encode(), b"0", b"0", b"0", b"0")]
             result["targets"].append({
