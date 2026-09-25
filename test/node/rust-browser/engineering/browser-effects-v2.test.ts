@@ -4,12 +4,23 @@ import type {
   BrowserRequestV2,
   GamePresentationEffectV2Wire,
 } from "../../../../src/rust-browser/contracts/browser-contracts-v2";
+import { decodeBrowserResponseEnvelopeV2 } from "../../../../src/rust-browser/contracts/browser-contracts-v2";
 import {
   type BrowserEffectAdaptersV2,
   BrowserEffectRouterV2,
 } from "../../../../src/rust-browser/routes/browser-effects-v2";
 
 describe("BrowserEffectRouterV2", () => {
+  it("decodes the read-only scene response and routed scene effect", () => {
+    const scene = { schema_version: 1, control: { schema_version: 2 }, actors: [] };
+    const decode = (response: unknown) => decodeBrowserResponseEnvelopeV2(
+      new TextEncoder().encode(JSON.stringify({ version: 2, request_id: 1, accepted_sequence: 1, response })).buffer,
+    );
+    expect(decode({ kind: "SCENE", scene }).response.kind).toBe("SCENE");
+    expect(decode({ kind: "EFFECTS", batch: { external_sequence: 1,
+      effects: [{ kind: "SCENE_PROJECTED", scene }] } }).response.kind).toBe("EFFECTS");
+    expect(() => decode({ kind: "SCENE", scene: { ...scene, schema_version: 0 } })).toThrow("scene projection is invalid");
+  });
   it("captures requested clock and Flash inputs once, without inventing Egg outputs", async () => {
     const delivered: BrowserRequestV2[] = [];
     const noop = () => {};

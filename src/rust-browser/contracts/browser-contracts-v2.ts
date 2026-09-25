@@ -275,6 +275,11 @@ export function decodeBrowserResponseEnvelopeV2(buffer: ArrayBuffer): BrowserRes
         throw new Error("current Worker snapshot is not V7");
       }
       break;
+    case "SCENE":
+      if (response.scene?.schema_version !== 1 || response.scene.control == null || !Array.isArray(response.scene.actors)) {
+        throw new Error("current Worker scene projection is invalid");
+      }
+      break;
     case "FAULT":
       if (typeof response.fault?.code !== "string" || typeof response.fault.message !== "string") {
         throw new Error("current host fault payload is invalid");
@@ -303,6 +308,7 @@ const CURRENT_EFFECT_KINDS_V2 = new Set<string>([
   "UTC_CLOCK_REQUEST",
   "FLASH_EGG_INPUTS_REQUEST",
   "UI_CHANGED",
+  "SCENE_PROJECTED",
   "PRESENTATION",
   "PRESENTATION_SCENE_CHANGED",
   "SEND_NETWORK_FRAME",

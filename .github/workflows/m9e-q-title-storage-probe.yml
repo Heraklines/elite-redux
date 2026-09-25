@@ -51,3 +51,25 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Execute browser effect router contract
         run: pnpm exec vitest run test/node/rust-browser/engineering/browser-effects-v2.test.ts test/node/rust-browser/engineering/current-scene-dom-v1.test.ts
+      - name: Typecheck scene browser boundary
+        run: >-
+          pnpm exec tsc --ignoreConfig --noEmit --pretty false --skipLibCheck --strict
+          --exactOptionalPropertyTypes --moduleResolution bundler --module ESNext --target ES2024
+          --types node,vitest/globals --lib ES2024,DOM,WebWorker
+          src/rust-browser/contracts/browser-contracts-v2.ts
+          src/rust-browser/host/current-rust-browser-host.ts
+          src/rust-browser/routes/browser-effects-v2.ts
+          src/rust-browser/routes/current-scene-dom-v1.ts
+          src/rust-browser/routes/rust-current-rtc-entry.ts
+          test/node/rust-browser/engineering/browser-effects-v2.test.ts
+          test/node/rust-browser/engineering/current-scene-dom-v1.test.ts
+      - name: Check browser scene Biome style
+        run: >-
+          pnpm exec biome ci --diagnostic-level=error
+          src/rust-browser/contracts/browser-contracts-v2.ts
+          src/rust-browser/host/current-rust-browser-host.ts
+          src/rust-browser/routes/browser-effects-v2.ts
+          src/rust-browser/routes/current-scene-dom-v1.ts
+          src/rust-browser/routes/rust-current-rtc-entry.ts
+          test/node/rust-browser/engineering/browser-effects-v2.test.ts
+          test/node/rust-browser/engineering/current-scene-dom-v1.test.ts
