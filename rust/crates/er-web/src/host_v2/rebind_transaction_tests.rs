@@ -378,7 +378,7 @@ impl Peer {
         let observation = self.host.session()?.observe()?;
         let (local_seat, role) = self.host.session()?.session_context()?;
         let mut restored = Self {
-            host: BrowserKernelHostV2::from_content(content()?),
+            host: Box::new(BrowserKernelHostV2::from_content(content()?)),
         };
         assert_eq!(
             restored.send(BrowserRequestV2::Initialize {
@@ -411,7 +411,7 @@ impl Peer {
         let before_observation = self.host.session()?.observe()?;
         let generation = self.host.generation;
         let mut restored = Self {
-            host: BrowserKernelHostV2::from_content(content()?),
+            host: Box::new(BrowserKernelHostV2::from_content(content()?)),
         };
         assert_eq!(
             restored.send(BrowserRequestV2::Initialize {
