@@ -592,11 +592,10 @@ fn actual_poison_redirect_absorbs_with_ordered_payload_and_material_conservation
             innate_slot: None,
         }];
         if hp < 13 {
-            expected_payloads.push(GamePresentationPayloadV1::HpRestored {
+            expected_payloads.push(GamePresentationPayloadV1::EnemyHpRestoredBar {
                 holder,
-                before: hp,
-                after: expected,
-                requested_heal: 3,
+                before_ten_thousandths: u16::try_from(u64::from(hp) * 10_000 / 13)?,
+                after_ten_thousandths: u16::try_from(u64::from(expected) * 10_000 / 13)?,
             });
         }
         expected_payloads.push(GamePresentationPayloadV1::AbilityHidden {
@@ -617,6 +616,7 @@ fn actual_poison_redirect_absorbs_with_ordered_payload_and_material_conservation
                     payload,
                     GamePresentationPayloadV1::AbilityShown { .. }
                         | GamePresentationPayloadV1::HpRestored { .. }
+                        | GamePresentationPayloadV1::EnemyHpRestoredBar { .. }
                         | GamePresentationPayloadV1::AbilityHidden { .. }
                         | GamePresentationPayloadV1::MoveNoEffect { .. }
                 )

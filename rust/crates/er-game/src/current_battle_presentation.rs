@@ -14,7 +14,9 @@ pub(super) fn project_current_battle_cues(
     revision: SafeU53,
     cues: &[BattlePresentationCueV5],
 ) -> Result<Vec<GamePresentationEffectV2>, GameRuntimeV6Error> {
-    use crate::m9e_material_v6::GamePresentationPayloadV1 as Payload;
+    use crate::m9e_material_v6::{
+        GamePresentationHpChangeV1 as HpChange, GamePresentationPayloadV1 as Payload,
+    };
     use BattlePresentationCueV5 as Cue;
     let mut observations = Vec::new();
     let mut effects = Vec::with_capacity(cues.len());
@@ -45,18 +47,34 @@ pub(super) fn project_current_battle_cues(
             }
             Cue::AbilityHeal {
                 pokemon,
-                before,
-                after,
+                before: hp_before,
+                after: hp_after,
                 requested_heal,
-            } => (
-                PresentationCueFamilyV1::Hp,
-                Some(Payload::HpRestored {
-                    holder: *pokemon,
-                    before: *before,
-                    after: *after,
-                    requested_heal: *requested_heal,
-                }),
-            ),
+            } => {
+                let change = player_safe_hp_change(
+                    before_state_run(before)?,
+                    *pokemon,
+                    *hp_before,
+                    *hp_after,
+                )?;
+                let payload = match change {
+                    HpChange::PlayerExact { before, after, .. } => Payload::HpRestored {
+                        holder: *pokemon,
+                        before,
+                        after,
+                        requested_heal: *requested_heal,
+                    },
+                    HpChange::EnemyBar {
+                        before_ten_thousandths,
+                        after_ten_thousandths,
+                    } => Payload::EnemyHpRestoredBar {
+                        holder: *pokemon,
+                        before_ten_thousandths,
+                        after_ten_thousandths,
+                    },
+                };
+                (PresentationCueFamilyV1::Hp, Some(payload))
+            }
             Cue::AbilityHidden {
                 pokemon,
                 ability,

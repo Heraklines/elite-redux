@@ -111,6 +111,11 @@ pub enum GamePresentationPayloadV1 {
         after: u32,
         requested_heal: u32,
     },
+    EnemyHpRestoredBar {
+        holder: PokemonId,
+        before_ten_thousandths: u16,
+        after_ten_thousandths: u16,
+    },
     AbilityHidden {
         holder: PokemonId,
         ability: AbilityId,
@@ -308,6 +313,17 @@ impl GamePresentationPayloadV1 {
                     && *after > *before
                     && *requested_heal > 0
                     && after - before <= *requested_heal,
+            ),
+            Self::EnemyHpRestoredBar {
+                holder,
+                before_ten_thousandths,
+                after_ten_thousandths,
+            } => (
+                PresentationCueFamilyV1::Hp,
+                holder.get() != SafeU53::ZERO
+                    && *before_ten_thousandths < 10_000
+                    && *after_ten_thousandths <= 10_000
+                    && after_ten_thousandths >= before_ten_thousandths,
             ),
             Self::RecoilMessage { holder } => {
                 (PresentationCueFamilyV1::Move, holder.get() != SafeU53::ZERO)

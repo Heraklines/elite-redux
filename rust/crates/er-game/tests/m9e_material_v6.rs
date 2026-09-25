@@ -65,6 +65,14 @@ fn battle_presentation_payloads_keep_typed_actor_and_cue_parameters() -> Result<
             Family::Hp,
         ),
         (
+            Payload::EnemyHpRestoredBar {
+                holder,
+                before_ten_thousandths: 4_615,
+                after_ten_thousandths: 6_923,
+            },
+            Family::Hp,
+        ),
+        (
             Payload::Switched {
                 holder,
                 slot: FieldSlot::new(BattleSide::Player, 0)?,
