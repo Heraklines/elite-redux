@@ -6,9 +6,15 @@ export const MAXIMUM_BROWSER_RESPONSE_BYTES_V2 = 32 * 1024 * 1024;
 
 // Rich kernel payloads retain their Rust-owned schema. The transport does not
 // reinterpret them as historical V1 state or claim to validate their content.
-export type CurrentJsonValue = null | boolean | number | string | CurrentJsonValue[] | {
-  [key: string]: CurrentJsonValue;
-};
+export type CurrentJsonValue =
+  | null
+  | boolean
+  | number
+  | string
+  | CurrentJsonValue[]
+  | {
+      [key: string]: CurrentJsonValue;
+    };
 export type CurrentJsonObject = { [key: string]: CurrentJsonValue };
 
 export interface BrowserSessionContextV2 {
@@ -20,13 +26,32 @@ export interface BrowserSessionContextV2 {
 
 // Rust's canonical wire form omits the false default for existing_saves.
 export type BrowserSessionInitializationV2 =
-  | { kind: "NATURAL_COOP"; context: BrowserSessionContextV2; profile: CurrentJsonObject;
-      seed: string; save_slots: string[]; local_is_host: boolean }
-  | { kind: "NATURAL_START"; context: BrowserSessionContextV2; profile: CurrentJsonObject;
-      seed: string; save_slots: string[]; local_is_host: boolean; existing_saves?: true }
-  | { kind: "FRESH_ACCOUNT_START"; context: BrowserSessionContextV2; profile: CurrentJsonObject;
-      seed: string; save_slots: string[]; account_identity: { trainer_id: number; secret_id: number };
-      existing_saves?: true }
+  | {
+      kind: "NATURAL_COOP";
+      context: BrowserSessionContextV2;
+      profile: CurrentJsonObject;
+      seed: string;
+      save_slots: string[];
+      local_is_host: boolean;
+    }
+  | {
+      kind: "NATURAL_START";
+      context: BrowserSessionContextV2;
+      profile: CurrentJsonObject;
+      seed: string;
+      save_slots: string[];
+      local_is_host: boolean;
+      existing_saves?: true;
+    }
+  | {
+      kind: "FRESH_ACCOUNT_START";
+      context: BrowserSessionContextV2;
+      profile: CurrentJsonObject;
+      seed: string;
+      save_slots: string[];
+      account_identity: { trainer_id: number; secret_id: number };
+      existing_saves?: true;
+    }
   | { kind: "EXISTING_SAVE"; context: BrowserSessionContextV2; save: CurrentJsonObject }
   | { kind: "SNAPSHOT"; context: BrowserSessionContextV2; snapshot: CurrentJsonObject }
   | { kind: "SCENARIO"; context: BrowserSessionContextV2; snapshot: CurrentJsonObject; scenario: number }
@@ -107,10 +132,7 @@ export type CurrentWorkerFailureV2 = {
   sequence: number | null;
   code: string;
   message: string;
-} & (
-  | { acceptance: "REJECTED"; accepted_sequence: number | null }
-  | { acceptance: "UNKNOWN"; accepted_sequence: null }
-);
+} & ({ acceptance: "REJECTED"; accepted_sequence: number | null } | { acceptance: "UNKNOWN"; accepted_sequence: null });
 
 export type PresentationAssetIdentityV1 =
   | "INTERFACE_WINDOW"
@@ -192,19 +214,34 @@ export function decodeBrowserResponseEnvelopeV2(buffer: ArrayBuffer): BrowserRes
     }
     return value;
   }) as BrowserResponseEnvelopeV2;
-  if (value == null || value.version !== 2 || !safeCurrentInteger(value.request_id)
-    || !safeCurrentInteger(value.accepted_sequence) || value.response == null) {
+  if (
+    value == null
+    || value.version !== 2
+    || !safeCurrentInteger(value.request_id)
+    || !safeCurrentInteger(value.accepted_sequence)
+    || value.response == null
+  ) {
     throw new Error("current Worker response ABI or correlation is invalid");
   }
   const response = value.response;
   switch (response.kind) {
     case "REBIND":
-      if (!safeCurrentInteger(response.output?.generation) || response.output.generation === 0
+      if (
+        !safeCurrentInteger(response.output?.generation)
+        || response.output.generation === 0
         || !Array.isArray(response.output.frames)
-        || response.output.frames.some(frame => !Array.isArray(frame) || frame.length === 0
-          || frame.length > 16 * 1024 || frame.some(byte => !safeCurrentInteger(byte) || byte > 255))
-        || response.observation == null || typeof response.observation !== "object"
-        || Array.isArray(response.observation) || response.observation.kernel_version !== 7) {
+        || response.output.frames.some(
+          frame =>
+            !Array.isArray(frame)
+            || frame.length === 0
+            || frame.length > 16 * 1024
+            || frame.some(byte => !safeCurrentInteger(byte) || byte > 255),
+        )
+        || response.observation == null
+        || typeof response.observation !== "object"
+        || Array.isArray(response.observation)
+        || response.observation.kernel_version !== 7
+      ) {
         throw new Error("current Worker rebind result is invalid");
       }
       break;
@@ -212,8 +249,12 @@ export function decodeBrowserResponseEnvelopeV2(buffer: ArrayBuffer): BrowserRes
     case "DISPOSED":
       break;
     case "SNAPSHOT":
-      if (response.snapshot == null || typeof response.snapshot !== "object"
-        || Array.isArray(response.snapshot) || response.snapshot.schema_version !== 7) {
+      if (
+        response.snapshot == null
+        || typeof response.snapshot !== "object"
+        || Array.isArray(response.snapshot)
+        || response.snapshot.schema_version !== 7
+      ) {
         throw new Error("current Worker snapshot is not V7");
       }
       break;
@@ -223,8 +264,11 @@ export function decodeBrowserResponseEnvelopeV2(buffer: ArrayBuffer): BrowserRes
       }
       break;
     case "EFFECTS":
-      if (response.batch?.external_sequence !== value.accepted_sequence || !Array.isArray(response.batch.effects)
-        || response.batch.effects.some(effect => effect == null || !CURRENT_EFFECT_KINDS_V2.has(effect.kind))) {
+      if (
+        response.batch?.external_sequence !== value.accepted_sequence
+        || !Array.isArray(response.batch.effects)
+        || response.batch.effects.some(effect => effect == null || !CURRENT_EFFECT_KINDS_V2.has(effect.kind))
+      ) {
         throw new Error("current Worker effect batch correlation is invalid");
       }
       break;
@@ -239,9 +283,19 @@ export function safeCurrentInteger(value: unknown): value is number {
 }
 
 const CURRENT_EFFECT_KINDS_V2 = new Set<string>([
-  "UTC_CLOCK_REQUEST", "FLASH_EGG_INPUTS_REQUEST",
-  "UI_CHANGED", "PRESENTATION", "PRESENTATION_SCENE_CHANGED", "SEND_NETWORK_FRAME", "STORAGE_REQUEST",
-  "ASSET_REQUEST", "AUDIO_CUE", "TERMINAL", "TELEMETRY", "REPRO_READY", "CURRENT_REPRO_READY",
+  "UTC_CLOCK_REQUEST",
+  "FLASH_EGG_INPUTS_REQUEST",
+  "UI_CHANGED",
+  "PRESENTATION",
+  "PRESENTATION_SCENE_CHANGED",
+  "SEND_NETWORK_FRAME",
+  "STORAGE_REQUEST",
+  "ASSET_REQUEST",
+  "AUDIO_CUE",
+  "TERMINAL",
+  "TELEMETRY",
+  "REPRO_READY",
+  "CURRENT_REPRO_READY",
 ]);
 /** Current payloads include signed stat stages/faction values. IDs are checked
  * separately; unsafe integers, fractions and non-finite values are not lossless
@@ -249,16 +303,27 @@ const CURRENT_EFFECT_KINDS_V2 = new Set<string>([
  */
 export function encodeCanonicalJsonV2(value: unknown): Uint8Array {
   const canonical = (value: unknown): string => {
-    if (value === null) return "null";
-    if (typeof value === "boolean" || typeof value === "string") return JSON.stringify(value);
+    if (value === null) {
+      return "null";
+    }
+    if (typeof value === "boolean" || typeof value === "string") {
+      return JSON.stringify(value);
+    }
     if (typeof value === "number") {
-      if (!Number.isSafeInteger(value)) throw new Error("current payload numbers must be signed safe integers");
+      if (!Number.isSafeInteger(value)) {
+        throw new Error("current payload numbers must be signed safe integers");
+      }
       return String(value);
     }
-    if (Array.isArray(value)) return `[${Array.from(value, canonical).join(",")}]`;
+    if (Array.isArray(value)) {
+      return `[${Array.from(value, canonical).join(",")}]`;
+    }
     if (typeof value === "object") {
       const object = value as Record<string, unknown>;
-      return `{${Object.keys(object).sort().map(key => `${JSON.stringify(key)}:${canonical(object[key])}`).join(",")}}`;
+      return `{${Object.keys(object)
+        .sort()
+        .map(key => `${JSON.stringify(key)}:${canonical(object[key])}`)
+        .join(",")}}`;
     }
     throw new Error("current payload is not canonical JSON");
   };

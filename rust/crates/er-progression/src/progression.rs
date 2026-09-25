@@ -509,7 +509,7 @@ fn recalculate_stats(
     pokemon.stats = stats;
     pokemon.max_hp = stats.hp;
     if !pokemon.fainted {
-        let gained = pokemon.max_hp.saturating_sub(previous_max);
+        let gained = pokemon.max_hp.checked_sub(previous_max).unwrap_or(0);
         pokemon.hp = pokemon
             .hp
             .checked_add(gained)

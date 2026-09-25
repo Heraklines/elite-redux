@@ -62,7 +62,23 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: cargo fmt --manifest-path rust/Cargo.toml --all -- --check
+      - id: rustfmt
+        run: cargo fmt --manifest-path rust/Cargo.toml --all -- --check
+      - name: Retain the exact bounded remote Rust formatter correction
+        if: failure() && steps.rustfmt.conclusion == 'failure'
+        shell: bash
+        run: |
+          cargo fmt --manifest-path rust/Cargo.toml --all
+          git diff --binary -- rust/crates > "$RUNNER_TEMP/m9e-q-rustfmt.patch"
+          test -s "$RUNNER_TEMP/m9e-q-rustfmt.patch"
+          test "$(wc -c < "$RUNNER_TEMP/m9e-q-rustfmt.patch")" -le 262144
+      - uses: actions/upload-artifact@v6
+        if: failure() && steps.rustfmt.conclusion == 'failure'
+        with:
+          name: m9e-q-rustfmt-${{ env.CANDIDATE_SHA }}
+          path: ${{ runner.temp }}/m9e-q-rustfmt.patch
+          if-no-files-found: error
+          retention-days: 14
       - run: cargo clippy --manifest-path rust/Cargo.toml -p er-production -p er-web --all-targets --no-deps -- -D warnings
       - run: node scripts/check-kernel-m9-engineering.mjs
       - name: Typecheck V7 browser boundary
@@ -155,6 +171,15 @@ jobs:
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Generate and verify the complete pinned source cases
         run: python3 scripts/ci/m9e_q_source_oracles.py "$RUNNER_TEMP/m9e-q-oracles"
+      - name: Bind the qualified actual friendship observations
+        env:
+          GH_TOKEN: ${{ github.token }}
+          M9E_NATIVE_LANE: b
+        run: |
+          python3 scripts/ci/m9e_friendship_inputs.py
+          mkdir "$RUNNER_TEMP/m9e-q-oracles/friendship"
+          cp "$RUNNER_TEMP/m9e-feedback/full/qualified-oracle/export-one.json" "$RUNNER_TEMP/m9e-q-oracles/friendship/export-one.json"
+          cp "$RUNNER_TEMP/m9e-feedback/full/qualified-oracle/effects-one.json" "$RUNNER_TEMP/m9e-q-oracles/friendship/effects-one.json"
       - uses: actions/upload-artifact@v6
         with:
           name: m9e-q-oracles-${{ env.CANDIDATE_SHA }}
@@ -227,6 +252,8 @@ jobs:
             test -s "$path"
             printf '%s=%s\n' "$variable" "$path" >> "$GITHUB_ENV"
           done
+          printf 'M9_FRIENDSHIP_COMPARISON_INPUT=%s\n' "$RUNNER_TEMP/m9e-q-oracles/friendship/export-one.json" >> "$GITHUB_ENV"
+          printf 'M9_FRIENDSHIP_EFFECTS_INPUT=%s\n' "$RUNNER_TEMP/m9e-q-oracles/friendship/effects-one.json" >> "$GITHUB_ENV"
       - name: Restore Cargo dependency downloads
         uses: actions/cache@v5
         with:

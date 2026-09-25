@@ -975,9 +975,9 @@ fn open_rebind_executes_actual_owned_gameplay_and_retries_strict_v2_receipt() ->
     handshake(&mut host, &mut guest, offer)?;
     let transcript = owner(&host.snapshot()?)?.transcript.clone();
     let (_, proposal) = actual_guest_proposal(&mut host, &mut guest, 2)?;
-    let before = host.snapshot()?;
+    let before = Box::new(host.snapshot()?);
     assert!(host.admit_game_proposal(&proposal).is_err());
-    assert_eq!(host.snapshot()?, before);
+    assert_eq!(host.snapshot()?, *before);
     let reply = wire(&host.ingest_network_frame(ConnectionGeneration::new(safe(2)), &proposal)?)?;
     let decoded = CurrentProposalMaterialReceiptV2::decode(&reply)?;
     assert_eq!(decoded.evidence()?.proposal_bytes, proposal);
@@ -986,7 +986,7 @@ fn open_rebind_executes_actual_owned_gameplay_and_retries_strict_v2_receipt() ->
         decoded.authority_context.connection_generation,
         ConnectionGeneration::new(safe(2))
     );
-    let host_after = host.snapshot()?;
+    let host_after = Box::new(host.snapshot()?);
     assert!(
         host_after
             .current_coop_setup
@@ -999,30 +999,30 @@ fn open_rebind_executes_actual_owned_gameplay_and_retries_strict_v2_receipt() ->
         wire(&host.ingest_network_frame(ConnectionGeneration::new(safe(2)), &proposal)?)?,
         reply
     );
-    assert_eq!(host.snapshot()?, host_after);
+    assert_eq!(host.snapshot()?, *host_after);
     for kernel in [&mut host, &mut guest] {
         kernel.transport_changed(ConnectionGeneration::new(safe(2)), false)?;
     }
     host = restored(&host, content()?, true)?;
     guest = restored(&guest, content()?, false)?;
-    let disconnected = guest.snapshot()?;
+    let disconnected = Box::new(guest.snapshot()?);
     assert!(guest.retry_current_coop_setup().is_err());
     assert!(
         guest
             .ingest_network_frame(ConnectionGeneration::new(safe(2)), &reply)
             .is_err()
     );
-    assert_eq!(guest.snapshot()?, disconnected);
+    assert_eq!(guest.snapshot()?, *disconnected);
     for kernel in [&mut host, &mut guest] {
         kernel.transport_changed(ConnectionGeneration::new(safe(2)), true)?;
     }
     assert_eq!(wire(&guest.retry_current_coop_setup()?)?, proposal);
-    let before_retry = host.snapshot()?;
+    let before_retry = Box::new(host.snapshot()?);
     assert_eq!(
         wire(&host.ingest_network_frame(ConnectionGeneration::new(safe(2)), &proposal)?)?,
         reply
     );
-    assert_eq!(host.snapshot()?, before_retry);
+    assert_eq!(host.snapshot()?, *before_retry);
     let step = guest.ingest_network_frame(ConnectionGeneration::new(safe(2)), &reply)?;
     assert!(step.effects.iter().all(|effect| matches!(
         effect,
@@ -1031,14 +1031,14 @@ fn open_rebind_executes_actual_owned_gameplay_and_retries_strict_v2_receipt() ->
             | GameKernelEffectV7::Terminal(_)
     )));
     assert!(guest.snapshot()?.current_proposal.is_none());
-    let applied = guest.snapshot()?;
+    let applied = Box::new(guest.snapshot()?);
     assert!(
         guest
             .ingest_network_frame(ConnectionGeneration::new(safe(2)), &reply)?
             .effects
             .is_empty()
     );
-    assert_eq!(guest.snapshot()?, applied);
+    assert_eq!(guest.snapshot()?, *applied);
     assert!(settle_owned_presentations(&mut guest)? > 0);
     settle_owned_presentations(&mut host)?;
     assert_eq!(host.state(), guest.state());

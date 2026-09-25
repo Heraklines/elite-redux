@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import type { BrowserEffectBatchV2, BrowserRequestV2, GamePresentationEffectV2Wire } from "../../../../src/rust-browser/contracts/browser-contracts-v2";
+import type {
+  BrowserEffectBatchV2,
+  BrowserRequestV2,
+  GamePresentationEffectV2Wire,
+} from "../../../../src/rust-browser/contracts/browser-contracts-v2";
 import {
   type BrowserEffectAdaptersV2,
   BrowserEffectRouterV2,
@@ -10,25 +14,46 @@ describe("BrowserEffectRouterV2", () => {
     const delivered: BrowserRequestV2[] = [];
     const noop = () => {};
     const adapters: BrowserEffectAdaptersV2 = {
-      completeExternalRequest: request => { delivered.push(request); },
-      renderUi: noop, present: noop, changePresentationScene: noop, sendNetworkFrame: noop,
-      handleStorageRequest: noop, requestAsset: noop, playAudioCue: noop, showTerminal: noop,
-      recordTelemetry: noop, publishRepro: noop, publishCurrentRepro: noop, dispose: noop,
+      completeExternalRequest: request => {
+        delivered.push(request);
+      },
+      renderUi: noop,
+      present: noop,
+      changePresentationScene: noop,
+      sendNetworkFrame: noop,
+      handleStorageRequest: noop,
+      requestAsset: noop,
+      playAudioCue: noop,
+      showTerminal: noop,
+      recordTelemetry: noop,
+      publishRepro: noop,
+      publishCurrentRepro: noop,
+      dispose: noop,
     };
     const random = vi.spyOn(Math, "random").mockReturnValue(0.5);
     const now = vi.spyOn(Date, "now").mockReturnValue(1234);
     try {
       const router = new BrowserEffectRouterV2(adapters);
-      const batch: BrowserEffectBatchV2 = { external_sequence: 1, effects: [
-        { kind: "UTC_CLOCK_REQUEST", request_id: 7 },
-        { kind: "FLASH_EGG_INPUTS_REQUEST", request: { request: 8, pending: 1 } },
-      ] };
+      const batch: BrowserEffectBatchV2 = {
+        external_sequence: 1,
+        effects: [
+          { kind: "UTC_CLOCK_REQUEST", request_id: 7 },
+          { kind: "FLASH_EGG_INPUTS_REQUEST", request: { request: 8, pending: 1 } },
+        ],
+      };
       await router.dispatch(batch);
       expect(delivered).toEqual([
         { kind: "UTC_CLOCK_RESULT", request_id: 7, utc_milliseconds: 1234 },
-        { kind: "FLASH_EGG_INPUTS", input: { request: 8, pending: 1,
-          seed_draws: Array.from({ length: 24 }, () => ({ ieee754_bits: "3fe0000000000000" })),
-          id_draw: { ieee754_bits: "3fe0000000000000" }, egg_utc_milliseconds: 1234 } },
+        {
+          kind: "FLASH_EGG_INPUTS",
+          input: {
+            request: 8,
+            pending: 1,
+            seed_draws: Array.from({ length: 24 }, () => ({ ieee754_bits: "3fe0000000000000" })),
+            id_draw: { ieee754_bits: "3fe0000000000000" },
+            egg_utc_milliseconds: 1234,
+          },
+        },
       ]);
       expect(random).toHaveBeenCalledTimes(25);
       await expect(router.dispatch(batch)).rejects.toThrow("stale");
@@ -38,11 +63,17 @@ describe("BrowserEffectRouterV2", () => {
       expect(delivered.slice(2)).toEqual(delivered.slice(0, 2));
       expect(random).toHaveBeenCalledTimes(50);
       delete adapters.completeExternalRequest;
-      await expect(new BrowserEffectRouterV2(adapters).dispatch({ external_sequence: 2,
-        effects: [{ kind: "FLASH_EGG_INPUTS_REQUEST", request: { request: 9, pending: 1 } }],
-      })).rejects.toThrow("adapter is unavailable");
+      await expect(
+        new BrowserEffectRouterV2(adapters).dispatch({
+          external_sequence: 2,
+          effects: [{ kind: "FLASH_EGG_INPUTS_REQUEST", request: { request: 9, pending: 1 } }],
+        }),
+      ).rejects.toThrow("adapter is unavailable");
       expect(random).toHaveBeenCalledTimes(50);
-    } finally { random.mockRestore(); now.mockRestore(); }
+    } finally {
+      random.mockRestore();
+      now.mockRestore();
+    }
   });
   it("routes every typed effect once and fences stale or disposed batches", async () => {
     const calls: string[] = [];
@@ -53,7 +84,9 @@ describe("BrowserEffectRouterV2", () => {
       renderUi: () => {
         calls.push("UI_CHANGED");
       },
-      completeExternalRequest: request => { external.push(request); },
+      completeExternalRequest: request => {
+        external.push(request);
+      },
       present: effect => {
         presented.push(effect);
         calls.push("PRESENTATION");
@@ -159,19 +192,45 @@ describe("BrowserEffectRouterV2", () => {
     // Exact current Rust field names, not a TypeScript validator or DOM renderer.
     // Transport must keep the queued Growl and Candy/LevelUp parameters intact.
     const payloadEffects: GamePresentationEffectV2Wire[] = [
-      { event_id: 2, semantic: { kind: "CUE", value: "MOVE" }, blocking: "BLOCKS_HUMAN_INPUT", skip: "FORBIDDEN",
-        payload: { kind: "STAT_STAGE_ANIMATION", holder: 2, stat: 1, before: 0, after: -1, tween_milliseconds: 1750 } },
-      { event_id: 3, semantic: { kind: "CUE", value: "MOVE" }, blocking: "BLOCKS_HUMAN_INPUT", skip: "FORBIDDEN",
-        payload: { kind: "STAT_STAGE_MESSAGE", holder: 2, stat: 1, before: 0, after: -1 } },
-      { event_id: 4, semantic: { kind: "CUE", value: "PROGRESSION" }, blocking: "BLOCKS_HUMAN_INPUT", skip: "FORBIDDEN",
-        payload: { kind: "CANDY_LEVEL_MESSAGE", holder: 1, level: 7 } },
-      { event_id: 5, semantic: { kind: "CUE", value: "PROGRESSION" }, blocking: "BLOCKS_HUMAN_INPUT", skip: "FORBIDDEN",
-        payload: { kind: "LEVEL_STATS", holder: 1, previous_level: 6, level: 7,
+      {
+        event_id: 2,
+        semantic: { kind: "CUE", value: "MOVE" },
+        blocking: "BLOCKS_HUMAN_INPUT",
+        skip: "FORBIDDEN",
+        payload: { kind: "STAT_STAGE_ANIMATION", holder: 2, stat: 1, before: 0, after: -1, tween_milliseconds: 1750 },
+      },
+      {
+        event_id: 3,
+        semantic: { kind: "CUE", value: "MOVE" },
+        blocking: "BLOCKS_HUMAN_INPUT",
+        skip: "FORBIDDEN",
+        payload: { kind: "STAT_STAGE_MESSAGE", holder: 2, stat: 1, before: 0, after: -1 },
+      },
+      {
+        event_id: 4,
+        semantic: { kind: "CUE", value: "PROGRESSION" },
+        blocking: "BLOCKS_HUMAN_INPUT",
+        skip: "FORBIDDEN",
+        payload: { kind: "CANDY_LEVEL_MESSAGE", holder: 1, level: 7 },
+      },
+      {
+        event_id: 5,
+        semantic: { kind: "CUE", value: "PROGRESSION" },
+        blocking: "BLOCKS_HUMAN_INPUT",
+        skip: "FORBIDDEN",
+        payload: {
+          kind: "LEVEL_STATS",
+          holder: 1,
+          previous_level: 6,
+          level: 7,
           previous_stats: { hp: 23, attack: 11, defense: 12, special_attack: 13, special_defense: 13, speed: 10 },
-          stats: { hp: 25, attack: 12, defense: 13, special_attack: 14, special_defense: 14, speed: 11 } } },
+          stats: { hp: 25, attack: 12, defense: 13, special_attack: 14, special_defense: 14, speed: 11 },
+        },
+      },
     ];
     const frozenPayloads = JSON.stringify(payloadEffects);
-    await router.dispatch({ external_sequence: 2,
+    await router.dispatch({
+      external_sequence: 2,
       effects: payloadEffects.map(effect => ({ kind: "PRESENTATION" as const, effect })),
     });
     expect(presented.slice(1)).toEqual(payloadEffects);

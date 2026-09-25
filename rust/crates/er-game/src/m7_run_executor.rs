@@ -373,12 +373,10 @@ fn dispatch_operation<C: RunExecutionContentV1>(
                     .position(|candidate| candidate.id == id)
                     .ok_or(RunExecutionError::Operation)?;
                 let stored = run.party.remove(index);
-                let next_slot = run
-                    .storage
-                    .iter()
-                    .map(|entry| entry.slot.get().get())
-                    .max()
-                    .map_or(0, |value| value.saturating_add(1));
+                let next_slot = match run.storage.iter().map(|entry| entry.slot.get().get()).max() {
+                    Some(value) => value.checked_add(1).ok_or(RunExecutionError::Overflow)?,
+                    None => 0,
+                };
                 let slot = StorageSlotId::new(
                     SafeU53::new(next_slot).map_err(|_| RunExecutionError::Overflow)?,
                 );

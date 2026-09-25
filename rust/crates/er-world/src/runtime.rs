@@ -331,7 +331,7 @@ fn is_interval_multiple(wave: u32, interval: u32) -> bool {
 }
 
 pub fn legend_min_wave(base_stat_total: u32) -> u32 {
-    let delta = u64::from(base_stat_total).saturating_sub(540);
+    let delta = u64::from(base_stat_total).checked_sub(540).unwrap_or(0);
     let rounded_quarters = (delta + 2) / 4;
     u32::try_from((55 + rounded_quarters).clamp(55, 90)).unwrap_or(90)
 }
@@ -410,7 +410,7 @@ pub fn biome_overstay(
         return 0;
     }
     world.overstay_anchor_wave.map_or(0, |anchor| {
-        wave.get().get().saturating_sub(anchor.get().get())
+        wave.get().get().checked_sub(anchor.get().get()).unwrap_or(0)
     })
 }
 

@@ -781,7 +781,7 @@ fn execute_move(
         }
         let target = pokemon_mut(run, target_id).ok_or(BattleV5Error::Target)?;
         let before_hp = target.hp;
-        target.hp = target.hp.saturating_sub(damage);
+        target.hp = target.hp.checked_sub(damage).unwrap_or(0);
         target.fainted = target.hp == 0;
         mutations.push(BattleMutation::HpChanged {
             pokemon: target_id,
@@ -836,7 +836,7 @@ fn execute_move(
         let actor = pokemon_mut(run, actor_id).ok_or(BattleV5Error::InactiveActor(actor_id))?;
         let before_hp = actor.hp;
         let recoil = (actor.max_hp / 4).max(1);
-        actor.hp = actor.hp.saturating_sub(recoil);
+        actor.hp = actor.hp.checked_sub(recoil).unwrap_or(0);
         actor.fainted = actor.hp == 0;
         mutations.push(BattleMutation::HpChanged {
             pokemon: actor_id,

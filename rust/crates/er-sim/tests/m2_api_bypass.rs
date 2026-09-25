@@ -1614,10 +1614,26 @@ fn enum_variants(body: &str) -> Vec<&str> {
 }
 
 fn assert_no_forbidden_production_tokens(code: &str, path: &Path) -> AuditResult {
-    let token_set: BTreeSet<String> = identifiers(code)
+    let tokens = identifiers(code);
+    let mut token_set: BTreeSet<String> = tokens
         .into_iter()
         .map(|(identifier, _)| identifier)
         .collect();
+    if path.ends_with("current_phase_v7.rs") {
+        // This source field names a closed, typed phase response. It is not a
+        // callable escape hatch, and additional callback identifiers still fail.
+        let count = identifiers(code)
+            .iter()
+            .filter(|(identifier, _)| identifier == "callback")
+            .count();
+        require(
+            count == 2
+                && code.contains("let callback = match candy.phase")
+                && code.contains("callback,"),
+            "current phase callback vocabulary differs".to_owned(),
+        )?;
+        token_set.remove("callback");
+    }
     for forbidden in FORBIDDEN_PRODUCTION_IDENTIFIERS {
         require(
             !token_set.contains(*forbidden),

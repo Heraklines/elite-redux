@@ -718,12 +718,12 @@ fn natural_rebind_controls_and_generation_two_gameplay_replay_exactly() -> TestR
     let proposal = guest.next_frame()?;
     let decoded = er_kernel::current_proposal_v7::decode_current_proposal_v1(&proposal)?;
     assert_eq!(decoded.connection_generation, generation(2));
-    let pending = guest.session.snapshot()?;
+    let pending = Box::new(guest.session.snapshot()?);
     assert_eq!(
         wire(&guest.ordinary(CurrentExternalEvent::RetryCoopSetup)?)?,
         proposal
     );
-    assert_eq!(guest.session.snapshot()?, pending);
+    assert_eq!(guest.session.snapshot()?, *pending);
     let reply = wire(&host.ordinary(CurrentExternalEvent::NetworkFrame {
         generation: generation(2),
         bytes: proposal.clone(),
@@ -737,7 +737,7 @@ fn natural_rebind_controls_and_generation_two_gameplay_replay_exactly() -> TestR
     assert!(
         er_kernel::current_proposal_v7::CurrentProposalMaterialReceiptV1::decode(&reply).is_err()
     );
-    let host_after = host.session.snapshot()?;
+    let host_after = Box::new(host.session.snapshot()?);
     assert_eq!(
         wire(&host.ordinary(CurrentExternalEvent::NetworkFrame {
             generation: generation(2),
@@ -745,14 +745,14 @@ fn natural_rebind_controls_and_generation_two_gameplay_replay_exactly() -> TestR
         })?)?,
         reply
     );
-    assert_eq!(host.session.snapshot()?, host_after);
+    assert_eq!(host.session.snapshot()?, *host_after);
     guest.restore_midphase()?;
     guest.ordinary(CurrentExternalEvent::NetworkFrame {
         generation: generation(2),
         bytes: reply.clone(),
     })?;
     assert!(guest.session.snapshot()?.current_proposal.is_none());
-    let guest_after = guest.session.snapshot()?;
+    let guest_after = Box::new(guest.session.snapshot()?);
     assert!(
         guest
             .ordinary(CurrentExternalEvent::NetworkFrame {
@@ -762,7 +762,7 @@ fn natural_rebind_controls_and_generation_two_gameplay_replay_exactly() -> TestR
             .effects
             .is_empty()
     );
-    assert_eq!(guest.session.snapshot()?, guest_after);
+    assert_eq!(guest.session.snapshot()?, *guest_after);
     assert!(guest.settle()? > 0);
     host.settle()?;
     assert_eq!(
@@ -770,7 +770,7 @@ fn natural_rebind_controls_and_generation_two_gameplay_replay_exactly() -> TestR
         guest.session.kernel_ref()?.state()
     );
     for peer in [&host, &guest] {
-        let capsule = peer.replay()?;
+        let capsule = Box::new(peer.replay()?);
         assert_eq!(capsule.schema_version, 1);
         assert!(capsule.attempts.iter().any(|attempt| matches!(
             &attempt.event,
@@ -839,7 +839,7 @@ impl From<CurrentSessionError> for AdmissionError {
 fn rebind_response_admission_and_rejections_preserve_complete_session() -> TestResult {
     let (mut host, mut guest) = captured_pair()?;
     let offer = begin_sessions(&mut host, &mut guest)?;
-    let before = guest.session.snapshot()?;
+    let before = Box::new(guest.session.snapshot()?);
     let observation = guest.session.observe()?;
     for control in [
         CurrentCoopRebindEventV1::Receive {
@@ -853,11 +853,11 @@ fn rebind_response_admission_and_rejections_preserve_complete_session() -> TestR
     ] {
         let position = guest.recorder.export()?.final_position;
         assert!(guest.rebind(control)?.is_err());
-        assert_eq!(guest.session.snapshot()?, before);
+        assert_eq!(guest.session.snapshot()?, *before);
         assert_eq!(guest.session.observe()?, observation);
         assert_eq!(guest.recorder.export()?.final_position, position + 1);
     }
-    let rejected = guest.replay()?;
+    let rejected = Box::new(guest.replay()?);
     assert_eq!(
         rejected
             .attempts
@@ -883,7 +883,7 @@ fn rebind_response_admission_and_rejections_preserve_complete_session() -> TestR
     };
     let admission: Result<(), AdmissionError> = guest.session.apply_rebind_with(control.clone(), |candidate, output| {
         assert_eq!(output.frames.len(), 1);
-        assert_ne!(candidate.snapshot()?, before);
+        assert_ne!(candidate.snapshot()?, *before);
         let response = serde_json::json!({"output":output,"observation":candidate.observe()?,"snapshot":candidate.snapshot()?});
         let bytes = serde_json::to_vec(&response).map_err(|error| AdmissionError::Session(CurrentSessionError::Digest(error.to_string())))?;
         if bytes.len() > 1 { return Err(AdmissionError::ResponseBudget); }
@@ -894,7 +894,7 @@ fn rebind_response_admission_and_rejections_preserve_complete_session() -> TestR
         Err(AdmissionError::Session(error)) => return Err(error.into()),
         Ok(()) => return Err("one-byte response admission unexpectedly succeeded".into()),
     }
-    assert_eq!(guest.session.snapshot()?, before);
+    assert_eq!(guest.session.snapshot()?, *before);
     assert_eq!(guest.session.observe()?, observation);
     guest.check()?;
     assert!(matches!(
@@ -906,22 +906,22 @@ fn rebind_response_admission_and_rejections_preserve_complete_session() -> TestR
     assert!(guest.recorder.export().is_err());
     let output = guest.rebind(control)??;
     assert_eq!(output.frames.len(), 1);
-    let suffix = guest.replay()?;
+    let suffix = Box::new(guest.replay()?);
     assert_eq!(suffix.attempts.len(), 1);
     assert_eq!(suffix.final_position, suffix.base_position + 1);
 
-    let before = host.session.snapshot()?;
+    let before = Box::new(host.session.snapshot()?);
     let observation = host.session.observe()?;
     let (seat, role) = host.session.session_context()?;
     let origin_recorder = CurrentReproRecorderV1::new(
-        before.clone(),
+        (*before).clone(),
         seat,
         role,
         content()?,
         CurrentReproLimitsV1::default(),
     )?;
     let retry = host.session.apply_rebind(CurrentCoopRebindEventV1::Retry)?;
-    assert_eq!(host.session.snapshot()?, before);
+    assert_eq!(host.session.snapshot()?, *before);
     let mut without_origin = origin_recorder.clone();
     assert!(matches!(
         without_origin.record_rebind(
@@ -947,25 +947,25 @@ fn rebind_response_admission_and_rejections_preserve_complete_session() -> TestR
         );
         if length == 128 {
             assert!(matches!(status, CurrentCaptureStatusV1::Available { .. }));
-            let capsule = recorder.export()?;
+            let capsule = Box::new(recorder.export()?);
             assert_eq!(capsule.attempts[0].origin.as_deref(), Some(origin.as_str()));
             assert_eq!(
                 replay_current_capsule_v1(&capsule, content()?, CurrentReproLimitsV1::default())?
                     .snapshot()?,
-                before
+                *before
             );
         } else {
             assert!(matches!(status, CurrentCaptureStatusV1::Unavailable { .. }));
             assert!(recorder.export().is_err());
         }
     }
-    let before = host.session.snapshot()?;
+    let before = Box::new(host.session.snapshot()?);
     let misuse = CurrentExternalEvent::CoopRebind {
         control: CurrentCoopRebindEventV1::Retry,
     };
     let outcome = host.session.apply(misuse.clone());
     assert!(outcome.is_err());
-    assert_eq!(host.session.snapshot()?, before);
+    assert_eq!(host.session.snapshot()?, *before);
     let observation = host.session.observe()?;
     assert!(matches!(
         host.recorder
@@ -989,7 +989,7 @@ fn deleted_reordered_or_forged_rebind_attempts_fail_replay() -> TestResult {
     let (mut host, mut guest) = captured_pair()?;
     let offer = begin_sessions(&mut host, &mut guest)?;
     handshake_sessions(&mut host, &mut guest, offer)?;
-    let original = guest.replay()?;
+    let original = Box::new(guest.replay()?);
     let receives = original
         .attempts
         .iter()
@@ -1046,7 +1046,7 @@ fn deleted_reordered_or_forged_rebind_attempts_fail_replay() -> TestResult {
         milliseconds: SafeU53::ZERO,
     };
     assert!(wrong_event.validate(limits).is_err());
-    assert_eq!(guest.recorder.export()?, original);
+    assert_eq!(guest.recorder.export()?, *original);
     guest.check()?;
     Ok(())
 }
