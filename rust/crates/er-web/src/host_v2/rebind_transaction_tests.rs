@@ -152,7 +152,7 @@ fn profile() -> TestResult<ProfileStateV1> {
 
 #[derive(Clone, Debug)]
 struct Peer {
-    host: BrowserKernelHostV2,
+    host: Box<BrowserKernelHostV2>,
 }
 
 impl Peer {
@@ -166,7 +166,7 @@ impl Peer {
             replica_protocol(host, guest, generation(1))?
         };
         let mut peer = Self {
-            host: BrowserKernelHostV2::from_content(content()?),
+            host: Box::new(BrowserKernelHostV2::from_content(content()?)),
         };
         let response = peer.send(BrowserRequestV2::Initialize {
             initialization: Box::new(BrowserSessionInitializationV2::NaturalCoop {

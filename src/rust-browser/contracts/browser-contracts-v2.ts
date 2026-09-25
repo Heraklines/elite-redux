@@ -186,8 +186,7 @@ export interface CurrentPresentationSceneV1Wire {
     form: number;
     owner_seat: number | null;
     status: "NONE" | "POISON" | "TOXIC" | "PARALYSIS" | "SLEEP" | "BURN";
-    hp: { kind: "PLAYER_EXACT"; hp: number; max_hp: number }
-      | { kind: "ENEMY_BAR"; ten_thousandths: number };
+    hp: { kind: "PLAYER_EXACT"; hp: number; max_hp: number } | { kind: "ENEMY_BAR"; ten_thousandths: number };
   }>;
 }
 
@@ -276,7 +275,11 @@ export function decodeBrowserResponseEnvelopeV2(buffer: ArrayBuffer): BrowserRes
       }
       break;
     case "SCENE":
-      if (response.scene?.schema_version !== 1 || response.scene.control == null || !Array.isArray(response.scene.actors)) {
+      if (
+        response.scene?.schema_version !== 1
+        || response.scene.control == null
+        || !Array.isArray(response.scene.actors)
+      ) {
         throw new Error("current Worker scene projection is invalid");
       }
       break;

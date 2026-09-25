@@ -36,6 +36,9 @@ jobs:
       - name: Execute browser host scene contract witnesses
         working-directory: rust
         run: cargo test --locked -p er-web --test m9e_host_v2 -- --nocapture
+      - name: Execute complete browser host library witnesses
+        working-directory: rust
+        run: cargo test --locked -p er-web --lib -- --nocapture
       - name: Check strict game and web Clippy
         working-directory: rust
         run: cargo clippy --locked -p er-game -p er-web --all-targets --no-deps -- -D warnings

@@ -7,8 +7,14 @@ type MenuView = {
 };
 
 const KEY_CODES = {
-  ArrowUp: "ARROW_UP", ArrowDown: "ARROW_DOWN", ArrowLeft: "ARROW_LEFT", ArrowRight: "ARROW_RIGHT",
-  Enter: "ENTER", Space: "SPACE", Escape: "ESCAPE", Backspace: "BACKSPACE",
+  ArrowUp: "ARROW_UP",
+  ArrowDown: "ARROW_DOWN",
+  ArrowLeft: "ARROW_LEFT",
+  ArrowRight: "ARROW_RIGHT",
+  Enter: "ENTER",
+  Space: "SPACE",
+  Escape: "ESCAPE",
+  Backspace: "BACKSPACE",
 } as const;
 
 /** Modest current-session reference view. It only receives the game-owned
@@ -24,9 +30,15 @@ export class CurrentSceneDomV1 {
   #failed = false;
   #disposed = false;
 
-  constructor(root: HTMLElement, localSeat: number, send: (request: BrowserRequestV2) => Promise<unknown>,
-    onError: (error: unknown) => void) {
-    if (!Number.isSafeInteger(localSeat) || localSeat <= 0) throw new Error("invalid local presentation seat");
+  constructor(
+    root: HTMLElement,
+    localSeat: number,
+    send: (request: BrowserRequestV2) => Promise<unknown>,
+    onError: (error: unknown) => void,
+  ) {
+    if (!Number.isSafeInteger(localSeat) || localSeat <= 0) {
+      throw new Error("invalid local presentation seat");
+    }
     this.#root = root;
     this.#localSeat = localSeat;
     this.#send = send;
@@ -37,21 +49,28 @@ export class CurrentSceneDomV1 {
   }
 
   render(scene: CurrentPresentationSceneV1Wire): void {
-    if (this.#disposed || scene.schema_version !== 1) throw new Error("unsupported current scene");
+    if (this.#disposed || scene.schema_version !== 1) {
+      throw new Error("unsupported current scene");
+    }
     this.#scene = scene;
     const doc = this.#root.ownerDocument;
     const heading = doc.createElement("h2");
     heading.textContent = scene.control.kind;
     const owner = doc.createElement("p");
-    owner.textContent = scene.control.owner_seat == null ? "Shared control"
-      : scene.control.owner_seat === this.#localSeat ? "Your control" : `Seat ${scene.control.owner_seat} controls`;
+    owner.textContent =
+      scene.control.owner_seat == null
+        ? "Shared control"
+        : scene.control.owner_seat === this.#localSeat
+          ? "Your control"
+          : `Seat ${scene.control.owner_seat} controls`;
     const field = doc.createElement("ul");
     field.setAttribute("aria-label", "Battle field");
     for (const actor of scene.actors) {
       const item = doc.createElement("li");
-      const hp = actor.hp.kind === "PLAYER_EXACT"
-        ? `HP ${actor.hp.hp}/${actor.hp.max_hp}`
-        : `HP bar ${Math.round(actor.hp.ten_thousandths / 100)}%`;
+      const hp =
+        actor.hp.kind === "PLAYER_EXACT"
+          ? `HP ${actor.hp.hp}/${actor.hp.max_hp}`
+          : `HP bar ${Math.round(actor.hp.ten_thousandths / 100)}%`;
       item.textContent = `${actor.slot.side} ${actor.slot.position + 1}: species ${actor.species}, form ${actor.form}, ${hp}, ${actor.status}`;
       field.append(item);
     }
@@ -59,7 +78,9 @@ export class CurrentSceneDomV1 {
     const options = doc.createElement("ul");
     options.setAttribute("aria-label", menu?.control_id ?? "No menu");
     for (const option of menu?.options ?? []) {
-      if (!option.visible) continue;
+      if (!option.visible) {
+        continue;
+      }
       const item = doc.createElement("li");
       const selected = option.option_id === menu?.selected_option_id;
       item.textContent = `${selected ? "▶ " : ""}${option.option_id}${option.enabled ? "" : " (unavailable)"}`;
@@ -71,7 +92,9 @@ export class CurrentSceneDomV1 {
   }
 
   dispose(): void {
-    if (this.#disposed) return;
+    if (this.#disposed) {
+      return;
+    }
     this.#disposed = true;
     this.#scene = null;
     this.#root.removeEventListener("keydown", this.#key);
@@ -80,17 +103,32 @@ export class CurrentSceneDomV1 {
   }
 
   readonly #key = (event: KeyboardEvent): void => {
-    if (this.#disposed || this.#failed || this.#scene == null) return;
-    if (this.#scene.control.owner_seat != null && this.#scene.control.owner_seat !== this.#localSeat) return;
+    if (this.#disposed || this.#failed || this.#scene == null) {
+      return;
+    }
+    if (this.#scene.control.owner_seat != null && this.#scene.control.owner_seat !== this.#localSeat) {
+      return;
+    }
     const kind = KEY_CODES[event.code as keyof typeof KEY_CODES];
-    if (kind == null) return;
+    if (kind == null) {
+      return;
+    }
     event.preventDefault();
-    const request: BrowserRequestV2 = { kind: "RAW_INPUT", event: event.type === "keydown"
-      ? { kind: "KEY_DOWN", data: { code: { kind }, printable: false, browser_repeat: event.repeat, focus: "GAME" } }
-      : { kind: "KEY_UP", data: { code: { kind } } } };
-    this.#delivery = this.#delivery.then(() => this.#send(request)).catch(error => {
-      this.#failed = true;
-      this.#onError(error);
-    });
+    const request: BrowserRequestV2 = {
+      kind: "RAW_INPUT",
+      event:
+        event.type === "keydown"
+          ? {
+              kind: "KEY_DOWN",
+              data: { code: { kind }, printable: false, browser_repeat: event.repeat, focus: "GAME" },
+            }
+          : { kind: "KEY_UP", data: { code: { kind } } },
+    };
+    this.#delivery = this.#delivery
+      .then(() => this.#send(request))
+      .catch(error => {
+        this.#failed = true;
+        this.#onError(error);
+      });
   };
 }
