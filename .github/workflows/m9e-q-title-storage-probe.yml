@@ -1,7 +1,8 @@
 name: M9E Q Title Storage Probe
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [codex/m9e-q-title-storage-probe-20260925]
 
 permissions:
   contents: read
