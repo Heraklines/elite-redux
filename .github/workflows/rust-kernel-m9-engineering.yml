@@ -180,6 +180,14 @@ jobs:
           mkdir "$RUNNER_TEMP/m9e-q-oracles/friendship"
           cp "$RUNNER_TEMP/m9e-feedback/full/qualified-oracle/export-one.json" "$RUNNER_TEMP/m9e-q-oracles/friendship/export-one.json"
           cp "$RUNNER_TEMP/m9e-feedback/full/qualified-oracle/effects-one.json" "$RUNNER_TEMP/m9e-q-oracles/friendship/effects-one.json"
+      - name: Derive the exact fresh-account source closure
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/m9e-current-phase/diagnostics" "$RUNNER_TEMP/m9e-q-oracles/fresh-account"
+          python3 scripts/ci/m9e_current_phase_diagnostic.py --source-oracle > "$RUNNER_TEMP/m9e-q-oracles/fresh-account/proof.json"
+          cp "$RUNNER_TEMP/m9e-current-phase/diagnostics/fresh-account-oracle.json" "$RUNNER_TEMP/m9e-q-oracles/fresh-account/source-cases.json"
+          test -s "$RUNNER_TEMP/m9e-q-oracles/fresh-account/source-cases.json"
       - uses: actions/upload-artifact@v6
         with:
           name: m9e-q-oracles-${{ env.CANDIDATE_SHA }}
@@ -254,6 +262,8 @@ jobs:
           done
           printf 'M9_FRIENDSHIP_COMPARISON_INPUT=%s\n' "$RUNNER_TEMP/m9e-q-oracles/friendship/export-one.json" >> "$GITHUB_ENV"
           printf 'M9_FRIENDSHIP_EFFECTS_INPUT=%s\n' "$RUNNER_TEMP/m9e-q-oracles/friendship/effects-one.json" >> "$GITHUB_ENV"
+          test -s "$RUNNER_TEMP/m9e-q-oracles/fresh-account/source-cases.json"
+          printf 'ER_M9E_FRESH_ACCOUNT_ORACLE=%s\n' "$RUNNER_TEMP/m9e-q-oracles/fresh-account/source-cases.json" >> "$GITHUB_ENV"
       - name: Restore Cargo dependency downloads
         uses: actions/cache@v5
         with:
@@ -286,6 +296,10 @@ jobs:
         if: matrix.shard.id == '28'
         working-directory: rust
         run: cargo test --locked -p er-cli --test m9e_current_rulechange_reload -- --nocapture
+      - name: Check independently sourced fresh accounts before the complete CLI shard
+        if: matrix.shard.id == '28'
+        working-directory: rust
+        run: cargo test --locked -p er-cli --test m9e_fresh_friendship_profile -- --nocapture
       - name: Run exact shard
         working-directory: rust
         env:
