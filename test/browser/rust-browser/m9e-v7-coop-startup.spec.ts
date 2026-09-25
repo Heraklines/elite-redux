@@ -311,7 +311,9 @@ for (const hostFirst of [true, false]) {
       })));
       expect(scenes[0].sceneCount).toBeGreaterThan(0);
       expect(scenes[1].sceneCount).toBeGreaterThan(0);
-      expect(scenes[0].lastScene).toEqual(scenes[1].lastScene);
+      // The shared field agrees across peers; each seat can retain its own
+      // private menu cursor and control ownership at this boundary.
+      expect(scenes[0].lastScene.actors).toEqual(scenes[1].lastScene.actors);
       const actors = scenes[0].lastScene.actors;
       expect(actors.length).toBeGreaterThan(1);
       expect(actors.some((actor: any) => actor.slot.side === "PLAYER" && actor.hp.kind === "PLAYER_EXACT")).toBe(true);

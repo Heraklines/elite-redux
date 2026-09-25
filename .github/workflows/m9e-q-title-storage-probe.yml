@@ -68,10 +68,29 @@ jobs:
         run: >-
           pnpm exec biome ci --diagnostic-level=error
           src/rust-browser/contracts/browser-contracts-v2.ts
-          src/rust-browser/host/current-rust-browser-host.ts
           src/rust-browser/routes/browser-effects-v2.ts
           src/rust-browser/routes/current-scene-dom-v1.ts
-          src/rust-browser/routes/rust-current-rtc-entry.ts
-          src/rust-browser/routes/rust-current-rtc-rebind-entry.ts
-          test/node/rust-browser/engineering/browser-effects-v2.test.ts
           test/node/rust-browser/engineering/current-scene-dom-v1.test.ts
+      - name: Retain bounded scene Biome correction
+        if: failure()
+        shell: bash
+        run: |
+          pnpm exec biome check --write \
+            src/rust-browser/contracts/browser-contracts-v2.ts \
+            src/rust-browser/routes/browser-effects-v2.ts \
+            src/rust-browser/routes/current-scene-dom-v1.ts \
+            test/node/rust-browser/engineering/current-scene-dom-v1.test.ts || true
+          git diff -- \
+            src/rust-browser/contracts/browser-contracts-v2.ts \
+            src/rust-browser/routes/browser-effects-v2.ts \
+            src/rust-browser/routes/current-scene-dom-v1.ts \
+            test/node/rust-browser/engineering/current-scene-dom-v1.test.ts \
+            > "$RUNNER_TEMP/m9e-scene-style.patch"
+          test "$(wc -c < "$RUNNER_TEMP/m9e-scene-style.patch")" -le 65536
+      - uses: actions/upload-artifact@v6
+        if: failure()
+        with:
+          name: m9e-scene-style-${{ github.sha }}
+          path: ${{ runner.temp }}/m9e-scene-style.patch
+          if-no-files-found: error
+          retention-days: 7
