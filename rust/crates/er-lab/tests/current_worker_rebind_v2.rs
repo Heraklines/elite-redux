@@ -254,7 +254,7 @@ impl Peer {
         content: Arc<PreparedGameContentV2>,
         host: bool,
         limits: CurrentTailLimitsV2,
-    ) -> TestResult<Self> {
+    ) -> TestResult<Box<Self>> {
         let title = owned_title(Arc::clone(&content), host)?.snapshot()?;
         assert!(
             matches!(&title.lifecycle, GameKernelLifecycleSnapshotV7::Bootstrap(bootstrap) if bootstrap.stage == RunBootstrapStageV1::Title)
@@ -275,7 +275,7 @@ impl Peer {
         host: bool,
         limits: CurrentTailLimitsV2,
         title: CoreGameKernelSnapshotV7,
-    ) -> TestResult<Self> {
+    ) -> TestResult<Box<Self>> {
         let seat = SeatId::new(safe(if host { 1 } else { 2 }));
         let role = if host {
             GameKernelRoleV7::Authority
@@ -296,12 +296,12 @@ impl Peer {
         assert_eq!(observation, reference.observe()?);
         assert_eq!(child.snapshot()?, title);
         let worker = CurrentKernelSupervisorV2::new(child, limits)?;
-        Ok(Self {
+        Ok(Box::new(Self {
             worker,
             reference,
             artifact,
             bundle: bundle.clone(),
-        })
+        }))
     }
 
     fn snapshot(&mut self) -> TestResult<CoreGameKernelSnapshotV7> {
@@ -480,14 +480,17 @@ fn wire(step: &GameKernelStepV7) -> TestResult<Vec<u8>> {
     Ok(bytes.clone())
 }
 
-fn pair(limits: CurrentTailLimitsV2) -> TestResult<(Peer, Peer)> {
+fn pair(limits: CurrentTailLimitsV2) -> TestResult<(Box<Peer>, Box<Peer>)> {
+    phase("pair start")?;
     // Keep only immutable snapshots from a real two-process Title journey.
     // No live process, supervisor frontier or rebind mutation is shared by cases.
     static STARTUP: OnceLock<Result<(CoreGameKernelSnapshotV7, CoreGameKernelSnapshotV7), String>> =
         OnceLock::new();
     let snapshots = STARTUP.get_or_init(|| {
         (|| -> TestResult<_> {
+            phase("cache build start")?;
             let (mut host, mut guest) = build_pair(CurrentTailLimitsV2::default())?;
+            phase("cache build complete")?;
             let snapshots = (host.snapshot()?, guest.snapshot()?);
             host.worker.dispose()?;
             guest.worker.dispose()?;
@@ -495,6 +498,7 @@ fn pair(limits: CurrentTailLimitsV2) -> TestResult<(Peer, Peer)> {
         })()
         .map_err(|error| error.to_string())
     });
+    phase("cache ready")?;
     let (host_snapshot, guest_snapshot) = snapshots.as_ref().map_err(Clone::clone)?;
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle.clone()))?);
@@ -505,21 +509,34 @@ fn pair(limits: CurrentTailLimitsV2) -> TestResult<(Peer, Peer)> {
         limits,
         host_snapshot.clone(),
     )?;
-    let mut guest = Peer::from_snapshot(&bundle, content, false, limits, guest_snapshot.clone())?;
+    phase("host restored")?;
+    let mut guest = Peer::from_snapshot(
+        &bundle,
+        content,
+        false,
+        limits,
+        guest_snapshot.clone(),
+    )?;
+    phase("guest restored")?;
     assert_ne!(host.worker.process_id(), guest.worker.process_id());
     assert_eq!(host.snapshot()?, *host_snapshot);
     assert_eq!(guest.snapshot()?, *guest_snapshot);
     Ok((host, guest))
 }
 
-fn build_pair(limits: CurrentTailLimitsV2) -> TestResult<(Peer, Peer)> {
+fn build_pair(limits: CurrentTailLimitsV2) -> TestResult<(Box<Peer>, Box<Peer>)> {
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     let content = Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle.clone()))?);
+    phase("build content")?;
     let mut host = Peer::new(&bundle, Arc::clone(&content), true, limits)?;
+    phase("build host")?;
     let mut guest = Peer::new(&bundle, Arc::clone(&content), false, limits)?;
+    phase("build guest")?;
     assert_ne!(host.worker.process_id(), guest.worker.process_id());
     let choices = guest.choose(&content, false)?;
+    phase("guest choices")?;
     let waiting = host.choose(&content, true)?;
+    phase("host choices")?;
     let [choice] = choices.as_slice() else {
         return Err("actual guest setup publication".into());
     };
@@ -532,6 +549,7 @@ fn build_pair(limits: CurrentTailLimitsV2) -> TestResult<(Peer, Peer)> {
         generation: generation(1),
         bytes: started,
     })?;
+    phase("start delivered")?;
     assert!(matches!(
         host.snapshot()?.lifecycle,
         GameKernelLifecycleSnapshotV7::Active(_)
@@ -622,9 +640,7 @@ fn handshake(host: &mut Peer, guest: &mut Peer, mut bytes: Vec<u8>) -> TestResul
 
 #[test]
 fn natural_owned_workers_rebind_and_continue_generation_two_gameplay() -> TestResult {
-    let (host, guest) = pair(CurrentTailLimitsV2::default())?;
-    let mut host = Box::new(host);
-    let mut guest = Box::new(guest);
+    let (mut host, mut guest) = pair(CurrentTailLimitsV2::default())?;
     phase("pair")?;
     let offer = begin(&mut host, &mut guest)?;
     phase("begin")?;

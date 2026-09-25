@@ -2,6 +2,7 @@
 //! No browser transport, CLI, or lost-reply recovery transaction claim.
 //! All decisions, deliveries and restored states use the current runtime.
 use std::error::Error;
+use std::io::Write;
 use std::sync::{Arc, OnceLock};
 
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
@@ -283,6 +284,12 @@ use er_kernel::game_kernel_v7::current_coop_rebind_v7::{
 };
 use er_kernel::snapshot_v7::CoreGameKernelSnapshotV7;
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
+fn phase(label: &str) -> TestResult {
+    std::io::stderr()
+        .lock()
+        .write_all(format!("kernel rebind phase: {label}\n").as_bytes())?;
+    Ok(())
+}
 
 fn content() -> TestResult<Arc<PreparedGameContentV2>> {
     static CONTENT: OnceLock<Result<Arc<PreparedGameContentV2>, String>> = OnceLock::new();
@@ -652,12 +659,14 @@ fn every_rebind_phase_restores_and_retries_exact_control_without_advancing_repla
     Ok(())
 }
 
-#[test]
-fn malformed_rebind_controls_and_generation_bypasses_preserve_full_snapshot() -> TestResult {
-    let (mut host, mut guest) = pair()?;
+#[inline(never)]
+fn malformed_rebind_frames_preserve_full_snapshot() -> TestResult {
+    let (host, guest) = pair()?;
+    let mut host = Box::new(host);
+    let mut guest = Box::new(guest);
     let offer = begin(&mut host, &mut guest)?;
-    let pristine = guest.snapshot()?;
-    let mut stripped = pristine.clone();
+    let pristine = Box::new(guest.snapshot()?);
+    let mut stripped = (*pristine).clone();
     stripped.current_coop_setup.as_mut().ok_or("setup")?.rebind = None;
     assert!(
         GameKernelV7::from_snapshot(
@@ -689,7 +698,7 @@ fn malformed_rebind_controls_and_generation_bypasses_preserve_full_snapshot() ->
                 .is_err(),
             "case {case}"
         );
-        assert_eq!(guest.snapshot()?, pristine);
+        assert_eq!(guest.snapshot()?, *pristine);
     }
     for generation in [0, 1, 3] {
         assert!(
@@ -702,7 +711,7 @@ fn malformed_rebind_controls_and_generation_bypasses_preserve_full_snapshot() ->
                 .transport_changed(ConnectionGeneration::new(safe(generation)), true)
                 .is_err()
         );
-        assert_eq!(guest.snapshot()?, pristine);
+        assert_eq!(guest.snapshot()?, *pristine);
     }
     assert!(
         guest
@@ -731,9 +740,15 @@ fn malformed_rebind_controls_and_generation_bypasses_preserve_full_snapshot() ->
             .ingest_network_frame(ConnectionGeneration::new(safe(2)), &offer)
             .is_err()
     );
-    assert_eq!(guest.snapshot()?, pristine);
+    assert_eq!(guest.snapshot()?, *pristine);
+    Ok(())
+}
 
-    let (mut ahead_host, mut behind_guest) = pair()?;
+#[inline(never)]
+fn undelivered_material_rebind_preserves_full_snapshot() -> TestResult {
+    let (ahead_host, behind_guest) = pair()?;
+    let mut ahead_host = Box::new(ahead_host);
+    let mut behind_guest = Box::new(behind_guest);
     let undelivered = next_game_frame(&mut ahead_host)?;
     assert!(!undelivered.is_empty());
     assert!(
@@ -747,90 +762,112 @@ fn malformed_rebind_controls_and_generation_bypasses_preserve_full_snapshot() ->
                 .next_authority_revision
     );
     let offer = begin(&mut ahead_host, &mut behind_guest)?;
-    let before = behind_guest.snapshot()?;
+    let before = Box::new(behind_guest.snapshot()?);
     assert!(
         behind_guest
             .receive_current_coop_rebind_v1(ConnectionGeneration::new(safe(2)), &offer)
             .is_err()
     );
-    assert_eq!(behind_guest.snapshot()?, before); // Actual undelivered material, not a forged frontier.
+    assert_eq!(behind_guest.snapshot()?, *before); // Actual undelivered material, not a forged frontier.
+    Ok(())
+}
 
-    let (mut pending_host, mut pending_guest) = pair()?;
+#[inline(never)]
+fn pending_proposal_rebind_preserves_full_snapshot() -> TestResult {
+    let (pending_host, pending_guest) = pair()?;
+    let mut pending_host = Box::new(pending_host);
+    let mut pending_guest = Box::new(pending_guest);
     let material = next_game_frame(&mut pending_host)?;
     pending_guest.ingest_network_frame(ConnectionGeneration::new(safe(1)), &material)?;
     let proposal = next_game_frame(&mut pending_guest)?;
     assert!(!proposal.is_empty() && pending_guest.snapshot()?.current_proposal.is_some());
     pending_guest.transport_changed(ConnectionGeneration::new(safe(1)), false)?;
-    let before = pending_guest.snapshot()?;
+    let before = Box::new(pending_guest.snapshot()?);
     assert!(pending_guest.begin_current_coop_rebind_v1().is_err());
-    assert_eq!(pending_guest.snapshot()?, before); // Pending/lost-reply recovery belongs to a later slice.
+    assert_eq!(pending_guest.snapshot()?, *before); // Pending/lost-reply recovery belongs to a later slice.
+    Ok(())
+}
+
+#[test]
+fn malformed_rebind_controls_and_generation_bypasses_preserve_full_snapshot() -> TestResult {
+    phase("start")?;
+    malformed_rebind_frames_preserve_full_snapshot()?;
+    phase("invalid frames")?;
+    undelivered_material_rebind_preserves_full_snapshot()?;
+    phase("undelivered material")?;
+    pending_proposal_rebind_preserves_full_snapshot()?;
+    phase("pending proposal")?;
     Ok(())
 }
 
 #[test]
 fn rebind_begin_and_replay_exhaustion_reject_without_retiring_existing_owners() -> TestResult {
-    let (mut host, mut guest) = pair()?;
-    let connected = host.snapshot()?;
+    let (host, guest) = pair()?;
+    let mut host = Box::new(host);
+    let mut guest = Box::new(guest);
+    let connected = Box::new(host.snapshot()?);
     assert!(host.begin_current_coop_rebind_v1().is_err());
-    assert_eq!(host.snapshot()?, connected);
+    assert_eq!(host.snapshot()?, *connected);
     host.transport_changed(ConnectionGeneration::new(safe(1)), false)?;
-    let disconnected = host.snapshot()?;
-    let mut exhausted = disconnected.clone();
+    let disconnected = Box::new(host.snapshot()?);
+    let mut exhausted = Box::new((*disconnected).clone());
     exhausted.replay_sequence = safe(9_007_199_254_740_991);
-    let mut exhausted = GameKernelV7::from_snapshot(
-        exhausted,
+    let mut exhausted = Box::new(GameKernelV7::from_snapshot(
+        *exhausted,
         SeatId::new(safe(1)),
         GameKernelRoleV7::Authority,
         content()?,
-    )?;
-    let before = exhausted.snapshot()?;
+    )?);
+    let before = Box::new(exhausted.snapshot()?);
     assert!(exhausted.begin_current_coop_rebind_v1().is_err());
-    assert_eq!(exhausted.snapshot()?, before);
-    let mut history = disconnected.clone();
+    assert_eq!(exhausted.snapshot()?, *before);
+    let mut history = Box::new((*disconnected).clone());
     history
         .protocol
         .as_mut()
         .and_then(|protocol| protocol.authority_log.as_mut())
         .ok_or("log")?
         .capacity_refusals = safe(1);
-    let mut history = GameKernelV7::from_snapshot(
-        history,
+    let mut history = Box::new(GameKernelV7::from_snapshot(
+        *history,
         SeatId::new(safe(1)),
         GameKernelRoleV7::Authority,
         content()?,
-    )?;
-    let before = history.snapshot()?;
+    )?);
+    let before = Box::new(history.snapshot()?);
     assert!(history.begin_current_coop_rebind_v1().is_err());
-    assert_eq!(history.snapshot()?, before);
+    assert_eq!(history.snapshot()?, *before);
     let offer = begin(&mut host, &mut guest)?;
-    let mut snapshot = guest.snapshot()?;
+    let mut snapshot = Box::new(guest.snapshot()?);
     snapshot.replay_sequence = safe(9_007_199_254_740_991);
-    let mut exhausted = GameKernelV7::from_snapshot(
-        snapshot,
+    let mut exhausted = Box::new(GameKernelV7::from_snapshot(
+        *snapshot,
         SeatId::new(safe(2)),
         GameKernelRoleV7::Replica,
         content()?,
-    )?;
-    let before = exhausted.snapshot()?;
+    )?);
+    let before = Box::new(exhausted.snapshot()?);
     assert!(
         exhausted
             .receive_current_coop_rebind_v1(ConnectionGeneration::new(safe(2)), &offer)
             .is_err()
     );
-    assert_eq!(exhausted.snapshot()?, before);
+    assert_eq!(exhausted.snapshot()?, *before);
     assert!(
         exhausted
             .transport_changed(ConnectionGeneration::new(safe(2)), false)
             .is_err()
     );
-    assert_eq!(exhausted.snapshot()?, before);
+    assert_eq!(exhausted.snapshot()?, *before);
     Ok(())
 }
 
 #[test]
 fn rebind_restore_checks_decision_binding_and_preserves_unrelated_scheduler_pause() -> TestResult {
-    let (host, mut guest) = pair()?;
-    let mut initial = host.snapshot()?;
+    let (host, guest) = pair()?;
+    let host = Box::new(host);
+    let mut guest = Box::new(guest);
+    let mut initial = Box::new(host.snapshot()?);
     let mut scheduler = er_protocol::KernelScheduler::new();
     scheduler.pause_class(
         SeatId::new(safe(1)),
@@ -852,19 +889,19 @@ fn rebind_restore_checks_decision_binding_and_preserves_unrelated_scheduler_paus
                     reasons: pause.reasons,
                 }),
         );
-    let mut host = GameKernelV7::from_snapshot(
-        initial,
+    let mut host = Box::new(GameKernelV7::from_snapshot(
+        *initial,
         SeatId::new(safe(1)),
         GameKernelRoleV7::Authority,
         content()?,
-    )?;
-    let before = host.snapshot()?;
+    )?);
+    let before = Box::new(host.snapshot()?);
     let offer = begin(&mut host, &mut guest)?;
     handshake(&mut host, &mut guest, offer)?;
     assert_conserved(&before, &host.snapshot()?)?;
-    let complete = host.snapshot()?;
+    let complete = Box::new(host.snapshot()?);
     for case in 0..6 {
-        let mut forged = complete.clone();
+        let mut forged = (*complete).clone();
         let value = forged
             .current_coop_setup
             .as_mut()
@@ -898,7 +935,7 @@ fn rebind_restore_checks_decision_binding_and_preserves_unrelated_scheduler_paus
             "case {case}"
         );
     }
-    let mut missing = complete.clone();
+    let mut missing = (*complete).clone();
     missing.current_coop_setup.as_mut().ok_or("setup")?.rebind = None;
     assert!(
         GameKernelV7::from_snapshot(
@@ -909,7 +946,7 @@ fn rebind_restore_checks_decision_binding_and_preserves_unrelated_scheduler_paus
         )
         .is_err()
     );
-    assert_eq!(host.snapshot()?, complete);
+    assert_eq!(host.snapshot()?, *complete);
     Ok(())
 }
 

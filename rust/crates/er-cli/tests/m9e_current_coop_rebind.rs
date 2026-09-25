@@ -483,11 +483,28 @@ impl Endpoint {
             .cli
             .result("session.capsule.export", json!({"session":SESSION}))?;
         let capsule: CurrentReproCapsuleV1 = serde_json::from_value(value["capsule"].clone())?;
+        let expected_snapshot = Box::new(self.checkpoint()?);
+        let expected_observation = self.session.observe()?;
         phase(if self.host { "H replay" } else { "G replay" })?;
-        let replay =
-            replay_current_capsule_v1(&capsule, content()?, CurrentReproLimitsV1::default())?;
-        assert_eq!(replay.snapshot()?, self.checkpoint()?);
-        assert_eq!(replay.observe()?, self.session.observe()?);
+        let capsule = std::thread::spawn(move || -> Result<CurrentReproCapsuleV1, String> {
+            let replay = replay_current_capsule_v1(
+                &capsule,
+                content().map_err(|error| error.to_string())?,
+                CurrentReproLimitsV1::default(),
+            )
+            .map_err(|error| error.to_string())?;
+            assert_eq!(
+                replay.snapshot().map_err(|error| error.to_string())?,
+                *expected_snapshot
+            );
+            assert_eq!(
+                replay.observe().map_err(|error| error.to_string())?,
+                expected_observation
+            );
+            Ok(capsule)
+        })
+        .join()
+        .map_err(|_| "capsule replay assertion panicked")??;
         phase(if self.host {
             "H captured"
         } else {
