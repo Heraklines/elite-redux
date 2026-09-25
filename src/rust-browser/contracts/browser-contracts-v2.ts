@@ -175,6 +175,21 @@ export interface GamePresentationEffectV2Wire {
   skip: "FORBIDDEN" | "ALLOWED";
 }
 
+export interface CurrentPresentationSceneV1Wire {
+  schema_version: 1;
+  control: GameControlPlanV2Wire;
+  actors: Array<{
+    slot: { side: "PLAYER" | "ENEMY"; position: number };
+    pokemon: number;
+    species: number;
+    form: number;
+    owner_seat: number | null;
+    status: "NONE" | "POISON" | "TOXIC" | "PARALYSIS" | "SLEEP" | "BURN";
+    hp: { kind: "PLAYER_EXACT"; hp: number; max_hp: number }
+      | { kind: "ENEMY_BAR"; ten_thousandths: number };
+  }>;
+}
+
 export interface BrowserStorageRequestV2Wire {
   request_id: number;
   kind: "READ" | "WRITE" | "DELETE" | "LIST";
@@ -187,6 +202,7 @@ export type BrowserEffectV2 =
   | { kind: "UTC_CLOCK_REQUEST"; request_id: number }
   | { kind: "FLASH_EGG_INPUTS_REQUEST"; request: { request: number; pending: number } }
   | { kind: "UI_CHANGED"; control: GameControlPlanV2Wire }
+  | { kind: "SCENE_PROJECTED"; scene: CurrentPresentationSceneV1Wire }
   | { kind: "PRESENTATION"; effect: GamePresentationEffectV2Wire }
   | { kind: "PRESENTATION_SCENE_CHANGED"; semantic: unknown }
   | { kind: "SEND_NETWORK_FRAME"; generation: number; bytes: number[] }

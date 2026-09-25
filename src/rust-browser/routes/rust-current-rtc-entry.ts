@@ -1,6 +1,6 @@
 import {
   type BrowserRequestV2, type BrowserResponseEnvelopeV2, type BrowserSessionContextV2, type BrowserSessionInitializationV2,
-  type CurrentJsonObject, type GamePresentationEffectV2Wire, encodeCanonicalJsonV2,
+  type CurrentJsonObject, type CurrentPresentationSceneV1Wire, type GamePresentationEffectV2Wire, encodeCanonicalJsonV2,
 } from "../contracts/browser-contracts-v2";
 import { CurrentRtcTransportV1, type CurrentRtcIdentityV1 } from "../adapters/current-rtc-transport";
 import { createCurrentDevelopmentWorkerV2, BrowserEffectRouterV2, CurrentWorkerRequestErrorV2, type CurrentRustBrowserHostV2 } from "./rust-current-worker-entry";
@@ -11,6 +11,7 @@ interface CurrentRtcPeerCommonOptionsV1 {
   identity: CurrentRtcIdentityV1;
   context: BrowserSessionContextV2;
   present(effect: GamePresentationEffectV2Wire, signal: AbortSignal): void | Promise<void>;
+  scene?(scene: CurrentPresentationSceneV1Wire): void | Promise<void>;
   frame?(direction: "sent" | "received", generation: number, bytes: Uint8Array): void;
 }
 export type CurrentRtcPeerOptionsV1 = CurrentRtcPeerCommonOptionsV1 & (
@@ -72,7 +73,7 @@ export class CurrentDevelopmentRtcPeerV1 {
       context: options.context });
     try {
       if (owned.byteLength > 16 << 20) throw new Error("current RTC initial owner data exceeds16MiB");
-      options = { ...JSON.parse(new TextDecoder().decode(owned)), present: options.present, frame: options.frame };
+      options = { ...JSON.parse(new TextDecoder().decode(owned)), present: options.present, scene: options.scene, frame: options.frame };
     } finally { owned.fill(0); }
     assertCheckpointBinding(options);
     this.#options = options;
@@ -81,7 +82,8 @@ export class CurrentDevelopmentRtcPeerV1 {
     catch (error) { this.#pc.close(); throw error; }
     const unsupported = () => { throw new Error("external platform capability is outside current RTC checkpoint scope"); };
     this.#router = new BrowserEffectRouterV2({
-      renderUi: () => {}, changePresentationScene: () => {}, requestAsset: () => {}, playAudioCue: () => {},
+      renderUi: () => {}, renderScene: scene => options.scene?.(structuredClone(scene)),
+      changePresentationScene: () => {}, requestAsset: () => {}, playAudioCue: () => {},
       recordTelemetry: () => {}, showTerminal: () => {}, handleStorageRequest: unsupported,
       publishRepro: unsupported, publishCurrentRepro: () => {}, dispose: () => {},
       present: async effect => {

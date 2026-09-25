@@ -3,6 +3,7 @@ import type {
   BrowserEffectV2,
   BrowserRequestV2,
   BrowserStorageRequestV2Wire,
+  CurrentPresentationSceneV1Wire,
   GameControlPlanV2Wire,
   GamePresentationEffectV2Wire,
   PresentationAssetIdentityV1,
@@ -13,6 +14,7 @@ export interface BrowserEffectAdaptersV2 {
   /** Enqueue capture delivery without awaiting nested effect routing. */
   completeExternalRequest?(request: BrowserRequestV2): void;
   renderUi(control: GameControlPlanV2Wire): void | Promise<void>;
+  renderScene(scene: CurrentPresentationSceneV1Wire): void | Promise<void>;
   present(effect: GamePresentationEffectV2Wire): void | Promise<void>;
   changePresentationScene(semantic: unknown): void | Promise<void>;
   sendNetworkFrame(generation: number, bytes: Uint8Array): void | Promise<void>;
@@ -104,6 +106,9 @@ export class BrowserEffectRouterV2 {
       }
       case "UI_CHANGED":
         await this.adapters.renderUi(effect.control);
+        return;
+      case "SCENE_PROJECTED":
+        await this.adapters.renderScene(effect.scene);
         return;
       case "PRESENTATION":
         await this.adapters.present(effect.effect);

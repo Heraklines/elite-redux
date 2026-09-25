@@ -11,6 +11,7 @@ use er_game::m9e_content_v2::{
     GameContentBundleV2, PreparedGameContentV2, PresentationSemanticIdV1,
 };
 use er_game::m9e_material_v6::{GamePlatformEffectV2, GameTelemetryEventV2};
+use er_game::m9e_presentation_scene::project_current_presentation_scene_v1;
 use er_kernel::game_kernel_v7::{
     GameKernelEffectV7, GameKernelRoleV7, GameKernelStepV7, GameKernelV7,
     KernelPresentationOutcomeV2, KernelStorageResultV2,
@@ -452,8 +453,8 @@ impl BrowserKernelHostV2 {
             .session
             .as_mut()
             .ok_or(BrowserWebErrorV2::Invalid)?
-            .apply_with(event.clone(), |_candidate, step| {
-                let response = Self::effects(content.as_ref(), step.clone(), generation, sequence)
+            .apply_with(event.clone(), |candidate, step| {
+                let response = Self::effects(content.as_ref(), candidate, step.clone(), generation, sequence)
                     .map_err(BrowserCompletionErrorV2::Adapter)?;
                 let bytes = encode_response(response, request_id, sequence, maximum_response_bytes)
                     .map_err(BrowserCompletionErrorV2::Adapter)?;
@@ -762,11 +763,23 @@ impl BrowserKernelHostV2 {
 
     fn effects(
         content: &PreparedGameContentV2,
+        candidate: &CurrentGameSession,
         step: GameKernelStepV7,
         generation: SafeU53,
         external_sequence: SafeU53,
     ) -> Result<BrowserResponseV2, BrowserWebErrorV2> {
         let mut effects = Vec::new();
+        if step.effects.iter().any(|effect| matches!(effect,
+            GameKernelEffectV7::UiChanged(_)
+                | GameKernelEffectV7::Presentation(_)
+                | GameKernelEffectV7::Terminal(_)
+        )) {
+            let kernel = candidate.kernel_ref()?;
+            let control = kernel.current_control().ok_or(BrowserWebErrorV2::Invalid)?;
+            let scene = project_current_presentation_scene_v1(kernel.state(), control)
+                .map_err(|error| BrowserWebErrorV2::Kernel(error.to_string()))?;
+            effects.push(BrowserEffectV2::SceneProjected { scene });
+        }
         for effect in step.effects {
             match effect {
                 GameKernelEffectV7::UiChanged(control) => {

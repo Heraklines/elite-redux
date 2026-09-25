@@ -18,6 +18,7 @@ describe("BrowserEffectRouterV2", () => {
         delivered.push(request);
       },
       renderUi: noop,
+      renderScene: noop,
       present: noop,
       changePresentationScene: noop,
       sendNetworkFrame: noop,
@@ -83,6 +84,10 @@ describe("BrowserEffectRouterV2", () => {
     const adapters: BrowserEffectAdaptersV2 = {
       renderUi: () => {
         calls.push("UI_CHANGED");
+      },
+      renderScene: scene => {
+        expect(scene.actors[0]?.hp).toEqual({ kind: "ENEMY_BAR", ten_thousandths: 6250 });
+        calls.push("SCENE_PROJECTED");
       },
       completeExternalRequest: request => {
         external.push(request);
@@ -151,6 +156,20 @@ describe("BrowserEffectRouterV2", () => {
             skip: "ALLOWED",
           },
         },
+        {
+          kind: "SCENE_PROJECTED",
+          scene: {
+            schema_version: 1,
+            control: {
+              schema_version: 2, revision: 1, kind: "BATTLE_COMMAND", owner_seat: 1,
+              action_context: null, menu: null, actionable: true,
+            },
+            actors: [{
+              slot: { side: "ENEMY", position: 0 }, pokemon: 2, species: 276, form: 0,
+              owner_seat: null, status: "NONE", hp: { kind: "ENEMY_BAR", ten_thousandths: 6250 },
+            }],
+          },
+        },
         { kind: "PRESENTATION_SCENE_CHANGED", semantic: "BATTLE" },
         { kind: "SEND_NETWORK_FRAME", generation: 2, bytes: [1, 2, 3] },
         {
@@ -179,6 +198,7 @@ describe("BrowserEffectRouterV2", () => {
     expect(calls).toEqual([
       "UI_CHANGED",
       "PRESENTATION",
+      "SCENE_PROJECTED",
       "PRESENTATION_SCENE_CHANGED",
       "SEND_NETWORK_FRAME",
       "STORAGE_REQUEST",

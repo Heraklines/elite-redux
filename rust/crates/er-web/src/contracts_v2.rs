@@ -7,6 +7,7 @@ use er_game::m9e_content_v2::{
     PresentationAssetIdentityV1, PresentationAudioCueV1, PresentationSemanticIdV1,
 };
 use er_game::m9e_material_v6::{GamePresentationEffectV2, GameTelemetryEventV2};
+use er_game::m9e_presentation_scene::CurrentPresentationSceneV1;
 use er_kernel::game_kernel_v7::GameKernelRoleV7;
 use er_kernel::snapshot::KernelSchedulerSnapshotV2;
 use er_kernel::snapshot_v7::CoreGameKernelSnapshotV7;
@@ -213,6 +214,9 @@ pub enum BrowserEffectV2 {
     },
     UiChanged {
         control: GameControlPlanV2,
+    },
+    SceneProjected {
+        scene: CurrentPresentationSceneV1,
     },
     Presentation {
         effect: GamePresentationEffectV2,

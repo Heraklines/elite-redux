@@ -1,14 +1,14 @@
-name: M9E Q Title Storage Probe
+name: M9E Scene Projection Probe
 
 on:
   push:
-    branches: [codex/m9e-q-title-storage-probe-20260925]
+    branches: [codex/m9e-scene-projection-20260925]
 
 permissions:
   contents: read
 
 jobs:
-  title-storage:
+  scene-projection:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -30,6 +30,16 @@ jobs:
           key: m9e-cargo-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
           restore-keys: |
             m9e-cargo-deps-${{ runner.os }}-${{ runner.arch }}-
-      - name: Execute complete Title storage witness target at this source SHA
+      - name: Check Rust formatting at this source SHA
         working-directory: rust
-        run: cargo test --locked -p er-kernel --test m9e_title_storage -- --nocapture
+        run: cargo fmt --all -- --check
+      - name: Execute browser host scene contract witnesses
+        working-directory: rust
+        run: cargo test --locked -p er-web --test m9e_host_v2 -- --nocapture
+      - name: Check strict game and web Clippy
+        working-directory: rust
+        run: cargo clippy --locked -p er-game -p er-web --all-targets --no-deps -- -D warnings
+      - name: Install Node dependencies
+        run: npm ci --ignore-scripts
+      - name: Execute browser effect router contract
+        run: npx vitest run test/node/rust-browser/engineering/browser-effects-v2.test.ts
