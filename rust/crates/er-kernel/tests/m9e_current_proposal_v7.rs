@@ -893,249 +893,302 @@ fn current_proposal_publication_receipt_and_snapshot_conserve_ownership()
     // The actual retention material must still await the other human's command.
     bind_battle_root(&mut state, SeatId::new(safe(2)))?;
     let pair_content = content.clone();
-    let (mut authority, mut replica) = on_default_stack("publication pair", move || {
+    let (authority, replica) = on_default_stack("publication pair", move || {
         pair_from_state(*state, revision, pair_content)
     })?;
     phase("pair complete")?;
-    let original_authority = authority.clone();
-    press(&mut replica, PhysicalKey::Space)?;
-    let initial = replica.snapshot()?;
-    assert_publication_exhaustion(&initial, content.clone())?;
-    let bytes = proposal(&press(&mut replica, PhysicalKey::Space)?)?;
-    let pending = replica.snapshot()?;
-    assert_eq!(
-        pending.replay_sequence.get(),
-        initial.replay_sequence.get() + 1
-    );
-    let mut expected_publication = initial.clone();
-    expected_publication.current_proposal = pending.current_proposal.clone();
-    expected_publication.replay_sequence = pending.replay_sequence;
-    assert_eq!(
-        pending, expected_publication,
-        "publication changes only exact owner and replay, preserving state/RNG and allocators"
-    );
-    let owner = pending
-        .current_proposal
-        .as_ref()
-        .ok_or("pending owner missing")?;
-    let retained = owner.retained();
-    assert_eq!(retained.proposal_hex, current_bytes_hex_v1(&bytes));
-    assert_eq!(retained.proposal_digest, json_bytes_sha256_v1(&bytes)?);
-    assert_ne!(
-        retained.publication_context.run_id.as_str(),
-        retained.publication_game_run_id.get().to_string()
-    );
-    assert_eq!(
-        restore(pending.clone(), content.clone())?.snapshot()?,
-        pending
-    );
-    assert_eq!(proposal(&press(&mut replica, PhysicalKey::Space)?)?, bytes);
-    assert_eq!(
-        replica.snapshot()?,
-        pending,
-        "exact re-publication cannot reset the owner or replay"
-    );
-    assert_pending_restore_rejections(&pending, &initial, content.clone())?;
-    assert_transport_exhaustion(&pending, content.clone())?;
-    for invalid_generation in [0, 2] {
-        let before = replica.snapshot()?;
-        assert!(
-            replica
-                .transport_changed(ConnectionGeneration::new(safe(invalid_generation)), true)
-                .is_err()
+    on_default_stack("publication continuation", move || {
+        let (authority, replica, original_authority) =
+            on_default_stack("publication initial press", move || {
+                let original_authority = authority.clone();
+                phase("publication authority cloned")?;
+                let mut replica = replica;
+                press(&mut replica, PhysicalKey::Space)?;
+                Ok((authority, replica, original_authority))
+            })?;
+        phase("publication first press")?;
+        let initial = replica.snapshot()?;
+        phase("publication initial snapshot")?;
+        let exhaustion_initial = initial.clone();
+        let exhaustion_content = content.clone();
+        on_default_stack("publication exhaustion", move || {
+            assert_publication_exhaustion(&exhaustion_initial, exhaustion_content)
+        })?;
+        let (next_replica, bytes) = on_default_stack("publication proposal", move || {
+            let mut replica = replica;
+            let bytes = proposal(&press(&mut replica, PhysicalKey::Space)?)?;
+            Ok((replica, bytes))
+        })?;
+        let mut replica = next_replica;
+        phase("publication proposal submitted")?;
+        let pending = replica.snapshot()?;
+        assert_eq!(
+            pending.replay_sequence.get(),
+            initial.replay_sequence.get() + 1
         );
-        assert_eq!(replica.snapshot()?, before);
-    }
-    replica.transport_changed(generation, false)?;
-    let disconnected = replica.snapshot()?;
-    assert_eq!(disconnected.current_proposal, pending.current_proposal);
-    assert_eq!(
-        disconnected.replay_sequence.get(),
-        pending.replay_sequence.get() + 1
-    );
-    replica = restore(disconnected.clone(), content.clone())?;
-    assert!(press(&mut replica, PhysicalKey::Space).is_err());
-    assert_eq!(replica.snapshot()?, disconnected);
+        let mut expected_publication = initial.clone();
+        expected_publication.current_proposal = pending.current_proposal.clone();
+        expected_publication.replay_sequence = pending.replay_sequence;
+        assert_eq!(
+            pending, expected_publication,
+            "publication changes only exact owner and replay, preserving state/RNG and allocators"
+        );
+        let owner = pending
+            .current_proposal
+            .as_ref()
+            .ok_or("pending owner missing")?;
+        let retained = owner.retained();
+        assert_eq!(retained.proposal_hex, current_bytes_hex_v1(&bytes));
+        assert_eq!(retained.proposal_digest, json_bytes_sha256_v1(&bytes)?);
+        assert_ne!(
+            retained.publication_context.run_id.as_str(),
+            retained.publication_game_run_id.get().to_string()
+        );
+        assert_eq!(
+            restore(pending.clone(), content.clone())?.snapshot()?,
+            pending
+        );
+        assert_eq!(proposal(&press(&mut replica, PhysicalKey::Space)?)?, bytes);
+        assert_eq!(
+            replica.snapshot()?,
+            pending,
+            "exact re-publication cannot reset the owner or replay"
+        );
+        let check_pending = pending.clone();
+        let check_initial = initial.clone();
+        let check_content = content.clone();
+        on_default_stack("publication restoration checks", move || {
+            assert_pending_restore_rejections(
+                &check_pending,
+                &check_initial,
+                check_content.clone(),
+            )?;
+            assert_transport_exhaustion(&check_pending, check_content)?;
+            Ok(())
+        })?;
+        phase("publication restore checks")?;
+        for invalid_generation in [0, 2] {
+            let before = replica.snapshot()?;
+            assert!(
+                replica
+                    .transport_changed(ConnectionGeneration::new(safe(invalid_generation)), true)
+                    .is_err()
+            );
+            assert_eq!(replica.snapshot()?, before);
+        }
+        replica.transport_changed(generation, false)?;
+        let disconnected = replica.snapshot()?;
+        assert_eq!(disconnected.current_proposal, pending.current_proposal);
+        assert_eq!(
+            disconnected.replay_sequence.get(),
+            pending.replay_sequence.get() + 1
+        );
+        replica = restore(disconnected.clone(), content.clone())?;
+        assert!(press(&mut replica, PhysicalKey::Space).is_err());
+        assert_eq!(replica.snapshot()?, disconnected);
 
-    assert_other_receipt(
-        &initial,
-        &pending,
-        &bytes,
-        original_authority,
-        content.clone(),
-    )?;
-    let admitted = authority.ingest_network_frame(generation, &bytes)?;
-    let receipt_bytes = material(&admitted)?;
-    let receipt = CurrentProposalMaterialReceiptV1::decode(&receipt_bytes)?;
-    let evidence = receipt.evidence()?;
-    assert_eq!(
-        authority
-            .state()
-            .and_then(|state| state.active_run.as_ref())
-            .and_then(|run| run.battle.as_ref())
-            .ok_or("retained battle missing")?
-            .command_state
-            .frontier
-            .len(),
-        1
-    );
-    assert_eq!(evidence.proposal_bytes, bytes);
-    assert_eq!(receipt.canonical_bytes()?, receipt_bytes);
-    assert!(receipt_bytes.len() <= MAX_CURRENT_RECEIPT_BYTES_V1);
-    assert!(evidence.material_bytes.len() <= MAX_CURRENT_RECEIPT_MATERIAL_BYTES_V1);
-    assert!(
-        authority
-            .ingest_network_frame(generation, &bytes)?
-            .effects
-            .is_empty(),
-        "lost reply is not regenerated"
-    );
-    reject_ingress(&mut replica, &receipt_bytes)?;
-    replica.transport_changed(generation, true)?;
-    assert_eq!(
-        replica.snapshot()?.current_proposal,
-        pending.current_proposal
-    );
-    // Internally canonical material with the SAME envelope but a wrong before
-    // frontier is independently decodable; only the retained binding rejects it.
-    let mut wrong_before_value: serde_json::Value =
-        serde_json::from_slice(&evidence.material_bytes)?;
-    wrong_before_value["value"]["before_digest"] =
-        serde_json::json!(format!("blake3-v1:{}", "0".repeat(64)));
-    let wrong_before_bytes = canonical_bytes(&wrong_before_value)?;
-    GameMaterialV6::decode(&wrong_before_bytes)?;
-    let wrong_before = CurrentProposalMaterialReceiptV1::from_admission(
-        &bytes,
-        &wrong_before_bytes,
-        receipt.authority_context.clone(),
-    )?
-    .canonical_bytes()?;
-    reject_ingress(&mut replica, &wrong_before)?;
-    let mut wrong_revision_value: serde_json::Value =
-        serde_json::from_slice(&evidence.material_bytes)?;
-    wrong_revision_value["value"]["authority_revision"] =
-        serde_json::json!(evidence.material.transition().authority_revision.get() + 1);
-    let wrong_revision_bytes = canonical_bytes(&wrong_revision_value)?;
-    assert!(
-        CurrentProposalMaterialReceiptV1::from_admission(
+        let other_initial = initial.clone();
+        let other_pending = pending.clone();
+        let other_bytes = bytes.clone();
+        let other_content = content.clone();
+        on_default_stack("publication other receipt", move || {
+            assert_other_receipt(
+                &other_initial,
+                &other_pending,
+                &other_bytes,
+                original_authority,
+                other_content,
+            )
+        })?;
+        phase("publication other receipt checked")?;
+        let admission_bytes = bytes.clone();
+        let (next_authority, admitted) =
+            on_default_stack("publication authority admission", move || {
+                let mut authority = authority;
+                let admitted = authority.ingest_network_frame(generation, &admission_bytes)?;
+                Ok((authority, admitted))
+            })?;
+        let mut authority = next_authority;
+        phase("publication authority admitted")?;
+        let receipt_bytes = material(&admitted)?;
+        let receipt = CurrentProposalMaterialReceiptV1::decode(&receipt_bytes)?;
+        let evidence = receipt.evidence()?;
+        assert_eq!(
+            authority
+                .state()
+                .and_then(|state| state.active_run.as_ref())
+                .and_then(|run| run.battle.as_ref())
+                .ok_or("retained battle missing")?
+                .command_state
+                .frontier
+                .len(),
+            1
+        );
+        assert_eq!(evidence.proposal_bytes, bytes);
+        assert_eq!(receipt.canonical_bytes()?, receipt_bytes);
+        assert!(receipt_bytes.len() <= MAX_CURRENT_RECEIPT_BYTES_V1);
+        assert!(evidence.material_bytes.len() <= MAX_CURRENT_RECEIPT_MATERIAL_BYTES_V1);
+        assert!(
+            authority
+                .ingest_network_frame(generation, &bytes)?
+                .effects
+                .is_empty(),
+            "lost reply is not regenerated"
+        );
+        reject_ingress(&mut replica, &receipt_bytes)?;
+        replica.transport_changed(generation, true)?;
+        assert_eq!(
+            replica.snapshot()?.current_proposal,
+            pending.current_proposal
+        );
+        // Internally canonical material with the SAME envelope but a wrong before
+        // frontier is independently decodable; only the retained binding rejects it.
+        let mut wrong_before_value: serde_json::Value =
+            serde_json::from_slice(&evidence.material_bytes)?;
+        wrong_before_value["value"]["before_digest"] =
+            serde_json::json!(format!("blake3-v1:{}", "0".repeat(64)));
+        let wrong_before_bytes = canonical_bytes(&wrong_before_value)?;
+        GameMaterialV6::decode(&wrong_before_bytes)?;
+        let wrong_before = CurrentProposalMaterialReceiptV1::from_admission(
             &bytes,
-            &wrong_revision_bytes,
-            receipt.authority_context.clone()
-        )
-        .is_err()
-    );
-    let receipt_json = serde_json::to_value(&receipt)?;
-    for (field, value) in [
-        ("schema_version", serde_json::json!(2)),
-        (
-            "proposal_digest",
-            serde_json::json!("sha256-json-bytes-v1:wrong"),
-        ),
-        (
-            "material_digest",
-            serde_json::json!("sha256-json-bytes-v1:wrong"),
-        ),
-        ("material_fingerprint", serde_json::json!("blake3-v1:wrong")),
-        ("material_hex", serde_json::json!("AA")),
-        ("unknown", serde_json::json!(true)),
-    ] {
-        let mut changed = receipt_json.clone();
-        changed[field] = value;
-        reject_ingress(&mut replica, &canonical_bytes(&changed)?)?;
-    }
-    let mut wrong_context = receipt_json.clone();
-    wrong_context["authority_context"]["runId"] = serde_json::json!("another-opaque-run");
-    reject_ingress(&mut replica, &canonical_bytes(&wrong_context)?)?;
-    for (field, value) in [
-        ("unknown", serde_json::json!(true)),
-        ("connectionGeneration", serde_json::json!(0)),
-        ("senderSeatId", serde_json::json!(2)),
-        ("sessionId", serde_json::json!("other-session")),
-        ("membershipRevision", serde_json::json!(2)),
-    ] {
-        let mut changed = receipt_json.clone();
-        changed["authority_context"][field] = value;
-        reject_ingress(&mut replica, &canonical_bytes(&changed)?)?;
-    }
-    for field in ["proposal_hex", "material_hex"] {
-        let mut changed = receipt_json.clone();
-        let maximum = if field == "proposal_hex" {
-            MAX_CURRENT_PROPOSAL_BYTES_V1
-        } else {
-            MAX_CURRENT_RECEIPT_MATERIAL_BYTES_V1
-        };
-        changed[field] = serde_json::json!("0".repeat(maximum * 2 + 2));
-        reject_ingress(&mut replica, &canonical_bytes(&changed)?)?;
-    }
-    let mut noncanonical = receipt_bytes.clone();
-    noncanonical.push(b' ');
-    reject_ingress(&mut replica, &noncanonical)?;
-    reject_ingress(&mut replica, &vec![b' '; MAX_CURRENT_RECEIPT_BYTES_V1 + 1])?;
+            &wrong_before_bytes,
+            receipt.authority_context.clone(),
+        )?
+        .canonical_bytes()?;
+        reject_ingress(&mut replica, &wrong_before)?;
+        let mut wrong_revision_value: serde_json::Value =
+            serde_json::from_slice(&evidence.material_bytes)?;
+        wrong_revision_value["value"]["authority_revision"] =
+            serde_json::json!(evidence.material.transition().authority_revision.get() + 1);
+        let wrong_revision_bytes = canonical_bytes(&wrong_revision_value)?;
+        assert!(
+            CurrentProposalMaterialReceiptV1::from_admission(
+                &bytes,
+                &wrong_revision_bytes,
+                receipt.authority_context.clone()
+            )
+            .is_err()
+        );
+        let receipt_json = serde_json::to_value(&receipt)?;
+        for (field, value) in [
+            ("schema_version", serde_json::json!(2)),
+            (
+                "proposal_digest",
+                serde_json::json!("sha256-json-bytes-v1:wrong"),
+            ),
+            (
+                "material_digest",
+                serde_json::json!("sha256-json-bytes-v1:wrong"),
+            ),
+            ("material_fingerprint", serde_json::json!("blake3-v1:wrong")),
+            ("material_hex", serde_json::json!("AA")),
+            ("unknown", serde_json::json!(true)),
+        ] {
+            let mut changed = receipt_json.clone();
+            changed[field] = value;
+            reject_ingress(&mut replica, &canonical_bytes(&changed)?)?;
+        }
+        let mut wrong_context = receipt_json.clone();
+        wrong_context["authority_context"]["runId"] = serde_json::json!("another-opaque-run");
+        reject_ingress(&mut replica, &canonical_bytes(&wrong_context)?)?;
+        for (field, value) in [
+            ("unknown", serde_json::json!(true)),
+            ("connectionGeneration", serde_json::json!(0)),
+            ("senderSeatId", serde_json::json!(2)),
+            ("sessionId", serde_json::json!("other-session")),
+            ("membershipRevision", serde_json::json!(2)),
+        ] {
+            let mut changed = receipt_json.clone();
+            changed["authority_context"][field] = value;
+            reject_ingress(&mut replica, &canonical_bytes(&changed)?)?;
+        }
+        for field in ["proposal_hex", "material_hex"] {
+            let mut changed = receipt_json.clone();
+            let maximum = if field == "proposal_hex" {
+                MAX_CURRENT_PROPOSAL_BYTES_V1
+            } else {
+                MAX_CURRENT_RECEIPT_MATERIAL_BYTES_V1
+            };
+            changed[field] = serde_json::json!("0".repeat(maximum * 2 + 2));
+            reject_ingress(&mut replica, &canonical_bytes(&changed)?)?;
+        }
+        let mut noncanonical = receipt_bytes.clone();
+        noncanonical.push(b' ');
+        reject_ingress(&mut replica, &noncanonical)?;
+        reject_ingress(&mut replica, &vec![b' '; MAX_CURRENT_RECEIPT_BYTES_V1 + 1])?;
 
-    // Raw compatibility material has no receipt authority and cannot settle even this exact proposal.
-    let raw = replica.apply_authority_material(&evidence.material_bytes)?;
-    assert!(
-        !raw.effects
-            .iter()
-            .any(|effect| matches!(effect, GameKernelEffectV7::Platform(_)))
-    );
-    assert_eq!(
-        replica.snapshot()?.current_proposal,
-        pending.current_proposal
-    );
-    // The actual retention presentation blocks human input until acknowledged.
-    for presentation in replica.snapshot()?.pending_presentations {
-        replica.settle_presentation(presentation.event_id)?;
-    }
-    assert_eq!(
-        replica.snapshot()?.current_proposal,
-        pending.current_proposal
-    );
-    press(&mut replica, PhysicalKey::Space)?;
-    let private = replica.snapshot()?;
-    assert!(private.private_battle_control.is_some());
-    // Controlled empty retained suffix at the real advanced frontier; no claim
-    // of executing 4096 turns. A valid receipt now lacks duplicate evidence.
-    let mut evicted = private.clone();
-    evicted.material_ledger.records.clear();
-    let mut evicted = restore(evicted, content.clone())?;
-    reject_ingress(&mut evicted, &receipt_bytes)?;
-    let mut duplicate_max = private.clone();
-    duplicate_max.replay_sequence = safe(9_007_199_254_740_991);
-    let mut duplicate_max = restore(duplicate_max, content.clone())?;
-    reject_ingress(&mut duplicate_max, &receipt_bytes)?;
-    let mut expected = private.clone();
-    expected.current_proposal = None;
-    expected.replay_sequence = safe(private.replay_sequence.get() + 1);
-    assert_eq!(
-        replica.ingest_network_frame(generation, &receipt_bytes)?,
-        GameKernelStepV7::default()
-    );
-    assert_eq!(
-        replica.snapshot()?,
-        expected,
-        "duplicate retirement must preserve ORIGINAL private state and every other owner"
-    );
-    assert_eq!(
-        replica.ingest_network_frame(generation, &receipt_bytes)?,
-        GameKernelStepV7::default()
-    );
-    assert_eq!(replica.snapshot()?, expected);
-    // A fresh receipt follows the same single replay advance and presentation-only fanout.
-    let mut fresh = restore(pending.clone(), content.clone())?;
-    let delivered = fresh.ingest_network_frame(generation, &receipt_bytes)?;
-    assert!(
-        !delivered
-            .effects
-            .iter()
-            .any(|effect| matches!(effect, GameKernelEffectV7::Platform(_)))
-    );
-    assert!(fresh.snapshot()?.current_proposal.is_none());
-    assert_eq!(
-        fresh.snapshot()?.replay_sequence.get(),
-        pending.replay_sequence.get() + 1
-    );
-    assert_eq!(fresh.state(), authority.state());
+        // Raw compatibility material has no receipt authority and cannot settle even this exact proposal.
+        let raw_bytes = evidence.material_bytes.clone();
+        let (next_replica, raw) = on_default_stack("publication raw material", move || {
+            let raw = replica.apply_authority_material(&raw_bytes)?;
+            Ok((replica, raw))
+        })?;
+        let mut replica = next_replica;
+        phase("publication raw material applied")?;
+        assert!(
+            !raw.effects
+                .iter()
+                .any(|effect| matches!(effect, GameKernelEffectV7::Platform(_)))
+        );
+        assert_eq!(
+            replica.snapshot()?.current_proposal,
+            pending.current_proposal
+        );
+        // The actual retention presentation blocks human input until acknowledged.
+        for presentation in replica.snapshot()?.pending_presentations {
+            replica.settle_presentation(presentation.event_id)?;
+        }
+        assert_eq!(
+            replica.snapshot()?.current_proposal,
+            pending.current_proposal
+        );
+        press(&mut replica, PhysicalKey::Space)?;
+        let private = replica.snapshot()?;
+        assert!(private.private_battle_control.is_some());
+        // Controlled empty retained suffix at the real advanced frontier; no claim
+        // of executing 4096 turns. A valid receipt now lacks duplicate evidence.
+        let mut evicted = private.clone();
+        evicted.material_ledger.records.clear();
+        let mut evicted = restore(evicted, content.clone())?;
+        reject_ingress(&mut evicted, &receipt_bytes)?;
+        let mut duplicate_max = private.clone();
+        duplicate_max.replay_sequence = safe(9_007_199_254_740_991);
+        let mut duplicate_max = restore(duplicate_max, content.clone())?;
+        reject_ingress(&mut duplicate_max, &receipt_bytes)?;
+        let mut expected = private.clone();
+        expected.current_proposal = None;
+        expected.replay_sequence = safe(private.replay_sequence.get() + 1);
+        assert_eq!(
+            replica.ingest_network_frame(generation, &receipt_bytes)?,
+            GameKernelStepV7::default()
+        );
+        assert_eq!(
+            replica.snapshot()?,
+            expected,
+            "duplicate retirement must preserve ORIGINAL private state and every other owner"
+        );
+        assert_eq!(
+            replica.ingest_network_frame(generation, &receipt_bytes)?,
+            GameKernelStepV7::default()
+        );
+        assert_eq!(replica.snapshot()?, expected);
+        // A fresh receipt follows the same single replay advance and presentation-only fanout.
+        let mut fresh = restore(pending.clone(), content.clone())?;
+        let delivered = fresh.ingest_network_frame(generation, &receipt_bytes)?;
+        assert!(
+            !delivered
+                .effects
+                .iter()
+                .any(|effect| matches!(effect, GameKernelEffectV7::Platform(_)))
+        );
+        assert!(fresh.snapshot()?.current_proposal.is_none());
+        assert_eq!(
+            fresh.snapshot()?.replay_sequence.get(),
+            pending.replay_sequence.get() + 1
+        );
+        assert_eq!(fresh.state(), authority.state());
+        Ok(())
+    })?;
     Ok(())
 }
 fn submit_strongest_move(
