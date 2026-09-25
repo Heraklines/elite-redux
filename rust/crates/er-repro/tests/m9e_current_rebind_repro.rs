@@ -183,7 +183,7 @@ fn replica_protocol(
 fn owned_title(
     content: Arc<PreparedGameContentV2>,
     host: bool,
-) -> Result<GameKernelV7, Box<dyn Error>> {
+) -> Result<Box<GameKernelV7>, Box<dyn Error>> {
     owned_title_with_capacity(content, host, safe(64))
 }
 
@@ -191,7 +191,7 @@ fn owned_title_with_capacity(
     content: Arc<PreparedGameContentV2>,
     host: bool,
     capacity: SafeU53,
-) -> Result<GameKernelV7, Box<dyn Error>> {
+) -> Result<Box<GameKernelV7>, Box<dyn Error>> {
     let authority = SeatId::new(safe(1));
     let replica = SeatId::new(safe(2));
     let seat = if host { authority } else { replica };
@@ -230,7 +230,7 @@ fn owned_title_with_capacity(
     );
     kernel.enable_current_coop_setup()?;
     assert!(kernel.current_control().is_some());
-    Ok(kernel)
+    Ok(Box::new(kernel))
 }
 
 fn capture_press(
@@ -336,11 +336,11 @@ fn choose_first_natural_starter(kernel: &mut GameKernelV7, host: bool) -> TestRe
     Ok(frames)
 }
 
-fn pair() -> TestResult<(GameKernelV7, GameKernelV7)> {
+fn pair() -> TestResult<(Box<GameKernelV7>, Box<GameKernelV7>)> {
     pair_with_capacity(safe(64))
 }
 
-fn pair_with_capacity(capacity: SafeU53) -> TestResult<(GameKernelV7, GameKernelV7)> {
+fn pair_with_capacity(capacity: SafeU53) -> TestResult<(Box<GameKernelV7>, Box<GameKernelV7>)> {
     let mut host = if capacity == safe(64) {
         owned_title(content()?, true)?
     } else {
@@ -351,8 +351,11 @@ fn pair_with_capacity(capacity: SafeU53) -> TestResult<(GameKernelV7, GameKernel
     } else {
         owned_title_with_capacity(content()?, false, capacity)?
     };
+    phase("owned titles")?;
     let choices = choose_first_natural_starter(&mut guest, false)?;
+    phase("guest starter")?;
     let waiting = choose_first_natural_starter(&mut host, true)?;
+    phase("host starter")?;
     assert_eq!(choices.len(), 1);
     assert!(waiting.is_empty());
     let started =
@@ -361,6 +364,7 @@ fn pair_with_capacity(capacity: SafeU53) -> TestResult<(GameKernelV7, GameKernel
     assert!(host.state().is_some() && guest.state().is_some());
     assert_eq!(host.state(), guest.state());
     assert!(guest.snapshot()?.current_proposal.is_none());
+    phase("natural pair")?;
     Ok((host, guest))
 }
 
@@ -410,12 +414,12 @@ fn reference_event(
 
 struct Captured {
     session: CurrentGameSession,
-    reference: GameKernelV7,
+    reference: Box<GameKernelV7>,
     recorder: CurrentReproRecorderV1,
 }
 
 impl Captured {
-    fn new(reference: GameKernelV7, host: bool) -> TestResult<Self> {
+    fn new(reference: Box<GameKernelV7>, host: bool) -> TestResult<Box<Self>> {
         let seat = SeatId::new(safe(if host { 1 } else { 2 }));
         let role = if host {
             GameKernelRoleV7::Authority
@@ -437,7 +441,7 @@ impl Captured {
             recorder,
         };
         value.check()?;
-        Ok(value)
+        Ok(Box::new(value))
     }
 
     fn check(&self) -> TestResult {
@@ -459,13 +463,13 @@ impl Captured {
 
     fn ordinary(&mut self, event: CurrentExternalEvent) -> TestResult<GameKernelStepV7> {
         let before = Box::new(self.session.snapshot()?);
-        let mut candidate = Box::new(self.reference.clone());
+        let mut candidate = self.reference.clone();
         let expected = reference_event(&mut candidate, event.clone())?;
         candidate.validate()?;
         let result = self.session.apply(event.clone());
         let actual = result.as_ref().map_err(|error| error.to_string())?;
         assert_eq!(actual, &expected);
-        self.reference = *candidate;
+        self.reference = candidate;
         self.check()?;
         let after = Box::new(self.session.snapshot()?);
         let observation = self.session.observe()?;
@@ -482,7 +486,7 @@ impl Captured {
         control: CurrentCoopRebindEventV1,
     ) -> TestResult<Result<CurrentSessionRebindOutputV1, CurrentSessionError>> {
         let before = Box::new(self.session.snapshot()?);
-        let mut candidate = Box::new(self.reference.clone());
+        let mut candidate = self.reference.clone();
         let expected = match &control {
             CurrentCoopRebindEventV1::Begin => candidate.begin_current_coop_rebind_v1(),
             CurrentCoopRebindEventV1::Retry => candidate.retry_current_coop_rebind_v1(),
@@ -502,7 +506,7 @@ impl Captured {
                     *actual
                 );
                 candidate.validate()?;
-                self.reference = *candidate;
+                self.reference = candidate;
             }
             (Err(actual), Err(expected)) => {
                 assert_eq!(actual.to_string(), expected.to_string());
@@ -531,29 +535,30 @@ impl Captured {
         let capsule = self.recorder.export()?;
         let expected_snapshot = Box::new(self.session.snapshot()?);
         let expected_observation = self.session.observe()?;
-        let replayed_capsule = std::thread::spawn(move || -> Result<CurrentReproCapsuleV1, String> {
-            let bytes = serde_json::to_vec(&capsule).map_err(|error| error.to_string())?;
-            let decoded: CurrentReproCapsuleV1 =
-                serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
-            assert_eq!(decoded, capsule);
-            let replayed = replay_current_capsule_v1(
-                &decoded,
-                content().map_err(|error| error.to_string())?,
-                CurrentReproLimitsV1::default(),
-            )
-            .map_err(|error| error.to_string())?;
-            assert_eq!(
-                replayed.snapshot().map_err(|error| error.to_string())?,
-                *expected_snapshot
-            );
-            assert_eq!(
-                replayed.observe().map_err(|error| error.to_string())?,
-                expected_observation
-            );
-            Ok(capsule)
-        })
-        .join()
-        .map_err(|_| "capsule replay assertion panicked")??;
+        let replayed_capsule =
+            std::thread::spawn(move || -> Result<CurrentReproCapsuleV1, String> {
+                let bytes = serde_json::to_vec(&capsule).map_err(|error| error.to_string())?;
+                let decoded: CurrentReproCapsuleV1 =
+                    serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
+                assert_eq!(decoded, capsule);
+                let replayed = replay_current_capsule_v1(
+                    &decoded,
+                    content().map_err(|error| error.to_string())?,
+                    CurrentReproLimitsV1::default(),
+                )
+                .map_err(|error| error.to_string())?;
+                assert_eq!(
+                    replayed.snapshot().map_err(|error| error.to_string())?,
+                    *expected_snapshot
+                );
+                assert_eq!(
+                    replayed.observe().map_err(|error| error.to_string())?,
+                    expected_observation
+                );
+                Ok(capsule)
+            })
+            .join()
+            .map_err(|_| "capsule replay assertion panicked")??;
         Ok(replayed_capsule)
     }
 
@@ -568,8 +573,12 @@ impl Captured {
             role,
             content()?,
         )?;
-        self.reference =
-            GameKernelV7::from_snapshot(serde_json::from_slice(&encoded)?, seat, role, content()?)?;
+        self.reference = Box::new(GameKernelV7::from_snapshot(
+            serde_json::from_slice(&encoded)?,
+            seat,
+            role,
+            content()?,
+        )?);
         let (recorder, replayed) = CurrentReproRecorderV1::from_capsule(
             *capsule,
             content()?,
@@ -640,9 +649,13 @@ impl Captured {
     }
 }
 
-fn captured_pair() -> TestResult<(Captured, Captured)> {
+fn captured_pair() -> TestResult<(Box<Captured>, Box<Captured>)> {
     let (host, guest) = pair()?;
-    Ok((Captured::new(host, true)?, Captured::new(guest, false)?))
+    phase("capture host")?;
+    let host = Captured::new(host, true)?;
+    phase("capture guest")?;
+    let guest = Captured::new(guest, false)?;
+    Ok((host, guest))
 }
 
 fn control_frame(output: &CurrentSessionRebindOutputV1) -> TestResult<Vec<u8>> {
@@ -725,9 +738,7 @@ fn handshake_sessions(host: &mut Captured, guest: &mut Captured, mut bytes: Vec<
 #[test]
 fn natural_rebind_controls_and_generation_two_gameplay_replay_exactly() -> TestResult {
     phase("start")?;
-    let (host, guest) = captured_pair()?;
-    let mut host = Box::new(host);
-    let mut guest = Box::new(guest);
+    let (mut host, mut guest) = captured_pair()?;
     phase("pair")?;
     let offer = begin_sessions(&mut host, &mut guest)?;
     phase("begin")?;

@@ -167,7 +167,7 @@ fn replica_protocol(
 fn owned_title(
     content: Arc<PreparedGameContentV2>,
     host: bool,
-) -> Result<GameKernelV7, Box<dyn Error>> {
+) -> Result<Box<GameKernelV7>, Box<dyn Error>> {
     owned_title_with_capacity(content, host, safe(64))
 }
 
@@ -175,7 +175,7 @@ fn owned_title_with_capacity(
     content: Arc<PreparedGameContentV2>,
     host: bool,
     capacity: SafeU53,
-) -> Result<GameKernelV7, Box<dyn Error>> {
+) -> Result<Box<GameKernelV7>, Box<dyn Error>> {
     let authority = SeatId::new(safe(1));
     let replica = SeatId::new(safe(2));
     let seat = if host { authority } else { replica };
@@ -214,7 +214,7 @@ fn owned_title_with_capacity(
     );
     kernel.enable_current_coop_setup()?;
     assert!(kernel.current_control().is_some());
-    Ok(kernel)
+    Ok(Box::new(kernel))
 }
 
 fn capture_press(
@@ -261,7 +261,7 @@ fn restored(
     kernel: &GameKernelV7,
     content: Arc<PreparedGameContentV2>,
     host: bool,
-) -> Result<GameKernelV7, Box<dyn Error>> {
+) -> Result<Box<GameKernelV7>, Box<dyn Error>> {
     let snapshot = kernel.snapshot()?;
     let encoded = er_canonical::canonical_bytes(&snapshot)?;
     let restored = GameKernelV7::from_snapshot(
@@ -275,7 +275,7 @@ fn restored(
         content,
     )?;
     assert_eq!(snapshot, restored.snapshot()?);
-    Ok(restored)
+    Ok(Box::new(restored))
 }
 
 use er_kernel::game_kernel_v7::current_coop_rebind_v7::{
@@ -354,11 +354,11 @@ fn choose_first_natural_starter(kernel: &mut GameKernelV7, host: bool) -> TestRe
     Ok(frames)
 }
 
-fn pair() -> TestResult<(GameKernelV7, GameKernelV7)> {
+fn pair() -> TestResult<(Box<GameKernelV7>, Box<GameKernelV7>)> {
     pair_with_capacity(safe(64))
 }
 
-fn pair_with_capacity(capacity: SafeU53) -> TestResult<(GameKernelV7, GameKernelV7)> {
+fn pair_with_capacity(capacity: SafeU53) -> TestResult<(Box<GameKernelV7>, Box<GameKernelV7>)> {
     let mut host = if capacity == safe(64) {
         owned_title(content()?, true)?
     } else {
@@ -369,8 +369,11 @@ fn pair_with_capacity(capacity: SafeU53) -> TestResult<(GameKernelV7, GameKernel
     } else {
         owned_title_with_capacity(content()?, false, capacity)?
     };
+    phase("owned titles")?;
     let choices = choose_first_natural_starter(&mut guest, false)?;
+    phase("guest starter")?;
     let waiting = choose_first_natural_starter(&mut host, true)?;
+    phase("host starter")?;
     assert_eq!(choices.len(), 1);
     assert!(waiting.is_empty());
     let started =
@@ -379,6 +382,7 @@ fn pair_with_capacity(capacity: SafeU53) -> TestResult<(GameKernelV7, GameKernel
     assert!(host.state().is_some() && guest.state().is_some());
     assert_eq!(host.state(), guest.state());
     assert!(guest.snapshot()?.current_proposal.is_none());
+    phase("natural pair")?;
     Ok((host, guest))
 }
 
@@ -661,9 +665,7 @@ fn every_rebind_phase_restores_and_retries_exact_control_without_advancing_repla
 
 #[inline(never)]
 fn malformed_rebind_frames_preserve_full_snapshot() -> TestResult {
-    let (host, guest) = pair()?;
-    let mut host = Box::new(host);
-    let mut guest = Box::new(guest);
+    let (mut host, mut guest) = pair()?;
     let offer = begin(&mut host, &mut guest)?;
     let pristine = Box::new(guest.snapshot()?);
     let mut stripped = (*pristine).clone();
@@ -746,9 +748,7 @@ fn malformed_rebind_frames_preserve_full_snapshot() -> TestResult {
 
 #[inline(never)]
 fn undelivered_material_rebind_preserves_full_snapshot() -> TestResult {
-    let (ahead_host, behind_guest) = pair()?;
-    let mut ahead_host = Box::new(ahead_host);
-    let mut behind_guest = Box::new(behind_guest);
+    let (mut ahead_host, mut behind_guest) = pair()?;
     let undelivered = next_game_frame(&mut ahead_host)?;
     assert!(!undelivered.is_empty());
     assert!(
@@ -774,9 +774,7 @@ fn undelivered_material_rebind_preserves_full_snapshot() -> TestResult {
 
 #[inline(never)]
 fn pending_proposal_rebind_preserves_full_snapshot() -> TestResult {
-    let (pending_host, pending_guest) = pair()?;
-    let mut pending_host = Box::new(pending_host);
-    let mut pending_guest = Box::new(pending_guest);
+    let (mut pending_host, mut pending_guest) = pair()?;
     let material = next_game_frame(&mut pending_host)?;
     pending_guest.ingest_network_frame(ConnectionGeneration::new(safe(1)), &material)?;
     let proposal = next_game_frame(&mut pending_guest)?;
@@ -802,9 +800,7 @@ fn malformed_rebind_controls_and_generation_bypasses_preserve_full_snapshot() ->
 
 #[test]
 fn rebind_begin_and_replay_exhaustion_reject_without_retiring_existing_owners() -> TestResult {
-    let (host, guest) = pair()?;
-    let mut host = Box::new(host);
-    let mut guest = Box::new(guest);
+    let (mut host, mut guest) = pair()?;
     let connected = Box::new(host.snapshot()?);
     assert!(host.begin_current_coop_rebind_v1().is_err());
     assert_eq!(host.snapshot()?, *connected);
@@ -864,9 +860,7 @@ fn rebind_begin_and_replay_exhaustion_reject_without_retiring_existing_owners() 
 
 #[test]
 fn rebind_restore_checks_decision_binding_and_preserves_unrelated_scheduler_pause() -> TestResult {
-    let (host, guest) = pair()?;
-    let host = Box::new(host);
-    let mut guest = Box::new(guest);
+    let (host, mut guest) = pair()?;
     let mut initial = Box::new(host.snapshot()?);
     let mut scheduler = er_protocol::KernelScheduler::new();
     scheduler.pause_class(
@@ -1007,15 +1001,20 @@ fn open_rebind_executes_actual_owned_gameplay_and_retries_strict_v2_receipt() ->
     use er_kernel::current_proposal_v7::{
         CurrentProposalMaterialReceiptV1, CurrentProposalMaterialReceiptV2,
     };
+    phase("open receipt start")?;
     let (mut host, mut guest) = pair()?;
+    phase("open receipt pair")?;
     let offer = begin(&mut host, &mut guest)?;
     handshake(&mut host, &mut guest, offer)?;
+    phase("open receipt handshake")?;
     let transcript = owner(&host.snapshot()?)?.transcript.clone();
     let (_, proposal) = actual_guest_proposal(&mut host, &mut guest, 2)?;
+    phase("open receipt proposal")?;
     let before = Box::new(host.snapshot()?);
     assert!(host.admit_game_proposal(&proposal).is_err());
     assert_eq!(host.snapshot()?, *before);
     let reply = wire(&host.ingest_network_frame(ConnectionGeneration::new(safe(2)), &proposal)?)?;
+    phase("open receipt reply")?;
     let decoded = CurrentProposalMaterialReceiptV2::decode(&reply)?;
     assert_eq!(decoded.evidence()?.proposal_bytes, proposal);
     assert!(CurrentProposalMaterialReceiptV1::decode(&reply).is_err());
@@ -1042,6 +1041,7 @@ fn open_rebind_executes_actual_owned_gameplay_and_retries_strict_v2_receipt() ->
     }
     host = restored(&host, content()?, true)?;
     guest = restored(&guest, content()?, false)?;
+    phase("open receipt restored")?;
     let disconnected = Box::new(guest.snapshot()?);
     assert!(guest.retry_current_coop_setup().is_err());
     assert!(
@@ -1061,6 +1061,7 @@ fn open_rebind_executes_actual_owned_gameplay_and_retries_strict_v2_receipt() ->
     );
     assert_eq!(host.snapshot()?, *before_retry);
     let step = guest.ingest_network_frame(ConnectionGeneration::new(safe(2)), &reply)?;
+    phase("open receipt applied")?;
     assert!(step.effects.iter().all(|effect| matches!(
         effect,
         GameKernelEffectV7::Presentation(_)

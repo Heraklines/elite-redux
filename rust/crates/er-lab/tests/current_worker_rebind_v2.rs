@@ -510,13 +510,7 @@ fn pair(limits: CurrentTailLimitsV2) -> TestResult<(Box<Peer>, Box<Peer>)> {
         host_snapshot.clone(),
     )?;
     phase("host restored")?;
-    let mut guest = Peer::from_snapshot(
-        &bundle,
-        content,
-        false,
-        limits,
-        guest_snapshot.clone(),
-    )?;
+    let mut guest = Peer::from_snapshot(&bundle, content, false, limits, guest_snapshot.clone())?;
     phase("guest restored")?;
     assert_ne!(host.worker.process_id(), guest.worker.process_id());
     assert_eq!(host.snapshot()?, *host_snapshot);
