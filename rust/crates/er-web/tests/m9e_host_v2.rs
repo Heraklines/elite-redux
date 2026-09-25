@@ -528,7 +528,10 @@ fn natural_browser_route_produces_typed_ui_transport_presentation_audio_and_asse
 fn restored_battle_scene_is_observable_before_any_input_without_mutation()
 -> Result<(), Box<dyn Error>> {
     let (mut host, sequence) = active_host()?;
-    let before = host.kernel_ref().ok_or("active kernel missing")?.snapshot()?;
+    let before = host
+        .kernel_ref()
+        .ok_or("active kernel missing")?
+        .snapshot()?;
     let BrowserResponseV2::Scene { scene } =
         send(&mut host, sequence, BrowserRequestV2::ObserveScene)?
     else {
@@ -544,7 +547,9 @@ fn restored_battle_scene_is_observable_before_any_input_without_mutation()
             .clone()
     );
     assert_eq!(
-        host.kernel_ref().ok_or("active kernel missing")?.snapshot()?,
+        host.kernel_ref()
+            .ok_or("active kernel missing")?
+            .snapshot()?,
         before
     );
     Ok(())
