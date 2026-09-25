@@ -531,18 +531,7 @@ fn build_pair(limits: CurrentTailLimitsV2) -> TestResult<(Box<Peer>, Box<Peer>)>
     phase("guest choices")?;
     let waiting = host.choose(&content, true)?;
     phase("host choices")?;
-    let [choice] = choices.as_slice() else {
-        return Err("actual guest setup publication".into());
-    };
-    assert!(waiting.is_empty());
-    let started = wire(&host.ordinary(CurrentExternalEvent::NetworkFrame {
-        generation: generation(1),
-        bytes: choice.clone(),
-    })?)?;
-    guest.ordinary(CurrentExternalEvent::NetworkFrame {
-        generation: generation(1),
-        bytes: started,
-    })?;
+    deliver_start(&mut host, &mut guest, choices, waiting)?;
     phase("start delivered")?;
     assert!(matches!(
         host.snapshot()?.lifecycle,
@@ -558,6 +547,30 @@ fn build_pair(limits: CurrentTailLimitsV2) -> TestResult<(Box<Peer>, Box<Peer>)>
     );
     assert!(guest.snapshot()?.current_proposal.is_none());
     Ok((host, guest))
+}
+
+#[inline(never)]
+fn deliver_start(
+    host: &mut Peer,
+    guest: &mut Peer,
+    choices: Vec<Vec<u8>>,
+    waiting: Vec<Vec<u8>>,
+) -> TestResult {
+    let [choice] = choices.as_slice() else {
+        return Err("actual guest setup publication".into());
+    };
+    assert!(waiting.is_empty());
+    phase("admit guest choice")?;
+    let started = wire(&host.ordinary(CurrentExternalEvent::NetworkFrame {
+        generation: generation(1),
+        bytes: choice.clone(),
+    })?)?;
+    phase("deliver start frame")?;
+    guest.ordinary(CurrentExternalEvent::NetworkFrame {
+        generation: generation(1),
+        bytes: started,
+    })?;
+    Ok(())
 }
 
 fn control_frame(output: &CurrentSessionRebindOutputV1) -> TestResult<Vec<u8>> {

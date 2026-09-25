@@ -40,6 +40,11 @@ fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("test value is safe")
 }
 
+fn phase(label: &str) -> Result<(), Box<dyn Error>> {
+    writeln!(std::io::stderr().lock(), "m9e proposal phase: {label}")?;
+    Ok(())
+}
+
 fn content() -> Result<Arc<PreparedGameContentV2>, Box<dyn Error>> {
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     Ok(Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle))?))
@@ -426,9 +431,12 @@ fn noncurrent_generation_raw_compatibility(
 fn ordinary_publication_atomicity(
     content: Arc<PreparedGameContentV2>,
 ) -> Result<(), Box<dyn Error>> {
+    phase("ordinary start")?;
     let (mut state, revision, menu) = natural_coop_state(content.clone(), SeatId::new(safe(1)))?;
+    phase("ordinary natural")?;
     save_checkpoint(&mut state, revision, menu)?;
     let (_, replica) = pair_from_state(state, revision, content.clone())?;
+    phase("ordinary pair")?;
     for event in [
         RawInputEvent::KeyDown {
             code: PhysicalKey::Space,
@@ -848,14 +856,19 @@ fn current_proposal_publication_receipt_and_snapshot_conserve_ownership()
         std::mem::size_of::<CoreGameKernelSnapshotV7>()
     )?;
     let content = content()?;
+    phase("content")?;
     let generation = ConnectionGeneration::new(safe(1));
     ordinary_publication_atomicity(content.clone())?;
+    phase("ordinary complete")?;
     noncurrent_generation_raw_compatibility(content.clone())?;
+    phase("noncurrent complete")?;
     let (mut state, revision, _) = natural_coop_state(content.clone(), SeatId::new(safe(1)))?;
+    phase("natural complete")?;
     // Controlled guest-first canonical root, not a natural guest-first claim.
     // The actual retention material must still await the other human's command.
     bind_battle_root(&mut state, SeatId::new(safe(2)))?;
     let (mut authority, mut replica) = pair_from_state(state, revision, content.clone())?;
+    phase("pair complete")?;
     let original_authority = authority.clone();
     press(&mut replica, PhysicalKey::Space)?;
     let initial = replica.snapshot()?;

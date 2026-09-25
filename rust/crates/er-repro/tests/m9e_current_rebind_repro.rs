@@ -413,9 +413,9 @@ fn reference_event(
 }
 
 struct Captured {
-    session: CurrentGameSession,
+    session: Box<CurrentGameSession>,
     reference: Box<GameKernelV7>,
-    recorder: CurrentReproRecorderV1,
+    recorder: Box<CurrentReproRecorderV1>,
 }
 
 impl Captured {
@@ -427,14 +427,19 @@ impl Captured {
             GameKernelRoleV7::Replica
         };
         let snapshot = reference.snapshot()?;
-        let session = CurrentGameSession::from_snapshot(snapshot.clone(), seat, role, content()?)?;
-        let recorder = CurrentReproRecorderV1::new(
+        let session = Box::new(CurrentGameSession::from_snapshot(
+            snapshot.clone(),
+            seat,
+            role,
+            content()?,
+        )?);
+        let recorder = Box::new(CurrentReproRecorderV1::new(
             snapshot,
             seat,
             role,
             content()?,
             CurrentReproLimitsV1::default(),
-        )?;
+        )?);
         let value = Self {
             session,
             reference,
@@ -531,16 +536,16 @@ impl Captured {
         Ok(result)
     }
 
-    fn replay(&self) -> TestResult<CurrentReproCapsuleV1> {
-        let capsule = self.recorder.export()?;
+    fn replay(&self) -> TestResult<Box<CurrentReproCapsuleV1>> {
+        let capsule = Box::new(self.recorder.export()?);
         let expected_snapshot = Box::new(self.session.snapshot()?);
         let expected_observation = self.session.observe()?;
         let replayed_capsule =
-            std::thread::spawn(move || -> Result<CurrentReproCapsuleV1, String> {
+            std::thread::spawn(move || -> Result<Box<CurrentReproCapsuleV1>, String> {
                 let bytes = serde_json::to_vec(&capsule).map_err(|error| error.to_string())?;
                 let decoded: CurrentReproCapsuleV1 =
                     serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
-                assert_eq!(decoded, capsule);
+                assert_eq!(decoded, *capsule);
                 let replayed = replay_current_capsule_v1(
                     &decoded,
                     content().map_err(|error| error.to_string())?,
@@ -563,29 +568,35 @@ impl Captured {
     }
 
     fn restore_midphase(&mut self) -> TestResult {
+        phase("restore start")?;
         let snapshot = Box::new(self.session.snapshot()?);
-        let capsule = Box::new(self.replay()?);
+        let capsule = self.replay()?;
+        phase("restore replay")?;
         let encoded = er_canonical::canonical_bytes(&snapshot)?;
+        phase("restore encoded")?;
         let (seat, role) = self.session.session_context()?;
-        self.session = CurrentGameSession::from_snapshot(
+        self.session = Box::new(CurrentGameSession::from_snapshot(
             serde_json::from_slice(&encoded)?,
             seat,
             role,
             content()?,
-        )?;
+        )?);
+        phase("restore session")?;
         self.reference = Box::new(GameKernelV7::from_snapshot(
             serde_json::from_slice(&encoded)?,
             seat,
             role,
             content()?,
         )?);
+        phase("restore kernel")?;
         let (recorder, replayed) = CurrentReproRecorderV1::from_capsule(
             *capsule,
             content()?,
             CurrentReproLimitsV1::default(),
         )?;
         assert_eq!(replayed.snapshot()?, *snapshot);
-        self.recorder = recorder;
+        self.recorder = Box::new(recorder);
+        phase("restore recorder")?;
         self.check()?;
         assert_eq!(self.session.snapshot()?, *snapshot);
         Ok(())
@@ -817,7 +828,7 @@ fn natural_rebind_controls_and_generation_two_gameplay_replay_exactly() -> TestR
     );
     phase("gameplay complete")?;
     for peer in [&host, &guest] {
-        let capsule = Box::new(peer.replay()?);
+        let capsule = peer.replay()?;
         assert_eq!(capsule.schema_version, 1);
         assert!(capsule.attempts.iter().any(|attempt| matches!(
             &attempt.event,
@@ -904,7 +915,7 @@ fn rebind_response_admission_and_rejections_preserve_complete_session() -> TestR
         assert_eq!(guest.session.observe()?, observation);
         assert_eq!(guest.recorder.export()?.final_position, position + 1);
     }
-    let rejected = Box::new(guest.replay()?);
+    let rejected = guest.replay()?;
     assert_eq!(
         rejected
             .attempts
@@ -953,7 +964,7 @@ fn rebind_response_admission_and_rejections_preserve_complete_session() -> TestR
     assert!(guest.recorder.export().is_err());
     let output = guest.rebind(control)??;
     assert_eq!(output.frames.len(), 1);
-    let suffix = Box::new(guest.replay()?);
+    let suffix = guest.replay()?;
     assert_eq!(suffix.attempts.len(), 1);
     assert_eq!(suffix.final_position, suffix.base_position + 1);
 
@@ -1036,7 +1047,7 @@ fn deleted_reordered_or_forged_rebind_attempts_fail_replay() -> TestResult {
     let (mut host, mut guest) = captured_pair()?;
     let offer = begin_sessions(&mut host, &mut guest)?;
     handshake_sessions(&mut host, &mut guest, offer)?;
-    let original = Box::new(guest.replay()?);
+    let original = guest.replay()?;
     let receives = original
         .attempts
         .iter()
