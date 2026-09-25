@@ -7,8 +7,8 @@ use er_game::m9e_material_v6::{
     APPLIED_MATERIAL_LEDGER_SCHEMA_VERSION_V1, AppliedGameMaterialLedgerV1, GameActionDomainV2,
     GameIdentityDomainV1, GameMaterialApplyOutcomeV6, GameMaterialV6, GameMaterialV6Error,
     GameMutationEvidenceV2, GameMutationKindV2, GamePlatformEffectV2, GamePresentationPayloadV1,
-    GameTelemetryEventV2,
-    GameTransitionMaterialV6, apply_game_material_v6, empty_game_state_digest, game_state_digest,
+    GameTelemetryEventV2, GameTransitionMaterialV6, apply_game_material_v6,
+    empty_game_state_digest, game_state_digest,
 };
 use er_state::m7_state::{
     DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
@@ -30,14 +30,34 @@ fn safe(value: u64) -> SafeU53 {
 }
 
 #[test]
-fn battle_presentation_payloads_keep_typed_actor_and_cue_parameters() -> Result<(), Box<dyn Error>> {
+fn battle_presentation_payloads_keep_typed_actor_and_cue_parameters() -> Result<(), Box<dyn Error>>
+{
     use GamePresentationPayloadV1 as Payload;
     use PresentationCueFamilyV1 as Family;
     let holder = PokemonId::new(safe(7));
     let cases = [
-        (Payload::MoveUsed { holder, move_id: MoveId::new(safe(33)) }, Family::Move),
-        (Payload::HpChanged { holder, before: 20, after: 11 }, Family::Hp),
-        (Payload::Switched { holder, slot: FieldSlot::new(BattleSide::Player, 0)? }, Family::Switch),
+        (
+            Payload::MoveUsed {
+                holder,
+                move_id: MoveId::new(safe(33)),
+            },
+            Family::Move,
+        ),
+        (
+            Payload::HpChanged {
+                holder,
+                before: 20,
+                after: 11,
+            },
+            Family::Hp,
+        ),
+        (
+            Payload::Switched {
+                holder,
+                slot: FieldSlot::new(BattleSide::Player, 0)?,
+            },
+            Family::Switch,
+        ),
         (Payload::Fainted { holder }, Family::Faint),
         (Payload::BattleEnded { won: true }, Family::Terminal),
         (Payload::BattleEnded { won: false }, Family::Terminal),
@@ -46,10 +66,21 @@ fn battle_presentation_payloads_keep_typed_actor_and_cue_parameters() -> Result<
         payload.validate(PresentationSemanticIdV1::Cue(family))?;
         let encoded = serde_json::to_vec(&payload)?;
         assert_eq!(serde_json::from_slice::<Payload>(&encoded)?, payload);
-        assert!(payload.validate(PresentationSemanticIdV1::Cue(Family::Ability)).is_err());
+        assert!(
+            payload
+                .validate(PresentationSemanticIdV1::Cue(Family::Ability))
+                .is_err()
+        );
     }
-    assert!(Payload::HpChanged { holder, before: 20, after: 20 }
-        .validate(PresentationSemanticIdV1::Cue(Family::Hp)).is_err());
+    assert!(
+        Payload::HpChanged {
+            holder,
+            before: 20,
+            after: 20
+        }
+        .validate(PresentationSemanticIdV1::Cue(Family::Hp))
+        .is_err()
+    );
     Ok(())
 }
 

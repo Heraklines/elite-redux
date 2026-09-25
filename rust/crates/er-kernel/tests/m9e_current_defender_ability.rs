@@ -612,11 +612,15 @@ fn actual_poison_redirect_absorbs_with_ordered_payload_and_material_conservation
         }
         let defender_payloads: Vec<_> = payloads
             .into_iter()
-            .filter(|payload| matches!(payload,
-                GamePresentationPayloadV1::AbilityShown { .. }
-                    | GamePresentationPayloadV1::HpRestored { .. }
-                    | GamePresentationPayloadV1::AbilityHidden { .. }
-                    | GamePresentationPayloadV1::MoveNoEffect { .. }))
+            .filter(|payload| {
+                matches!(
+                    payload,
+                    GamePresentationPayloadV1::AbilityShown { .. }
+                        | GamePresentationPayloadV1::HpRestored { .. }
+                        | GamePresentationPayloadV1::AbilityHidden { .. }
+                        | GamePresentationPayloadV1::MoveNoEffect { .. }
+                )
+            })
             .collect();
         assert_eq!(defender_payloads, expected_payloads);
         let tracked = after
