@@ -271,18 +271,19 @@ fn title_list_read_normalizes_exact_saved_state_and_raw_write_generation_two()
 -> Result<(), Box<dyn Error>> {
     let content = content()?;
     let bytes = saved_write(content.clone())?;
-    let saved = GameSaveV2::decode(&bytes)?;
+    let saved = Box::new(GameSaveV2::decode(&bytes)?);
     for floor in [1, 90] {
-        let mut initial = title(content.clone())?.snapshot()?;
+        eprintln!("m9e title storage: floor {floor} begin");
+        let mut initial = Box::new(title(content.clone())?.snapshot()?);
         bootstrap_mut(&mut initial)?
             .current_storage
             .as_mut()
             .ok_or("owner absent")?
             .next_platform_request_id = safe(floor);
-        let mut reader = restore(initial, content.clone())?;
+        let mut reader = Box::new(restore(*initial, content.clone())?);
         let list_request = list(&mut reader)?;
-        let listing = reader.snapshot()?;
-        let mut clone = restore(listing, content.clone())?;
+        let listing = Box::new(reader.snapshot()?);
+        let mut clone = Box::new(restore(*listing, content.clone())?);
         let outcome = KernelStorageResultV2::Slots {
             slots: vec!["actual-slot".to_owned()],
         };
@@ -292,8 +293,8 @@ fn title_list_read_normalizes_exact_saved_state_and_raw_write_generation_two()
         );
         assert_eq!(reader.snapshot()?, clone.snapshot()?);
         let request = read(&mut reader, "actual-slot")?;
-        let before = reader.snapshot()?;
-        let mut clone = restore(before.clone(), content.clone())?;
+        let before = Box::new(reader.snapshot()?);
+        let mut clone = Box::new(restore(*before.clone(), content.clone())?);
         let outcome = KernelStorageResultV2::Read {
             bytes: Some(bytes.clone()),
         };
@@ -301,8 +302,9 @@ fn title_list_read_normalizes_exact_saved_state_and_raw_write_generation_two()
             reader.apply_storage_result(request, outcome.clone())?,
             clone.apply_storage_result(request, outcome)?
         );
-        let loaded = reader.snapshot()?;
-        assert_eq!(loaded, clone.snapshot()?);
+        let loaded = Box::new(reader.snapshot()?);
+        eprintln!("m9e title storage: floor {floor} read restored");
+        assert_eq!(*loaded, clone.snapshot()?);
         let storage = bootstrap(&before)?
             .current_storage
             .as_ref()
@@ -316,7 +318,7 @@ fn title_list_read_normalizes_exact_saved_state_and_raw_write_generation_two()
                 saved.state.identities.next_platform_request_id < storage.next_platform_request_id
             );
         }
-        let mut state = saved.state.clone();
+        let mut state = Box::new(saved.state.clone());
         state.identities.next_platform_request_id = state
             .identities
             .next_platform_request_id
@@ -350,7 +352,7 @@ fn title_list_read_normalizes_exact_saved_state_and_raw_write_generation_two()
         context.authority_revision = revision;
         context.menu_instance = instance;
         let mut expected = before.clone();
-        expected.lifecycle = GameKernelLifecycleSnapshotV7::Active(state);
+        expected.lifecycle = GameKernelLifecycleSnapshotV7::Active(*state);
         expected.next_menu_instance_id = MenuInstanceId::new(safe(instance.get().get() + 1));
         expected.material_ledger = AppliedGameMaterialLedgerV1::new(revision)?;
         expected.pending_platform.clear();
@@ -363,6 +365,7 @@ fn title_list_read_normalizes_exact_saved_state_and_raw_write_generation_two()
             loaded, expected,
             "all saved gameplay and unrelated owners stay exact"
         );
+        eprintln!("m9e title storage: floor {floor} normalized state checked");
         reader.raw_input(RawInputEvent::KeyUp {
             code: PhysicalKey::Space,
         })?;
@@ -371,7 +374,7 @@ fn title_list_read_normalizes_exact_saved_state_and_raw_write_generation_two()
         })?;
         assert_eq!(
             reader.snapshot()?,
-            loaded,
+            *loaded,
             "held Title submit cannot bleed into loaded control"
         );
         let step = press(&mut reader, PhysicalKey::Space)?;
@@ -395,8 +398,8 @@ fn title_list_read_normalizes_exact_saved_state_and_raw_write_generation_two()
             })
             .ok_or("real post-load Write absent")?;
         assert!(next > request);
-        let written = GameSaveV2::decode(bytes)?;
-        let mut expected_write = saved.state.clone();
+        let written = Box::new(GameSaveV2::decode(bytes)?);
+        let mut expected_write = Box::new(saved.state.clone());
         let GameKernelLifecycleSnapshotV7::Active(loaded_state) = &loaded.lifecycle else {
             return Err("not active".into());
         };
@@ -411,8 +414,9 @@ fn title_list_read_normalizes_exact_saved_state_and_raw_write_generation_two()
             .control
             .clone();
         expected_write.identities.next_platform_request_id = safe(next.get().get() + 1);
-        assert_eq!(written.state, expected_write);
+        assert_eq!(written.state, *expected_write);
         assert_eq!(written.generation, safe(2));
+        eprintln!("m9e title storage: floor {floor} write checked");
         assert_eq!(
             reader.apply_storage_result(next, KernelStorageResultV2::Written)?,
             clone.apply_storage_result(next, KernelStorageResultV2::Written)?
@@ -431,6 +435,7 @@ fn title_list_read_normalizes_exact_saved_state_and_raw_write_generation_two()
                 .is_err()
         );
         assert_eq!(reader.snapshot()?, settled);
+        eprintln!("m9e title storage: floor {floor} complete");
     }
     Ok(())
 }

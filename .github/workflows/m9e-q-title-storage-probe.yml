@@ -1,0 +1,34 @@
+name: M9E Q Title Storage Probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  title-storage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          lfs: false
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9e-cargo-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+          restore-keys: |
+            m9e-cargo-deps-${{ runner.os }}-${{ runner.arch }}-
+      - name: Execute complete Title storage witness target at this source SHA
+        working-directory: rust
+        run: cargo test --locked -p er-kernel --test m9e_title_storage -- --nocapture
