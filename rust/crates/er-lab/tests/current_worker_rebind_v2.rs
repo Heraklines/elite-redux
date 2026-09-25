@@ -38,6 +38,7 @@ use er_types::{
     RunId, SafeU53, SeatId, SessionId, TimeClass,
 };
 use std::error::Error;
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -555,6 +556,13 @@ fn control_frame(output: &CurrentSessionRebindOutputV1) -> TestResult<Vec<u8>> {
     Ok(bytes.clone())
 }
 
+fn phase(label: &str) -> TestResult {
+    std::io::stderr()
+        .lock()
+        .write_all(format!("worker rebind phase: {label}\n").as_bytes())?;
+    Ok(())
+}
+
 fn begin(host: &mut Peer, guest: &mut Peer) -> TestResult<Vec<u8>> {
     for peer in [&mut *host, &mut *guest] {
         peer.ordinary(CurrentExternalEvent::TransportChanged {
@@ -614,9 +622,14 @@ fn handshake(host: &mut Peer, guest: &mut Peer, mut bytes: Vec<u8>) -> TestResul
 
 #[test]
 fn natural_owned_workers_rebind_and_continue_generation_two_gameplay() -> TestResult {
-    let (mut host, mut guest) = pair(CurrentTailLimitsV2::default())?;
+    let (host, guest) = pair(CurrentTailLimitsV2::default())?;
+    let mut host = Box::new(host);
+    let mut guest = Box::new(guest);
+    phase("pair")?;
     let offer = begin(&mut host, &mut guest)?;
+    phase("begin")?;
     handshake(&mut host, &mut guest, offer)?;
+    phase("handshake")?;
     host.settle()?;
     guest.settle()?;
     host.ordinary(CurrentExternalEvent::AdvanceTime {
@@ -628,6 +641,7 @@ fn natural_owned_workers_rebind_and_continue_generation_two_gameplay() -> TestRe
         generation: generation(2),
         bytes: material,
     })?;
+    phase("material")?;
     host.settle()?;
     guest.settle()?;
     let proposal = guest.next_frame()?;
@@ -636,12 +650,13 @@ fn natural_owned_workers_rebind_and_continue_generation_two_gameplay() -> TestRe
             .connection_generation,
         generation(2)
     );
-    let pending = guest.snapshot()?;
+    let pending = Box::new(guest.snapshot()?);
     assert_eq!(
         wire(&guest.ordinary(CurrentExternalEvent::RetryCoopSetup)?)?,
         proposal
     );
-    assert_eq!(guest.snapshot()?, pending);
+    assert_eq!(guest.snapshot()?, *pending);
+    phase("proposal")?;
     let receipt = wire(&host.ordinary(CurrentExternalEvent::NetworkFrame {
         generation: generation(2),
         bytes: proposal.clone(),
@@ -652,7 +667,7 @@ fn natural_owned_workers_rebind_and_continue_generation_two_gameplay() -> TestRe
             .proposal_bytes,
         proposal
     );
-    let committed = host.snapshot()?;
+    let committed = Box::new(host.snapshot()?);
     assert_eq!(
         wire(&host.ordinary(CurrentExternalEvent::NetworkFrame {
             generation: generation(2),
@@ -660,8 +675,9 @@ fn natural_owned_workers_rebind_and_continue_generation_two_gameplay() -> TestRe
         })?)?,
         receipt
     );
-    assert_eq!(host.snapshot()?, committed);
-    let before = host.snapshot()?;
+    assert_eq!(host.snapshot()?, *committed);
+    phase("host duplicate")?;
+    let before = Box::new(host.snapshot()?);
     let frontier = host.worker.frontier();
     assert!(
         host.worker
@@ -672,14 +688,15 @@ fn natural_owned_workers_rebind_and_continue_generation_two_gameplay() -> TestRe
             .is_err()
     );
     assert_eq!(host.worker.frontier(), frontier);
-    assert_eq!(host.snapshot()?, before);
+    assert_eq!(host.snapshot()?, *before);
     assert!(!host.worker.is_fenced());
+    phase("host rejection")?;
     guest.ordinary(CurrentExternalEvent::NetworkFrame {
         generation: generation(2),
         bytes: receipt.clone(),
     })?;
     assert!(guest.snapshot()?.current_proposal.is_none());
-    let committed = guest.snapshot()?;
+    let committed = Box::new(guest.snapshot()?);
     assert!(
         guest
             .ordinary(CurrentExternalEvent::NetworkFrame {
@@ -689,13 +706,14 @@ fn natural_owned_workers_rebind_and_continue_generation_two_gameplay() -> TestRe
             .effects
             .is_empty()
     );
-    assert_eq!(guest.snapshot()?, committed);
+    assert_eq!(guest.snapshot()?, *committed);
     assert!(guest.settle()? > 0);
     host.settle()?;
     assert_eq!(
         host.reference.kernel_ref()?.state(),
         guest.reference.kernel_ref()?.state()
     );
+    phase("gameplay complete")?;
     host.worker.dispose()?;
     guest.worker.dispose()?;
     Ok(())

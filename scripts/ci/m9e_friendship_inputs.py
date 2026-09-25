@@ -13,10 +13,11 @@ import zipfile
 FULL = None
 ORACLE_DATA = None
 ORACLE_RUN = 34149970288
+ORACLE_RUN_ATTEMPT = 2
 ORACLE_SHA = "7e8e98922524b209a168bb028c7784dd7c43294f"
 ORACLE_BRANCH = "codex/m9e-friendship-effects-sidecar-focused-20260907"
-ORACLE_ARTIFACT = 10029032038
-ORACLE_ARCHIVE_BYTES = 1777599
+ORACLE_ARTIFACT = 10840328062
+ORACLE_ARCHIVE_BYTES = 1777598
 ORACLE_FILES = {
     "export-one.json": [21428, "8182bb42b37ade8fd26bf9885b26c08d9a5c6b8ce028b6261fa369077d3e0e00"],
     "effects-one.json": [6397, "f56af6cd8fb70f707a80d3e7e6906681965be329cd8e0ac1021e9ccdcb9dbf5a"],
@@ -56,7 +57,7 @@ def fetch_qualified_oracle():
             return json.loads(raw), {"bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
 
         service, service_fact = api(f"/actions/runs/{ORACLE_RUN}", 65536)
-        for field, expected in {"id": ORACLE_RUN, "run_attempt": 1, "head_sha": ORACLE_SHA,
+        for field, expected in {"id": ORACLE_RUN, "run_attempt": ORACLE_RUN_ATTEMPT, "head_sha": ORACLE_SHA,
                 "head_branch": ORACLE_BRANCH, "status": "completed", "conclusion": "success", "event": "push",
                 "path": ".github/workflows/m9e-friendship-oracle-focused.yml"}.items():
             require(type(service.get(field)) is type(expected) and service[field] == expected,

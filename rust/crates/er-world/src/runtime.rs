@@ -410,7 +410,10 @@ pub fn biome_overstay(
         return 0;
     }
     world.overstay_anchor_wave.map_or(0, |anchor| {
-        wave.get().get().checked_sub(anchor.get().get()).unwrap_or(0)
+        wave.get()
+            .get()
+            .checked_sub(anchor.get().get())
+            .unwrap_or(0)
     })
 }
 
