@@ -885,8 +885,7 @@ fn current_proposal_publication_receipt_and_snapshot_conserve_ownership()
     phase("noncurrent complete")?;
     let setup_content = content.clone();
     let (mut state, revision, _) = on_default_stack("publication natural setup", move || {
-        let (state, revision, menu) =
-            natural_coop_state(setup_content, SeatId::new(safe(1)))?;
+        let (state, revision, menu) = natural_coop_state(setup_content, SeatId::new(safe(1)))?;
         Ok((Box::new(state), revision, menu))
     })?;
     phase("natural complete")?;
@@ -1230,160 +1229,171 @@ fn current_proposal_rejection_duplicate_and_terminal_are_transactional()
         pair_from_state(*state, revision, pair_content)
     })?;
     phase("terminal pair complete")?;
-    press(&mut authority, PhysicalKey::Space)?;
-    let first_material = material(&press(&mut authority, PhysicalKey::Space)?)?;
-    replica.apply_authority_material(&first_material)?;
-    let earlier = replica
-        .snapshot()?
-        .material_ledger
-        .records
-        .last()
-        .cloned()
-        .ok_or("earlier record absent")?;
-    assert_eq!(
-        replica
-            .current_control()
-            .and_then(|control| control.owner_seat),
-        Some(guest)
-    );
-    for pending in replica.snapshot()?.pending_presentations {
-        replica.settle_presentation(pending.event_id)?;
-    }
-    press(&mut replica, PhysicalKey::Space)?;
-    let terminal_proposal = proposal(&submit_strongest_move(&mut replica, &content)?)?;
-    let pending = replica.snapshot()?;
-    assert!(matches!(
-        pending.current_proposal,
-        Some(CurrentProposalOwnerSnapshotV1::Pending { .. })
-    ));
-    let resolved = authority.ingest_network_frame(generation, &terminal_proposal)?;
-    assert!(resolved.effects.iter().any(|effect| matches!(effect,
-        GameKernelEffectV7::Terminal(terminal) if terminal.reason == "VICTORY")));
-    let receipt_bytes = material(&resolved)?;
-    let receipt = CurrentProposalMaterialReceiptV1::decode(&receipt_bytes)?;
-    let inner = receipt.evidence()?.material_bytes;
-    let terminal_material = GameMaterialV6::decode(&inner)?;
-    assert_ne!(
-        terminal_material.transition().operation_id,
-        earlier.operation_id
-    );
-    let mut accepted = restore(pending.clone(), content.clone())?;
-    accepted.ingest_network_frame(generation, &receipt_bytes)?;
-    assert!(accepted.snapshot()?.current_proposal.is_none());
-    let accepted_snapshot = accepted.snapshot()?;
-    assert_eq!(
-        accepted.ingest_network_frame(generation, &receipt_bytes)?,
-        GameKernelStepV7::default()
-    );
-    assert_eq!(accepted.snapshot()?, accepted_snapshot);
+    (authority, replica) = on_default_stack("terminal initial material", move || {
+        press(&mut authority, PhysicalKey::Space)?;
+        let first_material = material(&press(&mut authority, PhysicalKey::Space)?)?;
+        replica.apply_authority_material(&first_material)?;
+        Ok((authority, replica))
+    })?;
+    phase("terminal first material applied")?;
+    on_default_stack("terminal transaction checks", move || {
+        let earlier = replica
+            .snapshot()?
+            .material_ledger
+            .records
+            .last()
+            .cloned()
+            .ok_or("earlier record absent")?;
+        assert_eq!(
+            replica
+                .current_control()
+                .and_then(|control| control.owner_seat),
+            Some(guest)
+        );
+        for pending in replica.snapshot()?.pending_presentations {
+            replica.settle_presentation(pending.event_id)?;
+        }
+        press(&mut replica, PhysicalKey::Space)?;
+        let terminal_proposal = proposal(&submit_strongest_move(&mut replica, &content)?)?;
+        phase("terminal proposal submitted")?;
+        let pending = replica.snapshot()?;
+        assert!(matches!(
+            pending.current_proposal,
+            Some(CurrentProposalOwnerSnapshotV1::Pending { .. })
+        ));
+        let resolved = authority.ingest_network_frame(generation, &terminal_proposal)?;
+        phase("terminal proposal resolved")?;
+        assert!(resolved.effects.iter().any(|effect| matches!(effect,
+            GameKernelEffectV7::Terminal(terminal) if terminal.reason == "VICTORY")));
+        let receipt_bytes = material(&resolved)?;
+        let receipt = CurrentProposalMaterialReceiptV1::decode(&receipt_bytes)?;
+        let inner = receipt.evidence()?.material_bytes;
+        let terminal_material = GameMaterialV6::decode(&inner)?;
+        assert_ne!(
+            terminal_material.transition().operation_id,
+            earlier.operation_id
+        );
+        let mut accepted = restore(pending.clone(), content.clone())?;
+        accepted.ingest_network_frame(generation, &receipt_bytes)?;
+        assert!(accepted.snapshot()?.current_proposal.is_none());
+        let accepted_snapshot = accepted.snapshot()?;
+        assert_eq!(
+            accepted.ingest_network_frame(generation, &receipt_bytes)?,
+            GameKernelStepV7::default()
+        );
+        assert_eq!(accepted.snapshot()?, accepted_snapshot);
+        phase("terminal receipt accepted")?;
 
-    // Raw terminal compatibility delivery during a real disconnect has no exact
-    // acceptance authority. The original proposal is conserved as abandoned.
-    let mut paused = replica.snapshot()?;
-    let mut unrelated_scheduler = live_scheduler(&paused.scheduler)?;
-    let _pause =
-        unrelated_scheduler.pause_class(guest, TimeClass::HumanInput, "current-owner-unrelated")?;
-    paused.scheduler = scheduler_snapshot(&unrelated_scheduler)?;
-    paused
-        .protocol
-        .as_mut()
-        .ok_or("protocol missing")?
-        .proposal_leases
-        .as_mut()
-        .ok_or("leases missing")?
-        .committed_tombstones
-        .push(OperationId::new("historical/inert")?);
-    replica = restore(paused, content.clone())?;
-    replica.transport_changed(generation, false)?;
-    let disconnected = replica.snapshot()?;
-    let original_owner = disconnected
-        .current_proposal
-        .clone()
-        .ok_or("owner missing")?;
-    let original_protocol = disconnected.protocol.clone();
-    let original_pauses = disconnected.scheduler.pauses.clone();
-    let terminal_step = replica.apply_authority_material(&inner)?;
-    assert!(
-        !terminal_step
-            .effects
-            .iter()
-            .any(|effect| matches!(effect, GameKernelEffectV7::Platform(_)))
-    );
-    let abandoned = replica.snapshot()?;
-    assert_eq!(abandoned.protocol, original_protocol);
-    assert_eq!(abandoned.scheduler.pauses, original_pauses);
-    assert_eq!(
-        abandoned.replay_sequence.get(),
-        disconnected.replay_sequence.get() + 1
-    );
-    let Some(CurrentProposalOwnerSnapshotV1::TerminalAbandoned { audit }) =
-        &abandoned.current_proposal
-    else {
-        return Err("terminal raw delivery did not abandon owner".into());
-    };
-    assert_eq!(&audit.retained, original_owner.retained());
-    assert_eq!(audit.terminal_reason, "VICTORY");
-    assert_eq!(
-        audit.terminal_operation_id,
-        terminal_material.transition().operation_id
-    );
-    assert_eq!(
-        audit.terminal_after_digest,
-        terminal_material.transition().after_digest
-    );
-    assert_eq!(
-        audit.terminal_authority_revision.get() + 1,
-        abandoned.material_ledger.next_authority_revision.get()
-    );
-    assert_eq!(
-        restore(abandoned.clone(), content.clone())?.snapshot()?,
-        abandoned
-    );
-    let mut wrong_anchor = serde_json::to_value(&abandoned)?;
-    wrong_anchor["current_proposal"]["audit"]["retained"]["publication_before_digest"] =
-        serde_json::json!(format!("blake3-v1:{}", "0".repeat(64)));
-    reject_restore(wrong_anchor, content.clone())?;
-    assert_eq!(abandoned.material_ledger.records.len(), 2);
-    // All four fields describe a REAL earlier record, so mere ledger membership
-    // would accept this forgery. It must still fail the terminal-frontier binding.
-    let mut older_audit = abandoned.clone();
-    let Some(CurrentProposalOwnerSnapshotV1::TerminalAbandoned { audit }) =
-        &mut older_audit.current_proposal
-    else {
-        return Err("audit missing".into());
-    };
-    audit.terminal_operation_id = earlier.operation_id;
-    audit.terminal_material_fingerprint = earlier.material_fingerprint;
-    audit.terminal_authority_revision = earlier.authority_revision;
-    audit.terminal_after_digest = earlier.after_digest;
-    assert!(restore(older_audit, content.clone()).is_err());
-    for (field, value) in [
-        ("terminal_id", serde_json::json!("wrong-terminal")),
-        ("terminal_reason", serde_json::json!("DEFEAT")),
-        ("abandonment_replay_sequence", serde_json::json!(0)),
-        ("unknown", serde_json::json!(true)),
-    ] {
-        let mut changed = serde_json::to_value(&abandoned)?;
-        changed["current_proposal"]["audit"][field] = value;
-        reject_restore(changed, content.clone())?;
-    }
-    let mut relabeled = serde_json::to_value(&abandoned)?;
-    relabeled["current_proposal"] = serde_json::to_value(original_owner)?;
-    reject_restore(relabeled, content.clone())?;
-    replica = restore(abandoned, content.clone())?;
-    reject_ingress(&mut replica, &receipt_bytes)?;
-    replica.transport_changed(generation, true)?;
-    let reconnected = replica.snapshot()?;
-    assert_eq!(
-        replica.ingest_network_frame(generation, &receipt_bytes)?,
-        GameKernelStepV7::default()
-    );
-    assert_eq!(
-        replica.snapshot()?,
-        reconnected,
-        "duplicate receipt cannot relabel abandonment as acceptance"
-    );
-    assert_eq!(replica.state(), authority.state());
-    assert_eq!(host, receipt.authority_context.sender_seat_id);
+        // Raw terminal compatibility delivery during a real disconnect has no exact
+        // acceptance authority. The original proposal is conserved as abandoned.
+        let mut paused = replica.snapshot()?;
+        let mut unrelated_scheduler = live_scheduler(&paused.scheduler)?;
+        let _pause =
+            unrelated_scheduler.pause_class(guest, TimeClass::HumanInput, "current-owner-unrelated")?;
+        paused.scheduler = scheduler_snapshot(&unrelated_scheduler)?;
+        paused
+            .protocol
+            .as_mut()
+            .ok_or("protocol missing")?
+            .proposal_leases
+            .as_mut()
+            .ok_or("leases missing")?
+            .committed_tombstones
+            .push(OperationId::new("historical/inert")?);
+        replica = restore(paused, content.clone())?;
+        replica.transport_changed(generation, false)?;
+        let disconnected = replica.snapshot()?;
+        let original_owner = disconnected
+            .current_proposal
+            .clone()
+            .ok_or("owner missing")?;
+        let original_protocol = disconnected.protocol.clone();
+        let original_pauses = disconnected.scheduler.pauses.clone();
+        let terminal_step = replica.apply_authority_material(&inner)?;
+        assert!(
+            !terminal_step
+                .effects
+                .iter()
+                .any(|effect| matches!(effect, GameKernelEffectV7::Platform(_)))
+        );
+        let abandoned = replica.snapshot()?;
+        phase("terminal raw material abandoned")?;
+        assert_eq!(abandoned.protocol, original_protocol);
+        assert_eq!(abandoned.scheduler.pauses, original_pauses);
+        assert_eq!(
+            abandoned.replay_sequence.get(),
+            disconnected.replay_sequence.get() + 1
+        );
+        let Some(CurrentProposalOwnerSnapshotV1::TerminalAbandoned { audit }) =
+            &abandoned.current_proposal
+        else {
+            return Err("terminal raw delivery did not abandon owner".into());
+        };
+        assert_eq!(&audit.retained, original_owner.retained());
+        assert_eq!(audit.terminal_reason, "VICTORY");
+        assert_eq!(
+            audit.terminal_operation_id,
+            terminal_material.transition().operation_id
+        );
+        assert_eq!(
+            audit.terminal_after_digest,
+            terminal_material.transition().after_digest
+        );
+        assert_eq!(
+            audit.terminal_authority_revision.get() + 1,
+            abandoned.material_ledger.next_authority_revision.get()
+        );
+        assert_eq!(
+            restore(abandoned.clone(), content.clone())?.snapshot()?,
+            abandoned
+        );
+        let mut wrong_anchor = serde_json::to_value(&abandoned)?;
+        wrong_anchor["current_proposal"]["audit"]["retained"]["publication_before_digest"] =
+            serde_json::json!(format!("blake3-v1:{}", "0".repeat(64)));
+        reject_restore(wrong_anchor, content.clone())?;
+        assert_eq!(abandoned.material_ledger.records.len(), 2);
+        // All four fields describe a REAL earlier record, so mere ledger membership
+        // would accept this forgery. It must still fail the terminal-frontier binding.
+        let mut older_audit = abandoned.clone();
+        let Some(CurrentProposalOwnerSnapshotV1::TerminalAbandoned { audit }) =
+            &mut older_audit.current_proposal
+        else {
+            return Err("audit missing".into());
+        };
+        audit.terminal_operation_id = earlier.operation_id;
+        audit.terminal_material_fingerprint = earlier.material_fingerprint;
+        audit.terminal_authority_revision = earlier.authority_revision;
+        audit.terminal_after_digest = earlier.after_digest;
+        assert!(restore(older_audit, content.clone()).is_err());
+        for (field, value) in [
+            ("terminal_id", serde_json::json!("wrong-terminal")),
+            ("terminal_reason", serde_json::json!("DEFEAT")),
+            ("abandonment_replay_sequence", serde_json::json!(0)),
+            ("unknown", serde_json::json!(true)),
+        ] {
+            let mut changed = serde_json::to_value(&abandoned)?;
+            changed["current_proposal"]["audit"][field] = value;
+            reject_restore(changed, content.clone())?;
+        }
+        let mut relabeled = serde_json::to_value(&abandoned)?;
+        relabeled["current_proposal"] = serde_json::to_value(original_owner)?;
+        reject_restore(relabeled, content.clone())?;
+        replica = restore(abandoned, content.clone())?;
+        reject_ingress(&mut replica, &receipt_bytes)?;
+        replica.transport_changed(generation, true)?;
+        let reconnected = replica.snapshot()?;
+        assert_eq!(
+            replica.ingest_network_frame(generation, &receipt_bytes)?,
+            GameKernelStepV7::default()
+        );
+        assert_eq!(
+            replica.snapshot()?,
+            reconnected,
+            "duplicate receipt cannot relabel abandonment as acceptance"
+        );
+        assert_eq!(replica.state(), authority.state());
+        assert_eq!(host, receipt.authority_context.sender_seat_id);
+        Ok(())
+    })?;
     Ok(())
 }

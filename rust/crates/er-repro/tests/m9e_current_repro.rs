@@ -1,6 +1,7 @@
 //! Current causal replay through the public recorder and isolated session APIs.
 
 use std::error::Error;
+use std::io::Write;
 use std::sync::{Arc, OnceLock};
 
 use er_env::current::{CurrentExternalEvent, CurrentGameSession, CurrentSessionError};
@@ -28,6 +29,11 @@ const BUNDLE: &[u8] =
 
 fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("safe test integer")
+}
+
+fn phase(label: &str) -> TestResult {
+    writeln!(std::io::stderr().lock(), "browser rotation phase: {label}")?;
+    Ok(())
 }
 fn seat() -> SeatId {
     SeatId::new(safe(1))
@@ -692,27 +698,29 @@ fn browser_capture(
 #[test]
 fn browser_generation_survives_rotation_import_and_kernel_rejections_without_protocol() -> TestResult
 {
-    let mut session = active()?;
+    phase("start")?;
+    let mut session = Box::new(active()?);
     assert!(session.snapshot()?.protocol.is_none());
     let bounded = CurrentReproLimitsV1 {
         maximum_events: 2,
         ..limits()
     };
-    let mut recorder = CurrentReproRecorderV1::new_with_browser_transport(
+    let mut recorder = Box::new(CurrentReproRecorderV1::new_with_browser_transport(
         session.snapshot()?,
         seat(),
         GameKernelRoleV7::Authority,
         Arc::clone(&fixture()?.content),
         bounded,
         safe(7),
-    )?;
+    )?);
     for milliseconds in [1, 2, 3] {
         let (result, status) =
             browser_capture(&mut session, &mut recorder, time(milliseconds), 7, 7)?;
         assert!(result.is_ok());
         assert!(matches!(status, CurrentCaptureStatusV1::Available { .. }));
     }
-    let capsule = recorder.export()?;
+    phase("captured three")?;
+    let capsule = Box::new(recorder.export()?);
     assert_eq!((capsule.base_position, capsule.final_position), (2, 3));
     assert_eq!(
         capsule.browser_transport,
@@ -728,13 +736,22 @@ fn browser_generation_survives_rotation_import_and_kernel_rejections_without_pro
             .before_generation,
         safe(7)
     );
-    let (mut recorder, mut resumed) = CurrentReproRecorderV1::from_capsule(
-        capsule.clone(),
-        Arc::clone(&fixture()?.content),
-        bounded,
-    )?;
-    assert_eq!(recorder.export()?, capsule);
-    let before = resumed.snapshot()?;
+    let import_capsule = capsule.clone();
+    let import_content = Arc::clone(&fixture()?.content);
+    let (mut recorder, mut resumed) = std::thread::spawn(move || -> Result<_, String> {
+        let (recorder, resumed) = CurrentReproRecorderV1::from_capsule(
+            *import_capsule,
+            import_content,
+            bounded,
+        )
+        .map_err(|error| error.to_string())?;
+        Ok((Box::new(recorder), Box::new(resumed)))
+    })
+    .join()
+    .map_err(|_| "browser recorder import panicked")??;
+    phase("imported")?;
+    assert_eq!(recorder.export()?, *capsule);
+    let before = Box::new(resumed.snapshot()?);
     let (result, status) = browser_capture(
         &mut resumed,
         &mut recorder,
@@ -753,7 +770,8 @@ fn browser_generation_survives_rotation_import_and_kernel_rejections_without_pro
             ..
         }
     ));
-    assert_eq!(resumed.snapshot()?, before);
+    assert_eq!(resumed.snapshot()?, *before);
+    phase("rejected transport")?;
     assert_eq!(
         recorder
             .export()?
@@ -784,6 +802,7 @@ fn browser_generation_survives_rotation_import_and_kernel_rejections_without_pro
         replay(&recorder.export()?)?.snapshot()?,
         resumed.snapshot()?
     );
+    phase("replayed")?;
     // Accidentally using the native wrapper cannot silently discard host context.
     let (result, status) = capture(&mut resumed, &mut recorder, time(1))?;
     assert!(result.is_ok());
@@ -809,6 +828,7 @@ fn browser_generation_survives_rotation_import_and_kernel_rejections_without_pro
             .base_generation,
         safe(7)
     );
+    phase("complete")?;
     Ok(())
 }
 
