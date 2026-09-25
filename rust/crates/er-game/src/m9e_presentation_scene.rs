@@ -10,7 +10,7 @@ use thiserror::Error;
 
 pub const CURRENT_PRESENTATION_SCENE_SCHEMA_VERSION_V1: u32 = 1;
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", deny_unknown_fields)]
 pub enum CurrentVisibleHpV1 {
     PlayerExact { hp: u32, max_hp: u32 },
@@ -71,8 +71,8 @@ pub fn project_current_presentation_scene_v1(
                     max_hp: pokemon.max_hp,
                 },
                 BattleSide::Enemy => CurrentVisibleHpV1::EnemyBar {
-                    ten_thousandths: (u64::from(pokemon.hp) * 10_000
-                        / u64::from(pokemon.max_hp)) as u16,
+                    ten_thousandths: (u64::from(pokemon.hp) * 10_000 / u64::from(pokemon.max_hp))
+                        as u16,
                 },
             };
             actors.push(CurrentPresentationActorV1 {

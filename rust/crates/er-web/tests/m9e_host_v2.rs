@@ -4,9 +4,7 @@ use std::sync::{Arc, OnceLock};
 use er_env::current::{CurrentExternalEvent, CurrentGameSession};
 use er_game::m7_progression_control::generic_vertical_control_v2;
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
-use er_game::m9e_presentation_scene::{
-    CurrentVisibleHpV1, project_current_presentation_scene_v1,
-};
+use er_game::m9e_presentation_scene::{CurrentVisibleHpV1, project_current_presentation_scene_v1};
 use er_kernel::game_kernel_v7::{
     GameKernelEffectV7, GameKernelRoleV7, GameKernelV7, GameProposalEnvelopeV2,
     KernelPresentationOutcomeV2,
@@ -509,13 +507,18 @@ fn natural_browser_route_produces_typed_ui_transport_presentation_audio_and_asse
             .iter()
             .any(|effect| matches!(effect, BrowserEffectV2::Telemetry { .. }))
     );
-    let scene = batch.effects.iter().find_map(|effect| match effect {
-        BrowserEffectV2::SceneProjected { scene } => Some(scene),
-        _ => None,
-    }).ok_or("natural route did not project a scene")?;
+    let scene = batch
+        .effects
+        .iter()
+        .find_map(|effect| match effect {
+            BrowserEffectV2::SceneProjected { scene } => Some(scene),
+            _ => None,
+        })
+        .ok_or("natural route did not project a scene")?;
     let kernel = host.kernel_ref().ok_or("active kernel missing")?;
     let expected = project_current_presentation_scene_v1(
-        kernel.state(), kernel.current_control().ok_or("control missing")?,
+        kernel.state(),
+        kernel.current_control().ok_or("control missing")?,
     )?;
     assert_eq!(*scene, expected);
     Ok(())
@@ -527,15 +530,22 @@ fn active_battle_scene_exposes_player_exact_and_enemy_bar_without_enemy_max_hp()
     let (host, _) = active_host()?;
     let kernel = host.kernel_ref().ok_or("active kernel missing")?;
     let scene = project_current_presentation_scene_v1(
-        kernel.state(), kernel.current_control().ok_or("control missing")?,
+        kernel.state(),
+        kernel.current_control().ok_or("control missing")?,
     )?;
     assert!(!scene.actors.is_empty());
-    assert!(scene.actors.iter().any(|actor| matches!(
-        actor.hp, CurrentVisibleHpV1::PlayerExact { .. }
-    )));
-    assert!(scene.actors.iter().any(|actor| matches!(
-        actor.hp, CurrentVisibleHpV1::EnemyBar { .. }
-    )));
+    assert!(
+        scene
+            .actors
+            .iter()
+            .any(|actor| matches!(actor.hp, CurrentVisibleHpV1::PlayerExact { .. }))
+    );
+    assert!(
+        scene
+            .actors
+            .iter()
+            .any(|actor| matches!(actor.hp, CurrentVisibleHpV1::EnemyBar { .. }))
+    );
     for actor in &scene.actors {
         let encoded = serde_json::to_value(actor)?;
         match actor.slot.side {

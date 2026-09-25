@@ -454,8 +454,14 @@ impl BrowserKernelHostV2 {
             .as_mut()
             .ok_or(BrowserWebErrorV2::Invalid)?
             .apply_with(event.clone(), |candidate, step| {
-                let response = Self::effects(content.as_ref(), candidate, step.clone(), generation, sequence)
-                    .map_err(BrowserCompletionErrorV2::Adapter)?;
+                let response = Self::effects(
+                    content.as_ref(),
+                    candidate,
+                    step.clone(),
+                    generation,
+                    sequence,
+                )
+                .map_err(BrowserCompletionErrorV2::Adapter)?;
                 let bytes = encode_response(response, request_id, sequence, maximum_response_bytes)
                     .map_err(BrowserCompletionErrorV2::Adapter)?;
                 Ok::<_, BrowserCompletionErrorV2>((bytes, step))
@@ -769,11 +775,14 @@ impl BrowserKernelHostV2 {
         external_sequence: SafeU53,
     ) -> Result<BrowserResponseV2, BrowserWebErrorV2> {
         let mut effects = Vec::new();
-        if step.effects.iter().any(|effect| matches!(effect,
-            GameKernelEffectV7::UiChanged(_)
-                | GameKernelEffectV7::Presentation(_)
-                | GameKernelEffectV7::Terminal(_)
-        )) {
+        if step.effects.iter().any(|effect| {
+            matches!(
+                effect,
+                GameKernelEffectV7::UiChanged(_)
+                    | GameKernelEffectV7::Presentation(_)
+                    | GameKernelEffectV7::Terminal(_)
+            )
+        }) {
             let kernel = candidate.kernel_ref()?;
             let control = kernel.current_control().ok_or(BrowserWebErrorV2::Invalid)?;
             let scene = project_current_presentation_scene_v1(kernel.state(), control)
