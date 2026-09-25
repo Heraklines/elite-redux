@@ -45,6 +45,16 @@ fn phase(label: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn on_default_stack<T: Send + 'static>(
+    label: &'static str,
+    work: impl FnOnce() -> Result<T, Box<dyn Error>> + Send + 'static,
+) -> Result<T, Box<dyn Error>> {
+    let outcome = std::thread::spawn(move || work().map_err(|error| error.to_string()))
+        .join()
+        .map_err(|_| format!("{label} witness panicked"))??;
+    Ok(outcome)
+}
+
 fn content() -> Result<Arc<PreparedGameContentV2>, Box<dyn Error>> {
     let bundle: GameContentBundleV2 = serde_json::from_slice(BUNDLE)?;
     Ok(Arc::new(PreparedGameContentV2::prepare(Arc::new(bundle))?))
@@ -148,7 +158,7 @@ fn natural_coop_state(
         )?,
         host,
     )?;
-    let mut kernel = GameKernelV7::natural_start(
+    let mut kernel = Box::new(GameKernelV7::natural_start(
         profile()?,
         "m9e-natural-coop".to_owned(),
         host,
@@ -158,10 +168,12 @@ fn natural_coop_state(
         scheduler(),
         Some(protocol),
     )
-    .map_err(|error| format!("natural co-op initialization failed: {error}"))?;
+    .map_err(|error| format!("natural co-op initialization failed: {error}"))?);
+    phase("natural title")?;
     press(&mut kernel, PhysicalKey::Space)?;
     navigate_down_to(&mut kernel, &mode_option)?;
     press(&mut kernel, PhysicalKey::Space)?;
+    phase("natural mode")?;
     navigate_down_to(&mut kernel, "bootstrap/challenge/done")?;
     press(&mut kernel, PhysicalKey::Space)?;
     press(&mut kernel, PhysicalKey::Space)?;
@@ -170,6 +182,7 @@ fn natural_coop_state(
     press(&mut kernel, PhysicalKey::Space)?;
     press(&mut kernel, PhysicalKey::Space)?;
     press(&mut kernel, PhysicalKey::Space)?;
+    phase("natural starter")?;
     let state = kernel
         .state()
         .cloned()
@@ -858,9 +871,15 @@ fn current_proposal_publication_receipt_and_snapshot_conserve_ownership()
     let content = content()?;
     phase("content")?;
     let generation = ConnectionGeneration::new(safe(1));
-    ordinary_publication_atomicity(content.clone())?;
+    let ordinary_content = content.clone();
+    on_default_stack("ordinary publication", move || {
+        ordinary_publication_atomicity(ordinary_content)
+    })?;
     phase("ordinary complete")?;
-    noncurrent_generation_raw_compatibility(content.clone())?;
+    let noncurrent_content = content.clone();
+    on_default_stack("noncurrent generation", move || {
+        noncurrent_generation_raw_compatibility(noncurrent_content)
+    })?;
     phase("noncurrent complete")?;
     let (mut state, revision, _) = natural_coop_state(content.clone(), SeatId::new(safe(1)))?;
     phase("natural complete")?;

@@ -47,6 +47,7 @@ type Line = Result<Option<Vec<u8>>, String>;
 type WriteJob = (Vec<u8>, mpsc::SyncSender<Result<(), String>>);
 type ChoicePublication = (Vec<StarterSelectionV1>, Vec<Vec<u8>>);
 fn trace(message: &str) -> TestResult {
+    writeln!(std::io::stderr().lock(), "cli coop phase: {message}")?;
     let Ok(path) = std::env::var("ER_M9E_ENTRY_PROGRESS") else {
         return Ok(());
     };
@@ -98,7 +99,7 @@ struct Endpoint {
     observed_control: Option<GameControlPlanV2>,
 }
 impl Endpoint {
-    fn new(content: Arc<PreparedGameContentV2>, worker: bool, host: bool) -> TestResult<Self> {
+    fn new(content: Arc<PreparedGameContentV2>, worker: bool, host: bool) -> TestResult<Box<Self>> {
         let authority = SeatId::new(safe(1));
         let guest = SeatId::new(safe(2));
         let local = if host { authority } else { guest };
@@ -148,7 +149,7 @@ impl Endpoint {
             }),
         })?;
         endpoint.checkpoint()?;
-        Ok(endpoint)
+        Ok(Box::new(endpoint))
     }
     fn browser_request(&mut self, request: BrowserRequestV2) -> TestResult<BrowserResponseV2> {
         let sequence = self.browser_sequence;
@@ -389,13 +390,14 @@ impl Endpoint {
         Ok((chosen, frames))
     }
     fn replay_capture(&mut self, content: Arc<PreparedGameContentV2>, native: bool) -> TestResult {
-        let expected = self.checkpoint()?;
+        let expected = Box::new(self.checkpoint()?);
         if native {
             let exported = self
                 .cli
                 .result("session.capsule.export", json!({"session":SESSION}))?;
-            let capsule: CurrentReproCapsuleV1 =
-                serde_json::from_value(exported["capsule"].clone())?;
+            let capsule = Box::new(serde_json::from_value::<CurrentReproCapsuleV1>(
+                exported["capsule"].clone(),
+            )?);
             assert!(
                 capsule
                     .attempts
@@ -408,15 +410,7 @@ impl Endpoint {
                     CurrentExternalEvent::NetworkFrame { .. }
                 ))
             );
-            assert_eq!(
-                replay_current_capsule_v1(
-                    &capsule,
-                    content.clone(),
-                    CurrentReproLimitsV1::default()
-                )?
-                .snapshot()?,
-                expected
-            );
+            verify_replay(capsule, content.clone(), expected.clone())?;
         }
         let BrowserResponseV2::Effects { batch } =
             self.browser_request(BrowserRequestV2::ExportRepro)?
@@ -431,18 +425,14 @@ impl Endpoint {
                 _ => None,
             })
             .ok_or("browser capsule absent")?;
-        let capsule: CurrentReproCapsuleV1 = serde_json::from_slice(bytes)?;
+        let capsule = Box::new(serde_json::from_slice::<CurrentReproCapsuleV1>(bytes)?);
         assert!(
             capsule
                 .attempts
                 .iter()
                 .any(|attempt| matches!(attempt.event, CurrentExternalEvent::RetryCoopSetup))
         );
-        assert_eq!(
-            replay_current_capsule_v1(&capsule, content, CurrentReproLimitsV1::default())?
-                .snapshot()?,
-            expected
-        );
+        verify_replay(capsule, content, expected)?;
         Ok(())
     }
     fn finish(mut self) -> TestResult {
@@ -451,6 +441,26 @@ impl Endpoint {
         self.browser_request(BrowserRequestV2::Dispose)?;
         self.cli.finish()
     }
+}
+
+fn verify_replay(
+    capsule: Box<CurrentReproCapsuleV1>,
+    content: Arc<PreparedGameContentV2>,
+    expected: Box<CoreGameKernelSnapshotV7>,
+) -> TestResult {
+    std::thread::spawn(move || -> Result<(), String> {
+        assert_eq!(
+            replay_current_capsule_v1(&capsule, content, CurrentReproLimitsV1::default())
+                .map_err(|error| error.to_string())?
+                .snapshot()
+                .map_err(|error| error.to_string())?,
+            *expected
+        );
+        Ok(())
+    })
+    .join()
+    .map_err(|_| "current capsule replay assertion panicked")??;
+    Ok(())
 }
 fn network_frames(step: &GameKernelStepV7) -> Vec<Vec<u8>> {
     step.effects
@@ -497,11 +507,15 @@ fn exercise(worker: bool) -> TestResult {
     })?;
     let replies = network_frames(&admitted);
     assert_eq!(replies.len(), 1);
-    let host_before = host.checkpoint()?;
+    trace(&format!(
+        "worker={worker} host admitted {:?}",
+        started.elapsed()
+    ))?;
+    let host_before = Box::new(host.checkpoint()?);
     let retry = host.event(CurrentExternalEvent::RetryCoopSetup)?;
     assert_eq!(network_frames(&retry), replies);
     assert_eq!(retry.effects.len(), 1);
-    assert_eq!(host.checkpoint()?, host_before);
+    assert_eq!(host.checkpoint()?, *host_before);
     let duplicate = host.event(CurrentExternalEvent::NetworkFrame {
         generation: ConnectionGeneration::new(safe(1)),
         bytes: choices.clone(),
@@ -513,7 +527,11 @@ fn exercise(worker: bool) -> TestResult {
         bytes: replies[0].clone(),
     })?;
     assert!(network_frames(&applied).is_empty());
-    let guest_before = guest.checkpoint()?;
+    trace(&format!(
+        "worker={worker} guest applied {:?}",
+        started.elapsed()
+    ))?;
+    let guest_before = Box::new(guest.checkpoint()?);
     assert_eq!(host_before.lifecycle, guest_before.lifecycle);
     assert_eq!(host_before.material_ledger, guest_before.material_ledger);
     assert_eq!(
@@ -543,10 +561,18 @@ fn exercise(worker: bool) -> TestResult {
             .effects
             .is_empty()
     );
-    assert_eq!(guest.checkpoint()?, guest_before);
+    assert_eq!(guest.checkpoint()?, *guest_before);
+    trace(&format!(
+        "worker={worker} coop settled {:?}",
+        started.elapsed()
+    ))?;
     host.replay_capture(content.clone(), !worker)?;
     trace(&format!(
         "worker={worker} host replayed {:?}",
+        started.elapsed()
+    ))?;
+    trace(&format!(
+        "worker={worker} guest replay starting {:?}",
         started.elapsed()
     ))?;
     guest.replay_capture(content, !worker)?;

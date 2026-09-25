@@ -589,13 +589,22 @@ impl Captured {
             content()?,
         )?);
         phase("restore kernel")?;
-        let (recorder, replayed) = CurrentReproRecorderV1::from_capsule(
-            *capsule,
-            content()?,
-            CurrentReproLimitsV1::default(),
-        )?;
-        assert_eq!(replayed.snapshot()?, *snapshot);
-        self.recorder = Box::new(recorder);
+        let expected_snapshot = snapshot.clone();
+        self.recorder = std::thread::spawn(move || -> Result<Box<CurrentReproRecorderV1>, String> {
+            let (recorder, replayed) = CurrentReproRecorderV1::from_capsule(
+                *capsule,
+                content().map_err(|error| error.to_string())?,
+                CurrentReproLimitsV1::default(),
+            )
+            .map_err(|error| error.to_string())?;
+            assert_eq!(
+                replayed.snapshot().map_err(|error| error.to_string())?,
+                *expected_snapshot
+            );
+            Ok(Box::new(recorder))
+        })
+        .join()
+        .map_err(|_| "recorder restore assertion panicked")??;
         phase("restore recorder")?;
         self.check()?;
         assert_eq!(self.session.snapshot()?, *snapshot);
