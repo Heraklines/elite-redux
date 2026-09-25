@@ -1,6 +1,6 @@
 //! Exact presentation parameters retained with the existing event identity.
 use er_types::SafeU53;
-use er_types::battle_ids::{AbilityId, MoveId, PokemonId, SpeciesId};
+use er_types::battle_ids::{AbilityId, FieldSlot, MoveId, PokemonId, SpeciesId};
 use serde::{Deserialize, Serialize};
 
 use super::GameMaterialV6Error;
@@ -23,6 +23,24 @@ pub enum GamePresentationAchievementV1 {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", deny_unknown_fields)]
 pub enum GamePresentationPayloadV1 {
+    MoveUsed {
+        holder: PokemonId,
+        move_id: MoveId,
+    },
+    HpChanged {
+        holder: PokemonId,
+        change: GamePresentationHpChangeV1,
+    },
+    Switched {
+        holder: PokemonId,
+        slot: FieldSlot,
+    },
+    Fainted {
+        holder: PokemonId,
+    },
+    BattleEnded {
+        won: bool,
+    },
     CandyLevelMessage {
         holder: PokemonId,
         level: u16,
@@ -93,6 +111,11 @@ pub enum GamePresentationPayloadV1 {
         after: u32,
         requested_heal: u32,
     },
+    EnemyHpRestoredBar {
+        holder: PokemonId,
+        before_ten_thousandths: u16,
+        after_ten_thousandths: u16,
+    },
     AbilityHidden {
         holder: PokemonId,
         ability: AbilityId,
@@ -116,9 +139,58 @@ pub enum GamePresentationPayloadV1 {
     },
 }
 
+/// Only the player's battle UI displays HP numbers. The enemy UI displays a
+/// bar, so its renderer-facing cue carries a fixed-scale bar value instead.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", deny_unknown_fields)]
+pub enum GamePresentationHpChangeV1 {
+    PlayerExact {
+        before: u32,
+        after: u32,
+        max_hp: u32,
+    },
+    EnemyBar {
+        before_ten_thousandths: u16,
+        after_ten_thousandths: u16,
+    },
+}
+
+impl GamePresentationHpChangeV1 {
+    fn valid(&self) -> bool {
+        match self {
+            Self::PlayerExact {
+                before,
+                after,
+                max_hp,
+            } => *max_hp > 0 && before <= max_hp && after <= max_hp && before != after,
+            Self::EnemyBar {
+                before_ten_thousandths,
+                after_ten_thousandths,
+            } => *before_ten_thousandths <= 10_000 && *after_ten_thousandths <= 10_000,
+        }
+    }
+}
+
 impl GamePresentationPayloadV1 {
     pub fn validate(&self, semantic: PresentationSemanticIdV1) -> Result<(), GameMaterialV6Error> {
         let (family, valid) = match self {
+            Self::MoveUsed { holder, move_id } => (
+                PresentationCueFamilyV1::Move,
+                holder.get() != SafeU53::ZERO && move_id.get() != SafeU53::ZERO,
+            ),
+            Self::HpChanged { holder, change } => (
+                PresentationCueFamilyV1::Hp,
+                holder.get() != SafeU53::ZERO && change.valid(),
+            ),
+            Self::Switched { holder, .. } => (
+                PresentationCueFamilyV1::Switch,
+                holder.get() != SafeU53::ZERO,
+            ),
+            Self::Fainted { holder } => (
+                PresentationCueFamilyV1::Faint,
+                holder.get() != SafeU53::ZERO,
+            ),
+            Self::BattleEnded { .. } => (PresentationCueFamilyV1::Terminal, true),
             Self::CandyLevelMessage { holder, level } => (
                 PresentationCueFamilyV1::Progression,
                 holder.get() != SafeU53::ZERO && (2..=11).contains(level),
@@ -241,6 +313,17 @@ impl GamePresentationPayloadV1 {
                     && *after > *before
                     && *requested_heal > 0
                     && after - before <= *requested_heal,
+            ),
+            Self::EnemyHpRestoredBar {
+                holder,
+                before_ten_thousandths,
+                after_ten_thousandths,
+            } => (
+                PresentationCueFamilyV1::Hp,
+                holder.get() != SafeU53::ZERO
+                    && *before_ten_thousandths < 10_000
+                    && *after_ten_thousandths <= 10_000
+                    && after_ten_thousandths >= before_ten_thousandths,
             ),
             Self::RecoilMessage { holder } => {
                 (PresentationCueFamilyV1::Move, holder.get() != SafeU53::ZERO)

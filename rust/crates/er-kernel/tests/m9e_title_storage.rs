@@ -281,9 +281,7 @@ fn title_list_read_normalizes_exact_saved_state_and_raw_write_generation_two()
 -> Result<(), Box<dyn Error>> {
     let content = content()?;
     let writer_content = content.clone();
-    eprintln!("m9e title storage: saved writer begin");
     let bytes = on_default_stack("Title saved writer", move || saved_write(writer_content))?;
-    eprintln!("m9e title storage: saved writer complete");
     for floor in [1, 90] {
         let floor_content = content.clone();
         let floor_bytes = bytes.clone();
@@ -291,7 +289,6 @@ fn title_list_read_normalizes_exact_saved_state_and_raw_write_generation_two()
             let content = floor_content;
             let bytes = floor_bytes;
             let saved = Box::new(GameSaveV2::decode(&bytes)?);
-            eprintln!("m9e title storage: floor {floor} begin");
             let mut initial = Box::new(title(content.clone())?.snapshot()?);
             bootstrap_mut(&mut initial)?
                 .current_storage
@@ -321,7 +318,6 @@ fn title_list_read_normalizes_exact_saved_state_and_raw_write_generation_two()
                 clone.apply_storage_result(request, outcome)?
             );
             let loaded = Box::new(reader.snapshot()?);
-            eprintln!("m9e title storage: floor {floor} read restored");
             assert_eq!(*loaded, clone.snapshot()?);
             let storage = bootstrap(&before)?
                 .current_storage
@@ -385,7 +381,6 @@ fn title_list_read_normalizes_exact_saved_state_and_raw_write_generation_two()
                 loaded, expected,
                 "all saved gameplay and unrelated owners stay exact"
             );
-            eprintln!("m9e title storage: floor {floor} normalized state checked");
             reader.raw_input(RawInputEvent::KeyUp {
                 code: PhysicalKey::Space,
             })?;
@@ -436,7 +431,6 @@ fn title_list_read_normalizes_exact_saved_state_and_raw_write_generation_two()
             expected_write.identities.next_platform_request_id = safe(next.get().get() + 1);
             assert_eq!(written.state, *expected_write);
             assert_eq!(written.generation, safe(2));
-            eprintln!("m9e title storage: floor {floor} write checked");
             assert_eq!(
                 reader.apply_storage_result(next, KernelStorageResultV2::Written)?,
                 clone.apply_storage_result(next, KernelStorageResultV2::Written)?
@@ -455,7 +449,6 @@ fn title_list_read_normalizes_exact_saved_state_and_raw_write_generation_two()
                     .is_err()
             );
             assert_eq!(reader.snapshot()?, settled);
-            eprintln!("m9e title storage: floor {floor} complete");
             Ok(())
         })?;
     }
