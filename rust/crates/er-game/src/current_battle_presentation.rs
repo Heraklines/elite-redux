@@ -99,13 +99,18 @@ pub(super) fn project_current_battle_cues(
             ),
             Cue::HpChanged {
                 pokemon,
-                before,
-                after,
+                before: hp_before,
+                after: hp_after,
             } => (
                 PresentationCueFamilyV1::Hp,
                 Some(Payload::HpChanged {
                     holder: *pokemon,
-                    change: player_safe_hp_change(before_state_run(before)?, *pokemon, *before, *after)?,
+                    change: player_safe_hp_change(
+                        before_state_run(before)?,
+                        *pokemon,
+                        *hp_before,
+                        *hp_after,
+                    )?,
                 }),
             ),
             // Source Faint text is queued behind the actual faint animation
