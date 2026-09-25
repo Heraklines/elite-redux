@@ -991,14 +991,20 @@ fn current_proposal_publication_receipt_and_snapshot_conserve_ownership()
                 let before = replica.snapshot()?;
                 assert!(
                     replica
-                        .transport_changed(ConnectionGeneration::new(safe(invalid_generation)), true)
+                        .transport_changed(
+                            ConnectionGeneration::new(safe(invalid_generation)),
+                            true
+                        )
                         .is_err()
                 );
                 assert_eq!(replica.snapshot()?, before);
             }
             replica.transport_changed(generation, false)?;
             let disconnected = replica.snapshot()?;
-            assert_eq!(disconnected.current_proposal, transport_pending.current_proposal);
+            assert_eq!(
+                disconnected.current_proposal,
+                transport_pending.current_proposal
+            );
             assert_eq!(
                 disconnected.replay_sequence.get(),
                 transport_pending.replay_sequence.get() + 1
