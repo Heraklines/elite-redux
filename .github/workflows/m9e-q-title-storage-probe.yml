@@ -61,6 +61,7 @@ jobs:
           src/rust-browser/routes/browser-effects-v2.ts
           src/rust-browser/routes/current-scene-dom-v1.ts
           src/rust-browser/routes/rust-current-rtc-entry.ts
+          src/rust-browser/routes/rust-current-rtc-rebind-entry.ts
           test/node/rust-browser/engineering/browser-effects-v2.test.ts
           test/node/rust-browser/engineering/current-scene-dom-v1.test.ts
       - name: Check browser scene Biome style
@@ -71,5 +72,6 @@ jobs:
           src/rust-browser/routes/browser-effects-v2.ts
           src/rust-browser/routes/current-scene-dom-v1.ts
           src/rust-browser/routes/rust-current-rtc-entry.ts
+          src/rust-browser/routes/rust-current-rtc-rebind-entry.ts
           test/node/rust-browser/engineering/browser-effects-v2.test.ts
           test/node/rust-browser/engineering/current-scene-dom-v1.test.ts

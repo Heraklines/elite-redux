@@ -1,6 +1,6 @@
 import {
   type BrowserRequestV2, type BrowserResponseEnvelopeV2, type BrowserSessionContextV2, type BrowserSessionInitializationV2,
-  type CurrentJsonObject, type GamePresentationEffectV2Wire, encodeCanonicalJsonV2, safeCurrentInteger,
+  type CurrentJsonObject, type CurrentPresentationSceneV1Wire, type GamePresentationEffectV2Wire, encodeCanonicalJsonV2, safeCurrentInteger,
 } from "../contracts/browser-contracts-v2";
 import { CurrentRtcTransportV2, type CurrentRtcIdentityV2 } from "../adapters/current-rtc-transport-v2";
 import { createCurrentDevelopmentWorkerV2, BrowserEffectRouterV2, CurrentWorkerRequestErrorV2, type CurrentRustBrowserHostV2 } from "./rust-current-worker-entry";
@@ -11,6 +11,7 @@ interface CurrentRtcPeerCommonOptionsV2 {
   identity: CurrentRtcIdentityV2;
   context: BrowserSessionContextV2;
   present(effect: GamePresentationEffectV2Wire, signal: AbortSignal): void | Promise<void>;
+  scene?(scene: CurrentPresentationSceneV1Wire): void | Promise<void>;
   frame?(direction: "sent" | "received", generation: number, bytes: Uint8Array): void;
 }
 export type CurrentRtcPeerOptionsV2 = CurrentRtcPeerCommonOptionsV2 & (
@@ -73,7 +74,7 @@ export class CurrentDevelopmentRtcPeerV2 {
       context: options.context });
     try {
       if (owned.byteLength > 16 << 20) throw new Error("current RTC initial owner data exceeds16MiB");
-      options = { ...JSON.parse(new TextDecoder().decode(owned)), present: options.present, frame: options.frame };
+      options = { ...JSON.parse(new TextDecoder().decode(owned)), present: options.present, scene: options.scene, frame: options.frame };
     } finally { owned.fill(0); }
     assertCheckpointBinding(options);
     this.#options = options;
@@ -83,7 +84,8 @@ export class CurrentDevelopmentRtcPeerV2 {
     catch (error) { this.#pc.close(); throw error; }
     const unsupported = () => { throw new Error("external platform capability is outside current RTC checkpoint scope"); };
     this.#router = new BrowserEffectRouterV2({
-      renderUi: () => {}, changePresentationScene: () => {}, requestAsset: () => {}, playAudioCue: () => {},
+      renderUi: () => {}, renderScene: scene => options.scene?.(structuredClone(scene)),
+      changePresentationScene: () => {}, requestAsset: () => {}, playAudioCue: () => {},
       recordTelemetry: () => {}, showTerminal: () => {}, handleStorageRequest: unsupported,
       publishRepro: unsupported, publishCurrentRepro: () => {}, dispose: () => {},
       present: async effect => {
@@ -130,16 +132,23 @@ export class CurrentDevelopmentRtcPeerV2 {
         ? { kind: "SNAPSHOT", context: this.#options.context, snapshot: this.#options.checkpoint }
         : { kind: "NATURAL_COOP", context: this.#options.context, ...this.#options.natural_start };
       const response = await this.#enqueue({ kind: "INITIALIZE", initialization });
+      if (this.#options.scene != null) {
+        const observed = await this.#enqueue({ kind: "OBSERVE_SCENE" });
+        if (observed.response.kind !== "SCENE") throw new Error("current RTC initialization scene missing");
+        const scene = observed.response.scene;
+        await boundedOperation(Promise.resolve().then(() => this.#options.scene?.(structuredClone(scene))), this.#abort.signal);
+      }
       this.#initialized = true;
       return response;
-    } finally { this.#initializing = false; }
+    } catch (error) { this.#fail(error); throw error; }
+    finally { this.#initializing = false; }
   }
 
   dispatch(request: BrowserRequestV2): Promise<BrowserResponseEnvelopeV2> {
-    if (this.#disposing || this.#rebindStarting || !this.#initialized || !["SNAPSHOT", "EXPORT_REPRO", "RAW_INPUT", "ADVANCE_TIME", "RETRY_COOP_SETUP"].includes(request.kind)) {
+    if (this.#disposing || this.#rebindStarting || !this.#initialized || !["SNAPSHOT", "OBSERVE_SCENE", "EXPORT_REPRO", "RAW_INPUT", "ADVANCE_TIME", "RETRY_COOP_SETUP"].includes(request.kind)) {
       return Promise.reject(new Error("current RTC external request is outside its initialized raw/time/setup-retry/snapshot/export scope"));
     }
-    if (!["SNAPSHOT", "EXPORT_REPRO"].includes(request.kind) && !this.#transport?.status.connected) {
+    if (!["SNAPSHOT", "OBSERVE_SCENE", "EXPORT_REPRO"].includes(request.kind) && !this.#transport?.status.connected) {
       return Promise.reject(new Error("current RTC gameplay requires its admitted peer connection"));
     }
     return this.#enqueue(request);

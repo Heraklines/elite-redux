@@ -138,14 +138,15 @@ export class CurrentDevelopmentRtcPeerV1 {
       }
       this.#initialized = true;
       return response;
-    } finally { this.#initializing = false; }
+    } catch (error) { this.#fail(error); throw error; }
+    finally { this.#initializing = false; }
   }
 
   dispatch(request: BrowserRequestV2): Promise<BrowserResponseEnvelopeV2> {
     if (this.#disposing || !this.#initialized || !["SNAPSHOT", "OBSERVE_SCENE", "EXPORT_REPRO", "RAW_INPUT", "ADVANCE_TIME", "RETRY_COOP_SETUP"].includes(request.kind)) {
       return Promise.reject(new Error("current RTC external request is outside its initialized raw/time/setup-retry/snapshot/export scope"));
     }
-    if (!["SNAPSHOT", "EXPORT_REPRO"].includes(request.kind) && !this.#transport?.status.connected) {
+    if (!["SNAPSHOT", "OBSERVE_SCENE", "EXPORT_REPRO"].includes(request.kind) && !this.#transport?.status.connected) {
       return Promise.reject(new Error("current RTC gameplay requires its admitted peer connection"));
     }
     return this.#enqueue(request);
