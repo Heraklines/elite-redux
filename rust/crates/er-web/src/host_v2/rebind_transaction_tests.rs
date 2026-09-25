@@ -615,13 +615,21 @@ fn evidence(host: &BrowserKernelHostV2) -> TestResult<Vec<u8>> {
 
 #[test]
 fn browser_rebind_natural_controls_and_generation_two_gameplay_replay() -> TestResult {
+    eprintln!("m9e rebind main: pair");
     let (mut host, mut guest) = pair()?;
+    eprintln!("m9e rebind main: begin");
     let offer = begin(&mut host, &mut guest)?;
+    eprintln!("m9e rebind main: handshake");
     handshake(&mut host, &mut guest, offer)?;
+    eprintln!("m9e rebind main: deliver material");
     deliver_generation_two_material(&mut host, &mut guest)?;
+    eprintln!("m9e rebind main: produce reply");
     let reply = produce_generation_two_reply(&mut host, &mut guest)?;
+    eprintln!("m9e rebind main: receive reply");
     receive_generation_two_reply(&mut host, &mut guest, reply)?;
+    eprintln!("m9e rebind main: inspect capsules");
     for (index, peer) in [&mut host, &mut guest].into_iter().enumerate() {
+        eprintln!("m9e rebind main: export {index}");
         let capsule = peer.export()?;
         let controls = capsule
             .attempts
@@ -652,8 +660,10 @@ fn browser_rebind_natural_controls_and_generation_two_gameplay_replay() -> TestR
                 CurrentReproOutcomeV1::RebindApplied { .. }
             ));
         }
+        eprintln!("m9e rebind main: import {index}");
         peer.import()?;
     }
+    eprintln!("m9e rebind main: done");
     Ok(())
 }
 

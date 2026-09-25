@@ -33,6 +33,9 @@ jobs:
       - name: Check Rust formatting at this source SHA
         working-directory: rust
         run: cargo fmt --all -- --check
+      - name: Locate generation-two browser rebind stack boundary
+        working-directory: rust
+        run: cargo test --locked -p er-web --lib host_v2::rebind_transaction_tests::browser_rebind_natural_controls_and_generation_two_gameplay_replay -- --nocapture
       - name: Execute browser host scene contract witnesses
         working-directory: rust
         run: cargo test --locked -p er-web --test m9e_host_v2 -- --nocapture
