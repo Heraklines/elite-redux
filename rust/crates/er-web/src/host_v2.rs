@@ -216,7 +216,9 @@ impl BrowserKernelHostV2 {
         let next_sequence = increment(self.next_sequence)?;
         *read_only = matches!(
             &envelope.request,
-            BrowserRequestV2::Snapshot | BrowserRequestV2::ExportRepro
+            BrowserRequestV2::Snapshot
+                | BrowserRequestV2::ObserveScene
+                | BrowserRequestV2::ExportRepro
         );
         let bytes = self.process_request(
             envelope.request,
@@ -314,6 +316,18 @@ impl BrowserKernelHostV2 {
                 let bytes =
                     encode_response(response, request_id, sequence, maximum_response_bytes)?;
                 return Ok(bytes);
+            }
+            BrowserRequestV2::ObserveScene => {
+                let kernel = self.session()?.kernel_ref()?;
+                let control = kernel.current_control().ok_or(BrowserWebErrorV2::Invalid)?;
+                let scene = project_current_presentation_scene_v1(kernel.state(), control)
+                    .map_err(|error| BrowserWebErrorV2::Kernel(error.to_string()))?;
+                return encode_response(
+                    BrowserResponseV2::Scene { scene },
+                    request_id,
+                    sequence,
+                    maximum_response_bytes,
+                );
             }
             BrowserRequestV2::ExportRepro => {
                 let capsule = self
@@ -1170,7 +1184,11 @@ mod transaction_tests {
         let (mut host, _, _) = initialized()?;
         let before = evidence(&host)?;
         let capture = host.capture_status();
-        for query in [BrowserRequestV2::Snapshot, BrowserRequestV2::ExportRepro] {
+        for query in [
+            BrowserRequestV2::Snapshot,
+            BrowserRequestV2::ObserveScene,
+            BrowserRequestV2::ExportRepro,
+        ] {
             let bytes = request(SafeU53::new(2)?, safe_one(), query)?;
             assert!(matches!(
                 host.process_bytes_with_response_limit(&bytes, 1),

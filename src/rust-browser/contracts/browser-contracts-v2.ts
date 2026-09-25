@@ -92,7 +92,7 @@ export type BrowserRequestV2 =
   | { kind: "STORAGE_RESULT"; request_id: number; result: BrowserStorageResultV2 }
   | { kind: "PRESENTATION_SETTLED"; event_id: number; outcome: BrowserPresentationOutcomeV2 }
   | { kind: "LIFECYCLE"; event: "SUSPEND" | "RESUME" | "HIDDEN" | "VISIBLE" | "PAGE_HIDE" | "PAGE_SHOW" }
-  | { kind: "SNAPSHOT" | "EXPORT_REPRO" | "RETRY_COOP_SETUP" | "DISPOSE" };
+  | { kind: "SNAPSHOT" | "OBSERVE_SCENE" | "EXPORT_REPRO" | "RETRY_COOP_SETUP" | "DISPOSE" };
 
 export interface CurrentFlashEggInputsV1 {
   request: number;
@@ -114,6 +114,7 @@ export type BrowserResponseV2 =
   | { kind: "READY" | "DISPOSED" }
   | { kind: "EFFECTS"; batch: BrowserEffectBatchV2 }
   | { kind: "SNAPSHOT"; snapshot: CurrentJsonObject }
+  | { kind: "SCENE"; scene: CurrentPresentationSceneV1Wire }
   | { kind: "FAULT"; fault: { code: string; message: string } };
 
 export interface BrowserResponseEnvelopeV2 {

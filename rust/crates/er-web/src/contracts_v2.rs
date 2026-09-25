@@ -171,6 +171,7 @@ pub enum BrowserRequestV2 {
         event: BrowserLifecycleEventV2,
     },
     Snapshot,
+    ObserveScene,
     ExportRepro,
     Dispose,
 }
@@ -282,6 +283,9 @@ pub enum BrowserResponseV2 {
     },
     Snapshot {
         snapshot: Box<CoreGameKernelSnapshotV7>,
+    },
+    Scene {
+        scene: CurrentPresentationSceneV1,
     },
     Fault {
         fault: BrowserKernelFaultV2,

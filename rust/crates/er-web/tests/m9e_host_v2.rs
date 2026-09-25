@@ -525,6 +525,32 @@ fn natural_browser_route_produces_typed_ui_transport_presentation_audio_and_asse
 }
 
 #[test]
+fn restored_battle_scene_is_observable_before_any_input_without_mutation()
+-> Result<(), Box<dyn Error>> {
+    let (mut host, sequence) = active_host()?;
+    let before = host.kernel_ref().ok_or("active kernel missing")?.snapshot()?;
+    let BrowserResponseV2::Scene { scene } =
+        send(&mut host, sequence, BrowserRequestV2::ObserveScene)?
+    else {
+        return Err("restored battle scene observation missing".into());
+    };
+    assert!(!scene.actors.is_empty());
+    assert_eq!(
+        scene.control,
+        host.kernel_ref()
+            .ok_or("active kernel missing")?
+            .current_control()
+            .ok_or("control missing")?
+            .clone()
+    );
+    assert_eq!(
+        host.kernel_ref().ok_or("active kernel missing")?.snapshot()?,
+        before
+    );
+    Ok(())
+}
+
+#[test]
 fn active_battle_scene_exposes_player_exact_and_enemy_bar_without_enemy_max_hp()
 -> Result<(), Box<dyn Error>> {
     let (host, _) = active_host()?;

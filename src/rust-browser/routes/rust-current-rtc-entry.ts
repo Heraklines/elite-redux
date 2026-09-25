@@ -130,13 +130,19 @@ export class CurrentDevelopmentRtcPeerV1 {
         ? { kind: "SNAPSHOT", context: this.#options.context, snapshot: this.#options.checkpoint }
         : { kind: "NATURAL_COOP", context: this.#options.context, ...this.#options.natural_start };
       const response = await this.#enqueue({ kind: "INITIALIZE", initialization });
+      if (this.#options.scene != null) {
+        const observed = await this.#enqueue({ kind: "OBSERVE_SCENE" });
+        if (observed.response.kind !== "SCENE") throw new Error("current RTC initialization scene missing");
+        const scene = observed.response.scene;
+        await boundedOperation(Promise.resolve().then(() => this.#options.scene?.(structuredClone(scene))), this.#abort.signal);
+      }
       this.#initialized = true;
       return response;
     } finally { this.#initializing = false; }
   }
 
   dispatch(request: BrowserRequestV2): Promise<BrowserResponseEnvelopeV2> {
-    if (this.#disposing || !this.#initialized || !["SNAPSHOT", "EXPORT_REPRO", "RAW_INPUT", "ADVANCE_TIME", "RETRY_COOP_SETUP"].includes(request.kind)) {
+    if (this.#disposing || !this.#initialized || !["SNAPSHOT", "OBSERVE_SCENE", "EXPORT_REPRO", "RAW_INPUT", "ADVANCE_TIME", "RETRY_COOP_SETUP"].includes(request.kind)) {
       return Promise.reject(new Error("current RTC external request is outside its initialized raw/time/setup-retry/snapshot/export scope"));
     }
     if (!["SNAPSHOT", "EXPORT_REPRO"].includes(request.kind) && !this.#transport?.status.connected) {
