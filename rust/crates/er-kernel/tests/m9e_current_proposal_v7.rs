@@ -921,10 +921,11 @@ fn current_proposal_publication_receipt_and_snapshot_conserve_ownership()
         })?;
         let replica = next_replica;
         phase("publication proposal submitted")?;
-        let (next_replica, pending) = on_default_stack("publication pending snapshot", move || {
-            let pending = replica.snapshot()?;
-            Ok((replica, pending))
-        })?;
+        let (next_replica, pending) =
+            on_default_stack("publication pending snapshot", move || {
+                let pending = replica.snapshot()?;
+                Ok((replica, pending))
+            })?;
         let replica = next_replica;
         phase("publication pending snapshot")?;
         assert_eq!(
@@ -953,7 +954,7 @@ fn current_proposal_publication_receipt_and_snapshot_conserve_ownership()
         let roundtrip_pending = pending.clone();
         let roundtrip_content = content.clone();
         let roundtrip = on_default_stack("publication restore roundtrip", move || {
-            restore(roundtrip_pending, roundtrip_content)?.snapshot()
+            Ok(restore(roundtrip_pending, roundtrip_content)?.snapshot()?)
         })?;
         assert_eq!(roundtrip, pending);
         phase("publication restore roundtrip")?;
