@@ -329,11 +329,13 @@ fn title_list_read_normalizes_exact_saved_state_and_raw_write_generation_two()
                 .ok_or("owner absent")?;
             if floor == 1 {
                 assert!(
-                    saved.state.identities.next_platform_request_id > storage.next_platform_request_id
+                    saved.state.identities.next_platform_request_id
+                        > storage.next_platform_request_id
                 );
             } else {
                 assert!(
-                    saved.state.identities.next_platform_request_id < storage.next_platform_request_id
+                    saved.state.identities.next_platform_request_id
+                        < storage.next_platform_request_id
                 );
             }
             let mut state = Box::new(saved.state.clone());
