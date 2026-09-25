@@ -561,16 +561,31 @@ fn deliver_start(
     };
     assert!(waiting.is_empty());
     phase("admit guest choice")?;
-    let started = wire(&host.ordinary(CurrentExternalEvent::NetworkFrame {
-        generation: generation(1),
-        bytes: choice.clone(),
-    })?)?;
+    let started = on_default_stack(|| {
+        wire(&host.ordinary(CurrentExternalEvent::NetworkFrame {
+            generation: generation(1),
+            bytes: choice.clone(),
+        })?)
+    })?;
     phase("deliver start frame")?;
-    guest.ordinary(CurrentExternalEvent::NetworkFrame {
-        generation: generation(1),
-        bytes: started,
+    on_default_stack(|| {
+        guest.ordinary(CurrentExternalEvent::NetworkFrame {
+            generation: generation(1),
+            bytes: started,
+        })?;
+        Ok(())
     })?;
     Ok(())
+}
+
+fn on_default_stack<T: Send>(work: impl FnOnce() -> TestResult<T> + Send) -> TestResult<T> {
+    let outcome = std::thread::scope(|scope| {
+        scope
+            .spawn(move || work().map_err(|error| error.to_string()))
+            .join()
+            .map_err(|_| "worker witness thread panicked".to_owned())?
+    })?;
+    Ok(outcome)
 }
 
 fn control_frame(output: &CurrentSessionRebindOutputV1) -> TestResult<Vec<u8>> {

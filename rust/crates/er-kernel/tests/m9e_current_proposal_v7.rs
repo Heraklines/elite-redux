@@ -158,17 +158,19 @@ fn natural_coop_state(
         )?,
         host,
     )?;
-    let mut kernel = Box::new(GameKernelV7::natural_start(
-        profile()?,
-        "m9e-natural-coop".to_owned(),
-        host,
-        vec!["m9e-coop-slot".to_owned()],
-        true,
-        content,
-        scheduler(),
-        Some(protocol),
-    )
-    .map_err(|error| format!("natural co-op initialization failed: {error}"))?);
+    let mut kernel = Box::new(
+        GameKernelV7::natural_start(
+            profile()?,
+            "m9e-natural-coop".to_owned(),
+            host,
+            vec!["m9e-coop-slot".to_owned()],
+            true,
+            content,
+            scheduler(),
+            Some(protocol),
+        )
+        .map_err(|error| format!("natural co-op initialization failed: {error}"))?,
+    );
     phase("natural title")?;
     press(&mut kernel, PhysicalKey::Space)?;
     navigate_down_to(&mut kernel, &mode_option)?;
@@ -881,12 +883,20 @@ fn current_proposal_publication_receipt_and_snapshot_conserve_ownership()
         noncurrent_generation_raw_compatibility(noncurrent_content)
     })?;
     phase("noncurrent complete")?;
-    let (mut state, revision, _) = natural_coop_state(content.clone(), SeatId::new(safe(1)))?;
+    let setup_content = content.clone();
+    let (mut state, revision, _) = on_default_stack("publication natural setup", move || {
+        let (state, revision, menu) =
+            natural_coop_state(setup_content, SeatId::new(safe(1)))?;
+        Ok((Box::new(state), revision, menu))
+    })?;
     phase("natural complete")?;
     // Controlled guest-first canonical root, not a natural guest-first claim.
     // The actual retention material must still await the other human's command.
     bind_battle_root(&mut state, SeatId::new(safe(2)))?;
-    let (mut authority, mut replica) = pair_from_state(state, revision, content.clone())?;
+    let pair_content = content.clone();
+    let (mut authority, mut replica) = on_default_stack("publication pair", move || {
+        pair_from_state(*state, revision, pair_content)
+    })?;
     phase("pair complete")?;
     let original_authority = authority.clone();
     press(&mut replica, PhysicalKey::Space)?;
@@ -1191,7 +1201,12 @@ fn current_proposal_rejection_duplicate_and_terminal_are_transactional()
     let generation = ConnectionGeneration::new(safe(1));
     // Natural cooperative bootstrap followed by an explicit final-wave checkpoint:
     // one living enemy, two runtime human-seat actors, and unchanged content/RNG rules.
-    let (mut state, revision, _) = natural_coop_state(content.clone(), host)?;
+    let setup_content = content.clone();
+    let (mut state, revision, _) = on_default_stack("terminal natural setup", move || {
+        let (state, revision, menu) = natural_coop_state(setup_content, host)?;
+        Ok((Box::new(state), revision, menu))
+    })?;
+    phase("terminal natural complete")?;
     let run = state.active_run.as_mut().ok_or("run missing")?;
     let final_wave = WaveIndex::new(safe(200))?;
     run.wave = final_wave;
@@ -1210,7 +1225,11 @@ fn current_proposal_rejection_duplicate_and_terminal_are_transactional()
         }
     }
     bind_battle_root(&mut state, host)?;
-    let (mut authority, mut replica) = pair_from_state(state, revision, content.clone())?;
+    let pair_content = content.clone();
+    let (mut authority, mut replica) = on_default_stack("terminal pair", move || {
+        pair_from_state(*state, revision, pair_content)
+    })?;
+    phase("terminal pair complete")?;
     press(&mut authority, PhysicalKey::Space)?;
     let first_material = material(&press(&mut authority, PhysicalKey::Space)?)?;
     replica.apply_authority_material(&first_material)?;
