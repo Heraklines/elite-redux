@@ -184,6 +184,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
+          export M9E_STARTED_AT="$(date +%s)"
           mkdir -p "$RUNNER_TEMP/m9e-current-phase/diagnostics" "$RUNNER_TEMP/m9e-q-oracles/fresh-account"
           python3 scripts/ci/m9e_current_phase_diagnostic.py --source-oracle > "$RUNNER_TEMP/m9e-q-oracles/fresh-account/proof.json"
           cp "$RUNNER_TEMP/m9e-current-phase/diagnostics/fresh-account-oracle.json" "$RUNNER_TEMP/m9e-q-oracles/fresh-account/source-cases.json"
