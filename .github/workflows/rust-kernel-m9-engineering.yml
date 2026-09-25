@@ -279,6 +279,9 @@ jobs:
           printf 'ER_M9E_WORKER_SOURCE_SHA=%s\n' "$CANDIDATE_SHA" >> "$GITHUB_ENV"
           printf 'ER_M9E_WORKER_BUILD_TARGET=%s\n' "$(rustc -vV | sed -n 's/^host: //p')" >> "$GITHUB_ENV"
           printf 'ER_M9E_WORKER_BUILD_PROFILE=debug\n' >> "$GITHUB_ENV"
+      - name: Bind exact-parent changed-rule Worker for complete CLI shard
+        if: matrix.shard.id == '28'
+        run: python3 scripts/ci/m9e_q_rule_worker.py
       - name: Run exact shard
         working-directory: rust
         env:
@@ -292,11 +295,14 @@ jobs:
           printf '{"candidate_sha":"%s","shard":"%s","name":"%s"}\n' \
             "$CANDIDATE_SHA" "${{ matrix.shard.id }}" "${{ matrix.shard.name }}" \
             > "$RUNNER_TEMP/m9e-shard/manifest.json"
+          if [ -f "$RUNNER_TEMP/m9e-q-rule-${CANDIDATE_SHA:0:12}/manifest.json" ]; then
+            cp "$RUNNER_TEMP/m9e-q-rule-${CANDIDATE_SHA:0:12}/manifest.json" "$RUNNER_TEMP/m9e-shard/rulechange.json"
+          fi
       - uses: actions/upload-artifact@v6
         if: always()
         with:
           name: m9e-${{ env.CANDIDATE_SHA }}-${{ matrix.shard.id }}-${{ matrix.shard.name }}
-          path: ${{ runner.temp }}/m9e-shard/manifest.json
+          path: ${{ runner.temp }}/m9e-shard/
           if-no-files-found: error
           retention-days: 30
 
