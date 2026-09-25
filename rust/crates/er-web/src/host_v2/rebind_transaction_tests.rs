@@ -630,40 +630,48 @@ fn browser_rebind_natural_controls_and_generation_two_gameplay_replay() -> TestR
     eprintln!("m9e rebind main: inspect capsules");
     for (index, peer) in [&mut host, &mut guest].into_iter().enumerate() {
         eprintln!("m9e rebind main: export {index}");
-        let capsule = peer.export()?;
-        let controls = capsule
-            .attempts
-            .iter()
-            .filter(|attempt| matches!(attempt.event, CurrentExternalEvent::CoopRebind { .. }))
-            .collect::<Vec<_>>();
-        assert_eq!(controls.len(), if index == 0 { 6 } else { 5 });
-        assert_eq!(
-            controls
-                .iter()
-                .filter(|attempt| matches!(
-                    attempt.event,
-                    CurrentExternalEvent::CoopRebind {
-                        control: CurrentCoopRebindEventV1::Receive { .. }
-                    }
-                ))
-                .count(),
-            4
-        );
-        for attempt in controls {
-            assert_eq!(attempt.origin.as_deref(), Some("browser.coop.REBIND"));
-            let transport = attempt
-                .browser_transport
-                .ok_or("rebind transport evidence required")?;
-            assert_eq!(transport.before_generation, transport.after_generation);
-            assert!(matches!(
-                attempt.outcome,
-                CurrentReproOutcomeV1::RebindApplied { .. }
-            ));
-        }
+        verify_generation_two_capsule(peer, index)?;
         eprintln!("m9e rebind main: import {index}");
         peer.import()?;
     }
     eprintln!("m9e rebind main: done");
+    Ok(())
+}
+
+// A full capsule must leave this frame before import exports and replays its
+// own full capsule on the ordinary default-stack test thread.
+#[inline(never)]
+fn verify_generation_two_capsule(peer: &mut Peer, index: usize) -> TestResult {
+    let capsule = peer.export()?;
+    let controls = capsule
+        .attempts
+        .iter()
+        .filter(|attempt| matches!(attempt.event, CurrentExternalEvent::CoopRebind { .. }))
+        .collect::<Vec<_>>();
+    assert_eq!(controls.len(), if index == 0 { 6 } else { 5 });
+    assert_eq!(
+        controls
+            .iter()
+            .filter(|attempt| matches!(
+                attempt.event,
+                CurrentExternalEvent::CoopRebind {
+                    control: CurrentCoopRebindEventV1::Receive { .. }
+                }
+            ))
+            .count(),
+        4
+    );
+    for attempt in controls {
+        assert_eq!(attempt.origin.as_deref(), Some("browser.coop.REBIND"));
+        let transport = attempt
+            .browser_transport
+            .ok_or("rebind transport evidence required")?;
+        assert_eq!(transport.before_generation, transport.after_generation);
+        assert!(matches!(
+            attempt.outcome,
+            CurrentReproOutcomeV1::RebindApplied { .. }
+        ));
+    }
     Ok(())
 }
 
