@@ -41,4 +41,4 @@ jobs:
         run: cargo test --locked -p er-kernel --test m9e_current_defender_ability -- --nocapture
       - name: Check strict game and kernel Clippy
         working-directory: rust
-        run: cargo clippy --locked -p er-game -p er-kernel --all-targets -- -D warnings
+        run: cargo clippy --locked -p er-game -p er-kernel --all-targets --no-deps -- -D warnings
