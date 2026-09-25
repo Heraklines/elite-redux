@@ -537,17 +537,17 @@ fn reject_actual_control_response(
     peer: &mut Endpoint,
     control: CurrentCoopRebindEventV1,
 ) -> TestResult {
-    let before = peer.checkpoint()?;
+    let before = Box::new(peer.checkpoint()?);
     phase("admission begin")?;
-    let original_capture = peer.capture()?;
+    let original_capture = Box::new(peer.capture()?);
     let (seat, role) = peer.session.session_context()?;
     peer.cli.result(
         "session.from_snapshot",
-        json!({"session":"admission-probe","snapshot":before,"owner_seat":seat,"role":role}),
+        json!({"session":"admission-probe","snapshot":before.as_ref(),"owner_seat":seat,"role":role}),
     )?;
     let mut candidate = peer.session.fork()?;
     let expected = candidate.apply_rebind(control.clone())?;
-    assert_ne!(candidate.snapshot()?, before);
+    assert_ne!(candidate.snapshot()?, *before);
     let params = json!({"session":"admission-probe","control":control});
     let empty =
         json!({"protocol_version":1,"id":"","method":"session.coop.rebind","params":params});
@@ -572,7 +572,7 @@ fn reject_actual_control_response(
     assert_eq!(
         peer.cli
             .result("session.snapshot", json!({"session":"admission-probe"}))?,
-        serde_json::to_value(&before)?
+        serde_json::to_value(before.as_ref())?
     );
     assert_eq!(
         peer.cli.result(
@@ -581,7 +581,7 @@ fn reject_actual_control_response(
         )?["status"]["kind"],
         "UNAVAILABLE"
     );
-    assert_eq!(peer.capture()?, original_capture);
+    assert_eq!(peer.capture()?, *original_capture);
     let accepted = peer.cli.result("session.coop.rebind", params)?;
     assert_eq!(
         accepted,
@@ -600,7 +600,7 @@ fn reject_actual_control_response(
             .clone(),
     )?;
     assert_eq!(suffix.attempts.len(), 1);
-    assert_eq!(*suffix.checkpoint, before);
+    assert_eq!(*suffix.checkpoint, *before);
     assert_eq!(
         replay_current_capsule_v1(&suffix, content()?, CurrentReproLimitsV1::default())?
             .snapshot()?,
@@ -614,9 +614,9 @@ fn reject_actual_control_response(
 #[test]
 fn actual_native_cli_rebind_preserves_capture_admission_restore_and_gameplay() -> TestResult {
     phase("start")?;
-    let mut host = Endpoint::new(true)?;
+    let mut host = Box::new(Endpoint::new(true)?);
     phase("host created")?;
-    let mut guest = Endpoint::new(false)?;
+    let mut guest = Box::new(Endpoint::new(false)?);
     phase("guest created")?;
     // Before the first wire delivery these are independent real CLI peers.
     // Run both complete raw-input journeys concurrently, then join before any
@@ -646,7 +646,7 @@ fn actual_native_cli_rebind_preserves_capture_admission_restore_and_gameplay() -
         host.session.kernel_ref()?.state(),
         guest.session.kernel_ref()?.state()
     );
-    for peer in [&mut host, &mut guest] {
+    for peer in [host.as_mut(), guest.as_mut()] {
         assert!(matches!(
             peer.checkpoint()?.lifecycle,
             GameKernelLifecycleSnapshotV7::Active(_)
@@ -674,7 +674,7 @@ fn actual_native_cli_rebind_preserves_capture_admission_restore_and_gameplay() -
         bytes: wire.clone(),
     })?;
     reject_actual_control_response(
-        &mut guest,
+        guest.as_mut(),
         CurrentCoopRebindEventV1::Receive {
             generation: generation(2),
             bytes: wire.clone(),
@@ -731,7 +731,7 @@ fn actual_native_cli_rebind_preserves_capture_admission_restore_and_gameplay() -
             phase("mid done")?;
         }
     }
-    for peer in [&mut host, &mut guest] {
+    for peer in [host.as_mut(), guest.as_mut()] {
         let snapshot = peer.checkpoint()?;
         let owner = snapshot
             .current_coop_setup
