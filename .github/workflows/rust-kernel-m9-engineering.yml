@@ -282,6 +282,10 @@ jobs:
       - name: Bind exact-parent changed-rule Worker for complete CLI shard
         if: matrix.shard.id == '28'
         run: python3 scripts/ci/m9e_q_rule_worker.py
+      - name: Check changed-rule Worker before the complete CLI shard
+        if: matrix.shard.id == '28'
+        working-directory: rust
+        run: cargo test --locked -p er-cli --test m9e_current_rulechange_reload -- --nocapture
       - name: Run exact shard
         working-directory: rust
         env:
