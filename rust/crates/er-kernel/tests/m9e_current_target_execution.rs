@@ -1001,7 +1001,9 @@ fn source_vine_whip_enters_the_owned_single_target_turn() -> Result<()> {
     );
     assert!(after.battle.as_ref().ok_or("battle absent")?.enemy_party[0].hp < enemy_hp);
     let after_enemy_hp = after.battle.as_ref().ok_or("battle absent")?.enemy_party[0].hp;
-    use er_game::m9e_material_v6::{GamePresentationHpChangeV1 as HpChange, GamePresentationPayloadV1 as Payload};
+    use er_game::m9e_material_v6::{
+        GamePresentationHpChangeV1 as HpChange, GamePresentationPayloadV1 as Payload,
+    };
     let bar_change = journal
         .materials
         .iter()
@@ -1009,10 +1011,11 @@ fn source_vine_whip_enters_the_owned_single_target_turn() -> Result<()> {
         .find_map(|effect| match effect.payload.as_ref() {
             Some(Payload::HpChanged {
                 holder,
-                change: HpChange::EnemyBar {
-                    before_ten_thousandths,
-                    after_ten_thousandths,
-                },
+                change:
+                    HpChange::EnemyBar {
+                        before_ten_thousandths,
+                        after_ten_thousandths,
+                    },
             }) if *holder == enemy_id => Some((*before_ten_thousandths, *after_ten_thousandths)),
             _ => None,
         })

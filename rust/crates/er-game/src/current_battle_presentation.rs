@@ -165,7 +165,10 @@ pub(super) fn project_current_battle_cues(
 fn before_state_run(
     before: &GameStateV6,
 ) -> Result<&er_state::m7_state::RunStateV3, GameRuntimeV6Error> {
-    before.active_run.as_ref().ok_or(GameRuntimeV6Error::Invalid)
+    before
+        .active_run
+        .as_ref()
+        .ok_or(GameRuntimeV6Error::Invalid)
 }
 
 fn player_safe_hp_change(

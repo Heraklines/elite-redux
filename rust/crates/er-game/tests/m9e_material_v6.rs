@@ -8,8 +8,7 @@ use er_game::m9e_material_v6::{
     GameIdentityDomainV1, GameMaterialApplyOutcomeV6, GameMaterialV6, GameMaterialV6Error,
     GameMutationEvidenceV2, GameMutationKindV2, GamePlatformEffectV2, GamePresentationHpChangeV1,
     GamePresentationPayloadV1, GameTelemetryEventV2, GameTransitionMaterialV6,
-    apply_game_material_v6,
-    empty_game_state_digest, game_state_digest,
+    apply_game_material_v6, empty_game_state_digest, game_state_digest,
 };
 use er_state::m7_state::{
     DexState, PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics,
@@ -110,15 +109,17 @@ fn battle_presentation_payloads_keep_typed_actor_and_cue_parameters() -> Result<
     assert!(change.get("before").is_none());
     assert!(change.get("after").is_none());
     assert!(change.get("max_hp").is_none());
-    assert!(Payload::HpChanged {
-        holder,
-        change: GamePresentationHpChangeV1::EnemyBar {
-            before_ten_thousandths: 10_001,
-            after_ten_thousandths: 4_583,
-        },
-    }
-    .validate(PresentationSemanticIdV1::Cue(Family::Hp))
-    .is_err());
+    assert!(
+        Payload::HpChanged {
+            holder,
+            change: GamePresentationHpChangeV1::EnemyBar {
+                before_ten_thousandths: 10_001,
+                after_ten_thousandths: 4_583,
+            },
+        }
+        .validate(PresentationSemanticIdV1::Cue(Family::Hp))
+        .is_err()
+    );
     Ok(())
 }
 
