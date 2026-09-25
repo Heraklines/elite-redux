@@ -105,8 +105,7 @@ pub(super) fn project_current_battle_cues(
                 PresentationCueFamilyV1::Hp,
                 Some(Payload::HpChanged {
                     holder: *pokemon,
-                    before: *before,
-                    after: *after,
+                    change: player_safe_hp_change(before_state_run(before)?, *pokemon, *before, *after)?,
                 }),
             ),
             // Source Faint text is queued behind the actual faint animation
@@ -161,4 +160,49 @@ pub(super) fn project_current_battle_cues(
     )
     .map_err(|_| GameRuntimeV6Error::Invalid)?;
     Ok(effects)
+}
+
+fn before_state_run(
+    before: &GameStateV6,
+) -> Result<&er_state::m7_state::RunStateV3, GameRuntimeV6Error> {
+    before.active_run.as_ref().ok_or(GameRuntimeV6Error::Invalid)
+}
+
+fn player_safe_hp_change(
+    run: &er_state::m7_state::RunStateV3,
+    holder: er_types::battle_ids::PokemonId,
+    before: u32,
+    after: u32,
+) -> Result<crate::m9e_material_v6::GamePresentationHpChangeV1, GameRuntimeV6Error> {
+    use crate::m9e_material_v6::GamePresentationHpChangeV1 as HpChange;
+    let player = run.party.iter().find(|pokemon| pokemon.id == holder);
+    let enemy = run
+        .battle
+        .as_ref()
+        .ok_or(GameRuntimeV6Error::Invalid)?
+        .enemy_party
+        .iter()
+        .find(|pokemon| pokemon.id == holder);
+    let max_hp = match (player, enemy) {
+        (Some(pokemon), None) | (None, Some(pokemon)) => pokemon.max_hp,
+        _ => return Err(GameRuntimeV6Error::Invalid),
+    };
+    if max_hp == 0 || before > max_hp || after > max_hp || before == after {
+        return Err(GameRuntimeV6Error::Invalid);
+    }
+    if player.is_some() {
+        return Ok(HpChange::PlayerExact {
+            before,
+            after,
+            max_hp,
+        });
+    }
+    let bar = |hp: u32| {
+        u16::try_from(u64::from(hp) * 10_000 / u64::from(max_hp))
+            .map_err(|_| GameRuntimeV6Error::Invalid)
+    };
+    Ok(HpChange::EnemyBar {
+        before_ten_thousandths: bar(before)?,
+        after_ten_thousandths: bar(after)?,
+    })
 }

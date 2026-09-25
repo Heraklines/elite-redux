@@ -39,6 +39,9 @@ jobs:
       - name: Execute natural defender presentation witness
         working-directory: rust
         run: cargo test --locked -p er-kernel --test m9e_current_defender_ability -- --nocapture
+      - name: Execute owned target and player-safe enemy HP witness
+        working-directory: rust
+        run: cargo test --locked -p er-kernel --test m9e_current_target_execution -- --nocapture
       - name: Check strict game and kernel Clippy
         working-directory: rust
         run: cargo clippy --locked -p er-game -p er-kernel --all-targets --no-deps -- -D warnings

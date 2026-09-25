@@ -6,8 +6,9 @@ use er_game::m9e_content_v2::{PresentationCueFamilyV1, PresentationSemanticIdV1}
 use er_game::m9e_material_v6::{
     APPLIED_MATERIAL_LEDGER_SCHEMA_VERSION_V1, AppliedGameMaterialLedgerV1, GameActionDomainV2,
     GameIdentityDomainV1, GameMaterialApplyOutcomeV6, GameMaterialV6, GameMaterialV6Error,
-    GameMutationEvidenceV2, GameMutationKindV2, GamePlatformEffectV2, GamePresentationPayloadV1,
-    GameTelemetryEventV2, GameTransitionMaterialV6, apply_game_material_v6,
+    GameMutationEvidenceV2, GameMutationKindV2, GamePlatformEffectV2, GamePresentationHpChangeV1,
+    GamePresentationPayloadV1, GameTelemetryEventV2, GameTransitionMaterialV6,
+    apply_game_material_v6,
     empty_game_state_digest, game_state_digest,
 };
 use er_state::m7_state::{
@@ -46,8 +47,21 @@ fn battle_presentation_payloads_keep_typed_actor_and_cue_parameters() -> Result<
         (
             Payload::HpChanged {
                 holder,
-                before: 20,
-                after: 11,
+                change: GamePresentationHpChangeV1::PlayerExact {
+                    before: 20,
+                    after: 11,
+                    max_hp: 24,
+                },
+            },
+            Family::Hp,
+        ),
+        (
+            Payload::HpChanged {
+                holder,
+                change: GamePresentationHpChangeV1::EnemyBar {
+                    before_ten_thousandths: 8_333,
+                    after_ten_thousandths: 4_583,
+                },
             },
             Family::Hp,
         ),
@@ -75,12 +89,36 @@ fn battle_presentation_payloads_keep_typed_actor_and_cue_parameters() -> Result<
     assert!(
         Payload::HpChanged {
             holder,
-            before: 20,
-            after: 20
+            change: GamePresentationHpChangeV1::PlayerExact {
+                before: 20,
+                after: 20,
+                max_hp: 24,
+            },
         }
         .validate(PresentationSemanticIdV1::Cue(Family::Hp))
         .is_err()
     );
+    let enemy = Payload::HpChanged {
+        holder,
+        change: GamePresentationHpChangeV1::EnemyBar {
+            before_ten_thousandths: 8_333,
+            after_ten_thousandths: 4_583,
+        },
+    };
+    let wire = serde_json::to_value(enemy)?;
+    let change = wire.get("change").ok_or("enemy HP change absent")?;
+    assert!(change.get("before").is_none());
+    assert!(change.get("after").is_none());
+    assert!(change.get("max_hp").is_none());
+    assert!(Payload::HpChanged {
+        holder,
+        change: GamePresentationHpChangeV1::EnemyBar {
+            before_ten_thousandths: 10_001,
+            after_ten_thousandths: 4_583,
+        },
+    }
+    .validate(PresentationSemanticIdV1::Cue(Family::Hp))
+    .is_err());
     Ok(())
 }
 

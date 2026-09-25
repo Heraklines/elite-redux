@@ -20,7 +20,8 @@ use crate::m9e_content_v2::{
 mod presentation_payload;
 pub use crate::m9e_runtime_v6::GameOwnedPhaseV1;
 pub use presentation_payload::{
-    GamePresentationAchievementV1, GamePresentationMoveLearningV1, GamePresentationPayloadV1,
+    GamePresentationAchievementV1, GamePresentationHpChangeV1, GamePresentationMoveLearningV1,
+    GamePresentationPayloadV1,
 };
 
 pub const GAME_MATERIAL_SCHEMA_VERSION_V6: u32 = 6;

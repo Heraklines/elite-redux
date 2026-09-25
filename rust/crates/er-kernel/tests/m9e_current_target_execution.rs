@@ -973,7 +973,10 @@ fn source_vine_whip_enters_the_owned_single_target_turn() -> Result<()> {
     let before = active(&snapshot)?;
     let run = active_run(before)?;
     let actor = run.party[0].id;
-    let enemy_hp = run.battle.as_ref().ok_or("battle absent")?.enemy_party[0].hp;
+    let enemy = &run.battle.as_ref().ok_or("battle absent")?.enemy_party[0];
+    let enemy_id = enemy.id;
+    let enemy_hp = enemy.hp;
+    let enemy_max_hp = enemy.max_hp;
     let plan = CurrentTargetExecution::from_state(before)?.plan(
         run,
         actor,
@@ -997,6 +1000,27 @@ fn source_vine_whip_enters_the_owned_single_target_turn() -> Result<()> {
         1
     );
     assert!(after.battle.as_ref().ok_or("battle absent")?.enemy_party[0].hp < enemy_hp);
+    let after_enemy_hp = after.battle.as_ref().ok_or("battle absent")?.enemy_party[0].hp;
+    use er_game::m9e_material_v6::{GamePresentationHpChangeV1 as HpChange, GamePresentationPayloadV1 as Payload};
+    let bar_change = journal
+        .materials
+        .iter()
+        .flat_map(|material| &material.transition().presentation)
+        .find_map(|effect| match effect.payload.as_ref() {
+            Some(Payload::HpChanged {
+                holder,
+                change: HpChange::EnemyBar {
+                    before_ten_thousandths,
+                    after_ten_thousandths,
+                },
+            }) if *holder == enemy_id => Some((*before_ten_thousandths, *after_ten_thousandths)),
+            _ => None,
+        })
+        .ok_or("enemy HP bar presentation absent")?;
+    let bar = |hp: u32| u16::try_from(u64::from(hp) * 10_000 / u64::from(enemy_max_hp));
+    assert_eq!(bar_change, (bar(enemy_hp)?, bar(after_enemy_hp)?));
+    assert!(!journal.materials.iter().flat_map(|material| &material.transition().presentation).any(|effect|
+        matches!(effect.payload.as_ref(), Some(Payload::HpChanged { holder, change: HpChange::PlayerExact { .. } }) if *holder == enemy_id)));
     Ok(())
 }
 
