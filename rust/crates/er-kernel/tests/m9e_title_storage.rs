@@ -25,6 +25,16 @@ use std::sync::Arc;
 const BUNDLE: &[u8] =
     include_bytes!("../../../fixtures/m9/engineering/game-content-bundle-v2.json");
 
+fn on_default_stack<T: Send + 'static>(
+    label: &'static str,
+    work: impl FnOnce() -> Result<T, Box<dyn Error>> + Send + 'static,
+) -> Result<T, Box<dyn Error>> {
+    let outcome = std::thread::spawn(move || work().map_err(|error| error.to_string()))
+        .join()
+        .map_err(|_| format!("{label} witness panicked"))??;
+    Ok(outcome)
+}
+
 fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("test value is safe")
 }
@@ -270,172 +280,182 @@ fn saved_write(content: Arc<PreparedGameContentV2>) -> Result<Vec<u8>, Box<dyn E
 fn title_list_read_normalizes_exact_saved_state_and_raw_write_generation_two()
 -> Result<(), Box<dyn Error>> {
     let content = content()?;
-    let bytes = saved_write(content.clone())?;
-    let saved = Box::new(GameSaveV2::decode(&bytes)?);
+    let writer_content = content.clone();
+    eprintln!("m9e title storage: saved writer begin");
+    let bytes = on_default_stack("Title saved writer", move || saved_write(writer_content))?;
+    eprintln!("m9e title storage: saved writer complete");
     for floor in [1, 90] {
-        eprintln!("m9e title storage: floor {floor} begin");
-        let mut initial = Box::new(title(content.clone())?.snapshot()?);
-        bootstrap_mut(&mut initial)?
-            .current_storage
-            .as_mut()
-            .ok_or("owner absent")?
-            .next_platform_request_id = safe(floor);
-        let mut reader = Box::new(restore(*initial, content.clone())?);
-        let list_request = list(&mut reader)?;
-        let listing = Box::new(reader.snapshot()?);
-        let mut clone = Box::new(restore(*listing, content.clone())?);
-        let outcome = KernelStorageResultV2::Slots {
-            slots: vec!["actual-slot".to_owned()],
-        };
-        assert_eq!(
-            reader.apply_storage_result(list_request, outcome.clone())?,
-            clone.apply_storage_result(list_request, outcome)?
-        );
-        assert_eq!(reader.snapshot()?, clone.snapshot()?);
-        let request = read(&mut reader, "actual-slot")?;
-        let before = Box::new(reader.snapshot()?);
-        let mut clone = Box::new(restore(*before.clone(), content.clone())?);
-        let outcome = KernelStorageResultV2::Read {
-            bytes: Some(bytes.clone()),
-        };
-        assert_eq!(
-            reader.apply_storage_result(request, outcome.clone())?,
-            clone.apply_storage_result(request, outcome)?
-        );
-        let loaded = Box::new(reader.snapshot()?);
-        eprintln!("m9e title storage: floor {floor} read restored");
-        assert_eq!(*loaded, clone.snapshot()?);
-        let storage = bootstrap(&before)?
-            .current_storage
-            .as_ref()
-            .ok_or("owner absent")?;
-        if floor == 1 {
-            assert!(
-                saved.state.identities.next_platform_request_id > storage.next_platform_request_id
+        let floor_content = content.clone();
+        let floor_bytes = bytes.clone();
+        on_default_stack("Title LIST/READ floor", move || {
+            let content = floor_content;
+            let bytes = floor_bytes;
+            let saved = Box::new(GameSaveV2::decode(&bytes)?);
+            eprintln!("m9e title storage: floor {floor} begin");
+            let mut initial = Box::new(title(content.clone())?.snapshot()?);
+            bootstrap_mut(&mut initial)?
+                .current_storage
+                .as_mut()
+                .ok_or("owner absent")?
+                .next_platform_request_id = safe(floor);
+            let mut reader = Box::new(restore(*initial, content.clone())?);
+            let list_request = list(&mut reader)?;
+            let listing = Box::new(reader.snapshot()?);
+            let mut clone = Box::new(restore(*listing, content.clone())?);
+            let outcome = KernelStorageResultV2::Slots {
+                slots: vec!["actual-slot".to_owned()],
+            };
+            assert_eq!(
+                reader.apply_storage_result(list_request, outcome.clone())?,
+                clone.apply_storage_result(list_request, outcome)?
             );
-        } else {
-            assert!(
-                saved.state.identities.next_platform_request_id < storage.next_platform_request_id
+            assert_eq!(reader.snapshot()?, clone.snapshot()?);
+            let request = read(&mut reader, "actual-slot")?;
+            let before = Box::new(reader.snapshot()?);
+            let mut clone = Box::new(restore(*before.clone(), content.clone())?);
+            let outcome = KernelStorageResultV2::Read {
+                bytes: Some(bytes.clone()),
+            };
+            assert_eq!(
+                reader.apply_storage_result(request, outcome.clone())?,
+                clone.apply_storage_result(request, outcome)?
             );
-        }
-        let mut state = Box::new(saved.state.clone());
-        state.identities.next_platform_request_id = state
-            .identities
-            .next_platform_request_id
-            .max(storage.next_platform_request_id);
-        let control = &mut state.active_run.as_mut().ok_or("saved run absent")?.control;
-        let revision = safe(
-            bootstrap(&before)?
-                .control
-                .revision
-                .get()
-                .max(control.revision.get())
-                + 1,
-        );
-        let instance = before.next_menu_instance_id.max(MenuInstanceId::new(safe(
+            let loaded = Box::new(reader.snapshot()?);
+            eprintln!("m9e title storage: floor {floor} read restored");
+            assert_eq!(*loaded, clone.snapshot()?);
+            let storage = bootstrap(&before)?
+                .current_storage
+                .as_ref()
+                .ok_or("owner absent")?;
+            if floor == 1 {
+                assert!(
+                    saved.state.identities.next_platform_request_id > storage.next_platform_request_id
+                );
+            } else {
+                assert!(
+                    saved.state.identities.next_platform_request_id < storage.next_platform_request_id
+                );
+            }
+            let mut state = Box::new(saved.state.clone());
+            state.identities.next_platform_request_id = state
+                .identities
+                .next_platform_request_id
+                .max(storage.next_platform_request_id);
+            let control = &mut state.active_run.as_mut().ok_or("saved run absent")?.control;
+            let revision = safe(
+                bootstrap(&before)?
+                    .control
+                    .revision
+                    .get()
+                    .max(control.revision.get())
+                    + 1,
+            );
+            let instance = before.next_menu_instance_id.max(MenuInstanceId::new(safe(
+                control
+                    .menu
+                    .as_ref()
+                    .ok_or("saved menu absent")?
+                    .instance_id
+                    .get()
+                    .get()
+                    + 1,
+            )));
+            control.revision = revision;
             control
                 .menu
-                .as_ref()
+                .as_mut()
                 .ok_or("saved menu absent")?
-                .instance_id
-                .get()
-                .get()
-                + 1,
-        )));
-        control.revision = revision;
-        control
-            .menu
-            .as_mut()
-            .ok_or("saved menu absent")?
-            .instance_id = instance;
-        let context = control.action_context.as_mut().ok_or("context absent")?;
-        context.authority_revision = revision;
-        context.menu_instance = instance;
-        let mut expected = before.clone();
-        expected.lifecycle = GameKernelLifecycleSnapshotV7::Active(*state);
-        expected.next_menu_instance_id = MenuInstanceId::new(safe(instance.get().get() + 1));
-        expected.material_ledger = AppliedGameMaterialLedgerV1::new(revision)?;
-        expected.pending_platform.clear();
-        expected.storage_frontiers = vec![StorageFrontierSnapshotV1 {
-            slot: "actual-slot".to_owned(),
-            generation: safe(1),
-        }];
-        expected.replay_sequence = safe(before.replay_sequence.get() + 1);
-        assert_eq!(
-            loaded, expected,
-            "all saved gameplay and unrelated owners stay exact"
-        );
-        eprintln!("m9e title storage: floor {floor} normalized state checked");
-        reader.raw_input(RawInputEvent::KeyUp {
-            code: PhysicalKey::Space,
-        })?;
-        clone.raw_input(RawInputEvent::KeyUp {
-            code: PhysicalKey::Space,
-        })?;
-        assert_eq!(
-            reader.snapshot()?,
-            *loaded,
-            "held Title submit cannot bleed into loaded control"
-        );
-        let step = press(&mut reader, PhysicalKey::Space)?;
-        assert_eq!(step, press(&mut clone, PhysicalKey::Space)?);
-        assert_eq!(reader.snapshot()?, clone.snapshot()?);
-        let (next, bytes) = step
-            .effects
-            .iter()
-            .find_map(|effect| match effect {
-                GameKernelEffectV7::Platform(GamePlatformEffectV2::StorageWrite {
-                    request,
-                    slot,
-                    generation,
-                    bytes,
-                }) => {
-                    assert_eq!(slot, "actual-slot");
-                    assert_eq!(*generation, safe(2));
-                    Some((*request, bytes))
-                }
-                _ => None,
-            })
-            .ok_or("real post-load Write absent")?;
-        assert!(next > request);
-        let written = Box::new(GameSaveV2::decode(bytes)?);
-        let mut expected_write = Box::new(saved.state.clone());
-        let GameKernelLifecycleSnapshotV7::Active(loaded_state) = &loaded.lifecycle else {
-            return Err("not active".into());
-        };
-        expected_write
-            .active_run
-            .as_mut()
-            .ok_or("run absent")?
-            .control = loaded_state
-            .active_run
-            .as_ref()
-            .ok_or("run absent")?
-            .control
-            .clone();
-        expected_write.identities.next_platform_request_id = safe(next.get().get() + 1);
-        assert_eq!(written.state, *expected_write);
-        assert_eq!(written.generation, safe(2));
-        eprintln!("m9e title storage: floor {floor} write checked");
-        assert_eq!(
-            reader.apply_storage_result(next, KernelStorageResultV2::Written)?,
-            clone.apply_storage_result(next, KernelStorageResultV2::Written)?
-        );
-        assert_eq!(reader.snapshot()?, clone.snapshot()?);
-        assert_eq!(reader.snapshot()?.storage_frontiers[0].generation, safe(2));
-        let settled = reader.snapshot()?;
-        assert!(
-            reader
-                .apply_storage_result(
-                    request,
-                    KernelStorageResultV2::Read {
-                        bytes: Some(bytes.clone())
+                .instance_id = instance;
+            let context = control.action_context.as_mut().ok_or("context absent")?;
+            context.authority_revision = revision;
+            context.menu_instance = instance;
+            let mut expected = before.clone();
+            expected.lifecycle = GameKernelLifecycleSnapshotV7::Active(*state);
+            expected.next_menu_instance_id = MenuInstanceId::new(safe(instance.get().get() + 1));
+            expected.material_ledger = AppliedGameMaterialLedgerV1::new(revision)?;
+            expected.pending_platform.clear();
+            expected.storage_frontiers = vec![StorageFrontierSnapshotV1 {
+                slot: "actual-slot".to_owned(),
+                generation: safe(1),
+            }];
+            expected.replay_sequence = safe(before.replay_sequence.get() + 1);
+            assert_eq!(
+                loaded, expected,
+                "all saved gameplay and unrelated owners stay exact"
+            );
+            eprintln!("m9e title storage: floor {floor} normalized state checked");
+            reader.raw_input(RawInputEvent::KeyUp {
+                code: PhysicalKey::Space,
+            })?;
+            clone.raw_input(RawInputEvent::KeyUp {
+                code: PhysicalKey::Space,
+            })?;
+            assert_eq!(
+                reader.snapshot()?,
+                *loaded,
+                "held Title submit cannot bleed into loaded control"
+            );
+            let step = press(&mut reader, PhysicalKey::Space)?;
+            assert_eq!(step, press(&mut clone, PhysicalKey::Space)?);
+            assert_eq!(reader.snapshot()?, clone.snapshot()?);
+            let (next, bytes) = step
+                .effects
+                .iter()
+                .find_map(|effect| match effect {
+                    GameKernelEffectV7::Platform(GamePlatformEffectV2::StorageWrite {
+                        request,
+                        slot,
+                        generation,
+                        bytes,
+                    }) => {
+                        assert_eq!(slot, "actual-slot");
+                        assert_eq!(*generation, safe(2));
+                        Some((*request, bytes))
                     }
-                )
-                .is_err()
-        );
-        assert_eq!(reader.snapshot()?, settled);
-        eprintln!("m9e title storage: floor {floor} complete");
+                    _ => None,
+                })
+                .ok_or("real post-load Write absent")?;
+            assert!(next > request);
+            let written = Box::new(GameSaveV2::decode(bytes)?);
+            let mut expected_write = Box::new(saved.state.clone());
+            let GameKernelLifecycleSnapshotV7::Active(loaded_state) = &loaded.lifecycle else {
+                return Err("not active".into());
+            };
+            expected_write
+                .active_run
+                .as_mut()
+                .ok_or("run absent")?
+                .control = loaded_state
+                .active_run
+                .as_ref()
+                .ok_or("run absent")?
+                .control
+                .clone();
+            expected_write.identities.next_platform_request_id = safe(next.get().get() + 1);
+            assert_eq!(written.state, *expected_write);
+            assert_eq!(written.generation, safe(2));
+            eprintln!("m9e title storage: floor {floor} write checked");
+            assert_eq!(
+                reader.apply_storage_result(next, KernelStorageResultV2::Written)?,
+                clone.apply_storage_result(next, KernelStorageResultV2::Written)?
+            );
+            assert_eq!(reader.snapshot()?, clone.snapshot()?);
+            assert_eq!(reader.snapshot()?.storage_frontiers[0].generation, safe(2));
+            let settled = reader.snapshot()?;
+            assert!(
+                reader
+                    .apply_storage_result(
+                        request,
+                        KernelStorageResultV2::Read {
+                            bytes: Some(bytes.clone())
+                        }
+                    )
+                    .is_err()
+            );
+            assert_eq!(reader.snapshot()?, settled);
+            eprintln!("m9e title storage: floor {floor} complete");
+            Ok(())
+        })?;
     }
     Ok(())
 }
