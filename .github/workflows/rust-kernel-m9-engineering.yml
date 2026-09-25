@@ -368,6 +368,117 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  browser-rtc:
+    name: Actual two-client Worker and RTC journeys
+    needs: candidate-binding
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: never
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.CANDIDATE_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Bind focused browser script to exact Q candidate
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          test "$GITHUB_SHA" = "$CANDIDATE_SHA"
+          test -z "$(git status --porcelain)"
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cargo/bin/wasm-bindgen
+            ~/.cargo/bin/wasm-bindgen-test-runner
+            ~/.cargo/bin/wasm2es6js
+          key: m9e-tools-${{ runner.os }}-${{ runner.arch }}-rust1.97.1-wasm-bindgen0.2.127
+      - uses: actions/cache/restore@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: m9e-focused-chromium-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install pinned Rust Wasm tooling remotely
+        run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy --target wasm32-unknown-unknown
+      - name: Qualify actual Workers, RTC, capsules, and native process import
+        run: python3 scripts/ci/m9e_coop_rtc_diagnostic.py
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: m9e-q-browser-rtc-${{ env.CANDIDATE_SHA }}
+          path: ${{ runner.temp }}/m9e-coop-rtc-focused/compact/
+          if-no-files-found: error
+          retention-days: 30
+
+  release-cost:
+    name: Optimized native current-session cost
+    needs: candidate-binding
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GIT_LFS_SKIP_SMUDGE: '1'
+      CARGO_INCREMENTAL: '0'
+      CARGO_TERM_COLOR: never
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      PYTHONDONTWRITEBYTECODE: '1'
+      RUSTUP_TOOLCHAIN: '1.97.1'
+    steps:
+      - name: Start shared release deadline before checkout
+        run: echo "M9E_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.CANDIDATE_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+          submodules: false
+          lfs: false
+      - name: Bind optimized witness to exact Q source
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          test "$GITHUB_SHA" = "$CANDIDATE_SHA"
+          test -z "$(git status --porcelain)"
+      - uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m9e-focused-deps-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Install pinned Rust toolchain
+        timeout-minutes: 5
+        run: rustup toolchain install 1.97.1 --profile minimal
+      - name: Measure complete optimized native cost witness
+        run: python3 scripts/ci/m9e_current_release_probe.py
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: m9e-q-release-cost-${{ env.CANDIDATE_SHA }}
+          path: ${{ runner.temp }}/m9e-current-release-probe/compact/
+          if-no-files-found: error
+          retention-days: 30
+
   aggregate:
     name: M9 Engineering exact-SHA aggregate
     if: always()
@@ -378,6 +489,8 @@ jobs:
       - source-oracles
       - rust-shards
       - v7-browser-wasm
+      - browser-rtc
+      - release-cost
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -389,6 +502,8 @@ jobs:
           SOURCE_ORACLES: ${{ needs.source-oracles.result }}
           RUST_SHARDS: ${{ needs.rust-shards.result }}
           V7_BROWSER_WASM: ${{ needs.v7-browser-wasm.result }}
+          BROWSER_RTC: ${{ needs.browser-rtc.result }}
+          RELEASE_COST: ${{ needs.release-cost.result }}
         run: |
           test "$BINDING" = success
           test "$STATIC" = success
@@ -396,4 +511,6 @@ jobs:
           test "$SOURCE_ORACLES" = success
           test "$RUST_SHARDS" = success
           test "$V7_BROWSER_WASM" = success
-          printf '%s\n' "M9 Engineering candidate $CANDIDATE_SHA passed all 29 Rust shards, independent static checks, and the browser V2 contract."
+          test "$BROWSER_RTC" = success
+          test "$RELEASE_COST" = success
+          printf '%s\n' "M9 Engineering candidate $CANDIDATE_SHA passed all 29 Rust shards, independent static checks, corrective browser Wasm, actual two-client Worker/RTC journeys, and optimized native cost."

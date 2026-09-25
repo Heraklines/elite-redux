@@ -37,8 +37,13 @@ def main():
               "harness_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest()}
     try:
         require(os.environ["GITHUB_REPOSITORY"] == "Heraklines/elite-redux", "repository")
-        require(os.environ["GITHUB_REF"] == "refs/heads/" + BRANCH
-                and result["branch"] == BRANCH and os.environ["GITHUB_EVENT_NAME"] == "push", "isolated push")
+        focused_push = (os.environ["GITHUB_REF"] == "refs/heads/" + BRANCH
+                        and result["branch"] == BRANCH and os.environ["GITHUB_EVENT_NAME"] == "push")
+        exact_q_dispatch = (os.environ["GITHUB_EVENT_NAME"] == "workflow_dispatch"
+                            and result["branch"].startswith("codex/m9e-q-qualification-")
+                            and os.environ["GITHUB_REF"] == "refs/heads/" + result["branch"]
+                            and os.environ.get("CANDIDATE_SHA") == result["source_sha"])
+        require(focused_push or exact_q_dispatch, "exact focused push or Q dispatch")
         require(os.name == "posix" and os.uname().machine == "x86_64", "native Linux host")
         require(re.fullmatch(r"[0-9a-f]{40}", result["source_sha"]) is not None, "source SHA")
         require(capture(["git", "rev-parse", "HEAD"]) == result["source_sha"], "exact HEAD")
@@ -49,6 +54,9 @@ def main():
             "workflow_sha256": hashlib.sha256((ROOT / ".github/workflows/m9e-current-release-probe.yml").read_bytes()).hexdigest(),
             "cost_harness_sha256": hashlib.sha256((ROOT / "scripts/ci/m9e_current_cost.py").read_bytes()).hexdigest(),
         }
+        if exact_q_dispatch:
+            result["source_bindings"]["q_workflow_sha256"] = hashlib.sha256(
+                (ROOT / ".github/workflows/rust-kernel-m9-engineering.yml").read_bytes()).hexdigest()
         identity = {"product_sha": result["source_sha"], "workflow_sha": result["source_sha"],
                     "profile": "test", "features": "default", "target": "x86_64-unknown-linux-gnu"}
         binding = cost.build_source_binding(ROOT, result["source_sha"])
