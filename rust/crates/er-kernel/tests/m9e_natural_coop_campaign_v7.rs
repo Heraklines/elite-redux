@@ -728,7 +728,10 @@ fn natural_owned_cooperative_campaign_reaches_wave_200_victory() -> Result<(), B
             "natural wave skipped"
         );
         if wave != maximum_wave && wave % 10 == 0 {
-            println!("cooperative campaign wave={wave} decisions={decision} proposals={proposals}");
+            writeln!(
+                std::io::stderr().lock(),
+                "cooperative campaign wave={wave} decisions={decision} proposals={proposals}"
+            )?;
         }
         maximum_wave = wave;
         if run.outcome == er_types::RunOutcome::Victory {
@@ -743,9 +746,10 @@ fn natural_owned_cooperative_campaign_reaches_wave_200_victory() -> Result<(), B
             host = restored(&host, content.clone(), true)?;
             guest = restored(&guest, content.clone(), false)?;
             assert_eq!(host.state(), guest.state());
-            println!(
+            writeln!(
+                std::io::stderr().lock(),
                 "M9E_NATURAL_COOP_CAMPAIGN wave=200 outcome=Victory decisions={decision} proposals={proposals} materials={materials} presentations={settled} rewards={rewards} progression={progression} replacements={replacements} fainted_enemy={saw_fainted_enemy}"
-            );
+            )?;
             return Ok(());
         }
         assert_eq!(
