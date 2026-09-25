@@ -582,6 +582,10 @@ fn actual_poison_redirect_absorbs_with_ordered_payload_and_material_conservation
             .flat_map(|proof| &proof.transition().presentation)
             .filter_map(|effect| effect.payload.clone())
             .collect();
+        assert!(payloads.iter().any(|payload| matches!(payload,
+            GamePresentationPayloadV1::MoveUsed { holder, move_id }
+            if *holder == active_run(&before_state).expect("run present").party[0].id
+                && *move_id == MoveId::new(safe(40)))));
         let mut expected_payloads = vec![GamePresentationPayloadV1::AbilityShown {
             holder,
             ability: AbilityId::new(safe(5082)),
@@ -606,7 +610,15 @@ fn actual_poison_redirect_absorbs_with_ordered_payload_and_material_conservation
                 move_id: MoveId::new(safe(40)),
             });
         }
-        assert_eq!(payloads, expected_payloads);
+        let defender_payloads: Vec<_> = payloads
+            .into_iter()
+            .filter(|payload| matches!(payload,
+                GamePresentationPayloadV1::AbilityShown { .. }
+                    | GamePresentationPayloadV1::HpRestored { .. }
+                    | GamePresentationPayloadV1::AbilityHidden { .. }
+                    | GamePresentationPayloadV1::MoveNoEffect { .. }))
+            .collect();
+        assert_eq!(defender_payloads, expected_payloads);
         let tracked = after
             .current_defender_dispatch
             .as_ref()

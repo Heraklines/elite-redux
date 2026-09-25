@@ -2,10 +2,12 @@ use std::error::Error;
 use std::sync::Arc;
 
 use er_game::m9e_content_v2::{GameContentBundleV2, PreparedGameContentV2};
+use er_game::m9e_content_v2::{PresentationCueFamilyV1, PresentationSemanticIdV1};
 use er_game::m9e_material_v6::{
     APPLIED_MATERIAL_LEDGER_SCHEMA_VERSION_V1, AppliedGameMaterialLedgerV1, GameActionDomainV2,
     GameIdentityDomainV1, GameMaterialApplyOutcomeV6, GameMaterialV6, GameMaterialV6Error,
-    GameMutationEvidenceV2, GameMutationKindV2, GamePlatformEffectV2, GameTelemetryEventV2,
+    GameMutationEvidenceV2, GameMutationKindV2, GamePlatformEffectV2, GamePresentationPayloadV1,
+    GameTelemetryEventV2,
     GameTransitionMaterialV6, apply_game_material_v6, empty_game_state_digest, game_state_digest,
 };
 use er_state::m7_state::{
@@ -14,7 +16,7 @@ use er_state::m7_state::{
 use er_state::m9e_state_v6::{
     GAME_STATE_SCHEMA_VERSION_V6, GameIdentityAllocatorStateV1, GameStateV6,
 };
-use er_types::battle_ids::WaveIndex;
+use er_types::battle_ids::{BattleSide, FieldSlot, MoveId, PokemonId, WaveIndex};
 use er_types::{
     BootstrapActionV1, GAME_CONTROL_PLAN_SCHEMA_VERSION_V2, GameActionV1, GameControlKindV2,
     GameControlPlanV2, OperationId, SafeU53, SeatId,
@@ -25,6 +27,30 @@ const BUNDLE: &[u8] =
 
 fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("test value is safe")
+}
+
+#[test]
+fn battle_presentation_payloads_keep_typed_actor_and_cue_parameters() -> Result<(), Box<dyn Error>> {
+    use GamePresentationPayloadV1 as Payload;
+    use PresentationCueFamilyV1 as Family;
+    let holder = PokemonId::new(safe(7));
+    let cases = [
+        (Payload::MoveUsed { holder, move_id: MoveId::new(safe(33)) }, Family::Move),
+        (Payload::HpChanged { holder, before: 20, after: 11 }, Family::Hp),
+        (Payload::Switched { holder, slot: FieldSlot::new(BattleSide::Player, 0)? }, Family::Switch),
+        (Payload::Fainted { holder }, Family::Faint),
+        (Payload::BattleEnded { won: true }, Family::Terminal),
+        (Payload::BattleEnded { won: false }, Family::Terminal),
+    ];
+    for (payload, family) in cases {
+        payload.validate(PresentationSemanticIdV1::Cue(family))?;
+        let encoded = serde_json::to_vec(&payload)?;
+        assert_eq!(serde_json::from_slice::<Payload>(&encoded)?, payload);
+        assert!(payload.validate(PresentationSemanticIdV1::Cue(Family::Ability)).is_err());
+    }
+    assert!(Payload::HpChanged { holder, before: 20, after: 20 }
+        .validate(PresentationSemanticIdV1::Cue(Family::Hp)).is_err());
+    Ok(())
 }
 
 fn prepared() -> Result<PreparedGameContentV2, Box<dyn Error>> {

@@ -77,23 +77,56 @@ pub(super) fn project_current_battle_cues(
                     move_id: *move_id,
                 }),
             ),
-            Cue::Switched { pokemon, .. } => {
+            Cue::Switched { pokemon, slot } => {
                 observations.push(CurrentDefenderObservationV1::Summoned {
                     ordinal,
                     holder: *pokemon,
                 });
-                (PresentationCueFamilyV1::Switch, None)
+                (
+                    PresentationCueFamilyV1::Switch,
+                    Some(Payload::Switched {
+                        holder: *pokemon,
+                        slot: *slot,
+                    }),
+                )
             }
-            Cue::MoveUsed { .. } => (PresentationCueFamilyV1::Move, None),
-            Cue::HpChanged { .. } => (PresentationCueFamilyV1::Hp, None),
+            Cue::MoveUsed { pokemon, move_id } => (
+                PresentationCueFamilyV1::Move,
+                Some(Payload::MoveUsed {
+                    holder: *pokemon,
+                    move_id: *move_id,
+                }),
+            ),
+            Cue::HpChanged {
+                pokemon,
+                before,
+                after,
+            } => (
+                PresentationCueFamilyV1::Hp,
+                Some(Payload::HpChanged {
+                    holder: *pokemon,
+                    before: *before,
+                    after: *after,
+                }),
+            ),
             // Source Faint text is queued behind the actual faint animation
             // callback/removal. Keep this mechanical observation for the
             // retained phase owner instead of displaying it during MoveEffect.
             Cue::Fainted { pokemon } if candidate.current_turn_execution.as_ref().is_some_and(|turn|
                 matches!(&turn.stage, er_state::current_turn_execution::CurrentTurnStageV1::AwaitingInterlude { faints }
                     if faints.iter().any(|faint| faint.pokemon == *pokemon))) => continue,
-            Cue::Fainted { .. } => (PresentationCueFamilyV1::Faint, None),
-            Cue::BattleWon | Cue::BattleLost => (PresentationCueFamilyV1::Terminal, None),
+            Cue::Fainted { pokemon } => (
+                PresentationCueFamilyV1::Faint,
+                Some(Payload::Fainted { holder: *pokemon }),
+            ),
+            Cue::BattleWon => (
+                PresentationCueFamilyV1::Terminal,
+                Some(Payload::BattleEnded { won: true }),
+            ),
+            Cue::BattleLost => (
+                PresentationCueFamilyV1::Terminal,
+                Some(Payload::BattleEnded { won: false }),
+            ),
         };
         let semantic = PresentationSemanticIdV1::Cue(family);
         let mapping = content

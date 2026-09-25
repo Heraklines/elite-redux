@@ -1,6 +1,6 @@
 //! Exact presentation parameters retained with the existing event identity.
 use er_types::SafeU53;
-use er_types::battle_ids::{AbilityId, MoveId, PokemonId, SpeciesId};
+use er_types::battle_ids::{AbilityId, FieldSlot, MoveId, PokemonId, SpeciesId};
 use serde::{Deserialize, Serialize};
 
 use super::GameMaterialV6Error;
@@ -23,6 +23,25 @@ pub enum GamePresentationAchievementV1 {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", deny_unknown_fields)]
 pub enum GamePresentationPayloadV1 {
+    MoveUsed {
+        holder: PokemonId,
+        move_id: MoveId,
+    },
+    HpChanged {
+        holder: PokemonId,
+        before: u32,
+        after: u32,
+    },
+    Switched {
+        holder: PokemonId,
+        slot: FieldSlot,
+    },
+    Fainted {
+        holder: PokemonId,
+    },
+    BattleEnded {
+        won: bool,
+    },
     CandyLevelMessage {
         holder: PokemonId,
         level: u16,
@@ -119,6 +138,27 @@ pub enum GamePresentationPayloadV1 {
 impl GamePresentationPayloadV1 {
     pub fn validate(&self, semantic: PresentationSemanticIdV1) -> Result<(), GameMaterialV6Error> {
         let (family, valid) = match self {
+            Self::MoveUsed { holder, move_id } => (
+                PresentationCueFamilyV1::Move,
+                holder.get() != SafeU53::ZERO && move_id.get() != SafeU53::ZERO,
+            ),
+            Self::HpChanged {
+                holder,
+                before,
+                after,
+            } => (
+                PresentationCueFamilyV1::Hp,
+                holder.get() != SafeU53::ZERO && before != after,
+            ),
+            Self::Switched { holder, .. } => (
+                PresentationCueFamilyV1::Switch,
+                holder.get() != SafeU53::ZERO,
+            ),
+            Self::Fainted { holder } => (
+                PresentationCueFamilyV1::Faint,
+                holder.get() != SafeU53::ZERO,
+            ),
+            Self::BattleEnded { .. } => (PresentationCueFamilyV1::Terminal, true),
             Self::CandyLevelMessage { holder, level } => (
                 PresentationCueFamilyV1::Progression,
                 holder.get() != SafeU53::ZERO && (2..=11).contains(level),
