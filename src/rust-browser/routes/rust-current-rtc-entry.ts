@@ -5,6 +5,7 @@ import {
 import { CurrentRtcTransportV1, type CurrentRtcIdentityV1 } from "../adapters/current-rtc-transport";
 import { createCurrentDevelopmentWorkerV2, BrowserEffectRouterV2, CurrentWorkerRequestErrorV2, type CurrentRustBrowserHostV2 } from "./rust-current-worker-entry";
 import type { CurrentWorkerAssetsV2 } from "../worker/rust-wasm-loader";
+export { CurrentSceneDomV1 } from "./current-scene-dom-v1";
 
 interface CurrentRtcPeerCommonOptionsV1 {
   assets: CurrentWorkerAssetsV2;

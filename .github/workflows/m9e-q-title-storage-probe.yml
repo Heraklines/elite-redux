@@ -39,7 +39,15 @@ jobs:
       - name: Check strict game and web Clippy
         working-directory: rust
         run: cargo clippy --locked -p er-game -p er-web --all-targets --no-deps -- -D warnings
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
       - name: Install Node dependencies
-        run: npm ci --ignore-scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Execute browser effect router contract
-        run: npx vitest run test/node/rust-browser/engineering/browser-effects-v2.test.ts
+        run: pnpm exec vitest run test/node/rust-browser/engineering/browser-effects-v2.test.ts test/node/rust-browser/engineering/current-scene-dom-v1.test.ts

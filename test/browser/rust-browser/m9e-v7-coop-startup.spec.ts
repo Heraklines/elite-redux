@@ -110,13 +110,17 @@ async function pair(browser: Browser, delayOffer: boolean): Promise<Pair> {
       const protocol = context.protocol;
       const frame = protocol.frame_context.context;
       const evidence = { frames: [] as { direction: string; generation: number; bytes: number[] }[],
-        bytes: 0, presentations: [] as number[] };
+        bytes: 0, presentations: [] as number[], sceneCount: 0, lastScene: null as any };
       const options = { assets, context, natural_start: { profile, seed, save_slots, local_is_host },
         identity: { source_sha: source, content_sha256: assets.content_sha256, worker_sha256: workerHash,
           session_id: frame.sessionId, run_id: frame.runId, authority_seat: frame.authoritySeatId,
           local_seat: context.local_seat, session_epoch: frame.sessionEpoch, seat_map_id: frame.seatMapId,
           membership_revision: frame.membershipRevision, peer_seat: protocol.connections[0].peer_seat, generation: 1 },
         present: async (effect: { event_id: number }) => { evidence.presentations.push(effect.event_id); },
+        scene: (scene: unknown) => {
+          if (++evidence.sceneCount > 256) throw new Error("unbounded current scene effects");
+          evidence.lastScene = structuredClone(scene);
+        },
         frame: (direction: string, generation: number, bytes: Uint8Array) => {
           if (evidence.frames.length >= 16 || bytes.length > (4 << 20) - evidence.bytes) throw new Error("startup frame evidence exceeds bound");
           evidence.bytes += bytes.length;
@@ -301,6 +305,18 @@ for (const hostFirst of [true, false]) {
       const presentations = await Promise.all([peers.left, peers.right].map(page => page.evaluate(() => (globalThis as any).__naturalCoop.evidence.presentations)));
       expect(presentations[0].length).toBeGreaterThan(0); expect(presentations[1]).toEqual(presentations[0]);
       expect(new Set(presentations[0]).size).toBe(presentations[0].length);
+      const scenes = await Promise.all([peers.left, peers.right].map(page => page.evaluate(() => {
+        const { sceneCount, lastScene } = (globalThis as any).__naturalCoop.evidence;
+        return { sceneCount, lastScene };
+      })));
+      expect(scenes[0].sceneCount).toBeGreaterThan(0);
+      expect(scenes[1].sceneCount).toBeGreaterThan(0);
+      expect(scenes[0].lastScene).toEqual(scenes[1].lastScene);
+      const actors = scenes[0].lastScene.actors;
+      expect(actors.length).toBeGreaterThan(1);
+      expect(actors.some((actor: any) => actor.slot.side === "PLAYER" && actor.hp.kind === "PLAYER_EXACT")).toBe(true);
+      expect(actors.some((actor: any) => actor.slot.side === "ENEMY" && actor.hp.kind === "ENEMY_BAR")).toBe(true);
+      expect(actors.every((actor: any) => actor.slot.side !== "ENEMY" || (actor.hp.hp == null && actor.hp.max_hp == null))).toBe(true);
       // A completed guest retry is a recorded no-op. Independently resend its
       // actual earlier wire bytes to exercise the host's cached reply over RTC.
       await retry(peers.right);

@@ -120,6 +120,7 @@ for (const capability of ["worker", "rtc"]) {
       "src/rust-browser/adapters/current-rtc-transport-v2.ts",
       "src/rust-browser/routes/rust-current-rtc-rebind-entry.ts",
       "src/rust-browser/routes/rust-current-rtc-entry.ts",
+      "src/rust-browser/routes/current-scene-dom-v1.ts",
       "test/browser/rust-browser/m9e-v7-worker-rtc.spec.ts",
     );
   }
