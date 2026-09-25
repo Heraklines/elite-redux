@@ -919,9 +919,14 @@ fn current_proposal_publication_receipt_and_snapshot_conserve_ownership()
             let bytes = proposal(&press(&mut replica, PhysicalKey::Space)?)?;
             Ok((replica, bytes))
         })?;
-        let mut replica = next_replica;
+        let replica = next_replica;
         phase("publication proposal submitted")?;
-        let pending = replica.snapshot()?;
+        let (next_replica, pending) = on_default_stack("publication pending snapshot", move || {
+            let pending = replica.snapshot()?;
+            Ok((replica, pending))
+        })?;
+        let replica = next_replica;
+        phase("publication pending snapshot")?;
         assert_eq!(
             pending.replay_sequence.get(),
             initial.replay_sequence.get() + 1
@@ -944,11 +949,22 @@ fn current_proposal_publication_receipt_and_snapshot_conserve_ownership()
             retained.publication_context.run_id.as_str(),
             retained.publication_game_run_id.get().to_string()
         );
-        assert_eq!(
-            restore(pending.clone(), content.clone())?.snapshot()?,
-            pending
-        );
-        assert_eq!(proposal(&press(&mut replica, PhysicalKey::Space)?)?, bytes);
+        phase("publication owner checked")?;
+        let roundtrip_pending = pending.clone();
+        let roundtrip_content = content.clone();
+        let roundtrip = on_default_stack("publication restore roundtrip", move || {
+            restore(roundtrip_pending, roundtrip_content)?.snapshot()
+        })?;
+        assert_eq!(roundtrip, pending);
+        phase("publication restore roundtrip")?;
+        let (next_replica, repeated) = on_default_stack("publication repeat", move || {
+            let mut replica = replica;
+            let repeated = proposal(&press(&mut replica, PhysicalKey::Space)?)?;
+            Ok((replica, repeated))
+        })?;
+        let mut replica = next_replica;
+        assert_eq!(repeated, bytes);
+        phase("publication repeat checked")?;
         assert_eq!(
             replica.snapshot()?,
             pending,
