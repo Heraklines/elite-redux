@@ -1261,7 +1261,11 @@ fn current_proposal_rejection_duplicate_and_terminal_are_transactional()
             pending.current_proposal,
             Some(CurrentProposalOwnerSnapshotV1::Pending { .. })
         ));
-        let resolved = authority.ingest_network_frame(generation, &terminal_proposal)?;
+        let (next_authority, resolved) = on_default_stack("terminal resolve", move || {
+            let resolved = authority.ingest_network_frame(generation, &terminal_proposal)?;
+            Ok((authority, resolved))
+        })?;
+        let authority = next_authority;
         phase("terminal proposal resolved")?;
         assert!(resolved.effects.iter().any(|effect| matches!(effect,
             GameKernelEffectV7::Terminal(terminal) if terminal.reason == "VICTORY")));
@@ -1273,23 +1277,31 @@ fn current_proposal_rejection_duplicate_and_terminal_are_transactional()
             terminal_material.transition().operation_id,
             earlier.operation_id
         );
-        let mut accepted = restore(pending.clone(), content.clone())?;
-        accepted.ingest_network_frame(generation, &receipt_bytes)?;
-        assert!(accepted.snapshot()?.current_proposal.is_none());
-        let accepted_snapshot = accepted.snapshot()?;
-        assert_eq!(
-            accepted.ingest_network_frame(generation, &receipt_bytes)?,
-            GameKernelStepV7::default()
-        );
-        assert_eq!(accepted.snapshot()?, accepted_snapshot);
+        let accept_content = content.clone();
+        let accept_receipt = receipt_bytes.clone();
+        on_default_stack("terminal receipt acceptance", move || {
+            let mut accepted = restore(pending, accept_content)?;
+            accepted.ingest_network_frame(generation, &accept_receipt)?;
+            assert!(accepted.snapshot()?.current_proposal.is_none());
+            let accepted_snapshot = accepted.snapshot()?;
+            assert_eq!(
+                accepted.ingest_network_frame(generation, &accept_receipt)?,
+                GameKernelStepV7::default()
+            );
+            assert_eq!(accepted.snapshot()?, accepted_snapshot);
+            Ok(())
+        })?;
         phase("terminal receipt accepted")?;
 
         // Raw terminal compatibility delivery during a real disconnect has no exact
         // acceptance authority. The original proposal is conserved as abandoned.
         let mut paused = replica.snapshot()?;
         let mut unrelated_scheduler = live_scheduler(&paused.scheduler)?;
-        let _pause =
-            unrelated_scheduler.pause_class(guest, TimeClass::HumanInput, "current-owner-unrelated")?;
+        let _pause = unrelated_scheduler.pause_class(
+            guest,
+            TimeClass::HumanInput,
+            "current-owner-unrelated",
+        )?;
         paused.scheduler = scheduler_snapshot(&unrelated_scheduler)?;
         paused
             .protocol
@@ -1309,7 +1321,12 @@ fn current_proposal_rejection_duplicate_and_terminal_are_transactional()
             .ok_or("owner missing")?;
         let original_protocol = disconnected.protocol.clone();
         let original_pauses = disconnected.scheduler.pauses.clone();
-        let terminal_step = replica.apply_authority_material(&inner)?;
+        let apply_inner = inner.clone();
+        let (next_replica, terminal_step) = on_default_stack("terminal raw material", move || {
+            let terminal_step = replica.apply_authority_material(&apply_inner)?;
+            Ok((replica, terminal_step))
+        })?;
+        let mut replica = next_replica;
         assert!(
             !terminal_step
                 .effects

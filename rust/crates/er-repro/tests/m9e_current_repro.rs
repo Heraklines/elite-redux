@@ -739,12 +739,9 @@ fn browser_generation_survives_rotation_import_and_kernel_rejections_without_pro
     let import_capsule = capsule.clone();
     let import_content = Arc::clone(&fixture()?.content);
     let (mut recorder, mut resumed) = std::thread::spawn(move || -> Result<_, String> {
-        let (recorder, resumed) = CurrentReproRecorderV1::from_capsule(
-            *import_capsule,
-            import_content,
-            bounded,
-        )
-        .map_err(|error| error.to_string())?;
+        let (recorder, resumed) =
+            CurrentReproRecorderV1::from_capsule(*import_capsule, import_content, bounded)
+                .map_err(|error| error.to_string())?;
         Ok((Box::new(recorder), Box::new(resumed)))
     })
     .join()
