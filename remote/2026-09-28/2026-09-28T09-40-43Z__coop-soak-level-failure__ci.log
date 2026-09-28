@@ -1,0 +1,366 @@
+{
+  "invariant": "lockstep",
+  "seed": 20260928,
+  "wave": 6,
+  "detail": "reward shop did not advance both counters once (before=6 host=6 guest=6)",
+  "replay": "SOAK_SEED=20260928",
+  "phaseState": {
+    "hostPhase": "ErDexNavPhase",
+    "guestPhase": "ErDexNavPhase",
+    "hostInteractionCounter": 6,
+    "guestInteractionCounter": 6,
+    "hostWave": 6,
+    "hostBattleType": 0,
+    "hostPlayerField": [
+      {
+        "id": 573095838,
+        "battlerIndex": -1,
+        "speciesId": 143,
+        "speciesName": "Snorlax",
+        "hp": 301,
+        "maxHp": 303,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          -2,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 1632400201,
+        "battlerIndex": -1,
+        "speciesId": 248,
+        "speciesName": "Tyranitar",
+        "hp": 224,
+        "maxHp": 225,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "hostEnemyField": [
+      {
+        "id": 784078085,
+        "battlerIndex": -1,
+        "speciesId": 261,
+        "speciesName": "Poochyena",
+        "hp": 0,
+        "maxHp": 18,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 336,
+            "ppUsed": 0
+          },
+          {
+            "id": 316,
+            "ppUsed": 0
+          },
+          {
+            "id": 46,
+            "ppUsed": 0
+          },
+          {
+            "id": 158,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 3036804423,
+        "battlerIndex": -1,
+        "speciesId": 52,
+        "speciesName": "Meowth",
+        "hp": 0,
+        "maxHp": 20,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 10,
+            "ppUsed": 0
+          },
+          {
+            "id": 468,
+            "ppUsed": 0
+          },
+          {
+            "id": 45,
+            "ppUsed": 1
+          },
+          {
+            "id": 252,
+            "ppUsed": 1
+          }
+        ]
+      }
+    ],
+    "guestPlayerField": [
+      {
+        "id": 573095838,
+        "battlerIndex": 0,
+        "speciesId": 143,
+        "speciesName": "Snorlax",
+        "hp": 301,
+        "maxHp": 303,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          -2,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 1632400201,
+        "battlerIndex": 1,
+        "speciesId": 248,
+        "speciesName": "Tyranitar",
+        "hp": 224,
+        "maxHp": 225,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "guestEnemyField": [
+      {
+        "id": 784078085,
+        "battlerIndex": 2,
+        "speciesId": 261,
+        "speciesName": "Poochyena",
+        "hp": 0,
+        "maxHp": 18,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 336,
+            "ppUsed": 0
+          },
+          {
+            "id": 316,
+            "ppUsed": 0
+          },
+          {
+            "id": 46,
+            "ppUsed": 0
+          },
+          {
+            "id": 158,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 3036804423,
+        "battlerIndex": 3,
+        "speciesId": 52,
+        "speciesName": "Meowth",
+        "hp": 0,
+        "maxHp": 20,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 10,
+            "ppUsed": 0
+          },
+          {
+            "id": 468,
+            "ppUsed": 0
+          },
+          {
+            "id": 45,
+            "ppUsed": 1
+          },
+          {
+            "id": 252,
+            "ppUsed": 1
+          }
+        ]
+      }
+    ]
+  },
+  "actionScript": [
+    "SKIP mysteryEncounterDisabledV1",
+    "content seed=coop-soak-20260928 preseeded=false",
+    "wave 1 turn 1: committed frontier omitted seat 1; guest remained a replay spectator until host action",
+    "wave 1 turn 1: host SWITCH -> party[2]",
+    "wave 1: host slot move=53 guest slot move=0",
+    "wave 1 turn 1: progress enemyHp=[16:14/14] playerHp=[149:213/213]",
+    "wave 1 turn 2: committed frontier omitted seat 1; guest remained a replay spectator until host action",
+    "wave 1: reward shop owner=host leave",
+    "wave 2 turn 1: replay guest crossed cmd:2:1 through real public COMMAND=opened",
+    "wave 2 turn 1: staged guest-owned lead at 1 HP on both engines",
+    "wave 2: host slot move=85 guest slot move=247",
+    "wave 2 turn 1: forced-faint guest MEMENTO self-KO",
+    "wave 2 turn 1: progress enemyHp=[276:0/16,546:14/14] playerHp=[149:212/213,94:0/179]",
+    "wave 2 turn 2: replay guest crossed cmd:2:2 through real public COMMAND=opened",
+    "wave 2: reward shop owner=guest take-nonparty",
+    "wave 3 turn 1: replay guest crossed cmd:3:1 through real public COMMAND=opened",
+    "wave 3 turn 1: host SWITCH -> party[2]",
+    "wave 3: host slot move=53 guest slot move=53",
+    "wave 3 turn 1: progress enemyHp=[21:16/16,519:0/18] playerHp=[143:303/303,248:225/225]",
+    "wave 3 turn 2: replay guest crossed cmd:3:2 through real public COMMAND=opened",
+    "wave 3: reward shop owner=host leave",
+    "wave 4 turn 1: replay guest crossed cmd:4:1 through real public COMMAND=opened",
+    "wave 4: host slot move=85 guest slot move=85",
+    "wave 4 turn 1: progress enemyHp=[420:0/18,915:0/19] playerHp=[143:303/303,248:225/225]",
+    "wave 4: reward shop owner=guest take-nonparty",
+    "wave 5 turn 1: replay guest crossed cmd:5:1 through real public COMMAND=opened",
+    "wave 5: TRAINER (fixed)",
+    "wave 5: host slot move=85 guest slot move=53",
+    "wave 5 turn 1: guest SWITCH -> party[5]",
+    "wave 5 turn 1: progress enemyHp=[13:0/18,506:18/18] playerHp=[143:303/303,445:232/235]",
+    "wave 5 turn 2: replay guest crossed cmd:5:2 through real public COMMAND=opened",
+    "wave 5: reward shop owner=host take-nonparty",
+    "wave 5: guest chose Crossroads Leave through public UI",
+    "wave 5: guest drove World Map via public UI=true and both consumed 1833562514968429:1:BIOME_PICK:9700005",
+    "wave 6 turn 1: replay guest crossed cmd:6:1 through real public COMMAND=opened",
+    "wave 6: BIOME 0->1",
+    "wave 6: host slot move=247 guest slot move=85",
+    "wave 6 turn 1: guest SWITCH -> party[5]",
+    "wave 6 turn 1: progress enemyHp=[261:0/18,52:20/20] playerHp=[143:301/303,248:224/225]",
+    "wave 6 turn 2: replay guest crossed cmd:6:2 through real public COMMAND=opened",
+    "wave 6: reward shop owner=host take-nonparty"
+  ]
+}
