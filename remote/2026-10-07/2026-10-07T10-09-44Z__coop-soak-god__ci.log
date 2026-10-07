@@ -1,0 +1,55 @@
+===== COOP SOAK RESULT =====
+profile: god
+verdict: FAIL
+waves_requested: 150
+run: 37604957806 (main)
+timestamp: 2026-10-07T10-09-44Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20261007 WAVES=150 - replay this run with:  SOAK_SEED=20261007 SOAK_WAVES=150 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] RUN ENDED at wave 69 (seed 20261007): host at terminal phase TitlePhase. Survey stops here.
+[22m[39m[coop-soak] DONE seed=20261007 waves=68/150 resyncHeals=0 assertions=0 findings=0 trainerWaves=10 (fixed=8 random=2) skips={"mysteryEncounterDisabledV1":1} elapsedMs=234080
+[coop-soak] RUN ENDED at wave 69 (seed 20261007) [TitlePhase]: host at terminal phase TitlePhase. Surveyed 68/150 waves under all invariants before the terminal.
+[22m[39m[coop-soak] FINDING wave 6 @post-shop (seed 206780945): guest scalar OVER-grant - money host=0 guest=110 (guest OVER-grant)
+
+----- vitest result tail -----
+  "kind": "verified-terminal",
+  "phase": "TitlePhase",
+  "reason": "host at terminal phase TitlePhase",
+  "wave": 69,
+}
+
+[36m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m245:11[22m[39m
+    [90m243|[39m           result[33m.[39mrunEnded[33m,[39m
+    [90m244|[39m           `the god profile is the start-to-finish carrier and may not …
+    [90m245|[39m         )[33m.[39m[34mtoBeUndefined[39m()[33m;[39m
+    [90m   |[39m           [31m^[39m
+    [90m246|[39m         expect(result.wavesCompleted, "the god profile completed the r…
+    [90m247|[39m       }
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:297:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mretained wave boundary keeps one X Attack exact on both clients through natural expiry without recovery
+[31m[1mTypeError[22m: Cannot read properties of null (reading 'waveIndex')[39m
+[36m [2m❯[22m GameData.getSessionSaveData src/system/game-data.ts:[2m2046:44[22m[39m
+    [90m2044|[39m       money: Math.floor(globalScene.money),
+    [90m2045|[39m       score: globalScene.score,
+    [90m2046|[39m       waveIndex: globalScene.currentBattle.waveIndex,
+    [90m   |[39m                                            [31m^[39m
+    [90m2047|[39m       battleType: globalScene.currentBattle.battleType,
+    [90m2048|[39m       battleFormat: globalScene.currentBattle.format.id,
+[90m [2m❯[22m captureCoopSaveDataNormalized src/data/elite-redux/coop/coop-battle-engine.ts:[2m2231:40[22m[39m
+[90m [2m❯[22m test/tools/coop-soak-driver.ts:[2m5195:27[22m[39m
+[90m [2m❯[22m withClient test/tools/coop-duo-harness.ts:[2m757:18[22m[39m
+[90m [2m❯[22m modifiersFor test/tools/coop-soak-driver.ts:[2m5194:7[22m[39m
+[90m [2m❯[22m capturePostWaveState test/tools/coop-soak-driver.ts:[2m5210:34[22m[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m5389:5[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[90m (2)[39m
+[2m   Start at [22m 10:05:01
+[2m   Duration [22m 283.22s[2m (transform 23.41s, setup 28.35s, import 337ms, tests 253.66s, environment 715ms)[22m
+
