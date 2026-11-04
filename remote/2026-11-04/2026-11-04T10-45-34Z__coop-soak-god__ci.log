@@ -1,0 +1,55 @@
+===== COOP SOAK RESULT =====
+profile: god
+verdict: FAIL
+waves_requested: 150
+run: 41816046952 (main)
+timestamp: 2026-11-04T10-45-34Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20261104 WAVES=150 - replay this run with:  SOAK_SEED=20261104 SOAK_WAVES=150 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] RUN ENDED at wave 7 (seed 20261104): host at terminal phase TitlePhase. Survey stops here.
+[22m[39m[coop-soak] DONE seed=20261104 waves=6/150 resyncHeals=0 assertions=0 findings=0 trainerWaves=1 (fixed=1 random=0) skips={"mysteryEncounterDisabledV1":1} elapsedMs=37449
+[coop-soak] RUN ENDED at wave 7 (seed 20261104) [TitlePhase]: host at terminal phase TitlePhase. Surveyed 6/150 waves under all invariants before the terminal.
+[22m[39m[coop-soak] RUN ENDED at wave 6 (seed 206780945): host at terminal phase TitlePhase. Survey stops here.
+
+----- vitest result tail -----
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Unhandled Errors [49m[22m[31m⎯⎯⎯⎯⎯⎯[39m
+[31m[1m
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.[22m[39m
+
+[31m⎯⎯⎯⎯⎯[39m[1m[41m Uncaught Exception [49m[22m[31m⎯⎯⎯⎯⎯[39m
+[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'isPlayer')[39m
+[36m [2m❯[22m erApplyPendingSwitchInBoost src/data/elite-redux/empower-switch-in.ts:[2m64:28[22m[39m
+    [90m 62|[39m  */[39m
+    [90m 63|[39m [35mexport[39m [35mfunction[39m [34merApplyPendingSwitchInBoost[39m(pokemon[33m:[39m [33mPokemon[39m)[33m:[39m [35mvoid[39m {
+    [90m 64|[39m   [35mconst[39m isPlayer [33m=[39m pokemon[33m.[39m[34misPlayer[39m()[33m;[39m
+    [90m   |[39m                            [31m^[39m
+    [90m 65|[39m   const armed = isPlayer ? PENDING_SWITCH_IN_BOOST.player : PENDING_SW…
+    [90m 66|[39m   [35mif[39m ([33m![39marmed) {
+[90m [2m❯[22m SwitchSummonPhase.onEnd src/phases/summon-phase.ts:[2m324:5[22m[39m
+[90m [2m❯[22m SwitchSummonPhase.onEnd src/phases/switch-summon-phase.ts:[2m419:11[22m[39m
+[90m [2m❯[22m SwitchSummonPhase.end src/phases/summon-phase.ts:[2m366:10[22m[39m
+[90m [2m❯[22m SwitchSummonPhase.pinned [as end] test/tools/coop-duo-harness.ts:[2m2801:20[22m[39m
+[90m [2m❯[22m TimerEvent.callback src/phases/summon-phase.ts:[2m244:63[22m[39m
+[90m [2m❯[22m MockClock.update node_modules/.pnpm/phaser@3.90.0/node_modules/phaser/src/time/Clock.js:[2m395:36[22m[39m
+[90m [2m❯[22m test/tools/coop-duo-harness.ts:[2m2761:22[22m[39m
+[90m [2m❯[22m runOwned test/tools/coop-duo-harness.ts:[2m2746:9[22m[39m
+[90m [2m❯[22m MockClock.clock.update test/tools/coop-duo-harness.ts:[2m2761:7[22m[39m
+
+[31mThis error originated in "[1mtest/tests/elite-redux/coop/coop-soak.test.ts[22m" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.[39m
+[31mThe latest test that might've caused the error is "[1mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave[22m". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.[39m
+[31m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[90m (2)[39m
+[2m     Errors [22m [1m[31m1 error[39m[22m
+[2m   Start at [22m 10:43:49
+[2m   Duration [22m 105.03s[2m (transform 23.00s, setup 27.64s, import 338ms, tests 76.18s, environment 714ms)[22m
+
