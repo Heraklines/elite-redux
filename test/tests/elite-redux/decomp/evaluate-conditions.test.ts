@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { compileCompositionRule } from "#data/elite-redux/ability-studio/vocabulary/evaluate/compile-composition";
 import {
   asAttackCondition,
   asDefendCondition,
@@ -19,6 +20,7 @@ import {
   frameFromAttrParams,
 } from "#data/elite-redux/ability-studio/vocabulary/evaluate/frame";
 import { evaluateGuard, guardsPass } from "#data/elite-redux/ability-studio/vocabulary/evaluate/guards";
+import { HitResult } from "#enums/hit-result";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
@@ -368,6 +370,72 @@ describe("compiled conditions (same engine predicates)", () => {
     expect(nth(frame(a))).toBe(false);
     expect(nth(frame(a))).toBe(true);
     expect(nth(frame(a))).toBe(false);
+  });
+
+  it("time.first-turn is exactly waveTurnCount === 1 (a command switch-in leaves 0)", () => {
+    const firstTurn = compileConditionBlock({ block: "time.first-turn" });
+    const at = (waveTurnCount: number) => frame(mon({ tempSummonData: { turnCount: 1, waveTurnCount } }));
+    expect(firstTurn(at(0))).toBe(false);
+    expect(firstTurn(at(1))).toBe(true);
+    expect(firstTurn(at(2))).toBe(false);
+  });
+
+  describe("once-per / nth-use commit only when the rule applies", () => {
+    const rule = (extra: object[], chance = 100) =>
+      ({
+        key: "berserk-like",
+        when: { block: "event.after-hit" },
+        if: [...extra, { block: "hp.at-most", params: { who: "holder", pct: 50, rounding: "exact" } }],
+        do: [{ block: "effect.stat-stage", params: { target: "holder", stat: "ATK", stages: 1 } }],
+        chance,
+      }) as never;
+    const run = (carrier: ReturnType<typeof compileCompositionRule>, holder: FakeMon): boolean => {
+      const params = {
+        pokemon: holder,
+        opponent: mon(),
+        move: move(),
+        damage: 10,
+        hitResult: HitResult.EFFECTIVE,
+        simulated: false,
+      };
+      const can = (carrier as unknown as { canApply: (p: object) => boolean }).canApply(params);
+      if (can) {
+        try {
+          (carrier as unknown as { apply: (p: object) => void }).apply(params);
+        } catch {
+          // The stat effect needs a real battle; the memory commit runs before the effects.
+        }
+      }
+      return can;
+    };
+    const oncePer = { block: "time.once-per", params: { scope: "battle", key: "k" } };
+
+    it("a failing later IF does not use up once-per", () => {
+      const carrier = compileCompositionRule(rule([oncePer]));
+      const holder = mon({ hp: 100 });
+      expect(run(carrier, holder)).toBe(false); // 100% HP: hp.at-most fails
+      holder.hp = 40;
+      expect(run(carrier, holder)).toBe(true); // still unused, fires now
+      expect(run(carrier, holder)).toBe(false); // used up after applying
+    });
+
+    it("a failed chance roll does not use up once-per", () => {
+      const carrier = compileCompositionRule(rule([oncePer], 50));
+      const holder = mon({ hp: 40, randBattleSeedInt: () => 99 });
+      expect(run(carrier, holder)).toBe(false);
+      holder.randBattleSeedInt = () => 0;
+      expect(run(carrier, holder)).toBe(true);
+      expect(run(carrier, holder)).toBe(false);
+    });
+
+    it("nth-use counts only applications", () => {
+      const carrier = compileCompositionRule(rule([{ block: "time.nth-use", params: { n: 2, key: "u" } }]));
+      const holder = mon({ hp: 100 });
+      expect(run(carrier, holder)).toBe(false); // fails hp, counts nothing
+      holder.hp = 40;
+      expect(run(carrier, holder)).toBe(false); // first real use
+      expect(run(carrier, holder)).toBe(true); // second real use
+    });
   });
 
   it("refuses unknown ids and the hand-added escape hatch in plain language", () => {

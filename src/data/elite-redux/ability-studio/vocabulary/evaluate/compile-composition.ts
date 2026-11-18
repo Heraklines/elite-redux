@@ -99,13 +99,32 @@ export function compileCompositionRule(rule: CompositionRuleV2): AbAttr {
       return false;
     }
     const frame = frameOf(params);
-    if (!conditions(frame)) {
+    // Pass 1: do the other IFs pass? Memory atoms say yes, and nth-use counts this occasion.
+    frame.memoryPass = "eligibility";
+    frame.commits = [];
+    const eligible = conditions(frame);
+    const counts = frame.commits;
+    frame.memoryPass = "decision";
+    frame.commits = [];
+    if (eligible) {
+      for (const count of counts) {
+        count();
+      }
+    }
+    // Pass 2: the real answer. once-per / nth-use only read; their marks wait for apply().
+    if (!eligible || !conditions(frame)) {
+      frame.commits = undefined;
       return false;
     }
     return frame.simulated || rule.chance >= 100 || frame.holder.randBattleSeedInt(100) < rule.chance;
   };
   carrier.apply = params => {
     const frame = frameOf(params);
+    const commits = frame.commits;
+    frame.commits = undefined;
+    for (const commit of commits ?? []) {
+      commit();
+    }
     for (const run of effects) {
       run({ frame, params: params as unknown as RawParams });
     }

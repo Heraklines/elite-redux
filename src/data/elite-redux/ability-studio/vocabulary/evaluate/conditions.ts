@@ -101,6 +101,18 @@ function memoryOf(pokemon: Pokemon): Map<string, unknown> {
   return map;
 }
 
+/** Writes now when no rule is collecting commits, otherwise when the rule actually applies. */
+function deferMemoryWrite(frame: Frame, write: () => void): void {
+  if (frame.simulated) {
+    return;
+  }
+  if (frame.commits === undefined) {
+    write();
+  } else {
+    frame.commits.push(write);
+  }
+}
+
 function scopeMarker(pokemon: Pokemon, scope: string): unknown {
   switch (scope) {
     case "battle":
@@ -278,7 +290,7 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
   },
 
   // Time and memory
-  "time.first-turn": () => frame => frame.holder.tempSummonData.waveTurnCount <= 1,
+  "time.first-turn": () => frame => frame.holder.tempSummonData.waveTurnCount === 1,
   "time.turn-count": p => frame => compare(frame.holder.tempSummonData.turnCount, p.cmp as CompareOp, Number(p.n)),
   "time.last-move": p => {
     const id = enumValue(MoveId, String(p.moveId), "move");
@@ -288,14 +300,15 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
     const scope = String(p.scope);
     const key = `once:${scope}:${String(p.key)}`;
     return frame => {
+      if (frame.memoryPass === "eligibility") {
+        return true;
+      }
       const memory = memoryOf(frame.holder);
       const marker = scopeMarker(frame.holder, scope);
       if (memory.get(key) === marker) {
         return false;
       }
-      if (!frame.simulated) {
-        memory.set(key, marker);
-      }
+      deferMemoryWrite(frame, () => memory.set(key, marker));
       return true;
     };
   },
@@ -303,10 +316,17 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
     const key = `nth:${String(p.key)}`;
     return frame => {
       const memory = memoryOf(frame.holder);
-      const next = ((memory.get(key) as number | undefined) ?? 0) + 1;
-      if (!frame.simulated) {
-        memory.set(key, next);
+      const seen = (memory.get(key) as number | undefined) ?? 0;
+      if (frame.memoryPass === "eligibility") {
+        // Counts the occasions on which every other IF passed (the carrier only commits then).
+        deferMemoryWrite(frame, () => memory.set(key, seen + 1));
+        return true;
       }
+      if (frame.memoryPass === "decision") {
+        return seen === Number(p.n);
+      }
+      const next = seen + 1;
+      deferMemoryWrite(frame, () => memory.set(key, next));
       return next === Number(p.n);
     };
   },

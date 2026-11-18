@@ -41,6 +41,17 @@ export interface Frame {
   readonly ally?: Pokemon | undefined;
   readonly simulated: boolean;
   readonly hits?: HitCounters | undefined;
+  /**
+   * Memory writes (time.once-per, time.nth-use) wait here while the IF list is read, and the carrier
+   * runs them in apply(), after every IF and the chance roll passed. Absent when a condition is
+   * evaluated on its own: the write then happens at once.
+   */
+  commits?: (() => void)[] | undefined;
+  /**
+   * Set by the carrier while it runs the IF list twice: "eligibility" (memory atoms answer true and
+   * nth-use counts the occasion if every other IF passed) then "decision" (memory atoms read only).
+   */
+  memoryPass?: "eligibility" | "decision" | undefined;
 }
 
 /** A compiled IF: built once, then called with a frame. Never interpreted per call. */
