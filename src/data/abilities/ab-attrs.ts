@@ -7369,6 +7369,23 @@ function calculateShellBellRecovery(pokemon: Pokemon): number {
   return 0;
 }
 
+/**
+ * Whether the Pokémon's HP just dropped across `ratio` of its max HP: it was at or above the line
+ * before `damage` landed and (counting a Shell Bell heal as already recovered) is below it now.
+ * This is the `hp.crossed-below` condition atom (exact rounding) of the ability studio vocabulary;
+ * it was moved here verbatim from {@linkcode PostDamageForceSwitchAbAttr.canApply}.
+ *
+ * @param pokemon - The Pokémon that took the damage.
+ * @param damage - The effective damage (for multi-hit moves, the whole turn's damage).
+ * @param ratio - The fraction of max HP that marks the threshold.
+ */
+export function hpCrossedBelow(pokemon: Pokemon, damage: number, ratio: number): boolean {
+  return (
+    pokemon.hp + damage >= pokemon.getMaxHp() * ratio
+    && pokemon.hp - calculateShellBellRecovery(pokemon) < pokemon.getMaxHp() * ratio
+  );
+}
+
 export interface PostDamageAbAttrParams extends AbAttrBaseParams {
   /** The pokemon that caused the damage; omitted if the damage was not from a pokemon */
   source?: Pokemon | undefined;
@@ -7438,16 +7455,13 @@ export class PostDamageForceSwitchAbAttr extends PostDamageAbAttr {
       }
     }
 
-    if (pokemon.hp + damage >= pokemon.getMaxHp() * this.hpRatio) {
-      const shellBellHeal = calculateShellBellRecovery(pokemon);
-      if (pokemon.hp - shellBellHeal < pokemon.getMaxHp() * this.hpRatio) {
-        for (const opponent of pokemon.getOpponents()) {
-          if (!this.helper.getSwitchOutCondition(pokemon, opponent)) {
-            return false;
-          }
+    if (hpCrossedBelow(pokemon, damage, this.hpRatio)) {
+      for (const opponent of pokemon.getOpponents()) {
+        if (!this.helper.getSwitchOutCondition(pokemon, opponent)) {
+          return false;
         }
-        return true;
       }
+      return true;
     }
 
     return false;

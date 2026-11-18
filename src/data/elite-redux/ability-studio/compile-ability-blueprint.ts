@@ -25,6 +25,7 @@ import {
   matchesAbilityStudioMoveFilter,
 } from "./rule-ab-attrs";
 import { compileAbilityStudioRuntimeComponentRuleAttrs } from "./runtime-components";
+import { compileComposition } from "./vocabulary/evaluate/compile-composition";
 
 function cloneAbilityAttr(ability: Ability, attrIndex: number, attrType?: string): AbAttr {
   const attr = ability.attrs[attrIndex];
@@ -162,6 +163,9 @@ export function compileAbilityStudioBlueprint(
   for (const componentRule of blueprint.componentRules ?? []) {
     builder.attrs.push(...compileAbilityStudioRuntimeComponentRuleAttrs(componentRule, resolveAbility));
   }
+  // V2: composition rules come after includes / mechanics / componentRules and before modifiers /
+  // rules, so the attr order of every V1 blueprint is exactly what it was.
+  builder.attrs.push(...compileComposition(blueprint.composition));
   for (const modifier of blueprint.modifiers) {
     addModifier(builder, modifier);
   }

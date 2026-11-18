@@ -10,8 +10,12 @@ import type {
   AbilityStudioRuntimeSource,
 } from "./runtime-components";
 import { isAbilityStudioRuntimeParameterValue } from "./runtime-parameters";
+import type { CompositionRuleV2 } from "./vocabulary/composition-types";
+import { validateComposition } from "./vocabulary/validate-composition";
 
 export const ABILITY_STUDIO_SCHEMA_VERSION = 1;
+/** A version 2 stamp only means the blueprint may contain `composition`; version 1 stays accepted. */
+export const ABILITY_STUDIO_COMPOSITION_SCHEMA_VERSION = 2;
 export const ABILITY_STUDIO_ID_MIN = 20000;
 export const ABILITY_STUDIO_ID_MAX = 29999;
 
@@ -189,7 +193,7 @@ export type AbilityStudioModifier =
     };
 
 export interface AbilityStudioBlueprintV1 {
-  readonly version: 1;
+  readonly version: 1 | 2;
   readonly id: number;
   readonly name: string;
   readonly description: string;
@@ -197,6 +201,11 @@ export interface AbilityStudioBlueprintV1 {
   readonly includes: readonly number[];
   readonly mechanics?: readonly AbilityStudioMechanicReference[];
   readonly componentRules?: readonly AbilityStudioRuntimeComponentRule[];
+  /**
+   * Additive V2 field: rules built from vocabulary blocks. Compiled after includes, mechanics and
+   * componentRules and before modifiers and rules, so the attr order of V1 blueprints never moves.
+   */
+  readonly composition?: readonly CompositionRuleV2[];
   readonly rules: readonly AbilityStudioRule[];
   readonly modifiers: readonly AbilityStudioModifier[];
   readonly flags?: {
@@ -549,8 +558,10 @@ function validateBlueprint(value: unknown, path: string, errors: string[]): valu
     errors.push(`${path} must be an object`);
     return false;
   }
-  if (value.version !== ABILITY_STUDIO_SCHEMA_VERSION) {
-    errors.push(`${path}.version must be ${ABILITY_STUDIO_SCHEMA_VERSION}`);
+  if (value.version !== ABILITY_STUDIO_SCHEMA_VERSION && value.version !== ABILITY_STUDIO_COMPOSITION_SCHEMA_VERSION) {
+    errors.push(
+      `${path}.version must be ${ABILITY_STUDIO_SCHEMA_VERSION} or ${ABILITY_STUDIO_COMPOSITION_SCHEMA_VERSION}`,
+    );
   }
   if (!Number.isInteger(value.id) || !isNumberInRange(value.id, ABILITY_STUDIO_ID_MIN, ABILITY_STUDIO_ID_MAX)) {
     errors.push(`${path}.id must be ${ABILITY_STUDIO_ID_MIN}-${ABILITY_STUDIO_ID_MAX}`);
@@ -628,6 +639,9 @@ function validateBlueprint(value: unknown, path: string, errors: string[]): valu
       }
     });
   }
+  if (value.composition !== undefined) {
+    errors.push(...validateComposition(value.composition, undefined, `${path}.composition`));
+  }
   if (!Array.isArray(value.rules) || value.rules.length > 24) {
     errors.push(`${path}.rules must contain at most 24 entries`);
   } else {
@@ -654,6 +668,7 @@ function validateBlueprint(value: unknown, path: string, errors: string[]): valu
     && value.includes.length
       + (Array.isArray(value.mechanics) ? value.mechanics.length : 0)
       + (Array.isArray(value.componentRules) ? value.componentRules.length : 0)
+      + (Array.isArray(value.composition) ? value.composition.length : 0)
       + value.rules.length
       + value.modifiers.length
       === 0

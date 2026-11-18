@@ -1,0 +1,150 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// The fresh-instance factory (spec 2.2): `buildAttr(declModule, params, conds)` calls the REAL
+// constructor with each value at its `ctorIndex`. Nothing is shallow-cloned, so the shared WeakSets,
+// arrays and `oncePerBattleKey` hazards of `cloneAttr` cannot leak between abilities.
+
+import type { AbAttr } from "#abilities/ab-attrs";
+import { getBinding } from "./bindings";
+import type { DeclCondition, DeclModule, DeclParam } from "./define-decl";
+import { type GatedAttr, setGateOverride } from "./gate-residual";
+import type { ConditionNode } from "./vocabulary/composition-types";
+import {
+  asAttackCondition,
+  asDefendCondition,
+  asHolderCondition,
+  compileCondition,
+} from "./vocabulary/evaluate/conditions";
+import type { Condition } from "./vocabulary/evaluate/frame";
+import { type ParamDef, type ParamValues, validateParamValues } from "./vocabulary/params";
+
+type Closure = (...args: never[]) => boolean;
+
+/** A condition slot value: a library IF tree (compiled once here) or a ready engine closure. */
+export type CondInput = ConditionNode | Closure;
+
+function isTree(input: CondInput): input is ConditionNode {
+  return typeof input === "object" && input !== null;
+}
+
+/** Turns a compiled frame condition into the closure shape the slot's engine signature expects. */
+export function adaptCondition(ctx: DeclCondition["ctx"], condition: Condition): Closure {
+  switch (ctx) {
+    case "attack":
+      return asAttackCondition(condition) as Closure;
+    case "defend":
+      return asDefendCondition(condition) as Closure;
+    case "holder":
+      return asHolderCondition(condition) as Closure;
+    default:
+      throw new Error('a condition slot with context "none" cannot take a library condition');
+  }
+}
+
+function paramDefs(params: readonly DeclParam[]): ParamDef[] {
+  return params.map(param => ({
+    id: param.id,
+    label: param.label,
+    control: param.control,
+    default: param.default,
+    ...(param.min === undefined ? {} : { min: param.min }),
+    ...(param.max === undefined ? {} : { max: param.max }),
+    ...(param.step === undefined ? {} : { step: param.step }),
+    ...(param.options === undefined ? {} : { options: param.options }),
+    ...(param.integer === undefined ? {} : { integer: param.integer }),
+  }));
+}
+
+/**
+ * Builds a fresh instance of the declared class.
+ *
+ * @param conds - slot (`ctor:N` / `gate`) to IF tree or closure. A slot the class declares but the
+ *   caller leaves out is an error, because the constructor cannot guess the original closure.
+ */
+export function buildAttr(
+  module: DeclModule,
+  params: ParamValues = {},
+  conds: Readonly<Record<string, CondInput>> = {},
+): AbAttr {
+  const { decl, ctor, className } = module;
+  const errors = validateParamValues(className, paramDefs(decl.params), params);
+  if (errors.length > 0) {
+    throw new Error(errors.join("; "));
+  }
+  const args: unknown[] = [];
+  for (const [index, value] of Object.entries(decl.fixedCtorArgs ?? {})) {
+    args[Number(index)] = value;
+  }
+  for (const param of decl.params) {
+    args[param.ctorIndex] = params[param.id] ?? param.default;
+  }
+  let gate: Closure | undefined;
+  for (const slot of decl.conditions) {
+    const given = conds[slot.slot];
+    if (given === undefined) {
+      throw new Error(`${className} needs a condition for ${slot.slot}`);
+    }
+    const closure = isTree(given) ? adaptCondition(slot.ctx, compileCondition(given)) : given;
+    if (slot.slot === "gate") {
+      gate = closure;
+      continue;
+    }
+    const match = /^ctor:(\d+)$/.exec(slot.slot);
+    if (match === null) {
+      throw new Error(`${className} declares an unsupported condition slot ${slot.slot}`);
+    }
+    args[Number(match[1])] = closure;
+  }
+  const attr = new (ctor as unknown as new (...a: unknown[]) => AbAttr)(...args);
+  if (gate !== undefined) {
+    setGateOverride(attr as unknown as GatedAttr<never>, gate as never);
+  }
+  return attr;
+}
+
+/** Reads the current value of each declared param from a live instance (via `path`). */
+export function readDeclParams(module: DeclModule, attr: AbAttr): ParamValues {
+  const values: Record<string, string | number | boolean> = {};
+  for (const param of module.decl.params) {
+    if (param.path === undefined) {
+      continue;
+    }
+    const value = (attr as unknown as Record<string, unknown>)[param.path];
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      values[param.id] = value;
+    }
+  }
+  return values;
+}
+
+/**
+ * decompose -> recompose: rebuilds a registered attr from its declaration, its live params and its
+ * bindings. A condition slot without a library binding (and without an override) makes this throw,
+ * which is how the coverage gate counts the attr as undecomposed.
+ */
+export function recomposeAttr(
+  module: DeclModule,
+  attr: AbAttr,
+  abilityId: number,
+  attrIndex: number,
+  overrides: { readonly params?: ParamValues; readonly conds?: Readonly<Record<string, CondInput>> } = {},
+): AbAttr {
+  const conds: Record<string, CondInput> = {};
+  for (const slot of module.decl.conditions) {
+    const binding = getBinding(abilityId, attrIndex, slot.slot);
+    if (binding?.spec === undefined) {
+      if (overrides.conds?.[slot.slot] === undefined) {
+        throw new Error(
+          `${module.className} (ability ${abilityId} attr ${attrIndex}) has no library binding for ${slot.slot}`,
+        );
+      }
+      continue;
+    }
+    conds[slot.slot] = binding.spec;
+  }
+  return buildAttr(module, { ...readDeclParams(module, attr), ...overrides.params }, { ...conds, ...overrides.conds });
+}
