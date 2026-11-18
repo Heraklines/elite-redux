@@ -631,6 +631,8 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     {
       alsoDispatchKeys: ["MoveImmunityAbAttr", "FieldPriorityMoveImmunityAbAttr"],
       synonyms: ["immune", "immunity", "absorb", "levitate", "ground immune", "volt absorb"],
+
+      composable: true,
     },
   ),
   calc(

@@ -19,6 +19,7 @@ import {
 } from "./composition-types";
 import { type ConditionDef, conditionRequires } from "./conditions";
 import type { EffectDef } from "./effects";
+import { getGuard } from "./guards";
 import { type ParamValues, validateParamValues } from "./params";
 import { missingSlots, SLOT_IDS, SLOTS, type SlotId } from "./slots";
 import { getVocabularyJson, type VocabularyJson, type VocabularyWhen } from "./vocabulary-json";
@@ -52,6 +53,8 @@ interface Context {
   readonly effects: ReadonlyMap<string, EffectDef>;
   readonly whens: ReadonlyMap<string, VocabularyWhen>;
   readonly errors: string[];
+  /** Bindings only: an empty `all` is "no condition" (the original closure is `() => true`). */
+  readonly allowEmptyAll?: boolean;
 }
 
 function checkRefShape(ref: unknown, path: string, errors: string[]): ref is BlockRef {
@@ -97,6 +100,9 @@ function validateCondition(node: unknown, path: string, when: VocabularyWhen, de
       return;
     }
     const list = isGroupAll(typed) ? typed.all : isGroupAny(typed) ? typed.any : [];
+    if (isGroupAll(typed) && context.allowEmptyAll === true && Array.isArray(list) && list.length === 0) {
+      return;
+    }
     if (!Array.isArray(list) || list.length === 0 || list.length > COMPOSITION_LIMITS.conditionsPerRule) {
       errors.push(`${path} groups need between 1 and ${COMPOSITION_LIMITS.conditionsPerRule} conditions`);
       return;
@@ -164,6 +170,15 @@ function validateEffect(ref: unknown, path: string, when: VocabularyWhen, contex
   const missing = missingSlots(def.requires, when.provides);
   if (missing.length > 0) {
     errors.push(`${path}: ${describeMissing(def.id, when, missing)}`);
+  }
+  for (const guardId of def.guards ?? []) {
+    const guard = getGuard(guardId);
+    const guardMissing = guard === undefined ? [] : missingSlots(guard.requires, when.provides);
+    if (guardMissing.length > 0) {
+      errors.push(
+        `${path}: its safety rule "${guardId}" needs ${guardMissing.map(slotLabel).join(" and ")}, but the trigger "${when.label}" does not provide ${guardMissing.length > 1 ? "them" : "it"}`,
+      );
+    }
   }
   if (def.kind === "calc") {
     if (when.kind !== "calc") {
@@ -294,6 +309,7 @@ export function validateConditionSpec(
     effects: new Map(vocabulary.effects.map(def => [def.id, def])),
     whens: new Map(vocabulary.whens.map(def => [def.id, def])),
     errors,
+    allowEmptyAll: true,
   });
   return errors;
 }

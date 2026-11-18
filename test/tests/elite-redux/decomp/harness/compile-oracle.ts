@@ -14,6 +14,7 @@ import {
   conditionRequires,
 } from "#data/elite-redux/ability-studio/vocabulary/conditions";
 import { EFFECT_REGISTRY, type EffectDef } from "#data/elite-redux/ability-studio/vocabulary/effects";
+import { getGuard } from "#data/elite-redux/ability-studio/vocabulary/guards";
 import type { ParamDef, ParamValues } from "#data/elite-redux/ability-studio/vocabulary/params";
 import { missingSlots, SLOTS } from "#data/elite-redux/ability-studio/vocabulary/slots";
 import { WHEN_REGISTRY, type WhenDef } from "#data/elite-redux/ability-studio/vocabulary/when-registry";
@@ -80,6 +81,12 @@ export function verdictFor(
   const missingEffect = missingSlots(effect.requires, when.provides);
   if (missingEffect.length > 0) {
     return fail(`effect needs ${missingEffect.join("+")}`, effect.id, ...missingEffect.map(slotWord));
+  }
+  for (const guardId of effect.guards ?? []) {
+    const guardMissing = missingSlots(getGuard(guardId)?.requires ?? [], when.provides);
+    if (guardMissing.length > 0) {
+      return fail(`safety rule ${guardId} needs ${guardMissing.join("+")}`, guardId, ...guardMissing.map(slotWord));
+    }
   }
   if (effect.kind === "calc") {
     if (when.kind !== "calc") {

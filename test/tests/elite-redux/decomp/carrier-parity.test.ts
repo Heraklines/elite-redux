@@ -10,6 +10,7 @@
 // one) and with a really constructed instance of the dispatch class, on every no-argument method.
 import {
   AbilityAttrs,
+  AttackTypeImmunityAbAttr,
   ChangeMovePriorityAbAttr,
   MoveDamageBoostAbAttr,
   type PostSummonAbAttr,
@@ -27,6 +28,7 @@ import {
 import { compileCompositionRule } from "#data/elite-redux/ability-studio/vocabulary/evaluate/compile-composition";
 import type { CompositionRuleV2 } from "#data/elite-redux/ability-studio/vocabulary/index";
 import { WHEN_REGISTRY } from "#data/elite-redux/ability-studio/vocabulary/index";
+import { PokemonType } from "#enums/pokemon-type";
 import { describe, expect, it } from "vitest";
 
 const STAT_STAGE = { block: "effect.stat-stage", params: { target: "holder", stat: "ATK", stages: 1 } };
@@ -35,6 +37,7 @@ const DO_BY_WHEN: Record<string, CompositionRuleV2["do"][number]> = {
   "calc.damage-taken": { block: "effect.multiply-damage-taken", params: { multiplier: 0.5 } },
   "calc.priority": { block: "effect.change-priority", params: { amount: 1 } },
   "calc.damage-dealt": { block: "effect.multiply-damage-dealt", params: { multiplier: 2 } },
+  "calc.move-immunity": { block: "effect.immune-to-type", params: { type: "GROUND" } },
 };
 
 const ruleFor = (whenId: string): CompositionRuleV2 => ({
@@ -63,6 +66,7 @@ const ORIGINAL_BY_WHEN: Record<string, object> = {
   "calc.damage-taken": new ReceivedMoveDamageMultiplierAbAttr(() => true, 0.5),
   "calc.damage-dealt": new MoveDamageBoostAbAttr(2, () => true),
   "calc.priority": new ChangeMovePriorityAbAttr(() => true, 1),
+  "calc.move-immunity": new AttackTypeImmunityAbAttr(PokemonType.GROUND),
 };
 
 /** Methods the carrier replaces on purpose. */

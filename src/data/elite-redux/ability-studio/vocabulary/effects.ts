@@ -27,6 +27,13 @@ export interface EffectDef {
   readonly modifies?: string;
   /** Event effects that reuse a V1 effect kind of ability-blueprint.ts. */
   readonly v1Kind?: "stat-stage" | "status" | "heal-percent" | "cure-status" | "set-weather" | "set-terrain";
+  /**
+   * Safety rules (guard registry ids) that always run before the rule's IF list, in this order. Locked in
+   * the editor: staff cannot remove them (spec 1.5). An effect that bundles guards needs the slots they read.
+   */
+  readonly guards?: readonly string[];
+  /** "Also requires" lines for checks the effect itself keeps (spec 1.5 feasibility); shown locked, never toggles. */
+  readonly feasibility?: readonly string[];
   readonly implemented: boolean;
   readonly synonyms: readonly string[];
   readonly examples: readonly string[];
@@ -190,13 +197,13 @@ export const EFFECT_REGISTRY: readonly EffectDef[] = [
     kind: "calc",
     label: "Be immune to {type} moves",
     requires: [],
-    params: [
-      selectParam("type", "Type", TYPE_OPTIONS, "GROUND"),
-      booleanParam("absorb", "Absorb the move", false),
-      sliderParam("healPct", "Heal percent when absorbed", 25, 0, 100, 1, true),
-    ],
+    params: [selectParam("type", "Type", TYPE_OPTIONS, "GROUND")],
     modifies: "cancelled",
-    implemented: false,
+    feasibility: [
+      "Does not block status moves or moves that treat Flying types neutrally (the same rule as Levitate)",
+      "Does not block moves that hit every Pokemon, or my own side",
+    ],
+    implemented: true,
     synonyms: ["immunity", "levitate", "volt absorb", "water absorb", "ground immune"],
     examples: ["Immune to Ground moves"],
   },
@@ -333,7 +340,9 @@ export const EFFECT_REGISTRY: readonly EffectDef[] = [
     label: "Switch out",
     requires: [],
     params: [],
-    implemented: false,
+    guards: ["not-own-hp-cost-move", "not-already-forced-out", "sheer-force-negates", "after-final-hit"],
+    feasibility: ["A switch must be possible against every foe (nothing traps me or blocks it)"],
+    implemented: true,
     synonyms: ["eject", "wimp out", "emergency exit", "pivot", "retreat"],
     examples: ["Switch out when HP drops below 35%"],
   },
@@ -341,12 +350,16 @@ export const EFFECT_REGISTRY: readonly EffectDef[] = [
     id: "effect.scripted-move",
     kind: "event",
     label: "Use {moveId} with {power} power",
-    requires: [],
+    requires: ["other"],
     params: [
       textParam("moveId", "Move id (enum name)", "STEAM_ERUPTION"),
       numberParam("power", "Power", 50, 1, 250, 1, true),
     ],
-    implemented: false,
+    feasibility: [
+      "Both I and the foe must still be standing",
+      "Never starts from an indirect move, so a follow-up cannot trigger another follow-up",
+    ],
+    implemented: true,
     synonyms: ["follow up move", "extra move", "free move", "steam eruption"],
     examples: ["50 power Steam Eruption after a Fire or Water move"],
   },

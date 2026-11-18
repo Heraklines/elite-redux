@@ -135,7 +135,7 @@ describe("composition validation (plain-language, vocabulary driven)", () => {
       { ...halfAtFullHp, when: { block: "event.berry-eaten" }, if: [], do: [{ block: "effect.heal-percent" }] },
       "cannot be used in a rule yet",
     );
-    expectInvalid({ ...switchOutBelow35, do: [{ block: "effect.force-switch-out" }] }, "cannot run yet");
+    expectInvalid({ ...switchOutBelow35, do: [{ block: "effect.apply-tag" }] }, "cannot run yet");
     expectInvalid({ ...halfAtFullHp, if: [{ block: "escape.legacy-closure" }] }, "cannot be added by hand");
     expectInvalid({ ...halfAtFullHp, when: { block: "while.active" }, if: [] }, "always-on flag");
     expectInvalid({ ...halfAtFullHp, when: { block: "calc.incoming-move" }, if: [] }, "legacy grouping");

@@ -33,7 +33,7 @@ import type { CompareOp, HpRounding } from "../enums";
 import { getGuard } from "../guards";
 import { compareNumbers as compare, hpAtLeast, hpAtMost, hpCrossedBelowRounded } from "../hp-math";
 import { type ParamValues, withParamDefaults } from "../params";
-import { type Condition, type Frame, holderLikeOf } from "./frame";
+import { type Condition, type Frame, frameFromAttrParams, holderLikeOf } from "./frame";
 import { evaluateGuard } from "./guards";
 
 type Resolved = Readonly<Record<string, string | number | boolean>>;
@@ -492,4 +492,51 @@ export function asDefendCondition(
   condition: Condition,
 ): (target: Pokemon, user: Pokemon, move: Frame["move"]) => boolean {
   return (target, user, move) => condition({ holder: target, other: user, move, moveUser: user, simulated: true });
+}
+
+/**
+ * A library IF tree installed as the Tier B `gate` slot (decl condition ctx "params"). The gate receives
+ * the engine parameter object of the WHEN, exactly like `canApply`, and builds the frame the way the
+ * composition carrier does (so the effective-damage rewrite of after-taking-damage applies here too).
+ *
+ * It follows the carrier's evaluation protocol: atoms answer their real value in order, nth-use counts
+ * are written right after the list, and once-per memory writes WAIT in `commit`, which `buildAttr`
+ * runs when `apply` runs. The pending writes are keyed by the holder, so a `prepare` step that hands the
+ * gate a different parameter object than the engine's does not lose them.
+ */
+export interface ParamsGate {
+  readonly gate: (params: object) => boolean;
+  readonly commit: (params: object) => void;
+}
+
+export function asParamsGate(whenId: string, condition: Condition): ParamsGate {
+  const pending = new WeakMap<object, (() => void)[]>();
+  const holderOf = (params: object): object => (params as { pokemon: object }).pokemon;
+  return {
+    gate: params => {
+      const frame = frameFromAttrParams(whenId, params);
+      frame.commits = [];
+      frame.counts = [];
+      const passed = condition(frame);
+      const { commits, counts } = frame;
+      frame.commits = undefined;
+      frame.counts = undefined;
+      for (const count of counts ?? []) {
+        count();
+      }
+      if (passed) {
+        pending.set(holderOf(params), commits ?? []);
+      } else {
+        pending.delete(holderOf(params));
+      }
+      return passed;
+    },
+    commit: params => {
+      const key = holderOf(params);
+      for (const write of pending.get(key) ?? []) {
+        write();
+      }
+      pending.delete(key);
+    },
+  };
 }

@@ -10,13 +10,14 @@
 
 import type { AbAttr } from "#abilities/ab-attrs";
 import { getBinding } from "./bindings";
-import type { DeclCondition, DeclModule, DeclParam } from "./define-decl";
+import { type DeclCondition, type DeclModule, type DeclParam, isAbsentOptional } from "./define-decl";
 import { type GatedAttr, setGateOverride } from "./gate-residual";
 import type { ConditionNode } from "./vocabulary/composition-types";
 import {
   asAttackCondition,
   asDefendCondition,
   asHolderCondition,
+  asParamsGate,
   compileCondition,
 } from "./vocabulary/evaluate/conditions";
 import type { Condition } from "./vocabulary/evaluate/frame";
@@ -79,14 +80,34 @@ export function buildAttr(
   for (const [index, value] of Object.entries(decl.fixedCtorArgs ?? {})) {
     args[Number(index)] = value;
   }
+  let spread: { index: number; list: unknown[] } | undefined;
   for (const param of decl.params) {
-    args[param.ctorIndex] = params[param.id] ?? param.default;
+    const value = params[param.id] ?? param.default;
+    const ctorValue = param.codec === undefined ? value : param.codec.toCtor(value);
+    if (param.ctorOption !== undefined) {
+      const bag = (args[param.ctorIndex] ??= {}) as Record<string, unknown>;
+      bag[param.ctorOption] = ctorValue;
+    } else if (param.spread === true) {
+      spread = { index: param.ctorIndex, list: ctorValue as unknown[] };
+    } else {
+      args[param.ctorIndex] = ctorValue;
+    }
   }
   let gate: Closure | undefined;
+  let gateCommit: ((params: never) => void) | undefined;
   for (const slot of decl.conditions) {
     const given = conds[slot.slot];
     if (given === undefined) {
+      if (slot.optional === true) {
+        continue;
+      }
       throw new Error(`${className} needs a condition for ${slot.slot}`);
+    }
+    if (slot.slot === "gate" && slot.ctx === "params" && isTree(given)) {
+      const paramsGate = asParamsGate(decl.when, compileCondition(given));
+      gate = paramsGate.gate as Closure;
+      gateCommit = paramsGate.commit as (params: never) => void;
+      continue;
     }
     const closure = isTree(given) ? adaptCondition(slot.ctx, compileCondition(given)) : given;
     if (slot.slot === "gate") {
@@ -99,9 +120,23 @@ export function buildAttr(
     }
     args[Number(match[1])] = closure;
   }
+  if (spread !== undefined) {
+    args.length = spread.index;
+    args.push(...spread.list);
+  }
   const attr = new (ctor as unknown as new (...a: unknown[]) => AbAttr)(...args);
   if (gate !== undefined) {
     setGateOverride(attr as unknown as GatedAttr<never>, gate as never);
+  }
+  if (gateCommit !== undefined) {
+    // Memory atoms in a library gate (once-per, nth-use) wait for the effect, like in a composition carrier:
+    // the write happens when `apply` runs, not when `canApply` merely passes.
+    const commit = gateCommit;
+    const carrierApply = (attr as unknown as { apply: (p: never) => void }).apply.bind(attr);
+    (attr as unknown as { apply: (p: never) => void }).apply = (p: never) => {
+      commit(p);
+      carrierApply(p);
+    };
   }
   return attr;
 }
@@ -113,7 +148,8 @@ export function readDeclParams(module: DeclModule, attr: AbAttr): ParamValues {
     if (param.path === undefined) {
       continue;
     }
-    const value = (attr as unknown as Record<string, unknown>)[param.path];
+    const raw = (attr as unknown as Record<string, unknown>)[param.path];
+    const value = param.codec === undefined ? raw : param.codec.fromInstance(raw);
     if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
       values[param.id] = value;
     }
@@ -135,6 +171,9 @@ export function recomposeAttr(
 ): AbAttr {
   const conds: Record<string, CondInput> = {};
   for (const slot of module.decl.conditions) {
+    if (isAbsentOptional(attr, slot)) {
+      continue;
+    }
     const binding = getBinding(abilityId, attrIndex, slot.slot);
     if (binding?.spec === undefined) {
       if (overrides.conds?.[slot.slot] === undefined) {

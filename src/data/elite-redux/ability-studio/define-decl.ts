@@ -33,8 +33,29 @@ export type DeclKind =
 
 export type DeclStatus = "todo" | "decomposed" | "verified" | "exempt";
 
-/** How the engine signature of a condition slot maps onto the frame (see evaluate/conditions.ts). */
-export type ConditionContext = "attack" | "defend" | "holder" | "none";
+/**
+ * How the engine signature of a condition slot maps onto the frame (see evaluate/conditions.ts).
+ *
+ *  - `attack`  PokemonAttackCondition `(user, target, move)`
+ *  - `defend`  PokemonDefendCondition `(target, user, move)`
+ *  - `holder`  AbAttrCondition `(pokemon)`
+ *  - `params`  the whole engine parameter object of the WHEN (the Tier B `gate` slot): the frame is built
+ *              from it exactly as the composition carrier builds it
+ *  - `none`    the slot takes a ready closure only
+ */
+export type ConditionContext = "attack" | "defend" | "holder" | "params" | "none";
+
+/**
+ * Translates between the value staff see (a string such as "GROUND", a 0-100 percent) and the value the
+ * class constructor wants (a PokemonType number, -1 for "always"). Without a codec the value is passed
+ * through unchanged, which is only right for plain numbers, booleans and free text.
+ */
+export interface ParamCodec {
+  /** UI value to constructor argument. */
+  readonly toCtor: (value: ParamValue) => unknown;
+  /** The raw value read from a live instance (via `path`) back to the UI value; undefined = not representable. */
+  readonly fromInstance: (raw: unknown) => ParamValue | undefined;
+}
 
 export interface DeclParam {
   readonly id: string;
@@ -52,6 +73,16 @@ export interface DeclParam {
   readonly step?: number;
   readonly options?: readonly string[];
   readonly integer?: boolean;
+  /** UI value <-> constructor argument translation (enums, sentinel values, lists). */
+  readonly codec?: ParamCodec;
+  /**
+   * The constructor takes one options object at `ctorIndex` (the archetype style
+   * `new X({ hpThreshold, targetFormKey })`); this param is the key inside it. Several params may share
+   * an index only when each of them names its key.
+   */
+  readonly ctorOption?: string;
+  /** The codec returns a list that the constructor takes as rest arguments (`...effects`). */
+  readonly spread?: boolean;
 }
 
 export interface DeclCondition {
@@ -70,6 +101,11 @@ export interface DeclCondition {
   readonly removable: boolean;
   /** Staff may replace this condition with another IF tree. */
   readonly editable: boolean;
+  /**
+   * The constructor argument may be left out (`condition?: AbAttrCondition`). An instance whose `path` field is
+   * null or undefined then needs no binding: it is rebuilt without a closure.
+   */
+  readonly optional?: boolean;
 }
 
 export interface DeclEffect {
@@ -135,6 +171,15 @@ export interface ClassDecl {
   readonly status: DeclStatus;
   /** Oddities, bugs found (never fixed in the same change) and reasons for package/exempt. */
   readonly notes: string;
+}
+
+/** True when `slot` is optional and the live instance has no closure there (so no binding is needed). */
+export function isAbsentOptional(attr: object, slot: DeclCondition): boolean {
+  if (slot.optional !== true || slot.slot === "gate") {
+    return false;
+  }
+  const value = (attr as Record<string, unknown>)[slot.path ?? "condition"];
+  return value === null || value === undefined;
 }
 
 /** What a `.decl.ts` file default-exports. */

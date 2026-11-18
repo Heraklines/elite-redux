@@ -21,7 +21,7 @@
 
 import { getBinding } from "#data/elite-redux/ability-studio/bindings";
 import type { DeclRegistry } from "#data/elite-redux/ability-studio/decl-registry";
-import type { DeclModule } from "#data/elite-redux/ability-studio/define-decl";
+import { type DeclModule, isAbsentOptional } from "#data/elite-redux/ability-studio/define-decl";
 import type { AttrSite } from "./sites";
 
 export type AttrBucket = "full" | "partly" | "packageOnly" | "engineQuery" | "notStarted";
@@ -55,6 +55,9 @@ export function classifyAttr(site: AttrSite, module: DeclModule | undefined): At
     why.push("feasibility checks stay in the class");
   }
   for (const slot of decl.conditions) {
+    if (isAbsentOptional(site.attr, slot)) {
+      continue;
+    }
     const binding = getBinding(site.abilityId, site.attrIndex, slot.slot);
     if (binding === undefined) {
       why.push(`${slot.slot} has no binding`);

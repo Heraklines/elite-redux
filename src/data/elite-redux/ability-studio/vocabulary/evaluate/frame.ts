@@ -7,6 +7,7 @@
 // EVALUATE (game) side of the vocabulary: the runtime frame that IF and DO blocks read.
 // The pure registries (../*.ts) only name slots; this file fills them from real engine parameters.
 
+import { effectiveDamageAfterMultiHit } from "#abilities/ab-attrs";
 import type { BattlerTag } from "#data/battler-tags";
 import type { TerrainType } from "#data/terrain";
 import type { HitResult } from "#enums/hit-result";
@@ -129,21 +130,7 @@ export function frameFromAttrParams(whenId: string, params: object): Frame {
   };
 }
 
-/**
- * The effective damage for after-taking-damage: the original PostDamageForceSwitchAbAttr rewrites
- * the local `damage` to `turnData.damageTaken` for multi-hit moves before its crossing test. That
- * rewrite is part of the frame builder, not a condition. It only applies when the source has a last
- * move on record, exactly like the original (the rewrite sat inside `if (enemyLastMoveUsed)`).
- */
-export function effectiveDamageAfterMultiHit(pokemon: Pokemon, source: Pokemon | undefined, damage: number): number {
-  if (source) {
-    const enemyLastMoveUsed = source.getLastXMoves()[0];
-    if (enemyLastMoveUsed && source.turnData.hitCount > 1) {
-      return pokemon.turnData.damageTaken;
-    }
-  }
-  return damage;
-}
+export { effectiveDamageAfterMultiHit };
 
 export function holderLikeOf(frame: Frame, who: string): Pokemon | undefined {
   switch (who) {

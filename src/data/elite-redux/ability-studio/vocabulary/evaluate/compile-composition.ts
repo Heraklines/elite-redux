@@ -23,8 +23,9 @@ import type { CompositionRuleV2 } from "../composition-types";
 import { validateComposition } from "../validate-composition";
 import { getWhen } from "../when-registry";
 import { compileConditionList } from "./conditions";
-import { compileEffectBlock } from "./effects";
+import { compileEffect } from "./effects";
 import { type Frame, frameFromAttrParams } from "./frame";
+import { guardsPass } from "./guards";
 
 type CarrierBase = new (...args: never[]) => AbAttr;
 
@@ -56,6 +57,12 @@ const MOMENT_GATES: Readonly<Record<string, (params: RawParams) => boolean>> = {
  * shouldActivateOnGain() when an ability is gained mid-battle (Skill Swap, Trace, Entrain).
  * A test compares every composable WHEN's carrier against the V1 rule attr to keep this complete.
  */
+/**
+ * WHENs whose original attrs flash the ability banner when they act although the WHEN is a calculation (a type
+ * immunity shows "Levitate" when it blocks a move). Event WHENs always show it.
+ */
+const SHOWS_ABILITY: ReadonlySet<string> = new Set(["calc.move-immunity"]);
+
 const ENGINE_FIELDS: Readonly<Record<string, Readonly<Record<string, unknown>>>> = {
   PostSummonAbAttr: { activateOnGain: true },
 };
@@ -74,17 +81,25 @@ export function compileCompositionRule(rule: CompositionRuleV2): AbAttr {
     throw new Error(`the trigger "${when.label}" has no game class to hang a rule on`);
   }
   const conditions = compileConditionList(rule.if ?? []);
-  const effects = rule.do.map(compileEffectBlock);
+  const compiledEffects = rule.do.map(compileEffect);
+  const effects = compiledEffects.map(effect => effect.run);
+  // Safety rules and "also requires" checks that the effects bundle: guards run before the IF list, the
+  // feasibility checks after it and before the chance roll, the original clause order of the classes.
+  const guardNames = [...new Set(compiledEffects.flatMap(effect => effect.guards))];
+  const feasibility = compiledEffects.flatMap(effect => (effect.feasible === undefined ? [] : [effect.feasible]));
   const whenId = when.id;
   const momentGate = MOMENT_GATES[whenId];
   const carrier = Reflect.construct(
     AbAttr as unknown as new (
       show?: boolean,
     ) => AbAttr,
-    [when.kind === "event"],
+    [when.kind === "event" || SHOWS_ABILITY.has(whenId)],
     base,
   ) as Carrier;
   Object.assign(carrier, ENGINE_FIELDS[when.dispatchKey] ?? {});
+  for (const effect of compiledEffects) {
+    Object.assign(carrier, effect.carrierFields ?? {});
+  }
   const frames = new WeakMap<object, Frame>();
   const frameOf = (params: AbAttrBaseParams): Frame => {
     let frame = frames.get(params);
@@ -99,6 +114,9 @@ export function compileCompositionRule(rule: CompositionRuleV2): AbAttr {
       return false;
     }
     const frame = frameOf(params);
+    if (guardNames.length > 0 && !guardsPass(guardNames, frame)) {
+      return false;
+    }
     // One sequential pass: every atom answers its real value at its own position, so RNG draws and
     // short-circuiting match compileConditionList. Memory writes wait for the outcome.
     frame.commits = [];
@@ -111,6 +129,11 @@ export function compileCompositionRule(rule: CompositionRuleV2): AbAttr {
       count();
     }
     if (!passed) {
+      frame.commits = undefined;
+      return false;
+    }
+    const raw = params as unknown as RawParams;
+    if (!feasibility.every(feasible => feasible({ frame, params: raw }))) {
       frame.commits = undefined;
       return false;
     }

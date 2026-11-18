@@ -172,6 +172,7 @@ describe("vocabulary: registry invariants", () => {
       [
         "calc.damage-dealt",
         "calc.damage-taken",
+        "calc.move-immunity",
         "calc.move-power",
         "calc.priority",
         "event.after-hit",

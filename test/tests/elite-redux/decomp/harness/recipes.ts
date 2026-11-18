@@ -124,12 +124,6 @@ const switchOutBelow: GoldenRecipe = {
       [{ block: "effect.force-switch-out" }],
     ),
   ],
-  expectedFail: {
-    reason:
-      '"effect.force-switch-out" is planned, not wired: it must call the same switch-out logic as Wimp Out and Emergency Exit',
-    landsWith: "the PostDamageForceSwitchAbAttr golden precedent (spec 3.3)",
-    mentions: ["effect.force-switch-out"],
-  },
   standIn: {
     abilityId: AbilityId.WIMP_OUT,
     note: "Wimp Out switches below 50%, so the same checks aim at the 50% line",
@@ -180,19 +174,8 @@ const immuneToGround: GoldenRecipe = {
   title: "Immune to Ground",
   phrase: "immune to Ground moves",
   rules: [
-    rule(
-      "ground-immunity",
-      "calc.move-immunity",
-      [],
-      [{ block: "effect.immune-to-type", params: { type: "GROUND", absorb: false, healPct: 0 } }],
-    ),
+    rule("ground-immunity", "calc.move-immunity", [], [{ block: "effect.immune-to-type", params: { type: "GROUND" } }]),
   ],
-  expectedFail: {
-    reason:
-      'the trigger "While the game checks whether a move can hit me" is not composable yet and "effect.immune-to-type" is planned, not wired to the type-immunity attr',
-    landsWith: "the TypeImmunityAbAttr immunity block with a type param",
-    mentions: ["While the game checks whether a move can hit me", "effect.immune-to-type"],
-  },
   standIn: {
     abilityId: AbilityId.LEVITATE,
     note: "Levitate is the shipped Ground immunity",
@@ -269,13 +252,15 @@ const FIRE_OR_WATER_MOVES: ScenarioSpec = {
   ...TEMPLATES["holder-hits-foe"],
   id: "recipe-steam-eruption",
   label: "The holder uses Ember, Water Gun, then Tackle",
+  // No foe ability: Ball Fetch copies and blocks "ball" moves such as Water Gun, which would hide the trigger.
+  foeAbility: AbilityId.NONE,
   holderMoves: [MoveId.EMBER, MoveId.WATER_GUN, MoveId.TACKLE, MoveId.CELEBRATE],
   turns: [use(MoveId.EMBER), use(MoveId.WATER_GUN), use(MoveId.TACKLE)],
 };
 
 const steamEruption: GoldenRecipe = {
   id: "steam-eruption-after-fire-or-water",
-  title: "50 BP Steam Eruption after a Fire or Water move",
+  title: "50 BP Steam Eruption after Fire or Water",
   phrase: "after I use a Fire or Water move, follow up with a 50 power Steam Eruption",
   rules: [
     rule(
@@ -292,27 +277,21 @@ const steamEruption: GoldenRecipe = {
       [{ block: "effect.scripted-move", params: { moveId: "STEAM_ERUPTION", power: 50 } }],
     ),
   ],
-  expectedFail: {
-    reason: '"effect.scripted-move" is planned, not wired: it needs the post-attack scripted-move precedent',
-    landsWith: "the post-attack scripted-move golden precedent",
-    mentions: ["effect.scripted-move"],
-  },
   async check(ctx) {
     if (ctx.ability === undefined) {
       return [];
     }
-    const none = await ctx.run(AbilityId.BALL_FETCH, FIRE_OR_WATER_MOVES);
+    const none = await ctx.run(AbilityId.NONE, FIRE_OR_WATER_MOVES);
     const withRecipe = await ctx.run(ctx.ability, FIRE_OR_WATER_MOVES);
     const movePhases = (trace: TraceData): number => trace.phases.filter(p => p === "MovePhase").length;
     const extra = movePhases(withRecipe) - movePhases(none);
-    const turnHp = (trace: TraceData, turn: number): number =>
-      (trace.snapshots[turn].data.enemy as Record<string, number>[])[0].hp;
+    const steamMessages = (trace: TraceData): number => trace.messages.filter(m => m.includes("Steam Eruption")).length;
     return [
       check("two follow-up moves happen (after Ember and after Water Gun)", extra === 2, `${extra} extra moves queued`),
       check(
-        "the Tackle turn is not followed by anything",
-        turnHp(withRecipe, 3) - turnHp(withRecipe, 2) === turnHp(none, 3) - turnHp(none, 2),
-        "Tackle damage equals the unprotected run",
+        "the follow-up is Steam Eruption, twice, and only with the ability",
+        steamMessages(withRecipe) === 2 && steamMessages(none) === 0,
+        `${steamMessages(withRecipe)} Steam Eruption messages with the ability, ${steamMessages(none)} without`,
       ),
     ];
   },

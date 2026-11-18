@@ -62,17 +62,26 @@ export function lintDecl(module: DeclModule): string[] {
 
   const arity = constructorArity(ctor);
   const usedIndices = new Set<number>();
-  const claim = (index: number, what: string): void => {
+  const claim = (index: number, what: string, optionKey?: string): void => {
     if (!Number.isInteger(index) || index < 0 || index >= arity) {
       say(`${what} points at constructor argument ${index}, but the constructor has ${arity}`);
     }
-    if (usedIndices.has(index)) {
+    // Several params may share one options-object argument, each under its own key.
+    if (optionKey === undefined && usedIndices.has(index)) {
       say(`${what} reuses constructor argument ${index}`);
     }
     usedIndices.add(index);
   };
+  const optionKeys = new Set<string>();
   for (const param of decl.params) {
-    claim(param.ctorIndex, `param "${param.id}"`);
+    if (param.ctorOption !== undefined) {
+      const slotKey = `${param.ctorIndex}.${param.ctorOption}`;
+      if (optionKeys.has(slotKey)) {
+        say(`param "${param.id}" reuses the option "${param.ctorOption}" of constructor argument ${param.ctorIndex}`);
+      }
+      optionKeys.add(slotKey);
+    }
+    claim(param.ctorIndex, `param "${param.id}"`, param.ctorOption);
   }
   for (const condition of decl.conditions) {
     const match = /^ctor:(\d+)$/.exec(condition.slot);

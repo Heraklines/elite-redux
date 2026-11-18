@@ -202,8 +202,13 @@ describe("L3 plain-language failure messages", () => {
     },
     {
       name: "an effect that is only planned",
-      rule: ruleFor("event.after-hit", undefined, "effect.force-switch-out", {}),
-      mustContain: ['"effect.force-switch-out"', "cannot run yet"],
+      rule: ruleFor("event.after-hit", undefined, "effect.apply-tag", { target: "holder", tag: "TAUNT" }),
+      mustContain: ['"effect.apply-tag"', "cannot run yet"],
+    },
+    {
+      name: "an effect whose safety rule needs something the trigger does not provide",
+      rule: ruleFor("event.on-entry", undefined, "effect.force-switch-out", {}),
+      mustContain: ['safety rule "not-already-forced-out"', "the other pokemon"],
     },
     {
       name: "a trigger that is not wired yet",

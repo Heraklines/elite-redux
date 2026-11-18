@@ -15,6 +15,7 @@
 import { allBindings } from "#data/elite-redux/ability-studio/bindings";
 import { lintDecl } from "#data/elite-redux/ability-studio/decl-lint";
 import type { DeclRegistry } from "#data/elite-redux/ability-studio/decl-registry";
+import { isAbsentOptional } from "#data/elite-redux/ability-studio/define-decl";
 import { WHEN_REGISTRY } from "#data/elite-redux/ability-studio/vocabulary/when-registry";
 import { mappedWhenIds, STATIC_WHEN_REASONS, TEMPLATES, templateForWhen } from "./scenarios";
 import type { AttrSite } from "./sites";
@@ -75,7 +76,11 @@ export function bindingProblems(sites: readonly AttrSite[], registry: DeclRegist
       continue;
     }
     for (const slot of module.decl.conditions) {
-      if (slot.slot.startsWith("ctor:") && !bound.has(`${site.abilityId}:${site.attrIndex}:${slot.slot}`)) {
+      if (
+        (slot.slot.startsWith("ctor:") || slot.slot === "gate")
+        && !isAbsentOptional(site.attr, slot)
+        && !bound.has(`${site.abilityId}:${site.attrIndex}:${slot.slot}`)
+      ) {
         problems.push(
           `${site.abilityName} attr ${site.attrIndex} (${site.className}): ${slot.slot} has neither a library binding nor a legacy-closure note`,
         );

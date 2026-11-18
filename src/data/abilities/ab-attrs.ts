@@ -10,6 +10,7 @@ import {
   ER_HONK_SHOO_ABILITY_ID,
   ER_REAP_AND_SOW_ABILITY_ID,
 } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { suppressAbilityIdForTurns } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import { clearErAilments, hasErAilment } from "#data/elite-redux/er-status-cure";
 import { SpeciesFormChangeAbilityTrigger, SpeciesFormChangeWeatherTrigger } from "#data/form-change-triggers";
@@ -7386,6 +7387,22 @@ export function hpCrossedBelow(pokemon: Pokemon, damage: number, ratio: number):
   );
 }
 
+/**
+ * The effective damage for after-taking-damage: Wimp Out and Emergency Exit rewrite the damage of a multi-hit
+ * move to the whole turn's damage (`turnData.damageTaken`) before their crossing test. Only applies when the
+ * source has a last move on record, exactly like the original code (the rewrite sat inside `if (enemyLastMoveUsed)`).
+ * The ability studio frame builder calls the same function, so the `damage` slot is already the effective value.
+ */
+export function effectiveDamageAfterMultiHit(pokemon: Pokemon, source: Pokemon | undefined, damage: number): number {
+  if (source) {
+    const enemyLastMoveUsed = source.getLastXMoves()[0];
+    if (enemyLastMoveUsed && source.turnData.hitCount > 1) {
+      return pokemon.turnData.damageTaken;
+    }
+  }
+  return damage;
+}
+
 export interface PostDamageAbAttrParams extends AbAttrBaseParams {
   /** The pokemon that caused the damage; omitted if the damage was not from a pokemon */
   source?: Pokemon | undefined;
@@ -7419,8 +7436,25 @@ export class PostDamageForceSwitchAbAttr extends PostDamageAbAttr {
     this.hpRatio = hpRatio;
   }
 
-  // TODO: Refactor to use more early returns
-  public override canApply({ pokemon, source, damage }: PostDamageAbAttrParams): boolean {
+  /**
+   * Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. Declared with
+   * `declare` so it is not an own field of ordinary instances (the runtime configuration snapshot ignores it).
+   */
+  public declare gateOverride: ((params: PostDamageAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1): `guards`, then the `prepare` frame rewrite, then `gate`, then
+   * `residual`, in the original clause order and with the original short-circuiting.
+   */
+  public override canApply(params: PostDamageAbAttrParams): boolean {
+    return gatedCanApply<PostDamageAbAttrParams>(this, params);
+  }
+
+  /**
+   * Safety rules that come first (guard ids: not-own-hp-cost-move, not-already-forced-out, sheer-force-negates,
+   * after-final-hit). Moved verbatim out of the old `canApply`; the guard registry holds the same predicates.
+   */
+  public guards({ pokemon, source }: PostDamageAbAttrParams): boolean {
     // Will not activate when the Pokémon's HP is lowered by cutting its own HP
     const forbiddenAttackingMoves = [MoveId.BELLY_DRUM, MoveId.SUBSTITUTE, MoveId.CURSE, MoveId.PAIN_SPLIT];
     const lastMoveUsed = pokemon.getLastXMoves()[0];
@@ -7449,22 +7483,30 @@ export class PostDamageForceSwitchAbAttr extends PostDamageAbAttr {
         if (source.turnData.hitsLeft > 1) {
           return false;
         }
-        if (source.turnData.hitCount > 1) {
-          damage = pokemon.turnData.damageTaken;
-        }
       }
     }
+    return true;
+  }
 
-    if (hpCrossedBelow(pokemon, damage, this.hpRatio)) {
-      for (const opponent of pokemon.getOpponents()) {
-        if (!this.helper.getSwitchOutCondition(pokemon, opponent)) {
-          return false;
-        }
+  /** The frame rewrite: the effective damage of a multi-hit move is the whole turn's damage. */
+  public prepare(params: PostDamageAbAttrParams): PostDamageAbAttrParams {
+    const damage = effectiveDamageAfterMultiHit(params.pokemon, params.source, params.damage);
+    return damage === params.damage ? params : { ...params, damage };
+  }
+
+  /** The replaceable condition (library atom `hp.crossed-below`, exact rounding); receives the effective damage. */
+  public gate({ pokemon, damage }: PostDamageAbAttrParams): boolean {
+    return hpCrossedBelow(pokemon, damage, this.hpRatio);
+  }
+
+  /** Feasibility that stays in the class: a switch must be possible against every opponent. */
+  public residual({ pokemon }: PostDamageAbAttrParams): boolean {
+    for (const opponent of pokemon.getOpponents()) {
+      if (!this.helper.getSwitchOutCondition(pokemon, opponent)) {
+        return false;
       }
-      return true;
     }
-
-    return false;
+    return true;
   }
 
   /**
