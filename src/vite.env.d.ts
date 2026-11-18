@@ -17,6 +17,8 @@ interface ImportMetaEnv {
   readonly VITE_DISCORD_CLIENT_ID?: string;
   readonly VITE_GOOGLE_CLIENT_ID?: string;
   readonly VITE_I18N_DEBUG?: "0" | "1";
+  // Ability decomposition harness: "1" lets setAbilityTraceSink install the applySingleAbAttrs trace hook outside tests.
+  readonly VITE_ER_ABILITY_TRACE?: "0" | "1";
   // LLM Director — read by `getDirectorRuntime()` at first access. Tests
   // mutate these to simulate missing/present configuration, so they are
   // intentionally not declared `readonly`.

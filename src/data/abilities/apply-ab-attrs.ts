@@ -1,4 +1,5 @@
 import type { Ability } from "#abilities/ability";
+import { abilityTraceSink } from "#abilities/ability-trace";
 import { globalScene } from "#app/global-scene";
 import { abilityStudioRuntimeComponentIsActive } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import {
@@ -127,8 +128,30 @@ function applySingleAbAttrs<T extends AbAttrString>(
     // the type of the argument expected by `attr.canApply()`. This is OK, because we know that
     // `attr` is an instance of the `attrType` class provided to the method, and typescript _will_ check
     // that the `params` object has the correct properties for that class at the callsites.
-    if ((condition && !condition(pokemon)) || !attr.canApply(params as any)) {
-      continue;
+    const trace = abilityTraceSink;
+    if (trace === null) {
+      if ((condition && !condition(pokemon)) || !attr.canApply(params as any)) {
+        continue;
+      }
+    } else {
+      // Trace hook (tests / VITE_ER_ABILITY_TRACE only): same evaluation order and short-circuiting as above.
+      const conditionResult = condition ? condition(pokemon) : null;
+      const canApplyResult = conditionResult === false ? null : attr.canApply(params as any);
+      if (conditionResult === false || !canApplyResult) {
+        trace.record({
+          ability: ability.id,
+          attrIndex: ability.attrs.indexOf(attr),
+          attrClass: attr.constructor.name,
+          dispatchKey: attrType,
+          passive,
+          passiveSlot: slot,
+          simulated,
+          condition: conditionResult,
+          canApply: canApplyResult,
+          applied: false,
+        });
+        continue;
+      }
     }
 
     let abShown = false;
@@ -149,6 +172,18 @@ function applySingleAbAttrs<T extends AbAttrString>(
 
     // The `as any` cast here uses the same reasoning as above.
     attr.apply(params as any);
+    trace?.record({
+      ability: ability.id,
+      attrIndex: ability.attrs.indexOf(attr),
+      attrClass: attr.constructor.name,
+      dispatchKey: attrType,
+      passive,
+      passiveSlot: slot,
+      simulated,
+      condition: condition ? true : null,
+      canApply: true,
+      applied: true,
+    });
     if (
       !simulated
       && recordErEndlessAvalancheTrigger(

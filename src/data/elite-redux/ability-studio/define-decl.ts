@@ -60,6 +60,12 @@ export interface DeclCondition {
   readonly ctx: ConditionContext;
   /** Library atom or group the original closure maps to, when it is one fixed atom; plain text note otherwise. */
   readonly lib?: string;
+  /**
+   * Property of a live instance that holds the ORIGINAL constructor closure for this slot (default
+   * "condition"). The L1 differential reads it to compare the closure with its library form. Not used
+   * for the `gate` slot, whose original is the class's own `gate` method.
+   */
+  readonly path?: string | undefined;
   /** Staff may remove this condition (monotonic rule: only conditions declared removable). */
   readonly removable: boolean;
   /** Staff may replace this condition with another IF tree. */
