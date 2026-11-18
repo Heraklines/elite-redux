@@ -301,6 +301,7 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
     const key = `once:${scope}:${String(p.key)}`;
     return frame => {
       if (frame.memoryPass === "eligibility") {
+        frame.unknownReads = (frame.unknownReads ?? 0) + 1;
         return true;
       }
       const memory = memoryOf(frame.holder);
@@ -319,6 +320,7 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
       const seen = (memory.get(key) as number | undefined) ?? 0;
       if (frame.memoryPass === "eligibility") {
         // Counts the occasions on which every other IF passed (the carrier only commits then).
+        frame.unknownReads = (frame.unknownReads ?? 0) + 1;
         deferMemoryWrite(frame, () => memory.set(key, seen + 1));
         return true;
       }
@@ -403,8 +405,14 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
   },
 
   // RNG: evaluated at its own position in the IF list, the only impure atom.
-  "rng.chance": p => frame =>
-    frame.simulated || Number(p.pct) >= 100 || frame.holder.randBattleSeedInt(100) < Number(p.pct),
+  "rng.chance": p => frame => {
+    if (frame.memoryPass === "eligibility") {
+      // Pass 1 never rolls: the roll happens once, in the decision pass, at its own position.
+      frame.unknownReads = (frame.unknownReads ?? 0) + 1;
+      return true;
+    }
+    return frame.simulated || Number(p.pct) >= 100 || frame.holder.randBattleSeedInt(100) < Number(p.pct);
+  },
 
   // Escape hatches
   "escape.engine-guard": p => {
@@ -438,7 +446,15 @@ export function compileConditionBlock(ref: BlockRef): Condition {
 export function compileCondition(node: ConditionNode): Condition {
   if (isGroupNot(node)) {
     const inner = compileCondition(node.not);
-    return frame => !inner(frame);
+    return frame => {
+      const before = frame.unknownReads ?? 0;
+      const result = inner(frame);
+      // Eligibility pass: an answer that came from an unknown atom (memory, chance) must not be negated.
+      if (frame.memoryPass === "eligibility" && (frame.unknownReads ?? 0) > before) {
+        return true;
+      }
+      return !result;
+    };
   }
   if (isGroupAll(node)) {
     const all = node.all.map(compileCondition);
@@ -446,7 +462,13 @@ export function compileCondition(node: ConditionNode): Condition {
   }
   if (isGroupAny(node)) {
     const any = node.any.map(compileCondition);
-    return frame => any.some(condition => condition(frame));
+    return frame =>
+      any.some(condition => {
+        const before = frame.unknownReads ?? 0;
+        const result = condition(frame);
+        // Eligibility pass: a branch that depends on an unknown atom might still be true.
+        return result || (frame.memoryPass === "eligibility" && (frame.unknownReads ?? 0) > before);
+      });
   }
   return compileConditionBlock(node);
 }

@@ -438,6 +438,107 @@ describe("compiled conditions (same engine predicates)", () => {
     });
   });
 
+  describe("chance and memory atoms inside the IF list (two-pass evaluation)", () => {
+    const ruleOf = (ifs: object[], chance = 100) =>
+      ({
+        key: "pass-test",
+        when: { block: "event.after-hit" },
+        if: ifs,
+        do: [{ block: "effect.stat-stage", params: { target: "holder", stat: "ATK", stages: 1 } }],
+        chance,
+      }) as never;
+    const canApply = (carrier: ReturnType<typeof compileCompositionRule>, holder: FakeMon): boolean =>
+      (carrier as unknown as { canApply: (p: object) => boolean }).canApply({
+        pokemon: holder,
+        opponent: mon(),
+        move: move(),
+        damage: 10,
+        hitResult: HitResult.EFFECTIVE,
+        simulated: false,
+      });
+
+    it("rng.chance in the IF list draws exactly once per canApply", () => {
+      const draw = vi.fn(() => 0);
+      const holder = mon({ hp: 40, randBattleSeedInt: draw });
+      const carrier = compileCompositionRule(ruleOf([{ block: "rng.chance", params: { pct: 30 } }]));
+      expect(canApply(carrier, holder)).toBe(true);
+      expect(draw).toHaveBeenCalledTimes(1);
+    });
+
+    it("rng.chance passes with probability p, not p squared", () => {
+      const holder = mon({ hp: 40, randBattleSeedInt: () => 25 });
+      const carrier = compileCompositionRule(ruleOf([{ block: "rng.chance", params: { pct: 30 } }]));
+      expect(canApply(carrier, holder)).toBe(true); // 25 < 30 on the single draw
+      holder.randBattleSeedInt = () => 30;
+      expect(canApply(carrier, holder)).toBe(false);
+    });
+
+    it("rng.chance in the IF list plus a rule chance draws once each, in order", () => {
+      const draw = vi.fn(() => 0);
+      const holder = mon({ hp: 40, randBattleSeedInt: draw });
+      const carrier = compileCompositionRule(ruleOf([{ block: "rng.chance", params: { pct: 30 } }], 50));
+      expect(canApply(carrier, holder)).toBe(true);
+      expect(draw).toHaveBeenCalledTimes(2);
+    });
+
+    it("a not-group around nth-use can fire", () => {
+      const carrier = compileCompositionRule(ruleOf([{ not: { block: "time.nth-use", params: { n: 2, key: "u" } } }]));
+      const holder = mon({ hp: 40 });
+      expect(canApply(carrier, holder)).toBe(true); // first occasion is not the 2nd
+      expect(canApply(carrier, holder)).toBe(false); // second occasion is the 2nd
+    });
+
+    it("a not-group around once-per answers by the real decision, not the eligibility placeholder", () => {
+      const carrier = compileCompositionRule(
+        ruleOf([{ not: { block: "time.once-per", params: { scope: "battle", key: "k" } } }]),
+      );
+      // On a fresh holder once-per would fire, so "not once-per" is correctly false (decision pass).
+      expect(canApply(carrier, mon({ hp: 40 }))).toBe(false);
+      // Once it was used (a plain once-per rule applied), "not once-per" is true.
+      const plain = compileCompositionRule(ruleOf([{ block: "time.once-per", params: { scope: "battle", key: "k" } }]));
+      const holder = mon({ hp: 40 });
+      const params = {
+        pokemon: holder,
+        opponent: mon(),
+        move: move(),
+        damage: 10,
+        hitResult: HitResult.EFFECTIVE,
+        simulated: false,
+      };
+      const p = plain as unknown as { canApply: (x: object) => boolean; apply: (x: object) => void };
+      expect(p.canApply(params)).toBe(true);
+      try {
+        p.apply(params);
+      } catch {
+        // The stat effect needs a real battle; the memory commit runs first.
+      }
+      expect(canApply(carrier, holder)).toBe(true);
+    });
+
+    it("a not-group around rng.chance does not roll in the eligibility pass", () => {
+      const draw = vi.fn(() => 99);
+      const holder = mon({ hp: 40, randBattleSeedInt: draw });
+      const carrier = compileCompositionRule(ruleOf([{ not: { block: "rng.chance", params: { pct: 30 } } }]));
+      expect(canApply(carrier, holder)).toBe(true); // roll 99 fails the chance, so not(...) holds
+      expect(draw).toHaveBeenCalledTimes(1);
+    });
+
+    it("an any-group with a memory atom stays eligible, and its real answer decides", () => {
+      const carrier = compileCompositionRule(
+        ruleOf([
+          {
+            any: [
+              { block: "time.nth-use", params: { n: 2, key: "u" } },
+              { block: "hp.at-most", params: { who: "holder", pct: 50, rounding: "exact" } },
+            ],
+          },
+        ]),
+      );
+      expect(canApply(carrier, mon({ hp: 40 }))).toBe(true); // hp branch
+      expect(canApply(carrier, mon({ hp: 100 }))).toBe(false); // nth is 1st use, hp fails
+    });
+  });
+
   it("refuses unknown ids and the hand-added escape hatch in plain language", () => {
     expect(() => compileConditionBlock({ block: "hp.nope" })).toThrow(/there is no condition called/);
     expect(() => compileConditionBlock({ block: "escape.legacy-closure" })).toThrow(/cannot be built from settings/);

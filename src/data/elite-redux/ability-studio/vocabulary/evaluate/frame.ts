@@ -52,6 +52,8 @@ export interface Frame {
    * nth-use counts the occasion if every other IF passed) then "decision" (memory atoms read only).
    */
   memoryPass?: "eligibility" | "decision" | undefined;
+  /** Eligibility pass only: how many atoms answered "unknown" (memory atoms, chance); not/any read it. */
+  unknownReads?: number | undefined;
 }
 
 /** A compiled IF: built once, then called with a frame. Never interpreted per call. */
