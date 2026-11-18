@@ -15,6 +15,9 @@ const codexEffort = process.env.CODEX_EFFORT || "high";
 const nimModel = process.env.NVIDIA_NIM_MODEL || "moonshotai/kimi-k3";
 const nimFallbackModel = process.env.NVIDIA_NIM_FALLBACK_MODEL || "deepseek-ai/deepseek-v4-flash-0731";
 const nimKey = process.env.NVIDIA_NIM_API_KEY || "";
+const openaiKey = process.env.OPENAI_API_KEY || "";
+const openaiModel = process.env.OPENAI_MODEL || "gpt-6.1-terra";
+const openaiEffort = process.env.OPENAI_REASONING_EFFORT || "medium";
 const maxGenerateBodyBytes = 8_388_608;
 let activeTurn = null;
 let generationBusy = false;
@@ -1953,7 +1956,66 @@ async function _runCodex(payload, emit) {
   }
 }
 
+async function requestOpenAiJson(body, schema, source, timeoutMs) {
+  let response;
+  try {
+    response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${openaiKey}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        model: openaiModel,
+        input: body.messages,
+        max_output_tokens: 16_000,
+        reasoning: { effort: openaiEffort },
+        store: false,
+        text: { format: { type: "json_schema", name: "ability_assembly_plan", strict: false, schema } },
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (error) {
+    if (error.name === "TimeoutError" || error.name === "AbortError") {
+      throw new Error(`The ${source} timed out`, { cause: error });
+    }
+    throw new Error(`Could not connect to the ${source}. Please retry.`, { cause: error });
+  }
+  if (!response.ok) {
+    // Provider error bodies stay in the server log; the browser only sees the status.
+    const providerError = (await response.text().catch(() => "")).replace(/\s+/g, " ").trim().slice(0, 1000);
+    console.error(JSON.stringify({ event: "ability-model-http-error", status: response.status, providerError }));
+    throw new Error(`The ability builder could not complete the request (${response.status}). Please retry.`);
+  }
+  const resultBody = await response.json();
+  const content = (resultBody?.output ?? [])
+    .filter(item => item?.type === "message")
+    .flatMap(item => item.content ?? [])
+    .filter(part => part?.type === "output_text")
+    .map(part => part.text)
+    .join("");
+  console.log(JSON.stringify({ event: "ability-model-usage", model: openaiModel, usage: resultBody?.usage }));
+  try {
+    return stripNulls(extractJson(content, source, false));
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "ability-model-invalid-output",
+        model: openaiModel,
+        status: resultBody?.status,
+        contentLength: content.length,
+        preview: content.slice(0, 400),
+      }),
+    );
+    throw error;
+  }
+}
+
 async function requestNimJson(model, body, schema, source, timeoutMs, forceGuidedJson = false) {
+  if (openaiKey && model === openaiModel) {
+    return await requestOpenAiJson(body, schema, source, Math.max(timeoutMs, 150_000));
+  }
   let response;
   try {
     response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
@@ -2063,10 +2125,10 @@ async function runNimModel(model, body, payload, searchContext, planSchema, emit
 }
 
 async function runNim(payload, emit) {
-  if (!nimKey) {
+  if (!openaiKey && !nimKey) {
     throw new Error("The ability builder is temporarily unavailable");
   }
-  const models = [...new Set([nimModel, nimFallbackModel].filter(Boolean))];
+  const models = openaiKey ? [openaiModel] : [...new Set([nimModel, nimFallbackModel].filter(Boolean))];
   emit({ type: "status", message: "Searching the complete ability catalog" });
   const searchContext = executeCatalogSearch(payload, null);
   emit({

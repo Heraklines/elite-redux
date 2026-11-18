@@ -9,7 +9,10 @@
     "CODEX_MODEL": "gpt-5.6-luna",
     "CODEX_EFFORT": "medium",
     "CODEX_AUTH_BOOTSTRAP_VERSION": "2026-08-26-1",
-    "ABILITY_AI_RUNTIME_VERSION": "2026-09-02-2",
+    "ABILITY_AI_RUNTIME_VERSION": "2026-11-18-1",
+    "OPENAI_MODEL": "gpt-6.1-terra",
+    "OPENAI_REASONING_EFFORT": "medium",
+    "DAILY_GENERATION_LIMIT": "300",
     "NVIDIA_NIM_MODEL": "moonshotai/kimi-k3",
     "NVIDIA_NIM_FALLBACK_MODEL": "deepseek-ai/deepseek-v4-flash-0731"
   },

@@ -7,6 +7,10 @@ interface Env {
   CODEX_AUTH_BOOTSTRAP_VERSION: string;
   ABILITY_AI_RUNTIME_VERSION: string;
   NVIDIA_NIM_API_KEY?: string;
+  OPENAI_API_KEY?: string;
+  OPENAI_MODEL: string;
+  OPENAI_REASONING_EFFORT: string;
+  DAILY_GENERATION_LIMIT: string;
   ALLOWED_ORIGINS: string;
   CODEX_MODEL: string;
   CODEX_EFFORT: string;
@@ -92,6 +96,9 @@ export class AbilityAiContainer extends Container<Env> {
       CODEX_MODEL: runtimeEnv.CODEX_MODEL,
       CODEX_EFFORT: runtimeEnv.CODEX_EFFORT,
       NVIDIA_NIM_API_KEY: runtimeEnv.NVIDIA_NIM_API_KEY ?? "",
+      OPENAI_API_KEY: runtimeEnv.OPENAI_API_KEY ?? "",
+      OPENAI_MODEL: runtimeEnv.OPENAI_MODEL,
+      OPENAI_REASONING_EFFORT: runtimeEnv.OPENAI_REASONING_EFFORT,
       NVIDIA_NIM_MODEL: runtimeEnv.NVIDIA_NIM_MODEL,
       NVIDIA_NIM_FALLBACK_MODEL: runtimeEnv.NVIDIA_NIM_FALLBACK_MODEL,
     };
@@ -161,8 +168,17 @@ export class AbilityAiContainer extends Container<Env> {
     if (window.count >= 12) {
       return false;
     }
+    // Daily ceiling so a public editor cannot run up the OpenAI bill.
+    const day = new Date(now).toISOString().slice(0, 10);
+    const daily = (await this.ctx.storage.get<{ day: string; count: number }>("daily-window")) ?? { day, count: 0 };
+    const today = daily.day === day ? daily : { day, count: 0 };
+    if (today.count >= (Number(this.runtimeEnv.DAILY_GENERATION_LIMIT) || 300)) {
+      return false;
+    }
+    today.count++;
     window.count++;
     await this.ctx.storage.put("rate-window", window);
+    await this.ctx.storage.put("daily-window", today);
     return true;
   }
 
@@ -172,13 +188,23 @@ export class AbilityAiContainer extends Container<Env> {
       return json({ error: "Not found" }, 404);
     }
     if (path === "/generate" && !(await this.takeRateSlot())) {
-      return json({ error: "The ability builder is limited to 12 requests per minute" }, 429);
+      return json(
+        {
+          error: "The ability builder is busy (limit: 12 requests per minute and a daily cap). Please try again later.",
+        },
+        429,
+      );
     }
-    const restoreError = await this.restoreAuth();
+    // The OpenAI path needs no Codex login; only restore it for the legacy Codex path.
+    const usesOpenAi = Boolean(this.runtimeEnv.OPENAI_API_KEY);
+    const restoreError = usesOpenAi ? undefined : await this.restoreAuth();
     if (restoreError) {
       return restoreError;
     }
     const response = await this.containerFetch(request);
+    if (usesOpenAi) {
+      return response;
+    }
     if (!response.body) {
       this.ctx.waitUntil(this.persistAuth());
       return response;
@@ -189,7 +215,9 @@ export class AbilityAiContainer extends Container<Env> {
   }
 
   override async onActivityExpired(): Promise<void> {
-    await this.persistAuth();
+    if (!this.runtimeEnv.OPENAI_API_KEY) {
+      await this.persistAuth();
+    }
     await this.stop();
   }
 }
@@ -231,7 +259,7 @@ export default {
     if (request.method !== "POST" || !publicPaths.has(path)) {
       return withCors(json({ error: "Not found" }, 404), origin, env);
     }
-    if (!env.AUTH_ENCRYPTION_KEY) {
+    if (!env.OPENAI_API_KEY && !env.AUTH_ENCRYPTION_KEY) {
       return withCors(json({ error: "Ability builder secrets are not configured" }, 503), origin, env);
     }
     const contentLength = Number(request.headers.get("Content-Length") ?? 0);
