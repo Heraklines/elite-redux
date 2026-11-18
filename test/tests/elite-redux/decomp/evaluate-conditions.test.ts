@@ -525,7 +525,7 @@ describe("compiled conditions (same engine predicates)", () => {
 
     it("chance first, then a failing IF: one draw, like sequential evaluation", () => {
       const draw = vi.fn(() => 0);
-      const holder = mon({ hp: 50, maxHp: 100, randBattleSeedInt: draw });
+      const holder = mon({ hp: 50, randBattleSeedInt: draw });
       const carrier = compileCompositionRule(
         ruleOf([
           { block: "rng.chance", params: { pct: 30 } },
@@ -538,7 +538,7 @@ describe("compiled conditions (same engine predicates)", () => {
 
     it("a failing IF before the chance: no draw", () => {
       const draw = vi.fn(() => 0);
-      const holder = mon({ hp: 50, maxHp: 100, randBattleSeedInt: draw });
+      const holder = mon({ hp: 50, randBattleSeedInt: draw });
       const carrier = compileCompositionRule(
         ruleOf([
           { block: "hp.full", params: { who: "holder" } },
