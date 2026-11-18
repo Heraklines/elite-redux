@@ -1,0 +1,2357 @@
+{
+  "new-ability": {
+    "id": 20000,
+    "name": "Psychic Supremacy",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": false,
+      "swappable": false
+    },
+    "attrs": [
+      {
+        "type": "StabAddAbAttr",
+        "hook": "PreAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "multiplier": 1.5,
+          "powerMultiplier": 1.5,
+          "showAbility": false,
+          "skipDuringMovesetGen": false,
+          "targetType": null
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "MovePowerBoostAbAttr",
+          "canApply": "MovePowerBoostAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "SuperEffectiveMultiplierBoostAbAttr",
+        "hook": "PreAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "powerMultiplier": 1.1,
+          "showAbility": false,
+          "skipDuringMovesetGen": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "MovePowerBoostAbAttr",
+          "canApply": "MovePowerBoostAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "ErTerrainSummonAbAttr",
+        "hook": "PostSummonAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "activateOnGain": true,
+          "erTurns": 8,
+          "extraCondition": null,
+          "showAbility": true,
+          "terrainType": 4
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "ErTerrainSummonAbAttr",
+          "canApply": "PostSummonTerrainChangeAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "PostBiomeChangeTerrainChangeAbAttr",
+        "hook": "PostBiomeChangeAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": true,
+          "terrainType": 4
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "PostBiomeChangeTerrainChangeAbAttr",
+          "canApply": "PostBiomeChangeTerrainChangeAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "SummonTerrainAiMovegenMoveStatsAbAttr",
+        "hook": "SummonTerrainAiMovegenMoveStatsAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "AiMovegenMoveStatsAbAttr",
+          "canApply": "AiMovegenMoveStatsAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-10": {
+    "id": 20009,
+    "name": "Old Ocean Relic",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "BlockNonDirectDamageAbAttr",
+        "hook": "CancelInteractionAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "CancelInteractionAbAttr",
+          "canApply": "CancelInteractionAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "TypeImmunityHealAbAttr",
+        "hook": "PreDefendAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "condition": null,
+          "extraCondition": null,
+          "immuneType": 10,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "TypeImmunityHealAbAttr",
+          "canApply": "TypeImmunityAbAttr",
+          "getCondition": "TypeImmunityAbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "BlockRedirectAbAttr",
+        "hook": "BlockRedirectAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "AbAttr",
+          "canApply": "AbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "BlockCritAbAttr",
+        "hook": "BlockCritAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "BlockCritAbAttr",
+          "canApply": "AbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-11": {
+    "id": 20010,
+    "name": "Duplicity",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "ReflectStatusMoveAbAttr",
+        "hook": "PreDefendAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "ReflectStatusMoveAbAttr",
+          "canApply": "AbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "FieldPriorityMoveImmunityAbAttr",
+        "hook": "PreDefendAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "FieldPriorityMoveImmunityAbAttr",
+          "canApply": "FieldPriorityMoveImmunityAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-12": {
+    "id": 20011,
+    "name": "Celestial Bow",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "EntryEffectAbAttr",
+        "hook": "PostSummonAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "activateOnGain": true,
+          "effect": {
+            "[class]": "Object",
+            "kind": "add-self-type",
+            "type": 13
+          },
+          "extraCondition": null,
+          "once": false,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "EntryEffectAbAttr",
+          "canApply": "EntryEffectAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "AttackTypeImmunityAbAttr",
+        "hook": "PreDefendAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "condition": null,
+          "extraCondition": null,
+          "immuneType": 4,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "TypeImmunityAbAttr",
+          "canApply": "AttackTypeImmunityAbAttr",
+          "getCondition": "TypeImmunityAbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "FloatAbAttr",
+        "hook": "FloatAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "FloatAbAttr",
+          "canApply": "AbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "FlagDamageBoostAbAttr",
+        "hook": "PreAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "flag": 2097152,
+          "highHpMultiplier": 1.3,
+          "lowHpMultiplier": null,
+          "lowHpThreshold": 0.3333333333333333,
+          "powerMultiplier": 1.3,
+          "showAbility": false,
+          "skipDuringMovesetGen": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "FlagDamageBoostAbAttr",
+          "canApply": "MovePowerBoostAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "ConditionalAlwaysHitAbAttr",
+        "hook": "ConditionalAlwaysHitAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "opts": {
+            "[class]": "Object",
+            "flag": 2097152
+          },
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "ConditionalAlwaysHitAbAttr",
+          "canApply": "ConditionalAlwaysHitAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "ConditionalAlwaysHitAbAttr",
+        "hook": "ConditionalAlwaysHitAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "opts": {
+            "[class]": "Object",
+            "flag": 1024
+          },
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "ConditionalAlwaysHitAbAttr",
+          "canApply": "ConditionalAlwaysHitAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "CritUseLowerDefensiveStatAbAttr",
+        "hook": "CritUseLowerDefensiveStatAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "CritUseLowerDefensiveStatAbAttr",
+          "canApply": "AbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-13": {
+    "id": 20012,
+    "name": "Blasé Powder",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "IgnoreOpponentStatStagesAbAttr",
+        "hook": "IgnoreOpponentStatStagesAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "opponentCondition": null,
+          "showAbility": false,
+          "stats": [1, 2, 3, 4, 6, 7]
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "IgnoreOpponentStatStagesAbAttr",
+          "canApply": "IgnoreOpponentStatStagesAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "OmniformAbAttr",
+        "hook": "PostSummonAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "activateOnGain": true,
+          "extraCondition": null,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "OmniformAbAttr",
+          "canApply": "PostSummonAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-14": {
+    "id": 20013,
+    "name": "Fairy Wings",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "PostSummonMessageAbAttr",
+        "hook": "PostSummonAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "activateOnGain": true,
+          "extraCondition": null,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "PostSummonMessageAbAttr",
+          "canApply": "PostSummonAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "FieldMoveTypePowerBoostAbAttr",
+        "hook": "FieldMoveTypePowerBoostAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "powerMultiplier": 1.3333333333333333,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "FieldMovePowerBoostAbAttr",
+          "canApply": "FieldMovePowerBoostAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "AbilityStudioSourceAbilityAbAttr",
+        "hook": "source-ability-runtime-check",
+        "configuration": {
+          "[class]": "Object",
+          "abilityStudioSourceAbilityId": 187,
+          "activeBattleData": null,
+          "componentHookId": "source-ability-runtime-check",
+          "componentHookLabel": "Whenever a game system checks for Fairy Aura",
+          "componentLabel": "Fairy Aura linked runtime behavior",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "AbAttr",
+          "canApply": "AbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "FlagDamageBoostAbAttr",
+        "hook": "PreAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "flag": 1048576,
+          "highHpMultiplier": 1.3,
+          "lowHpMultiplier": null,
+          "lowHpThreshold": 0.3333333333333333,
+          "powerMultiplier": 1.3,
+          "showAbility": false,
+          "skipDuringMovesetGen": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "FlagDamageBoostAbAttr",
+          "canApply": "MovePowerBoostAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-15": {
+    "id": 20014,
+    "name": "Mystic Fortification",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "BlockNonDirectDamageAbAttr",
+        "hook": "CancelInteractionAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "CancelInteractionAbAttr",
+          "canApply": "CancelInteractionAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "PostDefendSuppressOpponentDamageBoostAbAttr",
+        "hook": "PostDefendSuppressOpponentDamageBoostAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "AbAttr",
+          "canApply": "AbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-16": {
+    "id": 20015,
+    "name": "Siren's Song",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "PriorityModifierAbAttr",
+        "hook": "PriorityModifierAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "changeAmount": 1,
+          "condition": {
+            "[class]": "Object",
+            "kind": "full-hp"
+          },
+          "extraCondition": null,
+          "filter": {
+            "[class]": "Object",
+            "flag": 4
+          },
+          "priorityDelta": 1,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "ChangeMovePriorityAbAttr",
+          "canApply": "ChangeMovePriorityAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "MoveTypeChangeAbAttr",
+        "hook": "PreAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "newType": 10,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "MoveTypeChangeAbAttr",
+          "canApply": "MoveTypeChangeAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "MovePowerBoostAbAttr",
+        "hook": "PreAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "powerMultiplier": 1.2,
+          "showAbility": false,
+          "skipDuringMovesetGen": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "MovePowerBoostAbAttr",
+          "canApply": "MovePowerBoostAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "FlagDamageBoostAbAttr",
+        "hook": "PreAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "flag": 4,
+          "highHpMultiplier": 1.3,
+          "lowHpMultiplier": null,
+          "lowHpThreshold": 0.3333333333333333,
+          "powerMultiplier": 1.3,
+          "showAbility": false,
+          "skipDuringMovesetGen": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "FlagDamageBoostAbAttr",
+          "canApply": "MovePowerBoostAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "SpreadTargetByFlagAbAttr",
+        "hook": "SpreadTargetByFlagAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "flag": 4,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "SpreadTargetByFlagAbAttr",
+          "canApply": "AbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-17": {
+    "id": 20016,
+    "name": "Samehada",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": true,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "PostDefendContactDamageAbAttr",
+        "hook": "PostDefendAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "damageRatio": 8,
+          "extraCondition": null,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "PostDefendContactDamageAbAttr",
+          "canApply": "PostDefendContactDamageAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "ReceivedMoveDamageMultiplierAbAttr",
+        "hook": "PreDefendAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "affectsFixedDamage": false,
+          "damageMultiplier": 0.5,
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "ReceivedMoveDamageMultiplierAbAttr",
+          "canApply": "ReceivedMoveDamageMultiplierAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-18": {
+    "id": 20017,
+    "name": "Reaper's Scythe",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "FlagDamageBoostAbAttr",
+        "hook": "PreAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "flag": 256,
+          "highHpMultiplier": 1.3,
+          "lowHpMultiplier": null,
+          "lowHpThreshold": 0.3333333333333333,
+          "powerMultiplier": 1.3,
+          "showAbility": false,
+          "skipDuringMovesetGen": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "FlagDamageBoostAbAttr",
+          "canApply": "MovePowerBoostAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "LifestealOnKoAbAttr",
+        "hook": "PostKnockOutAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "flagBonus": null,
+          "koHealFraction": 0.25,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "LifestealOnKoAbAttr",
+          "canApply": "LifestealOnKoAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-19": {
+    "id": 20018,
+    "name": "External Combustion",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "AbsorbantAbAttr",
+        "hook": "PostAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "AbsorbantAbAttr",
+          "canApply": "AbsorbantAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-2": {
+    "id": 20001,
+    "name": "Dreadful Winds",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "PostSummonMessageAbAttr",
+        "hook": "PostSummonAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "activateOnGain": true,
+          "extraCondition": null,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "PostSummonMessageAbAttr",
+          "canApply": "PostSummonAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "FieldMoveTypePowerBoostAbAttr",
+        "hook": "FieldMoveTypePowerBoostAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "powerMultiplier": 1.3333333333333333,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "FieldMovePowerBoostAbAttr",
+          "canApply": "FieldMovePowerBoostAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "AbilityStudioSourceAbilityAbAttr",
+        "hook": "source-ability-runtime-check",
+        "configuration": {
+          "[class]": "Object",
+          "abilityStudioSourceAbilityId": 186,
+          "activeBattleData": null,
+          "componentHookId": "source-ability-runtime-check",
+          "componentHookLabel": "Whenever a game system checks for Dark Aura",
+          "componentLabel": "Dark Aura linked runtime behavior",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "AbAttr",
+          "canApply": "AbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "EntryEffectAbAttr",
+        "hook": "PostSummonAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "activateOnGain": true,
+          "effect": {
+            "[class]": "Object",
+            "kind": "set-screen-or-room",
+            "tag": "TAILWIND",
+            "turns": 3
+          },
+          "extraCondition": null,
+          "once": false,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "EntryEffectAbAttr",
+          "canApply": "EntryEffectAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-20": {
+    "id": 20019,
+    "name": "Radiant Jewel",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "StatMultiplierAbAttr",
+        "hook": "StatMultiplierAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "condition": null,
+          "extraCondition": null,
+          "multiplier": 1.2,
+          "showAbility": false,
+          "stat": 6
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "StatMultiplierAbAttr",
+          "canApply": "StatMultiplierAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "AttackTypeImmunityAbAttr",
+        "hook": "PreDefendAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "condition": null,
+          "extraCondition": null,
+          "immuneType": 16,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "TypeImmunityAbAttr",
+          "canApply": "AttackTypeImmunityAbAttr",
+          "getCondition": "TypeImmunityAbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "FieldPriorityMoveImmunityAbAttr",
+        "hook": "PreDefendAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "FieldPriorityMoveImmunityAbAttr",
+          "canApply": "FieldPriorityMoveImmunityAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "StatMultiplierAbAttr",
+        "hook": "StatMultiplierAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "condition": null,
+          "extraCondition": null,
+          "multiplier": 1.2,
+          "showAbility": false,
+          "stat": 6
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "StatMultiplierAbAttr",
+          "canApply": "StatMultiplierAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "AiMovegenMoveStatsAbAttr",
+        "hook": "AiMovegenMoveStatsAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "AiMovegenMoveStatsAbAttr",
+          "canApply": "AiMovegenMoveStatsAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-21": {
+    "id": 20020,
+    "name": "Unintentional Genius",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "EntryEffectAbAttr",
+        "hook": "PostSummonAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "activateOnGain": true,
+          "effect": {
+            "[class]": "Object",
+            "kind": "set-screen-or-room",
+            "tag": "TRICK_ROOM",
+            "turns": 3
+          },
+          "extraCondition": null,
+          "once": false,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "EntryEffectAbAttr",
+          "canApply": "EntryEffectAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "IgnoreOpponentStatStagesAbAttr",
+        "hook": "IgnoreOpponentStatStagesAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "opponentCondition": null,
+          "showAbility": false,
+          "stats": [1, 2, 3, 4, 6, 7]
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "IgnoreOpponentStatStagesAbAttr",
+          "canApply": "IgnoreOpponentStatStagesAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "AttackTypeImmunityAbAttr",
+        "hook": "PreDefendAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "condition": null,
+          "extraCondition": null,
+          "immuneType": 16,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "TypeImmunityAbAttr",
+          "canApply": "AttackTypeImmunityAbAttr",
+          "getCondition": "TypeImmunityAbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "AttackTypeImmunityAbAttr",
+        "hook": "PreDefendAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "condition": null,
+          "extraCondition": null,
+          "immuneType": 7,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "TypeImmunityAbAttr",
+          "canApply": "AttackTypeImmunityAbAttr",
+          "getCondition": "TypeImmunityAbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "AttackTypeImmunityAbAttr",
+        "hook": "PreDefendAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "condition": null,
+          "extraCondition": null,
+          "immuneType": 6,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "TypeImmunityAbAttr",
+          "canApply": "AttackTypeImmunityAbAttr",
+          "getCondition": "TypeImmunityAbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "ConditionalAlwaysHitAbAttr",
+        "hook": "ConditionalAlwaysHitAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "opts": {
+            "[class]": "Object",
+            "categories": [2]
+          },
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "ConditionalAlwaysHitAbAttr",
+          "canApply": "ConditionalAlwaysHitAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-22": {
+    "id": 20021,
+    "name": "Spin To Win",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "TypeGatedStatTriggerOnAttackAbAttr",
+        "hook": "PostAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "opts": {
+            "[class]": "Object",
+            "clearHazards": true,
+            "stats": [
+              {
+                "[class]": "Object",
+                "stages": 1,
+                "stat": 5
+              }
+            ],
+            "type": 1
+          },
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "TypeGatedStatTriggerOnAttackAbAttr",
+          "canApply": "TypeGatedStatTriggerOnAttackAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "BlockCritAbAttr",
+        "hook": "BlockCritAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "BlockCritAbAttr",
+          "canApply": "AbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "ReceivedMoveDamageMultiplierAbAttr",
+        "hook": "PreDefendAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "affectsFixedDamage": false,
+          "damageMultiplier": 0.8,
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "ReceivedMoveDamageMultiplierAbAttr",
+          "canApply": "ReceivedMoveDamageMultiplierAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "PostSummonStatStageChangeAbAttr",
+        "hook": "PostSummonAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "activateOnGain": true,
+          "extraCondition": null,
+          "intimidate": true,
+          "selfTarget": false,
+          "showAbility": true,
+          "stages": -1,
+          "stats": [1]
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "PostSummonStatStageChangeAbAttr",
+          "canApply": "PostSummonAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-23": {
+    "id": 20022,
+    "name": "As One",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "StatTriggerOnKoAbAttr",
+        "hook": "PostKnockOutAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "event": "on-ko",
+          "extraCondition": null,
+          "showAbility": true,
+          "stats": [
+            {
+              "[class]": "Object",
+              "stages": 1,
+              "stat": 5
+            }
+          ],
+          "triggerOnAnyFaint": false
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "StatTriggerOnKoAbAttr",
+          "canApply": "StatTriggerOnKoAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "PreventBerryUseAbAttr",
+        "hook": "CancelInteractionAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "CancelInteractionAbAttr",
+          "canApply": "CancelInteractionAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "PreventItemUseAbAttr",
+        "hook": "CancelInteractionAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "CancelInteractionAbAttr",
+          "canApply": "CancelInteractionAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-24": {
+    "id": 20023,
+    "name": "Sky Sovereign ",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "PriorityModifierAbAttr",
+        "hook": "PriorityModifierAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "changeAmount": 1,
+          "condition": {
+            "[class]": "Object",
+            "kind": "always"
+          },
+          "extraCondition": null,
+          "filter": {
+            "[class]": "Object",
+            "type": 2
+          },
+          "priorityDelta": 1,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "ChangeMovePriorityAbAttr",
+          "canApply": "ChangeMovePriorityAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "SpeedBonusToStatAbAttr",
+        "hook": "SpeedBonusToStatAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "bonusFilter": {
+            "[class]": "Object"
+          },
+          "bonusStat": 1,
+          "condition": null,
+          "extraCondition": null,
+          "multiplier": 1,
+          "replace": false,
+          "showAbility": false,
+          "sourceStat": 5,
+          "speedFraction": 0.2,
+          "stat": 1
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "SpeedBonusToStatAbAttr",
+          "canApply": "SpeedBonusToStatAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "SpeedBonusToStatAbAttr",
+        "hook": "SpeedBonusToStatAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "bonusFilter": {
+            "[class]": "Object"
+          },
+          "bonusStat": 3,
+          "condition": null,
+          "extraCondition": null,
+          "multiplier": 1,
+          "replace": false,
+          "showAbility": false,
+          "sourceStat": 5,
+          "speedFraction": 0.2,
+          "stat": 3
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "SpeedBonusToStatAbAttr",
+          "canApply": "SpeedBonusToStatAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-3": {
+    "id": 20002,
+    "name": "Ultra Recon Hunter",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "ConditionalCritAbAttr",
+        "hook": "ConditionalCritAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "ConditionalCritAbAttr",
+          "canApply": "ConditionalCritAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "PriorityModifierAbAttr",
+        "hook": "PriorityModifierAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "changeAmount": 1,
+          "condition": {
+            "[class]": "Object",
+            "kind": "full-hp"
+          },
+          "extraCondition": null,
+          "filter": {
+            "[class]": "Object",
+            "type": 12
+          },
+          "priorityDelta": 1,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "ChangeMovePriorityAbAttr",
+          "canApply": "ChangeMovePriorityAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-4": {
+    "id": 20003,
+    "name": "Extermination Vector",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "IgnoreTypeImmunityAbAttr",
+        "hook": "IgnoreTypeImmunityAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "allowedMoveTypes": [7],
+          "defenderType": 0,
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "IgnoreTypeImmunityAbAttr",
+          "canApply": "IgnoreTypeImmunityAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "OffensiveTypeChartOverrideAbAttr",
+        "hook": "OffensiveTypeChartOverrideAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "rules": [
+            {
+              "[class]": "Object",
+              "attackType": 12,
+              "defenderType": 4,
+              "newMultiplier": 0.5
+            }
+          ],
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "AbAttr",
+          "canApply": "AbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "OffensiveTypeChartOverrideAbAttr",
+        "hook": "OffensiveTypeChartOverrideAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "rules": [
+            {
+              "[class]": "Object",
+              "attackType": 12,
+              "defenderType": 12,
+              "newMultiplier": 2
+            }
+          ],
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "AbAttr",
+          "canApply": "AbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "IgnoreTypeStatusEffectImmunityAbAttr",
+        "hook": "IgnoreTypeStatusEffectImmunityAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "defenderType": [12],
+          "extraCondition": null,
+          "showAbility": false,
+          "statusEffect": [3],
+          "statusMoveOnly": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "IgnoreTypeStatusEffectImmunityAbAttr",
+          "canApply": "IgnoreTypeStatusEffectImmunityAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "AbsorbantAbAttr",
+        "hook": "PostAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "AbsorbantAbAttr",
+          "canApply": "AbsorbantAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-5": {
+    "id": 20004,
+    "name": "Exo Armor",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "TypeImmunityHealAbAttr",
+        "hook": "PreDefendAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "condition": null,
+          "extraCondition": null,
+          "immuneType": 12,
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "TypeImmunityHealAbAttr",
+          "canApply": "TypeImmunityAbAttr",
+          "getCondition": "TypeImmunityAbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "BlockCritAbAttr",
+        "hook": "BlockCritAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "BlockCritAbAttr",
+          "canApply": "AbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "ReceivedMoveDamageMultiplierAbAttr",
+        "hook": "PreDefendAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "affectsFixedDamage": false,
+          "damageMultiplier": 0.8,
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "ReceivedMoveDamageMultiplierAbAttr",
+          "canApply": "ReceivedMoveDamageMultiplierAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-6": {
+    "id": 20005,
+    "name": "Thunder Gods Vessel",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "BlockCritAbAttr",
+        "hook": "BlockCritAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "BlockCritAbAttr",
+          "canApply": "AbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "ReceivedMoveDamageMultiplierAbAttr",
+        "hook": "PreDefendAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "affectsFixedDamage": false,
+          "damageMultiplier": 0.8,
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "ReceivedMoveDamageMultiplierAbAttr",
+          "canApply": "ReceivedMoveDamageMultiplierAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "MoveTypeChangeAbAttr",
+        "hook": "PreAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "newType": 12,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "MoveTypeChangeAbAttr",
+          "canApply": "MoveTypeChangeAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "MovePowerBoostAbAttr",
+        "hook": "PreAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "powerMultiplier": 1.2,
+          "showAbility": false,
+          "skipDuringMovesetGen": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "MovePowerBoostAbAttr",
+          "canApply": "MovePowerBoostAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "TypeDamageBoostAbAttr",
+        "hook": "PreAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "highHpMultiplier": 1.2,
+          "lowHpMultiplier": null,
+          "lowHpThreshold": 0.3333333333333333,
+          "powerMultiplier": 1.2,
+          "showAbility": false,
+          "skipDuringMovesetGen": false,
+          "type": 12,
+          "weathers": null
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "TypeDamageBoostAbAttr",
+          "canApply": "MovePowerBoostAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": true
+      },
+      {
+        "type": "ChanceStatusOnAttackAbAttr",
+        "hook": "PostAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "chance": 10,
+          "contactExcluded": false,
+          "contactRequired": false,
+          "critRequired": false,
+          "effects": [3],
+          "filter": {
+            "[class]": "Object",
+            "type": 12
+          },
+          "firstTurnChance": null,
+          "outcomes": [
+            {
+              "[class]": "Object",
+              "kind": "status",
+              "value": 3
+            }
+          ],
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "ChanceStatusOnAttackAbAttr",
+          "canApply": "ChanceStatusOnAttackAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": true
+      },
+      {
+        "type": "MovePowerBoostAbAttr",
+        "hook": "PreAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "powerMultiplier": 1.5,
+          "showAbility": false,
+          "skipDuringMovesetGen": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "MovePowerBoostAbAttr",
+          "canApply": "MovePowerBoostAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "InfiltratorAbAttr",
+        "hook": "InfiltratorAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "InfiltratorAbAttr",
+          "canApply": "InfiltratorAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-7": {
+    "id": 20006,
+    "name": "Malicious Empathy",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": true,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "BlockCritAbAttr",
+        "hook": "BlockCritAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "BlockCritAbAttr",
+          "canApply": "AbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "ReceivedMoveDamageMultiplierAbAttr",
+        "hook": "PreDefendAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "affectsFixedDamage": false,
+          "damageMultiplier": 0.8,
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "ReceivedMoveDamageMultiplierAbAttr",
+          "canApply": "ReceivedMoveDamageMultiplierAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "MoveTypeChangeAbAttr",
+        "hook": "PreAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "newType": 12,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "MoveTypeChangeAbAttr",
+          "canApply": "MoveTypeChangeAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "MovePowerBoostAbAttr",
+        "hook": "PreAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "powerMultiplier": 1.2,
+          "showAbility": false,
+          "skipDuringMovesetGen": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "MovePowerBoostAbAttr",
+          "canApply": "MovePowerBoostAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "TypeDamageBoostAbAttr",
+        "hook": "PreAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "highHpMultiplier": 1.2,
+          "lowHpMultiplier": null,
+          "lowHpThreshold": 0.3333333333333333,
+          "powerMultiplier": 1.2,
+          "showAbility": false,
+          "skipDuringMovesetGen": false,
+          "type": 12,
+          "weathers": null
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "TypeDamageBoostAbAttr",
+          "canApply": "MovePowerBoostAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": true
+      },
+      {
+        "type": "ChanceStatusOnAttackAbAttr",
+        "hook": "PostAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "chance": 10,
+          "contactExcluded": false,
+          "contactRequired": false,
+          "critRequired": false,
+          "effects": [3],
+          "filter": {
+            "[class]": "Object",
+            "type": 12
+          },
+          "firstTurnChance": null,
+          "outcomes": [
+            {
+              "[class]": "Object",
+              "kind": "status",
+              "value": 3
+            }
+          ],
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "ChanceStatusOnAttackAbAttr",
+          "canApply": "ChanceStatusOnAttackAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": true
+      },
+      {
+        "type": "MovePowerBoostAbAttr",
+        "hook": "PreAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "powerMultiplier": 1.5,
+          "showAbility": false,
+          "skipDuringMovesetGen": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "MovePowerBoostAbAttr",
+          "canApply": "MovePowerBoostAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "InfiltratorAbAttr",
+        "hook": "InfiltratorAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "InfiltratorAbAttr",
+          "canApply": "InfiltratorAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "PostSummonUnnamedMessageAbAttr",
+        "hook": "PostSummonAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "activateOnGain": true,
+          "extraCondition": null,
+          "message": "The effects of the weather disappeared.",
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "PostSummonUnnamedMessageAbAttr",
+          "canApply": "PostSummonAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-8": {
+    "id": 20007,
+    "name": "Fae Heart",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "MoveTypeChangeAbAttr",
+        "hook": "PreAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "newType": 17,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "MoveTypeChangeAbAttr",
+          "canApply": "MoveTypeChangeAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "MovePowerBoostAbAttr",
+        "hook": "PreAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "powerMultiplier": 1.2,
+          "showAbility": false,
+          "skipDuringMovesetGen": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "MovePowerBoostAbAttr",
+          "canApply": "MovePowerBoostAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "TypeDamageBoostAbAttr",
+        "hook": "PreAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "highHpMultiplier": 1.2,
+          "lowHpMultiplier": null,
+          "lowHpThreshold": 0.3333333333333333,
+          "powerMultiplier": 1.2,
+          "showAbility": false,
+          "skipDuringMovesetGen": false,
+          "type": 17,
+          "weathers": null
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "TypeDamageBoostAbAttr",
+          "canApply": "MovePowerBoostAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": true
+      },
+      {
+        "type": "ChanceBattlerTagOnAttackAbAttr",
+        "hook": "PostAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "chance": 10,
+          "chanceResolver": null,
+          "contactExcluded": false,
+          "contactRequired": false,
+          "critRequired": false,
+          "damageDenominator": null,
+          "filter": {
+            "[class]": "Object",
+            "type": 17
+          },
+          "firstTurnChance": null,
+          "moveIds": null,
+          "showAbility": false,
+          "tags": ["INFATUATED"],
+          "targetHasStatus": null,
+          "targetHasTag": null,
+          "turnRange": null,
+          "turns": null
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "ChanceBattlerTagOnAttackAbAttr",
+          "canApply": "ChanceBattlerTagOnAttackAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": true
+      },
+      {
+        "type": "PostKnockOutStatStageChangeAbAttr",
+        "hook": "PostKnockOutAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": true,
+          "stages": 1,
+          "stat": 3
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "PostKnockOutStatStageChangeAbAttr",
+          "canApply": "PostKnockOutAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  },
+  "new-ability-9": {
+    "id": 20008,
+    "name": "Heartless Style",
+    "conditionCount": 0,
+    "flags": {
+      "bypassFaint": false,
+      "ignorable": false,
+      "suppressable": true,
+      "copiable": true,
+      "replaceable": true,
+      "swappable": true
+    },
+    "attrs": [
+      {
+        "type": "BattlerTagImmunityAbAttr",
+        "hook": "PreApplyBattlerTagAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "immuneTagTypes": ["FLINCHED", "ER_FEAR"],
+          "showAbility": true
+        },
+        "showAbility": true,
+        "owners": {
+          "apply": "BaseBattlerTagImmunityAbAttr",
+          "canApply": "BaseBattlerTagImmunityAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "IntimidateImmunityAbAttr",
+        "hook": "CancelInteractionAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "CancelInteractionAbAttr",
+          "canApply": "CancelInteractionAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "ConditionalAlwaysHitAbAttr",
+        "hook": "ConditionalAlwaysHitAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "opts": {
+            "[class]": "Object",
+            "moveIds": [411]
+          },
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "ConditionalAlwaysHitAbAttr",
+          "canApply": "ConditionalAlwaysHitAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "TypeConversionAbAttr",
+        "hook": "PreAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "configuredNewType": 1,
+          "extraCondition": null,
+          "newType": 1,
+          "showAbility": false,
+          "source": {
+            "[class]": "Object",
+            "kind": "type",
+            "type": 0
+          }
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "MoveTypeChangeAbAttr",
+          "canApply": "MoveTypeChangeAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "StabAddAbAttr",
+        "hook": "PreAttackAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "multiplier": 1.5,
+          "powerMultiplier": 1.5,
+          "showAbility": false,
+          "skipDuringMovesetGen": false,
+          "targetType": 1
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "MovePowerBoostAbAttr",
+          "canApply": "MovePowerBoostAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "IgnoreTypeImmunityAbAttr",
+        "hook": "IgnoreTypeImmunityAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "allowedMoveTypes": [0, 1],
+          "defenderType": 7,
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "IgnoreTypeImmunityAbAttr",
+          "canApply": "IgnoreTypeImmunityAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "IntimidateImmunityAbAttr",
+        "hook": "CancelInteractionAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "CancelInteractionAbAttr",
+          "canApply": "CancelInteractionAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "ConditionalAlwaysHitAbAttr",
+        "hook": "ConditionalAlwaysHitAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "opts": {
+            "[class]": "Object",
+            "superEffective": true
+          },
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "ConditionalAlwaysHitAbAttr",
+          "canApply": "ConditionalAlwaysHitAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "ConditionalCritAbAttr",
+        "hook": "ConditionalCritAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "ConditionalCritAbAttr",
+          "canApply": "ConditionalCritAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "ConditionalAlwaysHitAbAttr",
+        "hook": "ConditionalAlwaysHitAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "opts": {
+            "[class]": "Object",
+            "superEffective": true
+          },
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "ConditionalAlwaysHitAbAttr",
+          "canApply": "ConditionalAlwaysHitAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      },
+      {
+        "type": "ConditionalCritAbAttr",
+        "hook": "ConditionalCritAbAttr",
+        "configuration": {
+          "[class]": "Object",
+          "extraCondition": null,
+          "showAbility": false
+        },
+        "showAbility": false,
+        "owners": {
+          "apply": "ConditionalCritAbAttr",
+          "canApply": "ConditionalCritAbAttr",
+          "getCondition": "AbAttr"
+        },
+        "hasCondition": false
+      }
+    ]
+  }
+}
