@@ -99,23 +99,18 @@ export function compileCompositionRule(rule: CompositionRuleV2): AbAttr {
       return false;
     }
     const frame = frameOf(params);
-    // Pass 1: do the other IFs pass? Memory atoms say yes, and nth-use counts this occasion.
-    frame.memoryPass = "eligibility";
-    frame.unknownReads = 0;
-    frame.rolls = [];
-    frame.rollCursor = 0;
+    // One sequential pass: every atom answers its real value at its own position, so RNG draws and
+    // short-circuiting match compileConditionList. Memory writes wait for the outcome.
     frame.commits = [];
-    const eligible = conditions(frame);
-    const counts = frame.commits;
-    frame.memoryPass = "decision";
-    frame.commits = [];
-    if (eligible) {
-      for (const count of counts) {
-        count();
-      }
+    frame.counts = [];
+    const passed = conditions(frame);
+    const counts = frame.counts;
+    frame.counts = undefined;
+    // nth-use is "++counter === n" at its own position: it counts every occasion on which evaluation reached it.
+    for (const count of counts) {
+      count();
     }
-    // Pass 2: the real answer. once-per / nth-use only read; their marks wait for apply().
-    if (!eligible || !conditions(frame)) {
+    if (!passed) {
       frame.commits = undefined;
       return false;
     }

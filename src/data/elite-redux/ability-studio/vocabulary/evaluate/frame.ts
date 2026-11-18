@@ -48,15 +48,10 @@ export interface Frame {
    */
   commits?: (() => void)[] | undefined;
   /**
-   * Set by the carrier while it runs the IF list twice: "eligibility" (memory atoms answer true and
-   * nth-use counts the occasion if every other IF passed) then "decision" (memory atoms read only).
+   * nth-use count writes wait here until the IF list was evaluated; the carrier runs them then, pass or fail.
+   * Absent when a condition is evaluated on its own: the write then happens at once.
    */
-  memoryPass?: "eligibility" | "decision" | undefined;
-  /** Eligibility pass only: how many atoms answered "unknown" (memory atoms, chance); not/any read it. */
-  unknownReads?: number | undefined;
-  /** Carrier only: rng.chance results rolled in pass 1, replayed in the decision pass. */
-  rolls?: boolean[] | undefined;
-  rollCursor?: number | undefined;
+  counts?: (() => void)[] | undefined;
 }
 
 /** A compiled IF: built once, then called with a frame. Never interpreted per call. */

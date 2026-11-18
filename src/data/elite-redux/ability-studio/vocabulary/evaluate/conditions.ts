@@ -113,6 +113,18 @@ function deferMemoryWrite(frame: Frame, write: () => void): void {
   }
 }
 
+/** Like deferMemoryWrite, but the carrier runs it right after the IF list, whatever its outcome. */
+function deferCount(frame: Frame, write: () => void): void {
+  if (frame.simulated) {
+    return;
+  }
+  if (frame.counts === undefined) {
+    write();
+  } else {
+    frame.counts.push(write);
+  }
+}
+
 function scopeMarker(pokemon: Pokemon, scope: string): unknown {
   switch (scope) {
     case "battle":
@@ -300,10 +312,6 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
     const scope = String(p.scope);
     const key = `once:${scope}:${String(p.key)}`;
     return frame => {
-      if (frame.memoryPass === "eligibility") {
-        frame.unknownReads = (frame.unknownReads ?? 0) + 1;
-        return true;
-      }
       const memory = memoryOf(frame.holder);
       const marker = scopeMarker(frame.holder, scope);
       if (memory.get(key) === marker) {
@@ -317,19 +325,9 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
     const key = `nth:${String(p.key)}`;
     return frame => {
       const memory = memoryOf(frame.holder);
-      const seen = (memory.get(key) as number | undefined) ?? 0;
-      if (frame.memoryPass === "eligibility") {
-        // Counts the occasions on which every other IF passed (the carrier only commits then).
-        frame.unknownReads = (frame.unknownReads ?? 0) + 1;
-        deferMemoryWrite(frame, () => memory.set(key, seen + 1));
-        return true;
-      }
-      if (frame.memoryPass === "decision") {
-        // A simulated call skipped pass 1's count write, so the would-be next count is used instead.
-        return (frame.simulated ? seen + 1 : seen) === Number(p.n);
-      }
-      const next = seen + 1;
-      deferMemoryWrite(frame, () => memory.set(key, next));
+      const next = ((memory.get(key) as number | undefined) ?? 0) + 1;
+      // The count advances on every occasion evaluation reaches this atom (the carrier runs counts after the list); simulated calls never write.
+      deferCount(frame, () => memory.set(key, next));
       return next === Number(p.n);
     };
   },
@@ -408,21 +406,6 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
   // RNG: evaluated at its own position in the IF list, the only impure atom.
   "rng.chance": p => frame => {
     const pct = Number(p.pct);
-    if (frame.memoryPass === "eligibility") {
-      // Pass 1 evaluates the list in order and short-circuits like the original, so the roll lands at its
-      // own position. The result is kept and replayed in the decision pass, so there is one draw per atom.
-      const rolled = frame.simulated || pct >= 100 || frame.holder.randBattleSeedInt(100) < pct;
-      (frame.rolls ??= []).push(rolled);
-      return rolled;
-    }
-    if (frame.memoryPass === "decision" && frame.rolls !== undefined) {
-      const index = frame.rollCursor ?? 0;
-      frame.rollCursor = index + 1;
-      const kept = frame.rolls[index];
-      if (kept !== undefined) {
-        return kept;
-      }
-    }
     return frame.simulated || pct >= 100 || frame.holder.randBattleSeedInt(100) < pct;
   },
 
@@ -458,15 +441,7 @@ export function compileConditionBlock(ref: BlockRef): Condition {
 export function compileCondition(node: ConditionNode): Condition {
   if (isGroupNot(node)) {
     const inner = compileCondition(node.not);
-    return frame => {
-      const before = frame.unknownReads ?? 0;
-      const result = inner(frame);
-      // Eligibility pass: an answer that came from an unknown atom (memory, chance) must not be negated.
-      if (frame.memoryPass === "eligibility" && (frame.unknownReads ?? 0) > before) {
-        return true;
-      }
-      return !result;
-    };
+    return frame => !inner(frame);
   }
   if (isGroupAll(node)) {
     const all = node.all.map(compileCondition);
@@ -474,13 +449,7 @@ export function compileCondition(node: ConditionNode): Condition {
   }
   if (isGroupAny(node)) {
     const any = node.any.map(compileCondition);
-    return frame =>
-      any.some(condition => {
-        const before = frame.unknownReads ?? 0;
-        const result = condition(frame);
-        // Eligibility pass: a branch that depends on an unknown atom might still be true.
-        return result || (frame.memoryPass === "eligibility" && (frame.unknownReads ?? 0) > before);
-      });
+    return frame => any.some(condition => condition(frame));
   }
   return compileConditionBlock(node);
 }

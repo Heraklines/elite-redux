@@ -428,17 +428,26 @@ describe("compiled conditions (same engine predicates)", () => {
       expect(run(carrier, holder)).toBe(false);
     });
 
-    it("nth-use counts only applications", () => {
-      const carrier = compileCompositionRule(rule([{ block: "time.nth-use", params: { n: 2, key: "u" } }]));
+    it("nth-use counts the occasions evaluation reaches it, not those cut off by an earlier IF", () => {
+      const nth = { block: "time.nth-use", params: { n: 2, key: "u" } };
+      const reached = compileCompositionRule(rule([nth]));
       const holder = mon({ hp: 100 });
-      expect(run(carrier, holder)).toBe(false); // fails hp, counts nothing
+      expect(run(reached, holder)).toBe(false); // nth is reached (1st), then hp fails
       holder.hp = 40;
-      expect(run(carrier, holder)).toBe(false); // first real use
-      expect(run(carrier, holder)).toBe(true); // second real use
+      expect(run(reached, holder)).toBe(true); // 2nd time reached
+      const cutOff = compileCompositionRule({
+        ...(rule([]) as object),
+        if: [{ block: "hp.at-most", params: { who: "holder", pct: 50, rounding: "exact" } }, nth],
+      } as never);
+      const other = mon({ hp: 100 });
+      expect(run(cutOff, other)).toBe(false); // hp fails first, nth never reached
+      other.hp = 40;
+      expect(run(cutOff, other)).toBe(false); // 1st time reached
+      expect(run(cutOff, other)).toBe(true); // 2nd
     });
   });
 
-  describe("chance and memory atoms inside the IF list (two-pass evaluation)", () => {
+  describe("chance and memory atoms inside the IF list (one sequential pass)", () => {
     const ruleOf = (ifs: object[], chance = 100) =>
       ({
         key: "pass-test",
@@ -488,7 +497,7 @@ describe("compiled conditions (same engine predicates)", () => {
       expect(canApply(carrier, holder)).toBe(false); // second occasion is the 2nd
     });
 
-    it("a not-group around once-per answers by the real decision, not the eligibility placeholder", () => {
+    it("a not-group around once-per answers by the real decision, not a placeholder", () => {
       const carrier = compileCompositionRule(
         ruleOf([{ not: { block: "time.once-per", params: { scope: "battle", key: "k" } } }]),
       );
@@ -515,7 +524,7 @@ describe("compiled conditions (same engine predicates)", () => {
       expect(canApply(carrier, holder)).toBe(true);
     });
 
-    it("a not-group around rng.chance does not roll in the eligibility pass", () => {
+    it("a not-group around rng.chance negates the single real roll", () => {
       const draw = vi.fn(() => 99);
       const holder = mon({ hp: 40, randBattleSeedInt: draw });
       const carrier = compileCompositionRule(ruleOf([{ not: { block: "rng.chance", params: { pct: 30 } } }]));
@@ -555,6 +564,69 @@ describe("compiled conditions (same engine predicates)", () => {
       const carrier = compileCompositionRule(ruleOf([{ block: "rng.chance", params: { pct: 30 } }]));
       expect(canApply(carrier, holder)).toBe(false);
       expect(draw).toHaveBeenCalledTimes(1);
+    });
+
+    it("once-per before a chance: an already used once-per draws 0 times", () => {
+      const draw = vi.fn(() => 0);
+      const holder = mon({ hp: 40, randBattleSeedInt: draw });
+      const carrier = compileCompositionRule(
+        ruleOf([
+          { block: "time.once-per", params: { scope: "battle", key: "k" } },
+          { block: "rng.chance", params: { pct: 50 } },
+        ]),
+      );
+      const c = carrier as unknown as { canApply: (x: object) => boolean; apply: (x: object) => void };
+      const params = {
+        pokemon: holder,
+        opponent: mon(),
+        move: move(),
+        damage: 10,
+        hitResult: HitResult.EFFECTIVE,
+        simulated: false,
+      };
+      expect(c.canApply(params)).toBe(true);
+      expect(draw).toHaveBeenCalledTimes(1);
+      try {
+        c.apply(params);
+      } catch {
+        // The stat effect needs a real battle; the memory commit runs first.
+      }
+      draw.mockClear();
+      expect(c.canApply({ ...params })).toBe(false);
+      expect(draw).toHaveBeenCalledTimes(0);
+    });
+
+    it("nth-use before a chance: a non-matching count draws 0 times, a matching one draws once", () => {
+      const draw = vi.fn(() => 0);
+      const holder = mon({ hp: 40, randBattleSeedInt: draw });
+      const carrier = compileCompositionRule(
+        ruleOf([
+          { block: "time.nth-use", params: { n: 2, key: "u" } },
+          { block: "rng.chance", params: { pct: 50 } },
+        ]),
+      );
+      expect(canApply(carrier, holder)).toBe(false);
+      expect(draw).toHaveBeenCalledTimes(0);
+      expect(canApply(carrier, holder)).toBe(true);
+      expect(draw).toHaveBeenCalledTimes(1);
+    });
+
+    it("repeated canApply without apply keeps no stale commits", () => {
+      const holder = mon({ hp: 40 });
+      const carrier = compileCompositionRule(
+        ruleOf([{ block: "time.once-per", params: { scope: "battle", key: "k2" } }]),
+      );
+      const c = carrier as unknown as { canApply: (x: object) => boolean };
+      const params = {
+        pokemon: holder,
+        opponent: mon(),
+        move: move(),
+        damage: 10,
+        hitResult: HitResult.EFFECTIVE,
+        simulated: false,
+      };
+      expect(c.canApply(params)).toBe(true);
+      expect(c.canApply(params)).toBe(true); // nothing was applied, so still unused
     });
 
     it("a simulated call predicts what the real call does for nth-use", () => {
