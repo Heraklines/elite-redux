@@ -16,6 +16,7 @@
 // the order of an HP test and a dice roll.
 import { allAbilities } from "#data/data-lists";
 import { buildAttr } from "#data/elite-redux/ability-studio/build-attr";
+import { diffTraces } from "#test/tests/elite-redux/decomp/harness/battle-trace";
 import {
   registerCompositionAbility,
   rule,
@@ -43,6 +44,7 @@ import {
   liveAbility,
   type TwinScenario,
   twinById,
+  unreachedWhens,
 } from "#test/tests/elite-redux/decomp/harness/twin";
 import { buildStateGrid } from "#test/tests/elite-redux/decomp/harness/world";
 import Phaser from "phaser";
@@ -262,6 +264,82 @@ describe("harness self-test: a deliberately altered rebuild is caught", () => {
       expect(drift.differences[0].part).toBe("rng-count");
       expect(drift.differences[0].message).toMatch(/drew \d+ times, the rebuild \d+ times/);
       expect(drift.rebuild.rngCalls).toBeGreaterThan(drift.original.rngCalls);
+    });
+
+    it("the twin refuses to pass when the template never reaches the trigger (vacuous L2)", async () => {
+      // A faint rule twinned in a quiet-turns template: nobody ever faints, so neither run evaluates
+      // the attr and both traces are empty. That must be a failure, not a green result.
+      const afterHit = rule(
+        "faint-only",
+        "event.faint",
+        [{ block: "hp.full", params: { who: "holder" } }],
+        [{ block: "effect.stat-stage", params: { target: "holder", stat: "ATK", stages: 1 } }],
+      );
+      const a = registerCompositionAbility("Vacuous", [afterHit]);
+      const b = registerCompositionAbility("Vacuous", [afterHit]);
+      const quiet: TwinScenario = { template: TEMPLATES["quiet-turns"], axes: {}, label: "quiet turns, nobody faints" };
+      const vacuous = await twinById(phaserGame, a, b, quiet);
+      expect(vacuous.differences.map(d => d.part)).toContain("attr-not-evaluated");
+      expect(vacuous.differences.map(d => d.message).join(" ")).toContain("never had any attr evaluated");
+      // With an explicit expectation, the message names the attr.
+      const named = await twinById(phaserGame, a, b, quiet, {
+        reach: { attrs: [{ attrIndex: 0, className: "PostFaintAbAttr" }] },
+      });
+      expect(named.differences.map(d => d.part)).toContain("attr-not-evaluated");
+      // Control: an ability whose trigger the template does reach passes, and shows evaluated attrs.
+      const reached = registerCompositionAbility("Reached", [
+        rule(
+          "after-hit-reached",
+          "event.after-hit",
+          [{ block: "hp.full", params: { who: "holder" } }],
+          [{ block: "effect.stat-stage", params: { target: "holder", stat: "ATK", stages: 1 } }],
+        ),
+      ]);
+      const hit = await twinById(phaserGame, reached, reached, scenario({ hp: "max-1" }), {
+        reach: { attrs: [{ attrIndex: 0, className: "PostDefendAbAttr" }] },
+      });
+      expect(hit.differences, describeTwinFailure("Reached", hit)).toEqual([]);
+      expect(hit.original.attrEvents.length).toBeGreaterThan(0);
+    });
+
+    it("the twin refuses a scenario whose WHEN is listed unreached, unless the declaration gives a written reason", async () => {
+      const unreachedWhen = Object.keys(unreachedWhens())[0];
+      expect(unreachedWhen).toBeDefined();
+      const a = registerCompositionAbility("Unreached", [
+        rule(
+          "after-hit-unreached",
+          "event.after-hit",
+          [{ block: "hp.full", params: { who: "holder" } }],
+          [{ block: "effect.stat-stage", params: { target: "holder", stat: "ATK", stages: 1 } }],
+        ),
+      ]);
+      const refused = await twinById(phaserGame, a, a, { ...scenario({ hp: "max-1" }), when: unreachedWhen });
+      expect(refused.differences.map(d => d.part)).toEqual(["when-unreached"]);
+      const excused = await twinById(phaserGame, a, a, {
+        ...scenario({ hp: "max-1" }),
+        when: unreachedWhen,
+        staticReason: "verified by the static L1 differential only",
+      });
+      expect(excused.differences).toEqual([]);
+    });
+
+    it("equal draw counts with swapped ranges are caught as a reordered draw (rng-order)", async () => {
+      const a = registerCompositionAbility("Order probe", [
+        rule(
+          "order-probe",
+          "event.after-hit",
+          [{ block: "rng.chance", params: { pct: 50 } }],
+          [{ block: "effect.stat-stage", params: { target: "holder", stat: "ATK", stages: 1 } }],
+        ),
+      ]);
+      const base = await twinById(phaserGame, a, a, scenario({ hp: "max" }));
+      const draws = ["100+0", "6+1"];
+      const x = { ...base.original, rngLog: draws, rngCalls: 2 };
+      const y = { ...base.original, rngLog: [...draws].reverse(), rngCalls: 2 };
+      const parts = diffTraces(x, y).map(d => d.part);
+      expect(parts).toContain("rng-order");
+      expect(parts).not.toContain("rng-count");
+      expect(diffTraces(x, x)).toEqual([]);
     });
 
     it("the twin is deterministic: the same ability twice with the same seed has an empty diff, a different seed does not hide it", async () => {

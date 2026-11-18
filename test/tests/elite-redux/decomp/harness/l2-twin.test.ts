@@ -95,10 +95,16 @@ describe("L2 battle twin (live registry)", () => {
           );
           continue;
         }
-        const scenarios = new Map<string, TwinScenario>();
-        for (const { attr } of rebuiltBatchAttrs) {
+        const scenarios = new Map<
+          string,
+          { scenario: TwinScenario; attrs: { attrIndex: number; className: string }[] }
+        >();
+        for (const { attr, index } of rebuiltBatchAttrs) {
           for (const scenario of scenariosFor(declRegistry.get(attr.constructor.name)!)) {
-            scenarios.set(`${scenario.template.id}|${JSON.stringify(scenario.axes)}`, scenario);
+            const key = `${scenario.template.id}|${JSON.stringify(scenario.axes)}|${scenario.when}`;
+            const entry = scenarios.get(key) ?? { scenario, attrs: [] };
+            entry.attrs.push({ attrIndex: index, className: attr.constructor.name });
+            scenarios.set(key, entry);
           }
         }
         if (scenarios.size === 0) {
@@ -106,10 +112,11 @@ describe("L2 battle twin (live registry)", () => {
           continue;
         }
         registerShadow(shadowId, rebuilt.ability);
-        for (const scenario of scenarios.values()) {
+        for (const { scenario, attrs } of scenarios.values()) {
           scenarioCount++;
           battles += 2;
-          const outcome = await twinById(phaserGame, id, shadowId, scenario);
+          // The original must show every rebuilt attr of this scenario being evaluated, else L2 is vacuous.
+          const outcome = await twinById(phaserGame, id, shadowId, scenario, { reach: { attrs } });
           if (outcome.differences.length > 0) {
             failures.push(describeTwinFailure(original.name, outcome));
           }

@@ -19,6 +19,8 @@ import { readDeclParams } from "#data/elite-redux/ability-studio/build-attr";
 import type { DeclRegistry } from "#data/elite-redux/ability-studio/decl-registry";
 import type { DeclModule } from "#data/elite-redux/ability-studio/define-decl";
 import { getWhen } from "#data/elite-redux/ability-studio/vocabulary/when-registry";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import type Phaser from "phaser";
 import { BattleTrace, diffTraces, type TraceData, type TraceDifference } from "./battle-trace";
 import { freshGame } from "./game";
@@ -38,6 +40,67 @@ export interface TwinScenario {
   readonly template: ScenarioSpec;
   readonly axes: Axes;
   readonly label: string;
+  /** The WHEN registry id this scenario was built for (absent for hand-made self-test scenarios). */
+  readonly when?: string;
+  /** The declaration's written reason for tolerating an unreached WHEN (ClassDecl.l2StaticReason). */
+  readonly staticReason?: string;
+}
+
+/** What the original's run must show: each of these attrs evaluated at least once. */
+export interface ReachExpectation {
+  readonly attrs: readonly { readonly attrIndex: number; readonly className: string }[];
+}
+
+const REACH_FILE = resolve(process.cwd(), "test/fixtures/elite-redux/ability-studio/decomp-l2-reach.json");
+let unreachedCache: Record<string, string> | undefined;
+
+/** WHEN ids that no scenario template reaches, with the reason, from decomp-l2-reach.json. */
+export function unreachedWhens(): Readonly<Record<string, string>> {
+  unreachedCache ??= (JSON.parse(readFileSync(REACH_FILE, "utf8")) as { unreached: Record<string, string> }).unreached;
+  return unreachedCache;
+}
+
+/**
+ * The anti-vacuity check. A twin where the original never evaluated the rebuilt attr compares two empty
+ * traces and proves nothing, so it must not pass. Without an explicit expectation, the original ability
+ * must at least have evaluated one of its attrs.
+ */
+export function reachProblems(
+  abilityId: number,
+  original: TraceData,
+  scenario: TwinScenario,
+  reach: ReachExpectation | undefined,
+): TraceDifference[] {
+  const problems: TraceDifference[] = [];
+  if (scenario.when !== undefined && scenario.staticReason === undefined) {
+    const why = unreachedWhens()[scenario.when];
+    if (why !== undefined) {
+      problems.push({
+        part: "when-unreached",
+        message: `no scenario template reaches the trigger "${scenario.when}" (${why}); the twin would prove nothing. Add a template, or give the declaration a written l2StaticReason`,
+      });
+    }
+  }
+  const events = original.attrEvents.filter(event => event.startsWith(`${abilityId}#`));
+  if (reach === undefined || reach.attrs.length === 0) {
+    if (events.length === 0) {
+      problems.push({
+        part: "attr-not-evaluated",
+        message: `in "${scenario.label}" the original ability never had any attr evaluated, so the twin compared two empty traces`,
+      });
+    }
+    return problems;
+  }
+  for (const { attrIndex, className } of reach.attrs) {
+    const prefix = `${abilityId}#${attrIndex} ${className} `;
+    if (!events.some(event => event.startsWith(prefix))) {
+      problems.push({
+        part: "attr-not-evaluated",
+        message: `in "${scenario.label}" the original never evaluated its attr #${attrIndex} (${className}); the scenario does not steer into the trigger, so the rebuild was never exercised`,
+      });
+    }
+  }
+  return problems;
 }
 
 export interface TwinOutcome {
@@ -102,6 +165,8 @@ export function scenariosFor(module: DeclModule): TwinScenario[] {
       template,
       axes,
       label: `${getWhen(module.decl.when)?.label ?? module.decl.when}: ${describeAxes(axes)}`,
+      when: module.decl.when,
+      ...(module.decl.l2StaticReason === undefined ? {} : { staticReason: module.decl.l2StaticReason }),
     });
   }
   return scenarios;
@@ -140,7 +205,7 @@ export async function twinById(
   idA: number,
   idB: number,
   scenario: TwinScenario,
-  options: { readonly rng?: "max" | "seeded"; readonly seed?: string } = {},
+  options: { readonly rng?: "max" | "seeded"; readonly seed?: string; readonly reach?: ReachExpectation } = {},
 ): Promise<TwinOutcome> {
   const started = Date.now();
   const rng = options.rng ?? "seeded";
@@ -153,7 +218,7 @@ export async function twinById(
   const rebuild = await run(idB);
   return {
     scenario,
-    differences: diffTraces(original, rebuild),
+    differences: [...reachProblems(idA, original, scenario, options.reach), ...diffTraces(original, rebuild)],
     original,
     rebuild,
     millis: Date.now() - started,

@@ -126,6 +126,12 @@ export interface ClassDecl {
   readonly provides?: readonly SlotId[] | undefined;
   readonly requires?: readonly SlotId[] | undefined;
   readonly probes?: readonly DeclProbe[] | undefined;
+  /**
+   * Written reason why the L2 battle twin cannot reach this class's WHEN (no scenario template drives
+   * it; see decomp-l2-reach.json) and the class is verified statically instead. Without it, L2 refuses
+   * to pass a class whose WHEN is unreached.
+   */
+  readonly l2StaticReason?: string | undefined;
   readonly status: DeclStatus;
   /** Oddities, bugs found (never fixed in the same change) and reasons for package/exempt. */
   readonly notes: string;
