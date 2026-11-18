@@ -224,6 +224,10 @@ export function abilityStudioRuntimeCapabilityHookLabel(attr: AbAttr): string | 
     : undefined;
 }
 
+/**
+ * The V1 hook classes, kept as the bridge until WHEN_REGISTRY (vocabulary/when-registry.ts) fully
+ * replaces them. A consistency test keeps this set and the WHENs' `legacyHookId` values identical.
+ */
 const HOOK_TYPES = new Set([
   "PostBattleInitAbAttr",
   "PreDefendAbAttr",
@@ -257,7 +261,10 @@ const HOOK_TYPES = new Set([
   "RedirectMoveAbAttr",
   "FlinchEffectAbAttr",
   "CancelInteractionAbAttr",
+  "PostDamageAbAttr",
 ]);
+
+export const ABILITY_STUDIO_RUNTIME_HOOK_TYPES: ReadonlySet<string> = HOOK_TYPES;
 
 export const ABILITY_STUDIO_RUNTIME_HOOK_CONTEXTS: Readonly<Record<string, readonly string[]>> = {
   PostBattleInitAbAttr: ["holder", "battle initialization"],
@@ -292,6 +299,7 @@ export const ABILITY_STUDIO_RUNTIME_HOOK_CONTEXTS: Readonly<Record<string, reado
   RedirectMoveAbAttr: ["holder", "move user", "move", "targets", "redirection state"],
   FlinchEffectAbAttr: ["holder", "flinch state", "simulation state"],
   CancelInteractionAbAttr: ["holder", "cancellation state"],
+  PostDamageAbAttr: ["holder", "attacker", "damage dealt", "simulation state"],
   "source-ability-runtime-check": ["holder", "direct engine check"],
 };
 
