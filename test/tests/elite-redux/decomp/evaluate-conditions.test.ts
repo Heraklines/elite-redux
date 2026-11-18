@@ -523,6 +523,61 @@ describe("compiled conditions (same engine predicates)", () => {
       expect(draw).toHaveBeenCalledTimes(1);
     });
 
+    it("chance first, then a failing IF: one draw, like sequential evaluation", () => {
+      const draw = vi.fn(() => 0);
+      const holder = mon({ hp: 50, maxHp: 100, randBattleSeedInt: draw });
+      const carrier = compileCompositionRule(
+        ruleOf([
+          { block: "rng.chance", params: { pct: 30 } },
+          { block: "hp.full", params: { who: "holder" } },
+        ]),
+      );
+      expect(canApply(carrier, holder)).toBe(false);
+      expect(draw).toHaveBeenCalledTimes(1);
+    });
+
+    it("a failing IF before the chance: no draw", () => {
+      const draw = vi.fn(() => 0);
+      const holder = mon({ hp: 50, maxHp: 100, randBattleSeedInt: draw });
+      const carrier = compileCompositionRule(
+        ruleOf([
+          { block: "hp.full", params: { who: "holder" } },
+          { block: "rng.chance", params: { pct: 30 } },
+        ]),
+      );
+      expect(canApply(carrier, holder)).toBe(false);
+      expect(draw).toHaveBeenCalledTimes(0);
+    });
+
+    it("a failed IF-list chance consumes the draw and fails once", () => {
+      const draw = vi.fn(() => 99);
+      const holder = mon({ hp: 40, randBattleSeedInt: draw });
+      const carrier = compileCompositionRule(ruleOf([{ block: "rng.chance", params: { pct: 30 } }]));
+      expect(canApply(carrier, holder)).toBe(false);
+      expect(draw).toHaveBeenCalledTimes(1);
+    });
+
+    it("a simulated call predicts what the real call does for nth-use", () => {
+      const run = (carrier: ReturnType<typeof compileCompositionRule>, holder: FakeMon, simulated: boolean) =>
+        (carrier as unknown as { canApply: (p: object) => boolean }).canApply({
+          pokemon: holder,
+          opponent: mon(),
+          move: move(),
+          damage: 10,
+          hitResult: HitResult.EFFECTIVE,
+          simulated,
+        });
+      const carrier = compileCompositionRule(ruleOf([{ block: "time.nth-use", params: { n: 1, key: "u" } }]));
+      const holder = mon({ hp: 40 });
+      expect(run(carrier, holder, true)).toBe(true);
+      expect(run(carrier, holder, true)).toBe(true); // simulated mutates nothing
+      expect(run(carrier, holder, false)).toBe(true);
+      const second = compileCompositionRule(ruleOf([{ block: "time.nth-use", params: { n: 2, key: "u2" } }]));
+      const other = mon({ hp: 40 });
+      expect(run(second, other, true)).toBe(false);
+      expect(run(second, other, false)).toBe(false);
+    });
+
     it("an any-group with a memory atom stays eligible, and its real answer decides", () => {
       const carrier = compileCompositionRule(
         ruleOf([

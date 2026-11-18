@@ -325,7 +325,8 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
         return true;
       }
       if (frame.memoryPass === "decision") {
-        return seen === Number(p.n);
+        // A simulated call skipped pass 1's count write, so the would-be next count is used instead.
+        return (frame.simulated ? seen + 1 : seen) === Number(p.n);
       }
       const next = seen + 1;
       deferMemoryWrite(frame, () => memory.set(key, next));
@@ -406,12 +407,23 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
 
   // RNG: evaluated at its own position in the IF list, the only impure atom.
   "rng.chance": p => frame => {
+    const pct = Number(p.pct);
     if (frame.memoryPass === "eligibility") {
-      // Pass 1 never rolls: the roll happens once, in the decision pass, at its own position.
-      frame.unknownReads = (frame.unknownReads ?? 0) + 1;
-      return true;
+      // Pass 1 evaluates the list in order and short-circuits like the original, so the roll lands at its
+      // own position. The result is kept and replayed in the decision pass, so there is one draw per atom.
+      const rolled = frame.simulated || pct >= 100 || frame.holder.randBattleSeedInt(100) < pct;
+      (frame.rolls ??= []).push(rolled);
+      return rolled;
     }
-    return frame.simulated || Number(p.pct) >= 100 || frame.holder.randBattleSeedInt(100) < Number(p.pct);
+    if (frame.memoryPass === "decision" && frame.rolls !== undefined) {
+      const index = frame.rollCursor ?? 0;
+      frame.rollCursor = index + 1;
+      const kept = frame.rolls[index];
+      if (kept !== undefined) {
+        return kept;
+      }
+    }
+    return frame.simulated || pct >= 100 || frame.holder.randBattleSeedInt(100) < pct;
   },
 
   // Escape hatches

@@ -102,6 +102,8 @@ export function compileCompositionRule(rule: CompositionRuleV2): AbAttr {
     // Pass 1: do the other IFs pass? Memory atoms say yes, and nth-use counts this occasion.
     frame.memoryPass = "eligibility";
     frame.unknownReads = 0;
+    frame.rolls = [];
+    frame.rollCursor = 0;
     frame.commits = [];
     const eligible = conditions(frame);
     const counts = frame.commits;

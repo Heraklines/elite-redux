@@ -54,6 +54,9 @@ export interface Frame {
   memoryPass?: "eligibility" | "decision" | undefined;
   /** Eligibility pass only: how many atoms answered "unknown" (memory atoms, chance); not/any read it. */
   unknownReads?: number | undefined;
+  /** Carrier only: rng.chance results rolled in pass 1, replayed in the decision pass. */
+  rolls?: boolean[] | undefined;
+  rollCursor?: number | undefined;
 }
 
 /** A compiled IF: built once, then called with a frame. Never interpreted per call. */
