@@ -26,6 +26,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 const HALF_AT_FULL_ID = 20993;
 const CROSS_HALF_ID = 20994;
 const CROSS_35_ID = 20995;
+const ON_ENTRY_ID = 20996;
 
 function blueprintFor(id: number, name: string, rule: CompositionRuleV2): AbilityStudioBlueprintV1 {
   return {
@@ -72,6 +73,16 @@ describe("composition in a real battle", () => {
       [HALF_AT_FULL_ID, "Half At Full", halfAtFullHp],
       [CROSS_HALF_ID, "Cross Half", boostWhenCrossed(0.5)],
       [CROSS_35_ID, "Cross 35", boostWhenCrossed(0.35)],
+      [
+        ON_ENTRY_ID,
+        "On Entry",
+        {
+          key: "on-entry-boost",
+          when: { block: "event.on-entry" },
+          do: [{ block: "effect.stat-stage", params: { target: "holder", stat: "ATK", stages: 1 } }],
+          chance: 100,
+        },
+      ],
     ] as const) {
       const validated = validateAbilityStudioBlueprints({ [`t-${id}`]: blueprintFor(id, name, rule) });
       expect(validated.errors).toEqual([]);
@@ -180,5 +191,15 @@ describe("composition in a real battle", () => {
     await game.toNextTurn();
     expect(player.hp).toBeLessThan(max * 0.35);
     expect(player.getStatStage(Stat.ATK)).toBe(2);
+  });
+
+  it("an on-entry rule fires on switch-in and is flagged to fire when the ability is gained mid-battle", async () => {
+    game.override.ability(ON_ENTRY_ID as AbilityId);
+    await game.classicMode.startBattle(SpeciesId.BLISSEY);
+    const player = game.field.getPlayerPokemon();
+    expect(player.getStatStage(Stat.ATK)).toBe(1);
+    const attrs = allAbilities[ON_ENTRY_ID].getAttrs("PostSummonAbAttr");
+    expect(attrs).toHaveLength(1);
+    expect(attrs[0].shouldActivateOnGain()).toBe(true);
   });
 });

@@ -49,6 +49,17 @@ const MOMENT_GATES: Readonly<Record<string, (params: RawParams) => boolean>> = {
   "event.end-of-turn": p => !(p.pokemon as Pokemon).isFainted(),
 };
 
+/**
+ * Instance fields that a dispatch class's own constructor sets and that the ENGINE reads outside
+ * canApply/apply. The carrier never runs that constructor, so they are set here, to the same values
+ * the V1 rule attrs (rule-ab-attrs.ts) pass: for example PostSummonAbAttr.activateOnGain is read by
+ * shouldActivateOnGain() when an ability is gained mid-battle (Skill Swap, Trace, Entrain).
+ * A test compares every composable WHEN's carrier against the V1 rule attr to keep this complete.
+ */
+const ENGINE_FIELDS: Readonly<Record<string, Readonly<Record<string, unknown>>>> = {
+  PostSummonAbAttr: { activateOnGain: true },
+};
+
 export function compileCompositionRule(rule: CompositionRuleV2): AbAttr {
   const problems = validateComposition([rule]);
   if (problems.length > 0) {
@@ -73,6 +84,7 @@ export function compileCompositionRule(rule: CompositionRuleV2): AbAttr {
     [when.kind === "event"],
     base,
   ) as Carrier;
+  Object.assign(carrier, ENGINE_FIELDS[when.dispatchKey] ?? {});
   const frames = new WeakMap<object, Frame>();
   const frameOf = (params: AbAttrBaseParams): Frame => {
     let frame = frames.get(params);
@@ -99,14 +111,11 @@ export function compileCompositionRule(rule: CompositionRuleV2): AbAttr {
     }
   };
   carrier.getTriggerMessage = () => null;
-  if (
-    carrier instanceof ReceivedMoveDamageMultiplierAbAttr
-    && rule.do.some(
-      effect => effect.block === "effect.multiply-damage-taken" && effect.params?.affectsFixedDamage === true,
-    )
-  ) {
+  if (carrier instanceof ReceivedMoveDamageMultiplierAbAttr) {
     // The engine reads this through appliesToFixedDamage(); the constructor that sets it never ran.
-    (carrier as unknown as { affectsFixedDamage: boolean }).affectsFixedDamage = true;
+    (carrier as unknown as { affectsFixedDamage: boolean }).affectsFixedDamage = rule.do.some(
+      effect => effect.block === "effect.multiply-damage-taken" && effect.params?.affectsFixedDamage === true,
+    );
   }
   return carrier;
 }

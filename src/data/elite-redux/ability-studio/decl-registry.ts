@@ -6,7 +6,7 @@
 
 // Collects every `decl/**/*.decl.ts` sidecar (spec 2.1). `import.meta.glob` is resolved by Vite at
 // build time and by vitest at transform time; scripts/decomp/verify-glob-build.mjs and
-// test/tests/elite-redux/decomp/decl-registry.test.ts prove both. Bindings files
+// test/tests/elite-redux/decomp/decl-machinery.test.ts prove both. Bindings files
 // (`decl/**/bindings.ts`) are imported for their side effect of calling `bindCondition`.
 
 import type { DeclModule } from "./define-decl";
