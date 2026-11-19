@@ -13,6 +13,7 @@ import {
   type PostMoveInteractionAbAttrParams,
 } from "#abilities/ab-attrs";
 import { allMoves } from "#data/data-lists";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { HitResult } from "#enums/hit-result";
 import type { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
@@ -35,8 +36,25 @@ export class FirstFlaggedMovePriorityAbAttr extends ChangeMovePriorityAbAttr {
     this.flags = Array.isArray(flag) ? flag : [flag];
   }
 
-  override canApply({ pokemon, move }: ChangeMovePriorityAbAttrParams): boolean {
-    return !hasUsedPriority(pokemon) && this.flags.some(flag => move.hasFlag(flag));
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: ChangeMovePriorityAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1): `guards`, then `gate`, in the original clause order
+   * (the unspent test first, the flag test second). There is no `prepare` and no `residual`.
+   */
+  override canApply(params: ChangeMovePriorityAbAttrParams): boolean {
+    return gatedCanApply<ChangeMovePriorityAbAttrParams>(this, params);
+  }
+
+  /** The one-shot memory: the +1 priority has not been spent since the holder entered. Moved verbatim from `canApply`. */
+  public guards({ pokemon }: ChangeMovePriorityAbAttrParams): boolean {
+    return !hasUsedPriority(pokemon);
+  }
+
+  /** The replaceable condition: the move carries one of the configured flags (the printed flag, `move.hasFlag`). */
+  public gate({ move }: ChangeMovePriorityAbAttrParams): boolean {
+    return this.flags.some(flag => move.hasFlag(flag));
   }
 
   override apply({ priority }: ChangeMovePriorityAbAttrParams): void {
@@ -54,14 +72,27 @@ export class ConsumeFirstFlaggedMovePriorityAbAttr extends PostAttackAbAttr {
     this.regainOnKo = regainOnKo;
   }
 
-  override canApply({ move, hitResult, opponent }: PostMoveInteractionAbAttrParams): boolean {
-    const landed = [
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): `guards` (the hit landed), then `gate`, in the original clause order. */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** "After my attack lands": the hit result is one of the four landed results. Moved verbatim from `canApply`. */
+  public guards({ hitResult }: PostMoveInteractionAbAttrParams): boolean {
+    return [
       HitResult.EFFECTIVE,
       HitResult.SUPER_EFFECTIVE,
       HitResult.NOT_VERY_EFFECTIVE,
       HitResult.ONE_HIT_KO,
     ].includes(hitResult);
-    return landed && (this.flags.some(flag => move.hasFlag(flag)) || (this.regainOnKo && opponent.isFainted()));
+  }
+
+  /** The replaceable condition: the move has a configured flag, or (when `regainOnKo`) the target fainted. */
+  public gate({ move, opponent }: PostMoveInteractionAbAttrParams): boolean {
+    return this.flags.some(flag => move.hasFlag(flag)) || (this.regainOnKo && opponent.isFainted());
   }
 
   override apply({ pokemon, move, opponent }: PostMoveInteractionAbAttrParams): void {
@@ -92,12 +123,24 @@ export class ConsumeFirstFlaggedMoveOnUseAbAttr extends ExecutedMoveAbAttr {
     this.flag = flag;
   }
 
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
-    if (hasUsedPriority(pokemon)) {
-      return false;
-    }
-    // The just-executed move is the most recent history entry (pushed immediately
-    // before ExecutedMoveAbAttr is applied). Consume only when it carries the flag.
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): `guards` (bonus unspent), then `gate`, in the original clause order. */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The one-shot memory: the +1 priority has not been spent yet. Moved verbatim from `canApply`. */
+  public guards({ pokemon }: AbAttrBaseParams): boolean {
+    return !hasUsedPriority(pokemon);
+  }
+
+  /**
+   * The replaceable condition. The just-executed move is the most recent history entry (pushed immediately
+   * before ExecutedMoveAbAttr is applied). Consume only when it carries the flag.
+   */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     const lastMove = pokemon.getLastXMoves(1)[0];
     return lastMove != null && (allMoves[lastMove.move]?.hasFlag(this.flag) ?? false);
   }
@@ -126,8 +169,16 @@ export class RearmFirstFlaggedMoveOnMoveAbAttr extends ExecutedMoveAbAttr {
     this.moveId = moveId;
   }
 
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
-    // The just-executed move is the most recent history entry.
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole rule is the replaceable `gate`; no guard, no residual. */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The replaceable condition. The just-executed move is the most recent history entry. */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     const lastMove = pokemon.getLastXMoves(1)[0];
     return lastMove != null && lastMove.move === this.moveId;
   }
@@ -142,7 +193,16 @@ export class FirstTurnPriorityClampAbAttr extends ChangeMovePriorityAbAttr {
     super(() => false, 0);
   }
 
-  override canApply({ pokemon }: ChangeMovePriorityAbAttrParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: ChangeMovePriorityAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole rule is the replaceable `gate`; no guard, no residual. */
+  override canApply(params: ChangeMovePriorityAbAttrParams): boolean {
+    return gatedCanApply<ChangeMovePriorityAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: it is the holder's first turn out (library atom `time.first-turn`). */
+  public gate({ pokemon }: ChangeMovePriorityAbAttrParams): boolean {
     return pokemon.tempSummonData.waveTurnCount === 1;
   }
 

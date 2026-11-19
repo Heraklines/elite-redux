@@ -373,4 +373,14 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     power: new NumberHolder(ctx.move.power),
     simulated: false,
   }),
+  // Added by B09 chunk 2 (request R-B09-08). Move.getPriority (move.ts:1445): the user is the holder, the number is the move
+  // priority. Identical to the builder B05 adds; keep one of the two when merging.
+  "calc.priority": ctx => ({
+    pokemon: ctx.holder,
+    move: ctx.move,
+    priority: new NumberHolder(ctx.move.priority),
+    simulated: false,
+  }),
+  // Added by B09 chunk 2 (request R-B09-08). MoveEffectPhase (move-effect-phase.ts:455) passes only the user.
+  "event.my-move-starts": ({ holder }) => ({ pokemon: holder }),
 };

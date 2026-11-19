@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "096ef32b703c2f",
+  "hash": "06a0e987b264fc",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -124,6 +124,499 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.consume-first-flagged-move-on-use",
+      "className": "ConsumeFirstFlaggedMoveOnUseAbAttr",
+      "label": "Spend my first-move bonus when I use a matching move",
+      "summary": "As soon as I use a move with the property \"Biting move\", even if it misses or fails, my +1 priority bonus is used up.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.my-move-starts",
+      "whenLabel": "When my move starts to execute",
+      "synonyms": [
+        "use up the bonus",
+        "spend priority on use",
+        "coil up",
+        "curlipede",
+        "bonus lost even on a miss",
+        "consume on use"
+      ],
+      "examples": [
+        "Using a biting move uses up my first-move priority even if it misses, like Coil Up"
+      ],
+      "params": [
+        {
+          "id": "flag",
+          "label": "Move property that spends the bonus",
+          "control": "select",
+          "default": "BITING_MOVE",
+          "editable": false,
+          "options": [
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The bonus must not be spent yet"
+      ],
+      "effect": {
+        "id": "effect.arm-effect",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.consume-first-flagged-move-priority",
+      "className": "ConsumeFirstFlaggedMovePriorityAbAttr",
+      "label": "Spend my first-move bonus after a matching hit",
+      "summary": "After my attack lands with a \"Slicing move\" move, my +1 priority bonus is used up.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "use up the bonus",
+        "spend priority",
+        "consume priority",
+        "cutthroat",
+        "edgelord",
+        "first serpent",
+        "bonus returns on knockout",
+        "reset priority on kill"
+      ],
+      "examples": [
+        "After a slicing move lands, my first-move priority is used up, like Cutthroat",
+        "Knocking out a foe gives my first-move priority back, like Edgelord"
+      ],
+      "params": [
+        {
+          "id": "flags",
+          "label": "Move properties that spend the bonus (comma separated, any of them counts)",
+          "control": "text",
+          "default": "SLICING_MOVE",
+          "editable": false
+        },
+        {
+          "id": "regainOnKo",
+          "label": "A knock-out gives the bonus back",
+          "control": "boolean",
+          "default": false,
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must have landed (it was not a miss, an immunity or a failure)"
+      ],
+      "branches": [
+        {
+          "label": "Use up the bonus",
+          "conditions": [
+            "my move has one of the properties"
+          ],
+          "effect": {
+            "id": "effect.arm-effect",
+            "params": []
+          }
+        },
+        {
+          "label": "Give the bonus back",
+          "conditions": [
+            "the target fainted (only when a knock-out gives it back)"
+          ],
+          "effect": {
+            "id": "effect.arm-effect",
+            "params": []
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 7
+    },
+    {
+      "id": "block.first-flagged-move-priority",
+      "className": "FirstFlaggedMovePriorityAbAttr",
+      "label": "Give +1 priority to my first move of one kind",
+      "summary": "Until my first-move bonus is spent, my moves with the property \"Slicing move\" get +1 priority and go before normal moves. Other blocks spend and restore the bonus.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.priority",
+      "whenLabel": "While the game calculates my move's priority",
+      "synonyms": [
+        "first bite goes first",
+        "first slash goes first",
+        "cutthroat",
+        "edgelord",
+        "coil up",
+        "quick charge",
+        "one time priority",
+        "priority on entry",
+        "go first once",
+        "act before the foe"
+      ],
+      "examples": [
+        "My first slicing move after I enter gets +1 priority, like Cutthroat",
+        "My first biting move goes first, like Sidewinder"
+      ],
+      "params": [
+        {
+          "id": "flags",
+          "label": "Move properties that get the bonus (comma separated, any of them counts)",
+          "control": "text",
+          "default": "SLICING_MOVE",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The bonus must not be spent yet (it is spent by the move that carries the property, and some abilities give it back); it resets when I switch out"
+      ],
+      "effect": {
+        "id": "effect.change-priority",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 9
+    },
+    {
+      "id": "block.first-turn-priority-clamp",
+      "className": "FirstTurnPriorityClampAbAttr",
+      "label": "Raise move priority on my first turn and cancel slow moves",
+      "summary": "On my first turn out, my moves get +1 priority. A move that is normally slow (negative priority) just becomes normal priority (0).",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.priority",
+      "whenLabel": "While the game calculates my move's priority",
+      "synonyms": [
+        "on the prowl",
+        "overwatch",
+        "first turn priority",
+        "go first on entry",
+        "no slow moves on the first turn",
+        "negative priority becomes normal"
+      ],
+      "examples": [
+        "Every move gets +1 priority on my first turn and slow moves count as normal speed, like Overwatch"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "time.first-turn",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.change-priority",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.first-turn-stat-multiplier",
+      "className": "FirstTurnStatMultiplierAbAttr",
+      "label": "Multiply a stat until I have used a move",
+      "summary": "Until I have used a move since entering, my Speed is multiplied by 1.5. Example: 1.5 = 50% higher, like Violent Rush's Speed.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "violent rush",
+        "rapid response",
+        "showdown mode",
+        "champion's entrance",
+        "first turn speed",
+        "first turn attack",
+        "opening boost",
+        "stat boost on entry"
+      ],
+      "examples": [
+        "Speed x1.5 until I have moved, like Violent Rush",
+        "Double my Attack until my first move"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat (Attack, Defense, Sp. Atk, Sp. Def or Speed)",
+          "control": "select",
+          "default": "SPD",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "multiplier",
+          "label": "Stat multiplier (1.5 = 50% higher, 0.5 = half)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only the chosen stat is changed; accuracy and evasion count as stats here too"
+      ],
+      "effect": {
+        "id": "effect.multiply-stat",
+        "params": [
+          "stat",
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 8
+    },
+    {
+      "id": "block.flag-damage-boost",
+      "className": "FlagDamageBoostAbAttr",
+      "label": "Boost the power of my moves with one property",
+      "summary": "My moves with the property \"Slicing move\" have their power multiplied by 1.3 (1.3 = 30% stronger).",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "iron fist",
+        "strong jaw",
+        "mega launcher",
+        "keen edge",
+        "punching boost",
+        "biting boost",
+        "slicing boost",
+        "kicking boost",
+        "sound boost",
+        "horn boost",
+        "wing boost",
+        "boost one kind of move"
+      ],
+      "examples": [
+        "Boost slicing moves by 30%, like Keen Edge",
+        "Boost punching moves by 30%, like Iron Fist",
+        "Boost sound moves by 30%, like Amplifier"
+      ],
+      "params": [
+        {
+          "id": "flag",
+          "label": "Move property that is boosted",
+          "control": "select",
+          "default": "SLICING_MOVE",
+          "editable": true,
+          "options": [
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.3 = 30% more power)",
+          "control": "number",
+          "default": 1.3,
+          "editable": true,
+          "min": 0.05,
+          "max": 10,
+          "step": 0.05
+        },
+        {
+          "id": "lowHpMultiplier",
+          "label": "Power multiplier while my HP is low (0 = no change)",
+          "control": "number",
+          "default": 0,
+          "editable": true,
+          "min": 0,
+          "max": 10,
+          "step": 0.05
+        },
+        {
+          "id": "lowHpThreshold",
+          "label": "Low HP line (0.33 = below a third of max HP)",
+          "control": "slider",
+          "default": 0.3333333333333333,
+          "editable": true,
+          "min": 0.01,
+          "max": 0.99,
+          "step": 0.01
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Moves that deal a fixed amount of damage are not changed"
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 59
+    },
+    {
+      "id": "block.flare-boost-self-burn-on-summon",
+      "className": "FlareBoostSelfBurnOnSummonAbAttr",
+      "label": "Burn myself when I enter the battle in fog",
+      "summary": "When I enter the battle and fog (Eerie Fog or normal fog) is active, I get burned, unless I already have a status or my type cannot be burned.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "flare boost",
+        "self burn",
+        "ignite in fog",
+        "burn on entry",
+        "burn myself",
+        "fog burns me"
+      ],
+      "examples": [
+        "Burn myself when I switch into fog, like Flare Boost"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Fog must be active (Eerie Fog or normal fog) when I enter",
+        "I must not have fainted or already have a status",
+        "My type must be able to be burned (a Fire type is not)",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.inflict-status",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.float",
@@ -563,6 +1056,65 @@
         "do": true
       },
       "uses": 7
+    },
+    {
+      "id": "block.rearm-first-flagged-move-on-move",
+      "className": "RearmFirstFlaggedMoveOnMoveAbAttr",
+      "label": "Give back my first-move bonus when I use a chosen move",
+      "summary": "Whenever I use \"Sharpen\", my +1 priority bonus is back, so my next matching move goes first again. Example: Sharpen.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.my-move-starts",
+      "whenLabel": "When my move starts to execute",
+      "synonyms": [
+        "reset priority",
+        "refresh the bonus",
+        "cutthroat",
+        "sharpen resets",
+        "re-arm priority",
+        "bonus comes back"
+      ],
+      "examples": [
+        "Using Sharpen gives my first-move priority back, like Cutthroat"
+      ],
+      "params": [
+        {
+          "id": "moveId",
+          "label": "Move that gives the bonus back (type its id, for example Sharpen)",
+          "control": "text",
+          "default": "SHARPEN",
+          "editable": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "time.last-move",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "gateParams": [
+        {
+          "param": "moveId",
+          "block": "time.last-move",
+          "field": "moveId"
+        }
+      ],
+      "effect": {
+        "id": "effect.arm-effect",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.received-move-damage-multiplier",

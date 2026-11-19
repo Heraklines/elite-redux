@@ -17,8 +17,9 @@
 // =============================================================================
 
 import { StatMultiplierAbAttr } from "#abilities/ab-attrs";
-import type { StatMultiplierAbAttrParams } from "#types/ability-types";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { EffectiveStat } from "#enums/stat";
+import type { StatMultiplierAbAttrParams } from "#types/ability-types";
 
 export interface FirstTurnStatMultiplierOptions {
   readonly stat: EffectiveStat;
@@ -35,11 +36,21 @@ export class FirstTurnStatMultiplierAbAttr extends StatMultiplierAbAttr {
     super(opts.stat, opts.multiplier);
   }
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: StatMultiplierAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): `guards` (the parent test), then `gate`, in the original clause order. */
   override canApply(params: StatMultiplierAbAttrParams): boolean {
-    if (!super.canApply(params)) {
-      return false;
-    }
-    // "First turn" = user hasn't recorded any move yet in summonData.
+    return gatedCanApply<StatMultiplierAbAttrParams>(this, params);
+  }
+
+  /** The stat the game is asking about is the boosted one (the parent's own test). Moved verbatim from `canApply`. */
+  public guards(params: StatMultiplierAbAttrParams): boolean {
+    return super.canApply(params);
+  }
+
+  /** The replaceable condition. "First turn" = user hasn't recorded any move yet in summonData. */
+  public gate(params: StatMultiplierAbAttrParams): boolean {
     const history = params.pokemon.summonData?.moveHistory;
     return !history || history.length === 0;
   }
