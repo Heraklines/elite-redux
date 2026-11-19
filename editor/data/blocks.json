@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1d50feb8353e55",
-  "hash": "16c77adb989b55",
+  "hash": "0549d2fa23116b",
   "blocks": [
     {
       "id": "block.arena-trap",
@@ -174,6 +174,39 @@
       "uses": 3
     },
     {
+      "id": "block.block-redirect",
+      "className": "BlockRedirectAbAttr",
+      "label": "My moves cannot be pulled to another target",
+      "summary": "While I have this, other Pokemon cannot redirect my moves away from the target I picked. Example: Stalwart ignores Lightning Rod and Follow Me.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "stalwart",
+        "propeller tail",
+        "ignore redirection",
+        "cannot be redirected",
+        "ignore follow me",
+        "ignore lightning rod",
+        "keep my target"
+      ],
+      "examples": [
+        "My moves hit the target I chose even against Follow Me or Lightning Rod"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
       "id": "block.bypass-burn-damage-reduction",
       "className": "BypassBurnDamageReductionAbAttr",
       "label": "Keep my attacks at full strength while burned",
@@ -333,6 +366,79 @@
         "do": true
       },
       "uses": 2
+    },
+    {
+      "id": "block.flinch-stat-stage-change",
+      "className": "FlinchStatStageChangeAbAttr",
+      "label": "Change my stats when I flinch",
+      "summary": "When I flinch, my Speed change by 1 stages. Example: Steadfast raises Speed by 1 stage.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.flinched",
+      "whenLabel": "When I flinch",
+      "synonyms": [
+        "steadfast",
+        "rattled",
+        "superheavy",
+        "boost when flinched",
+        "speed up on flinch",
+        "stat boost after flinching",
+        "flinch reaction"
+      ],
+      "examples": [
+        "Raise Speed by 1 stage when I flinch, like Steadfast"
+      ],
+      "params": [
+        {
+          "id": "stats",
+          "label": "Stats that change (comma separated)",
+          "control": "text",
+          "default": "SPD",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "stages",
+          "label": "Stages the stats change by (negative lowers them)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Each stat can only go up to +6 or down to -6; at the limit the stat change reports that it cannot go further",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stats",
+          "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
     },
     {
       "id": "block.float",
@@ -1128,6 +1234,48 @@
       "uses": 5
     },
     {
+      "id": "block.post-faint-hp-damage",
+      "className": "PostFaintHPDamageAbAttr",
+      "label": "Hurt my attacker with the damage that knocked me out",
+      "summary": "When a foe knocks me out with a move, that foe loses as much HP as the hit that knocked me out did to me. Example: Innards Out.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.faint",
+      "whenLabel": "When I faint",
+      "synonyms": [
+        "innards out",
+        "take them with me",
+        "revenge damage on faint",
+        "last hit back",
+        "deal damage when knocked out",
+        "damage the killer",
+        "mutual damage"
+      ],
+      "examples": [
+        "When I am knocked out, the foe takes the damage of the final hit, like Innards Out"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "I must have been knocked out by a move of a foe: no effect after poison, weather, recoil or other damage that is not a move",
+        "A Pokemon on my own side that knocks me out is never hurt",
+        "A foe with an ability that blocks damage that is not from a move (Magic Guard) takes nothing",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.post-faint-unsuppressed-weather-form-change",
       "className": "PostFaintUnsuppressedWeatherFormChangeAbAttr",
       "label": "Update weather forms (Castform, Cherrim) when I faint",
@@ -1631,6 +1779,129 @@
         "do": true
       },
       "uses": 64
+    },
+    {
+      "id": "block.redirect-type-move",
+      "className": "RedirectTypeMoveAbAttr",
+      "label": "Draw single-target moves of one type to me",
+      "summary": "When a foe or ally aims a single-target Electric move at someone else, the move goes to me instead. Example: Lightning Rod draws Electric moves.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.redirect-move",
+      "whenLabel": "While the game picks who a move targets",
+      "synonyms": [
+        "lightning rod",
+        "storm drain",
+        "redirect attacks",
+        "draw in moves",
+        "attract moves",
+        "magnet for a type",
+        "take the hit for my team"
+      ],
+      "examples": [
+        "Draw every Electric move to me, like Lightning Rod",
+        "Draw Water moves to me"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Type of move that is drawn to me",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only moves that aim at one other Pokemon can be drawn in (not moves that hit everyone, a whole side or only the user)",
+        "In a triple battle I must stand next to the user, unless the move is Flying or a pulse move",
+        "Nothing happens when the move already aims at me",
+        "Center-of-attention moves such as Follow Me override it, and a user whose ability ignores redirection is not redirected"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 9
+    },
+    {
+      "id": "block.reduce-status-effect-duration",
+      "className": "ReduceStatusEffectDurationAbAttr",
+      "label": "Wake up from sleep faster",
+      "summary": "Each turn I try to move while my Sleep status lasts, it counts down one extra turn, so I wake up about twice as fast. Example: Early Bird.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.status-duration",
+      "whenLabel": "While the game calculates how long my status lasts",
+      "synonyms": [
+        "early bird",
+        "wake up sooner",
+        "shorter sleep",
+        "sleep less",
+        "faster wake up",
+        "rest less",
+        "sleep counts down faster"
+      ],
+      "examples": [
+        "Wake up from sleep about twice as fast, like Early Bird"
+      ],
+      "params": [
+        {
+          "id": "status",
+          "label": "Status that counts down one extra turn each turn",
+          "control": "select",
+          "default": "SLEEP",
+          "editable": true,
+          "options": [
+            "SLEEP"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only the sleep counter is ever asked, when I try to move while asleep",
+        "The turns left go down by one extra every turn I try to move, so the sleep lasts about half as long (a 4 turn sleep ends on the second turn)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.run-success",
