@@ -422,8 +422,15 @@ export class AlliedFieldDamageReductionAbAttr extends PreDefendAbAttr {
 }
 
 export class ReceivedTypeDamageMultiplierAbAttr extends ReceivedMoveDamageMultiplierAbAttr {
+  /**
+   * The move type this attribute reacts to. Kept as a field only so the ability studio declaration can read it
+   * back from a live instance; the closure passed to `super` below is still the one that decides.
+   */
+  private readonly moveType: PokemonType;
+
   constructor(moveType: PokemonType, damageMultiplier: number) {
     super((_target, user, move) => user.getMoveType(move) === moveType, damageMultiplier, false);
+    this.moveType = moveType;
   }
 }
 
