@@ -560,6 +560,17 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     },
   ),
   calc(
+    "calc.ally-stat-aura",
+    "PersistentFieldAuraAbAttr",
+    [H, O, ST],
+    "While the game calculates a stat of a Pokemon on my side",
+    "Stats",
+    "statValue",
+    {
+      synonyms: ["ally aura", "team stat boost", "boost my allies", "party aura", "field aura", "rat king"],
+    },
+  ),
+  calc(
     "calc.ignore-stat-stages",
     "IgnoreOpponentStatStagesAbAttr",
     [H, O, ST],

@@ -49,9 +49,10 @@
 //       status: StatusEffect.SLEEP } })`
 // =============================================================================
 
-import { isComatoseLike, PostTurnHealAbAttr } from "#abilities/ab-attrs";
+import { type AbAttrBaseParams, isComatoseLike, PostTurnHealAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { TerrainType } from "#data/terrain";
 import type { PokemonType } from "#enums/pokemon-type";
 import { StatusEffect } from "#enums/status-effect";
@@ -122,7 +123,10 @@ export interface PassiveRecoveryOptions {
  * override the fraction without rewriting the heal-phase shift. Our override
  * mirrors the parent body line-for-line and substitutes the divisor.
  */
-export class PassiveRecoveryAbAttr extends PostTurnHealAbAttr {
+export class PassiveRecoveryAbAttr extends PostTurnHealAbAttr implements GatedAttr<AbAttrBaseParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
   private readonly healFractionValue: number;
   private readonly conditionSpec: PassiveRecoveryCondition;
 
@@ -159,13 +163,21 @@ export class PassiveRecoveryAbAttr extends PostTurnHealAbAttr {
   }
 
   /**
-   * canApply: inherits the parent's "not at full HP" gate, then layers the
-   * configured condition gate. Both must pass for the heal to fire.
+   * canApply: the parent's "not at full HP" rule, then the configured condition. Both must pass for the heal
+   * to fire. Tier B split (ability studio spec 3.1): `guards` then `gate`, in the original clause order. There
+   * is no `prepare` and no `residual`.
    */
   public override canApply(params: Parameters<PostTurnHealAbAttr["canApply"]>[0]): boolean {
-    if (!super.canApply(params)) {
-      return false;
-    }
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** Rule that stays in the class: the parent's "not at full HP" test. Moved verbatim from `canApply`. */
+  public guards(params: AbAttrBaseParams): boolean {
+    return super.canApply(params);
+  }
+
+  /** The replaceable condition: the configured situation. Moved verbatim from `canApply`. */
+  public gate(params: AbAttrBaseParams): boolean {
     return PassiveRecoveryAbAttr.matchesCondition(this.conditionSpec, params.pokemon);
   }
 

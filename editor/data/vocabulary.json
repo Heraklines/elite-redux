@@ -1109,6 +1109,27 @@
       ]
     },
     {
+      "id": "calc.ally-stat-aura",
+      "kind": "calc",
+      "dispatchKey": "PersistentFieldAuraAbAttr",
+      "provides": [
+        "holder",
+        "other",
+        "stat"
+      ],
+      "label": "While the game calculates a stat of a Pokemon on my side",
+      "group": "Stats",
+      "modifies": "statValue",
+      "synonyms": [
+        "ally aura",
+        "team stat boost",
+        "boost my allies",
+        "party aura",
+        "field aura",
+        "rat king"
+      ]
+    },
+    {
       "id": "calc.ignore-stat-stages",
       "kind": "calc",
       "dispatchKey": "IgnoreOpponentStatStagesAbAttr",
@@ -5059,5 +5080,5 @@
       ]
     }
   ],
-  "hash": "1d31fe5b65dc1a"
+  "hash": "03ef54e0d0a23c"
 }

@@ -392,6 +392,7 @@ const WHEN_TEMPLATE: Readonly<Record<string, string>> = {
   "calc.weather-type-debuff": t.weather,
   "calc.stat-value": t.hit,
   "calc.foe-stat-value": t.hit,
+  "calc.ally-stat-aura": t.attack,
   "calc.ignore-stat-stages": t.attack,
   "calc.defensive-stat-substitute": t.hit,
   "calc.defensive-stat-pick": t.crit,

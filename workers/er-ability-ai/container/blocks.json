@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "1d31fe5b65dc1a",
-  "hash": "08fd6a5527f44b",
+  "vocabularyHash": "03ef54e0d0a23c",
+  "hash": "0dbc8f469c318e",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -716,6 +716,536 @@
         "do": true
       },
       "uses": 2
+    },
+    {
+      "id": "block.once-per-entry-contact-damage-reduction",
+      "className": "OncePerEntryContactDamageReductionAbAttr",
+      "label": "Take less damage once each time I enter the battle",
+      "summary": "Once after I enter the battle, the first hit that matches the condition (a contact move) does 0.5 times its damage. Example: 0.5 = half damage.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.damage-taken",
+      "whenLabel": "While the game calculates damage I take",
+      "synonyms": [
+        "chuckster",
+        "first contact hit reduced",
+        "shield for one hit",
+        "damage reduction on entry",
+        "brace for the first touch",
+        "one time guard"
+      ],
+      "examples": [
+        "The first contact move that hits me after I enter does only half damage, like Chuckster"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Damage multiplier for that one hit (0.5 = half damage)",
+          "control": "number",
+          "default": 0.5,
+          "editable": true,
+          "min": 0,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Works for one hit each time this Pokemon enters the battle: the first hit that passes the condition uses the charge up and it comes back at the next send-out",
+        "A damage preview shows the reduction but does not use the charge up"
+      ],
+      "effect": {
+        "id": "effect.multiply-damage-taken",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.one-shot-type-boost",
+      "className": "OneShotTypeBoostAbAttr",
+      "label": "Boost moves of one type until the first one is used",
+      "summary": "Moves of the Electric type get 2 times their power until the first one has been used. Needs its partner block to mark it used. Example: 2 = double power.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "power outage",
+        "one time type boost",
+        "first move of a type is stronger",
+        "single use power boost",
+        "boost the first attack of a type",
+        "type boost that runs out"
+      ],
+      "examples": [
+        "My first Electric move does double damage, like Power Outage"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Type of the boosted moves",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "factor",
+          "label": "Power multiplier (2 = double power)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 0.1,
+          "max": 8,
+          "step": 0.05
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The boost stops only after the partner block (lose the type after the first move of that type) has run once: that block marks the boost as used",
+        "A move counts as the chosen type after the Pokemon's own type changes are applied to it"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "type",
+          "factor"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": false
+      },
+      "packageReason": "Package, justified (see the header): one mechanic split over two classes that share a Symbol flag on the Pokemon object. Only user: Power Outage (attr 0 here, attr 1 is the Followup), nothing to bind (no ctor closure; the parent's `() => true` is dead because canApply stays the parent's and apply is overridden). Suspected game bugs, NOT fixed: (1) the flag is a Symbol property on the Pokemon object that nothing ever clears, so it survives into later battles although the header comment says once per battle, and the Pokemon never gets the boost again; (2) the type-loss side is on summonData.types, which is cleared at switch-out, so the type comes back but the boost does not; (3) `apply` does not look at `simulated`, so a damage preview also boosts (harmless, it only reads); (4) the move type is read with pokemon.getMoveType, so a -ate style ability that changes the move type also changes whether the boost applies.",
+      "uses": 1
+    },
+    {
+      "id": "block.one-shot-type-boost-followup",
+      "className": "OneShotTypeBoostFollowupAbAttr",
+      "label": "Lose a type after using my first move of that type",
+      "summary": "After my first move of the Electric type, I lose that type (a Pokemon with only that type keeps it). This marks the boost of its partner block as used.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "power outage",
+        "lose a type after attacking",
+        "type removal after use",
+        "burn out the type",
+        "give up a type",
+        "type is spent"
+      ],
+      "examples": [
+        "After my first Electric move I stop being Electric type, like Power Outage"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Type that is used up and lost",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "factor",
+          "label": "Power multiplier of the partner block (not used here, keep both the same)",
+          "control": "number",
+          "default": 2,
+          "editable": false,
+          "min": 0.1,
+          "max": 8,
+          "step": 0.05
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only the first move of the chosen type does this, one time only",
+        "A Pokemon whose only type is the chosen one keeps it, but the one-time use is still spent",
+        "A preview of the move does nothing"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "type"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": false
+      },
+      "packageReason": "Package, justified (see the header and the power half). Only user: Power Outage (attr 1). Nothing to bind: no closure, and the gate is the identity of the mechanic. The override of canApply never calls the parent's damaging-move test, so a STATUS move of the chosen type also counts as the first move and spends the boost: suspected game bug, NOT fixed. The one-time flag is never cleared (see the power half). A Pokemon with a single type of the chosen kind keeps its type but still spends the flag. Own test (the shared L1 grid and L2 twin cannot see it all): test/tests/elite-redux/decomp/B10/chunk2-one-shot.test.ts.",
+      "uses": 1
+    },
+    {
+      "id": "block.outgoing-stat-drop-multiplier",
+      "className": "OutgoingStatDropMultiplierAbAttr",
+      "label": "Make the stat drops of my moves stronger",
+      "summary": "When my move lowers a stat of its target, the drop is made 2 times as big with extra stages right after the move. Example: 2 = double, so -1 becomes -2.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "subdue",
+        "double stat drops",
+        "stronger stat lowering",
+        "debuff amplifier",
+        "bigger stat drops",
+        "extra drops on foes"
+      ],
+      "examples": [
+        "Stat-lowering moves I use drop the target's stats twice as much, like Subdue"
+      ],
+      "params": [
+        {
+          "id": "factor",
+          "label": "How many times bigger the drops are (2 = double, must be above 1)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1.1,
+          "max": 6,
+          "step": 0.1
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only works when the move I used lowers a stat of its target (a drop on myself does not count)",
+        "The target must still be standing, and nothing happens in a preview",
+        "The extra stages are whole stages, rounded away from zero: a factor of 1.5 on a drop of 1 adds 1 extra stage",
+        "The extra drop is a normal stat change, so effects that block stat drops (like Clear Body) still stop it"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "factor"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.party-count-multi-hit",
+      "className": "PartyCountMultiHitAbAttr",
+      "label": "Hit once more for every healthy Pokemon in my party",
+      "summary": "My moves that can strike several times get one extra hit per other healthy party member, up to 6 hits in total. Example: 5 healthy partners = 6 hits.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.hit-count",
+      "whenLabel": "While the game decides how many times a move hits",
+      "synonyms": [
+        "minion control",
+        "extra hits per party member",
+        "hit more with a bigger team",
+        "multi hit by party size",
+        "summon strikes",
+        "swarm hits"
+      ],
+      "examples": [
+        "My attacks hit one more time for each healthy teammate, up to six hits, like Minion Control"
+      ],
+      "params": [
+        {
+          "id": "maxHits",
+          "label": "Most hits in total (6 = never more than six hits)",
+          "control": "number",
+          "default": 6,
+          "editable": true,
+          "min": 2,
+          "max": 10,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only moves that can be turned into several strikes are changed (the same rule as other extra-strike abilities)",
+        "A healthy Pokemon is another member of my party that has not fainted and has no status condition; I do not count myself",
+        "The total is also capped by the number you set, so a move that already hits more times than that is cut down to it"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "maxHits"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.passive-recovery",
+      "className": "PassiveRecoveryAbAttr",
+      "label": "Heal a share of my max HP at the end of every turn",
+      "summary": "At the end of every turn I heal 12.5% of my max HP while I am missing HP. Situation: Always. Example: 6.25 = one sixteenth, 12.5 = one eighth.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "passive recovery",
+        "heal every turn",
+        "regenerate each turn",
+        "leftovers",
+        "rain dish",
+        "ice body",
+        "self sufficient",
+        "residual healing"
+      ],
+      "examples": [
+        "Heal one sixteenth of my max HP at the end of every turn, like Self Sufficient",
+        "Heal one eighth of my max HP each turn while Misty Terrain is up, like Celestial Blessing",
+        "Heal a quarter of my max HP each turn while I am at half HP or less, like Resilience"
+      ],
+      "params": [
+        {
+          "id": "percent",
+          "label": "Share of max HP healed each turn (% ; 6.25 = one sixteenth, 12.5 = one eighth)",
+          "control": "number",
+          "default": 12.5,
+          "editable": true,
+          "min": 0.5,
+          "max": 100,
+          "step": 0.25,
+          "gateIndependent": true
+        },
+        {
+          "id": "when",
+          "label": "Situation that turns the healing on (shown for reading; change the condition block to change it)",
+          "control": "text",
+          "default": "Always",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Healing only happens while I am missing HP: at full HP nothing is healed and nothing is shown",
+        "Nothing is healed in a preview"
+      ],
+      "effect": {
+        "id": "effect.heal-percent",
+        "params": [
+          "percent"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 17
+    },
+    {
+      "id": "block.persistent-field-aura",
+      "className": "PersistentFieldAuraAbAttr",
+      "label": "Boost the stats of my side the whole time I am on the field",
+      "summary": "While I am on the field, the stats you pick (Attack, Defense, Sp. Atk, Sp. Def, Speed) of Pokemon on my side are multiplied by 1.5: every pokemon on my side. Example: 1.5 = 50% more.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.ally-stat-aura",
+      "whenLabel": "While the game calculates a stat of a Pokemon on my side",
+      "synonyms": [
+        "team aura",
+        "ally stat boost",
+        "party stat aura",
+        "boost my teammates",
+        "field aura",
+        "rat king",
+        "polarity",
+        "fire aspect"
+      ],
+      "examples": [
+        "Double the Speed of my allies while I am on the field, like Fire Aspect",
+        "Raise all stats of allies with a base stat total below 400 by 50%, like Rat King"
+      ],
+      "params": [
+        {
+          "id": "stats",
+          "label": "Stats that are boosted (write them separated by commas: Attack, Sp. Atk, Speed)",
+          "control": "text",
+          "default": "Attack, Defense, Sp. Atk, Sp. Def, Speed",
+          "editable": true
+        },
+        {
+          "id": "multiplier",
+          "label": "Stat multiplier (1.5 = 50% more, 2 = double)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05
+        },
+        {
+          "id": "includeSelf",
+          "label": "Also boost myself",
+          "control": "boolean",
+          "default": false,
+          "editable": true
+        },
+        {
+          "id": "allies",
+          "label": "Which Pokemon on my side get the boost (write like the example)",
+          "control": "text",
+          "default": "Every Pokemon on my side",
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only Pokemon on the same side as me are boosted, and only while I am still on the field",
+        "Every aura on the field multiplies, so two Pokemon with an aura boost the same ally twice",
+        "Everything is worked out each time a stat is read, so allies that come in later are boosted too"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "stats",
+          "multiplier",
+          "includeSelf",
+          "allies"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.poisoned-foe-purge",
+      "className": "PoisonedFoePurgeAbAttr",
+      "label": "Strip a poisoned target's stat boosts and block its healing",
+      "summary": "After my attack, a poisoned target loses all its raised stats and cannot heal. The block is refreshed on every attack while it stays poisoned.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "hemolysis",
+        "remove stat boosts from poisoned foes",
+        "no healing for poisoned foes",
+        "heal block",
+        "poison cleanse of buffs",
+        "punish poisoned targets"
+      ],
+      "examples": [
+        "Poisoned foes lose all stat boosts and cannot heal, like Hemolysis"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "There must be a target, and nothing happens in a preview",
+        "Only raised stats (above zero) are reset; lowered stats stay as they are",
+        "The healing block is added only if the target does not already have it"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.post-damage-force-switch",

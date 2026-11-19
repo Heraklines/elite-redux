@@ -37,6 +37,8 @@ function makeStubPokemon(
     // so matchesCondition consults hasAbility(COMATOSE) — the stub must provide it.
     hasAbility: (id: AbilityId) => (opts.comatose ?? false) && id === AbilityId.COMATOSE,
     getTypes: () => [],
+    // isComatoseLike also asks which abilities are active (Honk Shoo); the stub has none.
+    getActiveAbilitySources: () => [],
   } as unknown as Pokemon;
 }
 

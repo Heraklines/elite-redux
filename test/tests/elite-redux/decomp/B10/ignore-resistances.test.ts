@@ -34,7 +34,7 @@ describe("B10: ignore type resistances (IgnoreResistancesAbAttr)", () => {
     expect(rebuilt).not.toBe(original);
 
     let defenderTypes: PokemonType[] = [PokemonType.NORMAL];
-    vi.spyOn(foe, "getTypes").mockImplementation(() => [...defenderTypes]);
+    vi.spyOn(foe, "getTypes").mockImplementation(() => [...defenderTypes] as never);
     const matchup = (attrs: readonly unknown[], types: PokemonType[]): number => {
       defenderTypes = types;
       vi.spyOn(holder, "getAllActiveAbilityAttrs").mockReturnValue(attrs as never);
