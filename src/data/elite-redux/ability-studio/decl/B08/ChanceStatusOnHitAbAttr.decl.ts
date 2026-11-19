@@ -5,7 +5,7 @@
  */
 
 // B08 / event-effect, Tier B with RNG in the gate. Read from the source (archetypes/chance-status-on-hit.ts) and from
-// the live instances of all 12 users. canApply is now `gate && residual`, in the original clause order:
+// the live instances of all 10 users. canApply is now `gate && residual`, in the original clause order:
 //
 //   gate     1. contactExcluded: the move INHERENTLY makes contact (move.hasFlag, ignoring Long Reach) -> false; and the
 //               hit result must be a damaging one (EFFECTIVE, SUPER_EFFECTIVE, NOT_VERY_EFFECTIVE, ONE_HIT_KO) -> else false
@@ -180,5 +180,5 @@ export default defineDecl(ChanceStatusOnHitAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "Tier B split by hand: canApply = gate && residual (a pure move of the original clauses; the outcome pick is a random draw that stays AFTER the chance roll, so it is in the residual). Users (12), all 12 gates bound: contact tier Poison Touch, Super Hot Goo, Arc Flash, Daybreak, Hypnotic Touch, Crispy Cream (a frostbite tag in the pick: no status.has), and the non-contact tier Static, Flame Body, White Noise, Smoldering Wood (atoms move.inherent-flag, which ignores Long Reach, and hit.landed-damage, which keeps Growl from proccing, added to the library). The filter, moveIds-style options and firstTurnChance of the options type are never set by a live user and stay in the class. The class ignores `simulated` in canApply (draws and rolls even when simulated; the library atom rng.chance answers true without a draw when simulated). Siblings (ChanceBattlerTagOnHitAbAttr, ChanceStatusOnAttackAbAttr) are separate classes.",
+    "Tier B split by hand: canApply = gate && residual (a pure move of the original clauses; the outcome pick is a random draw that stays AFTER the chance roll, so it is in the residual). Users (10), all 10 gates bound: contact tier Poison Touch, Super Hot Goo, Arc Flash, Daybreak, Hypnotic Touch, Crispy Cream (a frostbite tag in the pick: no status.has), and the non-contact tier Static, Flame Body, White Noise, Smoldering Wood (atoms move.inherent-flag, which ignores Long Reach, and hit.landed-damage, which keeps Growl from proccing, added to the library). The filter, moveIds-style options and firstTurnChance of the options type are never set by a live user and stay in the class. The class ignores `simulated` in canApply (draws and rolls even when simulated; the library atom rng.chance answers true without a draw when simulated). Siblings (ChanceBattlerTagOnHitAbAttr, ChanceStatusOnAttackAbAttr) are separate classes.",
 });

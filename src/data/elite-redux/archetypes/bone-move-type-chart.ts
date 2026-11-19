@@ -30,9 +30,26 @@ import type { Move } from "#moves/move";
 import type { AbAttrBaseParams } from "#types/ability-types";
 import type { NumberHolder } from "#utils/common";
 
+/** Settings of {@linkcode BoneMoveTypeChartAbAttr}. Every default equals the original fixed behaviour. */
+export interface BoneMoveTypeChartOptions {
+  /** Moves with this property are rewritten (default BONE_BASED). */
+  readonly flag?: MoveFlags;
+  /** The multiplier an immune matchup (0x) becomes (default 1, normal damage). */
+  readonly immuneBecomes?: number;
+  /** The factor a resisted matchup (below 1x) is multiplied by (default 2). */
+  readonly resistedFactor?: number;
+}
+
 export class BoneMoveTypeChartAbAttr extends AbAttr {
-  constructor() {
+  private readonly flag: MoveFlags;
+  private readonly immuneBecomes: number;
+  private readonly resistedFactor: number;
+
+  constructor(options: BoneMoveTypeChartOptions = {}) {
     super(false);
+    this.flag = options.flag ?? MoveFlags.BONE_BASED;
+    this.immuneBecomes = options.immuneBecomes ?? 1;
+    this.resistedFactor = options.resistedFactor ?? 2;
   }
 
   override canApply(_params: AbAttrBaseParams): boolean {
@@ -43,13 +60,13 @@ export class BoneMoveTypeChartAbAttr extends AbAttr {
 
   /** Adjust the effectiveness multiplier for a bone move. No-op otherwise. */
   public fire(move: Move, multi: NumberHolder): void {
-    if (!move.hasFlag(MoveFlags.BONE_BASED)) {
+    if (!move.hasFlag(this.flag)) {
       return;
     }
     if (multi.value === 0) {
-      multi.value = 1; // bypass type immunity → normal damage
+      multi.value = this.immuneBecomes; // bypass type immunity → normal damage
     } else if (multi.value < 1) {
-      multi.value *= 2; // resisted → doubled
+      multi.value *= this.resistedFactor; // resisted → doubled
     }
   }
 }

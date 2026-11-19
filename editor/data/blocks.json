@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "0a752a909ad620",
-  "hash": "108f759ccb7b10",
+  "hash": "172810e0cfb1b0",
   "blocks": [
     {
       "id": "block.absorbant",
@@ -1561,11 +1561,64 @@
       "examples": [
         "My bone moves hit Flying types with Ground moves and do normal damage against resists"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "flag",
+          "label": "Only for moves with this property",
+          "control": "select",
+          "default": "BONE_BASED",
+          "editable": true,
+          "options": [
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        },
+        {
+          "id": "immuneBecomes",
+          "label": "Damage multiplier when the target is immune (1 = normal damage, 0 = stays immune)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 0,
+          "max": 4,
+          "step": 0.25
+        },
+        {
+          "id": "resistedFactor",
+          "label": "Times the damage multiplier is multiplied when the target resists (2 = doubled, 1 = unchanged)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 0.25,
+          "max": 8,
+          "step": 0.25
+        }
+      ],
       "conditions": [],
       "guards": [],
       "feasibility": [
-        "Only moves with the bone property are changed",
+        "Only moves with the chosen property (bone by default) are changed",
         "A target that is neutral or weak to the move is left as it is"
       ],
       "effect": {

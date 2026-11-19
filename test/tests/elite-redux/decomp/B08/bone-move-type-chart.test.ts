@@ -31,11 +31,11 @@ describe("B08: bone moves and the type chart (BoneMoveTypeChartAbAttr)", () => {
   });
   const sitesOf = () => allAttrSites().filter(site => site.className === "BoneMoveTypeChartAbAttr");
 
-  it("has the two live users and no params to read back", async () => {
+  it("has the two live users and three editable params", async () => {
     await startWorld(phaserGame);
     const sites = sitesOf();
     expect(sites.map(site => site.abilityName).sort()).toEqual(["Bone Zone", "Cranisphere"]);
-    expect(module.decl.params).toHaveLength(0);
+    expect(module.decl.params.map(param => param.id)).toEqual(["flag", "immuneBecomes", "resistedFactor"]);
   });
 
   it("the rebuild equals the original for every multiplier and for bone and non-bone moves, and matches the documented rule", async () => {
