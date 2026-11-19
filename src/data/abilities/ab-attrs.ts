@@ -6554,11 +6554,25 @@ export class MoveAbilityBypassAbAttr extends AbAttr {
  * the bypass does not fire.
  */
 export class SuperEffectiveMoveAbilityBypassAbAttr extends MoveAbilityBypassAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: MoveAbilityBypassAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `guards` (the base class check: the bypass
+   * is not already decided and the constructor's per-move closure agrees), then `gate` (a foe is known and the move is
+   * super effective against it). There is no residual and there is no random draw.
+   */
   override canApply(params: MoveAbilityBypassAbAttrParams): boolean {
-    if (!super.canApply(params)) {
-      return false;
-    }
-    const { pokemon, move, target } = params;
+    return gatedCanApply<MoveAbilityBypassAbAttrParams>(this, params);
+  }
+
+  /** The base class check, kept first and unchanged. */
+  public guards(params: MoveAbilityBypassAbAttrParams): boolean {
+    return super.canApply(params);
+  }
+
+  /** The replaceable condition: a foe is known and the move is super effective against it (fails closed without one). */
+  public gate({ pokemon, move, target }: MoveAbilityBypassAbAttrParams): boolean {
     return target != null && target.getMoveEffectiveness(pokemon, move) > 1;
   }
 }

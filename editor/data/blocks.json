@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "096ef32b703c2f",
+  "hash": "0cf0d263056480",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -160,6 +160,46 @@
       "uses": 5
     },
     {
+      "id": "block.force-switch-out-immunity",
+      "className": "ForceSwitchOutImmunityAbAttr",
+      "label": "Cannot be forced out of battle",
+      "summary": "Moves that drag me out (Roar, Whirlwind, Dragon Tail, Circle Throw) fail against me, so I stay in the battle. Example: a foe's Roar does nothing.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.forced-switch",
+      "whenLabel": "While the game checks if I can be forced out",
+      "synonyms": [
+        "suction cups",
+        "anchor",
+        "no phazing",
+        "roar immunity",
+        "whirlwind immunity",
+        "cannot be dragged out",
+        "stay in the battle",
+        "guard dog"
+      ],
+      "examples": [
+        "Roar and Whirlwind fail against me, like Suction Cups"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when the forced switch was already blocked by something earlier"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 5
+    },
+    {
       "id": "block.hp-threshold-form-change",
       "className": "HpThresholdFormChangeAbAttr",
       "label": "Change form depending on my HP",
@@ -307,6 +347,89 @@
         "do": true
       },
       "uses": 1
+    },
+    {
+      "id": "block.ignore-protect-on-contact",
+      "className": "IgnoreProtectOnContactAbAttr",
+      "label": "My contact moves go through protection",
+      "summary": "While I have this, my moves that make contact ignore protection moves such as Protect and hit anyway. Example: Tackle breaks through Protect.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "unseen fist",
+        "ignore protect",
+        "break through protect",
+        "bypass protect",
+        "protect breaker",
+        "final blow",
+        "contact ignores protection"
+      ],
+      "examples": [
+        "My contact moves break through Protect, like Unseen Fist"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only moves that make contact (after contact-ignoring abilities such as Long Reach) are let through; the engine tests that itself"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.move-ability-bypass",
+      "className": "MoveAbilityBypassAbAttr",
+      "label": "My moves ignore the target's ability",
+      "summary": "My moves ignore the target's ability, so abilities that block or weaken them do not work. Example: a Levitate foe is still hit by my Ground moves.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.ability-bypass",
+      "whenLabel": "While the game decides whether my move ignores abilities",
+      "synonyms": [
+        "mold breaker",
+        "ignore abilities",
+        "bypass ability",
+        "ignore the target's ability",
+        "teravolt",
+        "turboblaze",
+        "get past levitate",
+        "break through abilities"
+      ],
+      "examples": [
+        "My moves ignore the target's ability, like Mold Breaker",
+        "Only my Rock moves ignore abilities, like Stonecutter"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": false,
+          "editable": false,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when something earlier already decided that abilities are ignored"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 6
     },
     {
       "id": "block.post-damage-force-switch",
@@ -628,6 +751,152 @@
         "do": true
       },
       "uses": 64
+    },
+    {
+      "id": "block.reduce-berry-use-threshold",
+      "className": "ReduceBerryUseThresholdAbAttr",
+      "label": "Eat my pinch berries at twice the HP",
+      "summary": "The HP level at which my stat berries are eaten is doubled. Example: a Liechi Berry that waits for 25% HP is eaten at 50% HP.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.berry-threshold",
+      "whenLabel": "While the game checks if my berry should be eaten",
+      "synonyms": [
+        "gluttony",
+        "eat berry earlier",
+        "berry sooner",
+        "early berry",
+        "pinch berry",
+        "voracity",
+        "double berry threshold"
+      ],
+      "examples": [
+        "Eat my Liechi Berry at 50% HP instead of 25%, like Gluttony"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The doubling only counts while my HP is above the berry's normal level; right at that level (25%) the berry is not eaten early"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.super-effective-move-ability-bypass",
+      "className": "SuperEffectiveMoveAbilityBypassAbAttr",
+      "label": "My super effective moves ignore the target's ability",
+      "summary": "My super effective moves ignore the target's ability, so abilities that block or weaken them do not work. Needs a known target, otherwise nothing happens.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.ability-bypass",
+      "whenLabel": "While the game decides whether my move ignores abilities",
+      "synonyms": [
+        "deadly precision",
+        "weakness breaks abilities",
+        "super effective ignores ability",
+        "type advantage ignores ability",
+        "mold breaker on weakness",
+        "flawless precision",
+        "mach 3"
+      ],
+      "examples": [
+        "Super effective hits ignore the target's damage-cutting abilities, like Deadly Precision"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": false,
+          "editable": false,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Needs a known target; without one the bypass does not happen",
+        "Does nothing when something earlier already decided that abilities are ignored"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.weight-multiplier",
+      "className": "WeightMultiplierAbAttr",
+      "label": "Change my weight",
+      "summary": "My weight is multiplied by 2. Example: 2 makes me twice as heavy, 0.5 makes me half as heavy. Weight-based moves such as Heavy Slam and Low Kick read it.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.weight",
+      "whenLabel": "While the game calculates my weight",
+      "synonyms": [
+        "heavy metal",
+        "light metal",
+        "heavier",
+        "lighter",
+        "weigh more",
+        "weigh less",
+        "body weight",
+        "lead coat"
+      ],
+      "examples": [
+        "Twice as heavy, like Heavy Metal",
+        "Half as heavy, like Light Metal"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Weight multiplier (2 = twice as heavy, 0.5 = half)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 0.1,
+          "max": 10,
+          "step": 0.1
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A Pokemon never weighs less than 0.1 kg, whatever the multiplier"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 6
     }
   ]
 }
