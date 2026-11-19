@@ -49,6 +49,7 @@
   let componentSearchView = { key: "", abilityLimit: 8, effectLimit: 32, partLimit: 80 };
   let studioDrag = null;
   let community = false;
+  let compositionModel = null;
   let callbacks = {};
   let aiEndpoint = "";
   let loadSavedBlueprints = null;
@@ -262,6 +263,11 @@
   function normalizeAiBlueprint(raw) {
     const blueprint = clone(raw || {});
     blueprint.version = primitiveCatalog.schemaVersion;
+    if (compositionModel && Array.isArray(blueprint.composition) && blueprint.composition.length > 0) {
+      blueprint.version = 2;
+    } else {
+      blueprint.composition = undefined;
+    }
     blueprint.id = nextId();
     blueprint.name = String(blueprint.name || "Generated Ability")
       .trim()
@@ -511,7 +517,7 @@
 
   function newAbility(name = "New Ability") {
     return {
-      version: primitiveCatalog.schemaVersion,
+      version: compositionModel ? 2 : primitiveCatalog.schemaVersion,
       id: nextId(),
       name,
       description: "Describe the complete battle effect.",
@@ -519,6 +525,7 @@
       includes: [],
       mechanics: [],
       componentRules: [],
+      ...(compositionModel ? { composition: [] } : {}),
       rules: [],
       modifiers: [],
       flags: {},
@@ -723,6 +730,25 @@
     return `<div class="as-chain-item" draggable="true" data-as-drag-part="effect" data-as-drag-rule="${ruleIndex}" data-as-drag-index="${effectIndex}" data-as-drop-part="effect" data-as-drop-rule="${ruleIndex}" data-as-drop-index="${effectIndex}"><span class="as-drag-grip" aria-hidden="true">⠿</span><div class="as-effect-block"><select class="as-kind-select" data-as-component-effect-kind aria-label="Effect type" ${prefix}>${selectOptions(primitiveCatalog.effectKinds, effect.kind)}</select>${fields}</div><button type="button" class="icon danger as-component-part-remove" title="Remove effect" aria-label="Remove ${esc(pretty(effect.kind))}" data-as-action="remove-component-effect" ${prefix}>×</button></div>`;
   }
 
+  function packageBadgeHtml(attrType) {
+    return compositionModel ? window.erCompositionBuilder.badgeHtml(compositionModel, attrType) : "";
+  }
+
+  function unpackHtml(condition, ruleIndex, conditionIndex) {
+    if (!compositionModel || condition.kind !== "event") {
+      return "";
+    }
+    const entry = currentEntry();
+    const info = entry ? compositionModel.unpackInfo(entry, ruleIndex, conditionIndex) : null;
+    if (!info) {
+      return "";
+    }
+    const prefix = `data-as-component-rule="${ruleIndex}" data-as-component-condition="${conditionIndex}"`;
+    return info.available
+      ? `<span class="cb-unpack"><button type="button" class="cb-small" title="Replace this gate with its explicit blocks and locked safety rules. The rebuilt rule is listed with your block rules." data-as-action="unpack-gate" ${prefix}>Unpack</button></span>`
+      : `<span class="cb-unpack cb-unpack-off" title="${esc(info.reason)}"><button type="button" class="cb-small" disabled ${prefix}>Unpack</button><small>${esc(info.reason)}</small></span>`;
+  }
+
   function componentRuleHtml(rule, index, number) {
     const sourceRule = resolveComponent(rule.hook);
     const trigger = sourceRule?.hook.label || rule.hook.attrType;
@@ -747,7 +773,7 @@
               }
               const definition = componentConditionsByKey.get(componentConditionKey(condition));
               const label = definition?.label || `${condition.attrType} condition`;
-              return `${conditionIndex > 0 ? conditionConnectorHtml(rule, "component", index) : ""}<div class="as-runtime-condition as-runtime-configurable" draggable="true" data-as-drag-part="condition" data-as-drag-rule="${index}" data-as-drag-index="${conditionIndex}" data-as-drop-part="condition" data-as-drop-rule="${index}" data-as-drop-index="${conditionIndex}"><span class="as-drag-grip" aria-hidden="true">⠿</span><div class="as-runtime-component-copy"><b>${esc(label)}</b><small>${esc(condition.kind)}</small>${runtimeParametersHtml(condition, "condition", index, conditionIndex)}</div><button type="button" class="icon danger" title="Remove condition" aria-label="Remove ${esc(label)}" data-as-action="remove-component-condition" data-as-component-rule="${index}" data-as-component-condition="${conditionIndex}">×</button></div>`;
+              return `${conditionIndex > 0 ? conditionConnectorHtml(rule, "component", index) : ""}<div class="as-runtime-condition as-runtime-configurable" draggable="true" data-as-drag-part="condition" data-as-drag-rule="${index}" data-as-drag-index="${conditionIndex}" data-as-drop-part="condition" data-as-drop-rule="${index}" data-as-drop-index="${conditionIndex}"><span class="as-drag-grip" aria-hidden="true">⠿</span><div class="as-runtime-component-copy"><b>${esc(label)}</b><small>${esc(condition.kind)}</small>${unpackHtml(condition, index, conditionIndex)}${runtimeParametersHtml(condition, "condition", index, conditionIndex)}</div><button type="button" class="icon danger" title="Remove condition" aria-label="Remove ${esc(label)}" data-as-action="remove-component-condition" data-as-component-rule="${index}" data-as-component-condition="${conditionIndex}">×</button></div>`;
             })
             .join("")
         : '<span class="as-always">Always</span>';
@@ -757,7 +783,7 @@
       }
       const definition = componentEffectsByKey.get(componentSourceKey(effect));
       const label = definition?.label || effect.attrType;
-      return `<div class="as-chain-item" draggable="true" data-as-drag-part="effect" data-as-drag-rule="${index}" data-as-drag-index="${effectIndex}" data-as-drop-part="effect" data-as-drop-rule="${index}" data-as-drop-index="${effectIndex}"><span class="as-drag-grip" aria-hidden="true">⠿</span><div class="as-runtime-effect as-runtime-configurable"><div class="as-runtime-component-copy"><b>${esc(label)}</b><small>${esc(effect.attrType)}</small>${runtimeParametersHtml(effect, "effect", index, effectIndex)}</div></div><button type="button" class="icon danger as-component-part-remove" title="Remove effect" aria-label="Remove ${esc(label)}" data-as-action="remove-component-effect" data-as-component-rule="${index}" data-as-component-effect="${effectIndex}">×</button></div>`;
+      return `<div class="as-chain-item" draggable="true" data-as-drag-part="effect" data-as-drag-rule="${index}" data-as-drag-index="${effectIndex}" data-as-drop-part="effect" data-as-drop-rule="${index}" data-as-drop-index="${effectIndex}"><span class="as-drag-grip" aria-hidden="true">⠿</span><div class="as-runtime-effect as-runtime-configurable"><div class="as-runtime-component-copy"><b>${esc(label)}</b>${packageBadgeHtml(effect.attrType)}<small>${esc(effect.attrType)}</small>${runtimeParametersHtml(effect, "effect", index, effectIndex)}</div></div><button type="button" class="icon danger as-component-part-remove" title="Remove effect" aria-label="Remove ${esc(label)}" data-as-action="remove-component-effect" data-as-component-rule="${index}" data-as-component-effect="${effectIndex}">×</button></div>`;
     };
     const firstEffect = rule.effects[0] ? effectHtml(rule.effects[0], 0) : "";
     const laterEffects = rule.effects
@@ -957,6 +983,7 @@
           .join(", then ");
         return `${triggerText}, if ${conditionText}: ${effectText}.`;
       }),
+      ...(compositionModel ? window.erCompositionBuilder.summaryLines(compositionModel, entry) : []),
       ...entry.modifiers.map(modifierSummary),
       ...entry.mechanics.map(reference => {
         const mechanic = resolveMechanic(reference);
@@ -1113,6 +1140,9 @@
   }
 
   function handleKeyDown(event) {
+    if (compositionModel && currentEntry() && window.erCompositionBuilder.handleKeyDown(event, builderContext())) {
+      return true;
+    }
     const input = event.target.closest(".as-runtime-search")?.querySelector("[data-as-move-search]");
     if (!input) {
       return false;
@@ -1962,6 +1992,7 @@
       entry.includes.length
         + entry.mechanics.length
         + entry.componentRules.length
+        + (Array.isArray(entry.composition) ? entry.composition.length : 0)
         + entry.rules.length
         + entry.modifiers.length
       === 0
@@ -2043,6 +2074,9 @@
         validateRuntimeParameters(effect, "effect", `Component rule ${number} DO`, errors);
       }
     });
+    if (compositionModel) {
+      errors.push(...window.erCompositionBuilder.entryErrors(compositionModel, entry));
+    }
     const ruleKeys = new Set();
     entry.rules.forEach((rule, index) => {
       if (!rule.key || ruleKeys.has(rule.key)) {
@@ -2162,7 +2196,7 @@
               .map(([key, ability]) => {
                 const ready = validateEntry(key, ability, allIds).length === 0;
                 const hay = `${ability.name} ${ability.description}`.toLowerCase();
-                return `<button type="button" class="as-ability-row${key === selected ? " active" : ""}${eq(ability, baseline[key]) ? "" : " dirty"}"${key === selected ? ' aria-current="true"' : ""}${listQuery && !hay.includes(listQuery) ? " hidden" : ""} data-as-action="select" data-as-key="${esc(key)}" data-as-hay="${esc(hay)}"><span class="as-ability-mark" aria-hidden="true">◆</span><span class="as-ability-copy"><b>${esc(ability.name)}</b><small>#${ability.id} · ${ability.rules.length + ability.includes.length + ability.mechanics.length + ability.componentRules.length + ability.modifiers.length} blocks</small></span><span class="as-state ${ready ? "ready" : "draft"}">${ready ? "READY" : "DRAFT"}</span></button>`;
+                return `<button type="button" class="as-ability-row${key === selected ? " active" : ""}${eq(ability, baseline[key]) ? "" : " dirty"}"${key === selected ? ' aria-current="true"' : ""}${listQuery && !hay.includes(listQuery) ? " hidden" : ""} data-as-action="select" data-as-key="${esc(key)}" data-as-hay="${esc(hay)}"><span class="as-ability-mark" aria-hidden="true">◆</span><span class="as-ability-copy"><b>${esc(ability.name)}</b><small>#${ability.id} · ${ability.rules.length + ability.includes.length + ability.mechanics.length + ability.componentRules.length + ability.modifiers.length + (Array.isArray(ability.composition) ? ability.composition.length : 0)} blocks</small></span><span class="as-state ${ready ? "ready" : "draft"}">${ready ? "READY" : "DRAFT"}</span></button>`;
               })
               .join("")
           : '<div class="as-list-empty">No authored abilities yet.</div>'
@@ -2171,6 +2205,9 @@
       <aside class="as-inspector" aria-label="Builder, summary, and validation">${entry ? renderInspector(entry, errors) : `${renderAiAssistant()}<div class="as-panel"><h3>Ability Studio</h3><p class="muted">No ability selected.</p></div>`}</aside>
       ${runtimeAbilityDatalistHtml()}
     </div>`;
+    if (compositionModel) {
+      window.erCompositionBuilder.afterRender(root);
+    }
   }
 
   function renderEntry(entry) {
@@ -2189,9 +2226,17 @@
       modifierHtml(modifier, index, modifierOffset + index + 1),
     );
     const blocks = [...rules, ...componentRules, ...mechanics, ...includes, ...modifiers];
+    const builder = compositionModel ? window.erCompositionBuilder : null;
+    const upgraded = builder?.isUpgraded(entry);
+    const blocksSection = builder ? builder.sectionHtml(compositionModel, entry, selected) : "";
+    const classicOpen = !upgraded || blocks.length > 0 || builder.isClassicOpen(selected);
+    const classicHead = upgraded
+      ? `<div class="cb-classic-head"><button type="button" class="cb-classic-toggle" aria-expanded="${classicOpen}" data-cb-action="toggle-classic">${classicOpen ? "Hide" : "Show"} the classic builder (older style rules, included abilities, always-on modifiers)</button></div>`
+      : "";
     return `<section class="as-entry">
       <section class="as-details"><div class="as-section-title"><h3>ABILITY DETAILS</h3><div class="as-entry-actions"><button type="button" data-as-action="duplicate">Duplicate</button><button type="button" class="danger" data-as-action="delete-ability">Delete</button></div></div><div class="as-details-grid"><label><span>Name</span><input class="as-name" maxlength="40" aria-label="Ability name" value="${esc(entry.name)}" data-as-field="name"></label><label><span>Internal ID</span><input aria-label="Internal ability ID" value="${esc(selected)}" readonly></label><label class="as-description"><span>Description</span><textarea maxlength="500" rows="2" aria-label="Ability description" data-as-field="description">${esc(entry.description)}</textarea></label></div></section>
-      <section class="as-compose"><div class="as-section-title"><h3>RULES</h3>${blocks.length > 0 ? `<div class="as-rule-create" data-as-drop-part="new-rule">${componentPartSearchHtml("new-hook", -1, "Add rule: search WHEN triggers…")}</div>` : ""}</div><div class="as-rules">${blocks.length > 0 ? blocks.join("") : emptyRuleHtml()}</div><div class="as-rule-adders"><div class="as-include-picker"><div class="as-include-search"><input id="as-include-picker" type="search" role="combobox" aria-autocomplete="list" aria-controls="as-include-results" aria-expanded="false" aria-label="Search existing abilities" autocomplete="off" placeholder="Search whole ability packages…" data-as-action="open-include-search" data-as-include-search><div id="as-include-results" class="as-include-results" role="listbox" hidden></div></div><button type="button" data-as-action="add-include">+ Include ability</button></div><button type="button" data-as-action="add-modifier">+ Always modifier</button></div></section>
+      ${blocksSection}${classicHead}
+      <section class="as-compose"${classicOpen ? "" : " hidden"}><div class="as-section-title"><h3>RULES</h3>${blocks.length > 0 ? `<div class="as-rule-create" data-as-drop-part="new-rule">${componentPartSearchHtml("new-hook", -1, "Add rule: search WHEN triggers…")}</div>` : ""}</div><div class="as-rules">${blocks.length > 0 ? blocks.join("") : emptyRuleHtml()}</div><div class="as-rule-adders"><div class="as-include-picker"><div class="as-include-search"><input id="as-include-picker" type="search" role="combobox" aria-autocomplete="list" aria-controls="as-include-results" aria-expanded="false" aria-label="Search existing abilities" autocomplete="off" placeholder="Search whole ability packages…" data-as-action="open-include-search" data-as-include-search><div id="as-include-results" class="as-include-results" role="listbox" hidden></div></div><button type="button" data-as-action="add-include">+ Include ability</button></div><button type="button" data-as-action="add-modifier">+ Always modifier</button></div></section>
     </section>`;
   }
 
@@ -2238,6 +2283,9 @@
         ),
         "Component hook, IF, and DO references resolve",
       ],
+      ...(compositionModel && Array.isArray(entry.composition)
+        ? [[!errors.some(error => error.startsWith("Block rule")), "Block rules fit their trigger and settings"]]
+        : []),
       [!errors.some(error => error.includes("cycle")), "No circular ability references"],
     ];
     return `${renderAiAssistant()}<div class="as-panel"><span class="as-eyebrow">MECHANICS SUMMARY</span><h3>${esc(entry.name)}</h3><div class="as-summary">${lines.length > 0 ? lines.map(line => `<p>${esc(line)}</p>`).join("") : '<p class="muted">No mechanics yet.</p>'}</div></div>
@@ -2380,7 +2428,19 @@
     return true;
   }
 
+  function builderContext() {
+    return {
+      model: compositionModel,
+      entry: currentEntry(),
+      key: selected,
+      notify,
+    };
+  }
+
   function handleInput(element) {
+    if (compositionModel && currentEntry() && window.erCompositionBuilder.handleInput(element, builderContext())) {
+      return true;
+    }
     if (element.hasAttribute("data-as-move-search")) {
       renderRuntimeMoveSearch(element);
     }
@@ -2697,6 +2757,14 @@
   }
 
   function handleClick(event) {
+    if (
+      compositionModel
+      && currentEntry()
+      && event.target.closest?.("[data-cb-action]")
+      && window.erCompositionBuilder.handleClick(event, builderContext())
+    ) {
+      return true;
+    }
     const button = event.target.closest("[data-as-action]");
     if (!button) {
       if (!event.target.closest(".as-runtime-search")) {
@@ -2717,6 +2785,23 @@
     const entry = currentEntry();
     if (action === "open-move-search") {
       renderRuntimeMoveSearch(button);
+      return true;
+    }
+    if (action === "unpack-gate") {
+      const info = entry
+        ? compositionModel?.unpackInfo(
+            entry,
+            Number(button.dataset.asComponentRule),
+            Number(button.dataset.asComponentCondition),
+          )
+        : null;
+      if (!info?.available) {
+        return true;
+      }
+      window.erCompositionBuilder.upgradeEntry(entry);
+      entry.componentRules.splice(Number(button.dataset.asComponentRule), 1);
+      entry.composition.push(info.rule);
+      notify(true);
       return true;
     }
     if (action === "choose-runtime-move") {
@@ -3079,6 +3164,19 @@
       ),
     );
     community = !!options.community;
+    compositionModel =
+      !community && options.vocabulary && window.erCompositionBuilder
+        ? window.erCompositionBuilder.createModel(options.vocabulary, options.blocks, options.gates, {
+            moveNames: moveCatalog
+              .map(move =>
+                String(move.name || "")
+                  .toUpperCase()
+                  .replace(/[^A-Z0-9]+/g, "_")
+                  .replace(/^_+|_+$/g, ""),
+              )
+              .filter(Boolean),
+          })
+        : null;
     callbacks = options.callbacks || {};
     aiEndpoint = String(options.aiEndpoint || "").replace(/\/$/, "");
     loadSavedBlueprints = typeof options.loadSavedBlueprints === "function" ? options.loadSavedBlueprints : null;
@@ -3113,6 +3211,7 @@
   window.erAbilityStudio = {
     init,
     available: () => !community && !!primitiveCatalog,
+    compositionAvailable: () => !!compositionModel,
     mode: () => mode,
     setMode(value) {
       mode = value === "studio" && !community ? "studio" : "assignments";

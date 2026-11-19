@@ -1,0 +1,3401 @@
+{
+  "schemaVersion": 1,
+  "slots": [
+    {
+      "id": "holder",
+      "label": "The ability owner",
+      "meaning": "The Pokemon that owns the ability."
+    },
+    {
+      "id": "other",
+      "label": "The other Pokemon",
+      "meaning": "The attacker, target, opponent or source, as the trigger defines it."
+    },
+    {
+      "id": "move",
+      "label": "The move",
+      "meaning": "The move currently being used or resolved."
+    },
+    {
+      "id": "moveUser",
+      "label": "The move user",
+      "meaning": "The Pokemon whose type, category and flags are read for the move."
+    },
+    {
+      "id": "damage",
+      "label": "The damage",
+      "meaning": "The effective damage. For after-taking-damage this includes the multi-hit rewrite."
+    },
+    {
+      "id": "hitResult",
+      "label": "The hit result",
+      "meaning": "How the hit turned out (normal, super effective, and so on)."
+    },
+    {
+      "id": "stat",
+      "label": "The stat",
+      "meaning": "The stat involved."
+    },
+    {
+      "id": "stages",
+      "label": "The stage change",
+      "meaning": "How many stages the stat moved."
+    },
+    {
+      "id": "weather",
+      "label": "The weather",
+      "meaning": "The current weather."
+    },
+    {
+      "id": "terrain",
+      "label": "The terrain",
+      "meaning": "The current terrain."
+    },
+    {
+      "id": "status",
+      "label": "The status",
+      "meaning": "The status condition involved."
+    },
+    {
+      "id": "tag",
+      "label": "The battle effect",
+      "meaning": "The battler tag (volatile effect) involved."
+    },
+    {
+      "id": "ally",
+      "label": "The ally",
+      "meaning": "The holder's ally."
+    },
+    {
+      "id": "simulated",
+      "label": "Simulation flag",
+      "meaning": "Whether the call is only a preview, with no side effects."
+    },
+    {
+      "id": "hits",
+      "label": "The hit counters",
+      "meaning": "The hit count and hit index of a multi-hit move."
+    }
+  ],
+  "whens": [
+    {
+      "id": "event.on-entry",
+      "kind": "event",
+      "dispatchKey": "PostSummonAbAttr",
+      "provides": ["holder", "simulated"],
+      "label": "When I enter the battle",
+      "group": "Entry and exit",
+      "legacyHookId": "PostSummonAbAttr",
+      "synonyms": ["switch in", "send out", "on summon"],
+      "composable": true
+    },
+    {
+      "id": "event.before-entry",
+      "kind": "event",
+      "dispatchKey": "PreSummonAbAttr",
+      "provides": ["holder"],
+      "label": "Just before I enter the battle",
+      "group": "Entry and exit",
+      "legacyHookId": "PreSummonAbAttr"
+    },
+    {
+      "id": "event.battle-start",
+      "kind": "event",
+      "dispatchKey": "PostBattleInitAbAttr",
+      "provides": ["holder"],
+      "label": "When a battle begins",
+      "group": "Entry and exit",
+      "legacyHookId": "PostBattleInitAbAttr",
+      "synonyms": ["start of battle", "battle init"]
+    },
+    {
+      "id": "event.after-battle",
+      "kind": "event",
+      "dispatchKey": "PostBattleAbAttr",
+      "provides": ["holder"],
+      "label": "After the battle ends",
+      "group": "Entry and exit",
+      "legacyHookId": "PostBattleAbAttr",
+      "synonyms": ["end of battle", "post battle"]
+    },
+    {
+      "id": "event.switch-out",
+      "kind": "event",
+      "dispatchKey": "PreSwitchOutAbAttr",
+      "provides": ["holder", "simulated"],
+      "label": "When I switch out",
+      "group": "Entry and exit",
+      "legacyHookId": "PreSwitchOutAbAttr",
+      "synonyms": ["recall", "withdraw"]
+    },
+    {
+      "id": "event.leave-field",
+      "kind": "event",
+      "dispatchKey": "PreLeaveFieldAbAttr",
+      "provides": ["holder", "simulated"],
+      "label": "When I leave the field",
+      "group": "Entry and exit",
+      "legacyHookId": "PreLeaveFieldAbAttr",
+      "synonyms": ["leave battle", "flee", "faint or switch"]
+    },
+    {
+      "id": "event.faint",
+      "kind": "event",
+      "dispatchKey": "PostFaintAbAttr",
+      "provides": ["holder", "other", "move", "moveUser", "hitResult", "simulated"],
+      "label": "When I faint",
+      "group": "Entry and exit",
+      "legacyHookId": "PostFaintAbAttr",
+      "synonyms": ["knocked out", "die", "last words"],
+      "composable": true,
+      "moveUserIs": "other"
+    },
+    {
+      "id": "event.end-of-turn",
+      "kind": "event",
+      "dispatchKey": "PostTurnAbAttr",
+      "provides": ["holder", "simulated"],
+      "label": "At the end of every turn",
+      "group": "Turn",
+      "legacyHookId": "PostTurnAbAttr",
+      "synonyms": ["each turn", "end turn", "residual"],
+      "composable": true
+    },
+    {
+      "id": "event.wake-up",
+      "kind": "event",
+      "dispatchKey": "PostWakeUpAbAttr",
+      "provides": ["holder"],
+      "label": "When I wake up",
+      "group": "Turn",
+      "legacyHookId": "PostWakeUpAbAttr"
+    },
+    {
+      "id": "event.flinched",
+      "kind": "event",
+      "dispatchKey": "FlinchEffectAbAttr",
+      "provides": ["holder", "simulated"],
+      "label": "When I flinch",
+      "group": "Turn",
+      "legacyHookId": "FlinchEffectAbAttr"
+    },
+    {
+      "id": "event.berry-eaten",
+      "kind": "event",
+      "dispatchKey": "HealFromBerryUseAbAttr",
+      "provides": ["holder"],
+      "label": "After I eat a berry",
+      "group": "Turn",
+      "synonyms": ["berry consumed", "nom"]
+    },
+    {
+      "id": "event.before-i-use-move",
+      "kind": "event",
+      "dispatchKey": "PokemonTypeChangeAbAttr",
+      "provides": ["holder", "other", "move", "moveUser"],
+      "label": "Just before I use a move",
+      "group": "Attacking",
+      "synonyms": ["move starts", "before attacking"],
+      "moveUserIs": "holder"
+    },
+    {
+      "id": "event.my-move-starts",
+      "kind": "event",
+      "dispatchKey": "ExecutedMoveAbAttr",
+      "provides": ["holder"],
+      "label": "When my move starts to execute",
+      "group": "Attacking"
+    },
+    {
+      "id": "event.after-my-hit",
+      "kind": "event",
+      "dispatchKey": "PostAttackAbAttr",
+      "provides": ["holder", "other", "move", "moveUser", "damage", "hitResult", "simulated"],
+      "label": "After my attack lands",
+      "group": "Attacking",
+      "legacyHookId": "PostAttackAbAttr",
+      "synonyms": ["on hit", "after attacking", "after damaging", "when I hit"],
+      "composable": true,
+      "moveUserIs": "holder"
+    },
+    {
+      "id": "event.on-ko",
+      "kind": "event",
+      "dispatchKey": "PostKnockOutAbAttr",
+      "provides": ["holder", "other", "simulated"],
+      "label": "When I knock out a Pokemon",
+      "group": "Attacking",
+      "legacyHookId": "PostKnockOutAbAttr",
+      "synonyms": ["kill", "ko", "defeat a foe"],
+      "composable": true
+    },
+    {
+      "id": "event.on-win",
+      "kind": "event",
+      "dispatchKey": "PostVictoryAbAttr",
+      "provides": ["holder", "simulated"],
+      "label": "When I win the fight",
+      "group": "Attacking",
+      "legacyHookId": "PostVictoryAbAttr",
+      "synonyms": ["victory", "battle won"]
+    },
+    {
+      "id": "event.after-any-move",
+      "kind": "event",
+      "dispatchKey": "PostMoveUsedAbAttr",
+      "provides": ["holder", "other", "move", "moveUser", "simulated"],
+      "label": "After anyone uses a move",
+      "group": "Attacking",
+      "legacyHookId": "PostMoveUsedAbAttr",
+      "synonyms": ["any move", "after a move"],
+      "moveUserIs": "other"
+    },
+    {
+      "id": "event.after-inflicting-status",
+      "kind": "event",
+      "dispatchKey": "ConfusionOnStatusEffectAbAttr",
+      "provides": ["holder", "other", "status"],
+      "label": "After I inflict a status",
+      "group": "Attacking",
+      "synonyms": ["status landed", "after poisoning", "after burning"]
+    },
+    {
+      "id": "event.after-hit",
+      "kind": "event",
+      "dispatchKey": "PostDefendAbAttr",
+      "provides": ["holder", "other", "move", "moveUser", "damage", "hitResult", "simulated"],
+      "label": "After I am hit",
+      "group": "Being hit",
+      "legacyHookId": "PostDefendAbAttr",
+      "synonyms": ["when hit", "on being hit", "after defending", "contact"],
+      "composable": true,
+      "moveUserIs": "other"
+    },
+    {
+      "id": "event.after-taking-damage",
+      "kind": "event",
+      "dispatchKey": "PostDamageAbAttr",
+      "provides": ["holder", "other", "damage", "simulated"],
+      "label": "After I take any damage",
+      "group": "Being hit",
+      "legacyHookId": "PostDamageAbAttr",
+      "synonyms": ["hp dropped", "lose hp", "damaged", "below half", "wimp out"],
+      "composable": true
+    },
+    {
+      "id": "event.after-crit-taken",
+      "kind": "event",
+      "dispatchKey": "PostReceiveCritStatStageChangeAbAttr",
+      "provides": ["holder", "other", "move", "moveUser", "damage", "hitResult", "simulated"],
+      "label": "When I take a critical hit",
+      "group": "Being hit",
+      "synonyms": ["crit received", "struck by a crit"],
+      "moveUserIs": "other"
+    },
+    {
+      "id": "event.before-hit-lands",
+      "kind": "event",
+      "dispatchKey": "PreHitResistTypeChangeAbAttr",
+      "provides": ["holder", "other", "move", "moveUser"],
+      "label": "Just before a hit lands on me",
+      "group": "Being hit",
+      "moveUserIs": "other"
+    },
+    {
+      "id": "event.got-status",
+      "kind": "event",
+      "dispatchKey": "PostSetStatusAbAttr",
+      "provides": ["holder", "other", "status", "simulated"],
+      "label": "When I get a status condition",
+      "group": "Being hit",
+      "legacyHookId": "PostSetStatusAbAttr",
+      "synonyms": ["afflicted", "poisoned", "burned", "paralyzed"]
+    },
+    {
+      "id": "event.item-lost",
+      "kind": "event",
+      "dispatchKey": "PostItemLostAbAttr",
+      "provides": ["holder", "other"],
+      "label": "When I lose my held item",
+      "group": "Being hit",
+      "legacyHookId": "PostItemLostAbAttr",
+      "synonyms": ["item stolen", "item knocked off", "item consumed"]
+    },
+    {
+      "id": "event.intimidated",
+      "kind": "event",
+      "dispatchKey": "PostIntimidateStatStageChangeAbAttr",
+      "provides": ["holder", "stat", "stages", "simulated"],
+      "label": "When Intimidate hits me",
+      "group": "Being hit",
+      "synonyms": ["scared", "intimidate reaction"]
+    },
+    {
+      "id": "event.weather-changed",
+      "kind": "event",
+      "dispatchKey": "PostWeatherChangeAbAttr",
+      "provides": ["holder", "weather", "simulated"],
+      "label": "When the weather changes",
+      "group": "Field",
+      "legacyHookId": "PostWeatherChangeAbAttr"
+    },
+    {
+      "id": "event.weather-each-turn",
+      "kind": "event",
+      "dispatchKey": "PostWeatherLapseAbAttr",
+      "provides": ["holder", "weather", "simulated"],
+      "label": "Each turn while weather is active",
+      "group": "Field",
+      "legacyHookId": "PostWeatherLapseAbAttr"
+    },
+    {
+      "id": "event.terrain-changed",
+      "kind": "event",
+      "dispatchKey": "PostTerrainChangeAbAttr",
+      "provides": ["holder", "terrain", "simulated"],
+      "label": "When the terrain changes",
+      "group": "Field",
+      "alsoDispatchKeys": ["TerrainEventTypeChangeAbAttr"],
+      "legacyHookId": "PostTerrainChangeAbAttr"
+    },
+    {
+      "id": "event.biome-changed",
+      "kind": "event",
+      "dispatchKey": "PostBiomeChangeAbAttr",
+      "provides": ["holder", "simulated"],
+      "label": "When the biome changes",
+      "group": "Field",
+      "legacyHookId": "PostBiomeChangeAbAttr"
+    },
+    {
+      "id": "event.stat-changed",
+      "kind": "event",
+      "dispatchKey": "PostStatStageChangeAbAttr",
+      "provides": ["holder", "other", "stat", "stages", "simulated"],
+      "label": "When one of my stats changes",
+      "group": "Stat stages",
+      "legacyHookId": "PostStatStageChangeAbAttr",
+      "synonyms": ["stat boosted", "stat dropped", "stat stage"]
+    },
+    {
+      "id": "event.ally-stat-changed",
+      "kind": "event",
+      "dispatchKey": "PostAllyStatStageChangeAbAttr",
+      "provides": ["holder", "ally", "stat", "stages", "simulated"],
+      "label": "When my ally's stat changes",
+      "group": "Stat stages",
+      "legacyHookId": "PostAllyStatStageChangeAbAttr"
+    },
+    {
+      "id": "event.foe-raised-stat",
+      "kind": "event",
+      "dispatchKey": "StatStageChangeCopyAbAttr",
+      "provides": ["holder", "stat", "stages"],
+      "label": "When a foe raises a stat",
+      "group": "Stat stages",
+      "synonyms": ["opportunist", "copy boost", "foe boosted"]
+    },
+    {
+      "id": "calc.redirect-move",
+      "kind": "calc",
+      "dispatchKey": "RedirectMoveAbAttr",
+      "provides": ["holder", "other", "move", "moveUser"],
+      "label": "While the game picks who a move targets",
+      "group": "Move flow",
+      "modifies": "targetIndex",
+      "legacyHookId": "RedirectMoveAbAttr",
+      "synonyms": ["redirect", "lightning rod", "storm drain", "draw attacks"],
+      "moveUserIs": "other"
+    },
+    {
+      "id": "calc.priority",
+      "kind": "calc",
+      "dispatchKey": "ChangeMovePriorityAbAttr",
+      "provides": ["holder", "move", "moveUser"],
+      "label": "While the game calculates my move's priority",
+      "group": "Move flow",
+      "modifies": "priority",
+      "alsoDispatchKeys": ["ChangeMovePriorityInBracketAbAttr"],
+      "synonyms": ["gale wings", "prankster", "go first"],
+      "composable": true,
+      "moveUserIs": "holder"
+    },
+    {
+      "id": "calc.speed-bypass",
+      "kind": "calc",
+      "dispatchKey": "BypassSpeedChanceAbAttr",
+      "provides": ["holder"],
+      "label": "While the game decides if I jump the turn order",
+      "group": "Move flow",
+      "modifies": "bypass",
+      "alsoDispatchKeys": ["PreventBypassSpeedChanceAbAttr"],
+      "synonyms": ["quick claw", "quick draw"]
+    },
+    {
+      "id": "calc.trap-check",
+      "kind": "calc",
+      "dispatchKey": "CheckTrappedAbAttr",
+      "provides": ["holder", "other"],
+      "label": "While the game checks if a foe can escape",
+      "group": "Move flow",
+      "modifies": "trapped",
+      "synonyms": ["shadow tag", "arena trap", "magnet pull", "trap"]
+    },
+    {
+      "id": "calc.run-chance",
+      "kind": "calc",
+      "dispatchKey": "RunSuccessAbAttr",
+      "provides": ["holder"],
+      "label": "While the game rolls my chance to run away",
+      "group": "Move flow",
+      "modifies": "chance"
+    },
+    {
+      "id": "calc.weight",
+      "kind": "calc",
+      "dispatchKey": "WeightMultiplierAbAttr",
+      "provides": ["holder"],
+      "label": "While the game calculates my weight",
+      "group": "Move flow",
+      "modifies": "weight",
+      "synonyms": ["heavy metal", "light metal"]
+    },
+    {
+      "id": "calc.burn-damage",
+      "kind": "calc",
+      "dispatchKey": "ReduceBurnDamageAbAttr",
+      "provides": ["holder"],
+      "label": "While the game calculates burn damage on me",
+      "group": "Move flow",
+      "modifies": "burnDamage",
+      "alsoDispatchKeys": ["BypassBurnDamageReductionAbAttr"]
+    },
+    {
+      "id": "calc.status-duration",
+      "kind": "calc",
+      "dispatchKey": "ReduceStatusEffectDurationAbAttr",
+      "provides": ["holder", "status"],
+      "label": "While the game calculates how long my status lasts",
+      "group": "Move flow",
+      "modifies": "duration",
+      "synonyms": ["early bird", "shorter sleep"]
+    },
+    {
+      "id": "calc.berry-effect",
+      "kind": "calc",
+      "dispatchKey": "DoubleBerryEffectAbAttr",
+      "provides": ["holder"],
+      "label": "While the game calculates a berry's healing",
+      "group": "Move flow",
+      "modifies": "effectValue",
+      "synonyms": ["ripen", "double berry"]
+    },
+    {
+      "id": "calc.berry-threshold",
+      "kind": "calc",
+      "dispatchKey": "ReduceBerryUseThresholdAbAttr",
+      "provides": ["holder"],
+      "label": "While the game checks if my berry should be eaten",
+      "group": "Move flow",
+      "modifies": "hpRatioRequired",
+      "synonyms": ["gluttony", "eat berry earlier"]
+    },
+    {
+      "id": "calc.move-power",
+      "kind": "calc",
+      "dispatchKey": "MovePowerBoostAbAttr",
+      "provides": ["holder", "other", "move", "moveUser", "simulated"],
+      "label": "While the game calculates a move's power",
+      "group": "Damage and power",
+      "modifies": "power",
+      "alsoDispatchKeys": [
+        "VariableMovePowerAbAttr",
+        "UserFieldMoveTypePowerBoostAbAttr",
+        "AllyMoveCategoryPowerBoostAbAttr"
+      ],
+      "synonyms": ["base power", "boost moves", "power up"],
+      "composable": true,
+      "moveUserIs": "holder"
+    },
+    {
+      "id": "calc.damage-dealt",
+      "kind": "calc",
+      "dispatchKey": "MoveDamageBoostAbAttr",
+      "provides": ["holder", "other", "move", "moveUser", "damage", "simulated"],
+      "label": "While the game calculates damage I deal",
+      "group": "Damage and power",
+      "modifies": "damage",
+      "synonyms": ["damage output", "deal more damage"],
+      "composable": true,
+      "moveUserIs": "holder"
+    },
+    {
+      "id": "calc.damage-taken",
+      "kind": "calc",
+      "dispatchKey": "ReceivedMoveDamageMultiplierAbAttr",
+      "provides": ["holder", "other", "move", "moveUser", "damage", "simulated"],
+      "label": "While the game calculates damage I take",
+      "group": "Damage and power",
+      "modifies": "damage",
+      "alsoDispatchKeys": ["AlliedFieldDamageReductionAbAttr", "PreDefendFullHpEndureAbAttr"],
+      "synonyms": ["resist", "damage reduction", "half damage", "tank"],
+      "composable": true,
+      "moveUserIs": "other"
+    },
+    {
+      "id": "calc.stab",
+      "kind": "calc",
+      "dispatchKey": "StabBoostAbAttr",
+      "provides": ["holder", "simulated"],
+      "label": "While the game calculates same-type attack bonus",
+      "group": "Damage and power",
+      "modifies": "stab",
+      "synonyms": ["stab", "same type bonus"]
+    },
+    {
+      "id": "calc.crit-stage",
+      "kind": "calc",
+      "dispatchKey": "BonusCritAbAttr",
+      "provides": ["holder"],
+      "label": "While the game calculates critical hit stage",
+      "group": "Damage and power",
+      "modifies": "critStage"
+    },
+    {
+      "id": "calc.crit-multiplier",
+      "kind": "calc",
+      "dispatchKey": "MultCritAbAttr",
+      "provides": ["holder", "simulated"],
+      "label": "While the game calculates critical hit damage",
+      "group": "Damage and power",
+      "modifies": "critMultiplier"
+    },
+    {
+      "id": "calc.crit-roll",
+      "kind": "calc",
+      "dispatchKey": "ConditionalCritAbAttr",
+      "provides": ["holder", "other", "move", "moveUser"],
+      "label": "While the game decides if a hit is critical",
+      "group": "Damage and power",
+      "modifies": "isCritical",
+      "synonyms": ["always crit", "guaranteed crit"],
+      "moveUserIs": "holder"
+    },
+    {
+      "id": "calc.hit-count",
+      "kind": "calc",
+      "dispatchKey": "AddSecondStrikeAbAttr",
+      "provides": ["holder", "other", "move", "moveUser", "hits"],
+      "label": "While the game decides how many times a move hits",
+      "group": "Damage and power",
+      "modifies": "hitCount",
+      "alsoDispatchKeys": ["AllAttacksMultiHitAbAttr"],
+      "synonyms": ["multi hit", "extra strike", "parental bond", "hit twice"],
+      "moveUserIs": "holder"
+    },
+    {
+      "id": "calc.max-multi-hit",
+      "kind": "calc",
+      "dispatchKey": "MaxMultiHitAbAttr",
+      "provides": ["holder"],
+      "label": "While the game rolls how many hits a multi-hit move gets",
+      "group": "Damage and power",
+      "modifies": "hits",
+      "synonyms": ["skill link", "always max hits"]
+    },
+    {
+      "id": "calc.accuracy",
+      "kind": "calc",
+      "dispatchKey": "SetMoveAccuracyAbAttr",
+      "provides": ["holder", "move", "moveUser"],
+      "label": "While the game calculates my move's accuracy",
+      "group": "Damage and power",
+      "modifies": "accuracy",
+      "synonyms": ["always hit", "no guard", "accuracy boost"],
+      "moveUserIs": "holder"
+    },
+    {
+      "id": "calc.incoming-accuracy",
+      "kind": "calc",
+      "dispatchKey": "WonderSkinAbAttr",
+      "provides": ["holder", "move"],
+      "label": "While the game calculates accuracy against me",
+      "group": "Damage and power",
+      "modifies": "accuracy",
+      "synonyms": ["evasion", "wonder skin"]
+    },
+    {
+      "id": "calc.effect-chance",
+      "kind": "calc",
+      "dispatchKey": "MoveEffectChanceMultiplierAbAttr",
+      "provides": ["holder", "move"],
+      "label": "While the game calculates my move's effect chance",
+      "group": "Damage and power",
+      "modifies": "effectChance",
+      "synonyms": ["serene grace", "secondary effect chance"]
+    },
+    {
+      "id": "calc.incoming-effect-chance",
+      "kind": "calc",
+      "dispatchKey": "IgnoreMoveEffectsAbAttr",
+      "provides": ["holder", "move"],
+      "label": "While the game calculates effect chance against me",
+      "group": "Damage and power",
+      "modifies": "effectChance",
+      "alsoDispatchKeys": ["UserFieldIgnoreMoveEffectsAbAttr"],
+      "synonyms": ["shield dust", "block secondary effects"]
+    },
+    {
+      "id": "calc.damage-roll",
+      "kind": "calc",
+      "dispatchKey": "EnemyMinDamageRollAbAttr",
+      "provides": ["holder", "simulated"],
+      "label": "While the game rolls the random damage spread",
+      "group": "Damage and power",
+      "modifies": "rollMultiplier"
+    },
+    {
+      "id": "calc.weather-type-debuff",
+      "kind": "calc",
+      "dispatchKey": "IgnoreWeatherTypeDebuffAbAttr",
+      "provides": ["holder", "move"],
+      "label": "While the game applies weather damage changes to my move",
+      "group": "Damage and power",
+      "modifies": "weatherMultiplier"
+    },
+    {
+      "id": "calc.stat-value",
+      "kind": "calc",
+      "dispatchKey": "StatMultiplierAbAttr",
+      "provides": ["holder", "move", "stat"],
+      "label": "While the game calculates one of my stats",
+      "group": "Stats",
+      "modifies": "statValue",
+      "alsoDispatchKeys": ["AllyStatMultiplierAbAttr"],
+      "synonyms": ["stat boost", "attack up", "speed up", "defense up"]
+    },
+    {
+      "id": "calc.foe-stat-value",
+      "kind": "calc",
+      "dispatchKey": "FieldMultiplyStatAbAttr",
+      "provides": ["holder", "other", "stat"],
+      "label": "While the game calculates a foe's stat",
+      "group": "Stats",
+      "modifies": "statValue",
+      "synonyms": ["lower foe stat", "aura"]
+    },
+    {
+      "id": "calc.ignore-stat-stages",
+      "kind": "calc",
+      "dispatchKey": "IgnoreOpponentStatStagesAbAttr",
+      "provides": ["holder", "other", "stat"],
+      "label": "While the game applies the foe's stat stages",
+      "group": "Stats",
+      "modifies": "ignored",
+      "synonyms": ["unaware", "ignore boosts"]
+    },
+    {
+      "id": "calc.defensive-stat-substitute",
+      "kind": "calc",
+      "dispatchKey": "DefensiveStatSubstituteAbAttr",
+      "provides": ["holder"],
+      "label": "While the game picks my defensive stat",
+      "group": "Stats",
+      "modifies": "statValue"
+    },
+    {
+      "id": "calc.defensive-stat-pick",
+      "kind": "calc",
+      "dispatchKey": "CritUseLowerDefensiveStatAbAttr",
+      "provides": ["holder", "other"],
+      "label": "While the game picks the foe's defensive stat",
+      "group": "Stats",
+      "modifies": "statValue",
+      "alsoDispatchKeys": ["LowerDefensiveStatVsStatusedFoeAbAttr"]
+    },
+    {
+      "id": "calc.stage-change-amount",
+      "kind": "calc",
+      "dispatchKey": "StatStageChangeMultiplierAbAttr",
+      "provides": ["holder"],
+      "label": "While the game calculates how far my stats move",
+      "group": "Stats",
+      "modifies": "numStages",
+      "synonyms": ["simple", "contrary", "double stat changes"]
+    },
+    {
+      "id": "calc.move-type",
+      "kind": "calc",
+      "dispatchKey": "MoveTypeChangeAbAttr",
+      "provides": ["holder", "other", "move", "moveUser"],
+      "label": "While the game decides a move's type",
+      "group": "Type",
+      "modifies": "moveType",
+      "synonyms": ["aerilate", "pixilate", "change move type", "normalize"],
+      "moveUserIs": "holder"
+    },
+    {
+      "id": "calc.type-matchup",
+      "kind": "calc",
+      "dispatchKey": "FullHpResistTypeAbAttr",
+      "provides": ["holder", "other", "move"],
+      "label": "While the game calculates type matchup against me",
+      "group": "Type",
+      "modifies": "typeMultiplier",
+      "synonyms": ["resist type", "tera shell", "filter"]
+    },
+    {
+      "id": "calc.move-immunity",
+      "kind": "calc",
+      "dispatchKey": "TypeImmunityAbAttr",
+      "provides": ["holder", "other", "move"],
+      "label": "While the game checks whether a move can hit me",
+      "group": "Type",
+      "modifies": "cancelled",
+      "alsoDispatchKeys": ["MoveImmunityAbAttr", "FieldPriorityMoveImmunityAbAttr"],
+      "synonyms": ["immune", "immunity", "absorb", "levitate", "ground immune", "volt absorb"],
+      "composable": true
+    },
+    {
+      "id": "calc.ignore-type-immunity",
+      "kind": "calc",
+      "dispatchKey": "IgnoreTypeImmunityAbAttr",
+      "provides": ["holder"],
+      "label": "While the game checks the foe's type immunity",
+      "group": "Type",
+      "modifies": "cancelled",
+      "synonyms": ["scrappy", "hit ghost types", "ignore immunity"]
+    },
+    {
+      "id": "calc.ability-bypass",
+      "kind": "calc",
+      "dispatchKey": "MoveAbilityBypassAbAttr",
+      "provides": ["holder", "move"],
+      "label": "While the game decides whether my move ignores abilities",
+      "group": "Type",
+      "modifies": "cancelled",
+      "synonyms": ["mold breaker", "ignore abilities"]
+    },
+    {
+      "id": "cancel.stat-drop",
+      "kind": "calc",
+      "dispatchKey": "PreStatStageChangeAbAttr",
+      "provides": ["holder", "stat", "stages", "other"],
+      "label": "While the game checks if a stat drop can land on me",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "legacyHookId": "PreStatStageChangeAbAttr",
+      "baseClassOnly": true,
+      "synonyms": ["clear body", "hyper cutter", "block stat drop"]
+    },
+    {
+      "id": "cancel.stat-protect",
+      "kind": "calc",
+      "dispatchKey": "ProtectStatAbAttr",
+      "provides": ["holder", "stat", "stages"],
+      "label": "While the game checks if my stat is protected",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "alsoDispatchKeys": ["SelfStatDropImmunityAbAttr", "UserFieldSelfStatDropImmunityAbAttr"],
+      "synonyms": ["keen eye", "big pecks", "stat protection"]
+    },
+    {
+      "id": "cancel.stat-protect-field",
+      "kind": "calc",
+      "dispatchKey": "ConditionalUserFieldProtectStatAbAttr",
+      "provides": ["holder", "stat"],
+      "label": "While the game checks if my side's stat is protected",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "synonyms": ["flower veil", "side protection"]
+    },
+    {
+      "id": "cancel.stat-reflect",
+      "kind": "calc",
+      "dispatchKey": "ReflectStatStageChangeAbAttr",
+      "provides": ["holder", "stat", "stages", "other"],
+      "label": "While the game checks if a stat drop is reflected",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "synonyms": ["mirror armor", "reflect stat drop"]
+    },
+    {
+      "id": "cancel.intimidate",
+      "kind": "calc",
+      "dispatchKey": "IntimidateImmunityAbAttr",
+      "provides": ["holder", "stat", "stages", "simulated"],
+      "label": "While the game checks if Intimidate lands on me",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "synonyms": ["inner focus", "own tempo", "oblivious", "scrappy"]
+    },
+    {
+      "id": "cancel.status",
+      "kind": "calc",
+      "dispatchKey": "PreSetStatusAbAttr",
+      "provides": ["holder", "status", "other"],
+      "label": "While the game checks if a status can land on me",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "legacyHookId": "PreSetStatusAbAttr",
+      "baseClassOnly": true,
+      "synonyms": ["status immunity", "limber", "insomnia"]
+    },
+    {
+      "id": "cancel.status-immunity",
+      "kind": "calc",
+      "dispatchKey": "StatusEffectImmunityAbAttr",
+      "provides": ["holder", "status"],
+      "label": "While the game checks my status immunity",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "synonyms": ["immune to burn", "immune to poison", "immune to sleep"]
+    },
+    {
+      "id": "cancel.status-immunity-field",
+      "kind": "calc",
+      "dispatchKey": "UserFieldStatusEffectImmunityAbAttr",
+      "provides": ["holder", "status", "other"],
+      "label": "While the game checks my side's status immunity",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "synonyms": ["sweet veil", "pastel veil", "ally status immunity"]
+    },
+    {
+      "id": "cancel.status-type-immunity",
+      "kind": "calc",
+      "dispatchKey": "IgnoreTypeStatusEffectImmunityAbAttr",
+      "provides": ["holder", "status"],
+      "label": "While the game checks type-based status immunity",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "synonyms": ["corrosion", "poison steel types"]
+    },
+    {
+      "id": "cancel.battle-effect",
+      "kind": "calc",
+      "dispatchKey": "PreApplyBattlerTagAbAttr",
+      "provides": ["holder", "tag", "other"],
+      "label": "While the game checks if a battle effect can land on me",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "legacyHookId": "PreApplyBattlerTagAbAttr",
+      "baseClassOnly": true,
+      "synonyms": ["confusion immunity", "volatile immunity", "flinch immunity"]
+    },
+    {
+      "id": "cancel.battle-effect-immunity",
+      "kind": "calc",
+      "dispatchKey": "BattlerTagImmunityAbAttr",
+      "provides": ["holder", "tag"],
+      "label": "While the game checks my battle-effect immunity",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "synonyms": ["immune to confusion", "immune to infatuation", "oblivious"]
+    },
+    {
+      "id": "cancel.battle-effect-immunity-field",
+      "kind": "calc",
+      "dispatchKey": "UserFieldBattlerTagImmunityAbAttr",
+      "provides": ["holder", "tag", "other"],
+      "label": "While the game checks my side's battle-effect immunity",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "synonyms": ["aroma veil", "ally effect immunity"]
+    },
+    {
+      "id": "cancel.weather-damage",
+      "kind": "calc",
+      "dispatchKey": "PreWeatherDamageAbAttr",
+      "provides": ["holder", "weather"],
+      "label": "While the game checks if weather damage hurts me",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "legacyHookId": "PreWeatherDamageAbAttr",
+      "synonyms": ["sand veil", "magic guard", "overcoat", "weather immunity"]
+    },
+    {
+      "id": "cancel.weather-effect",
+      "kind": "calc",
+      "dispatchKey": "PreWeatherEffectAbAttr",
+      "provides": ["holder", "weather"],
+      "label": "While the game checks if weather affects me",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "legacyHookId": "PreWeatherEffectAbAttr",
+      "baseClassOnly": true
+    },
+    {
+      "id": "cancel.weather-suppress",
+      "kind": "calc",
+      "dispatchKey": "SuppressWeatherEffectAbAttr",
+      "provides": ["holder", "weather"],
+      "label": "While the game checks if weather is suppressed",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "synonyms": ["cloud nine", "air lock"]
+    },
+    {
+      "id": "cancel.interaction",
+      "kind": "calc",
+      "dispatchKey": "CancelInteractionAbAttr",
+      "provides": ["holder"],
+      "label": "While the game checks if an interaction is blocked",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "legacyHookId": "CancelInteractionAbAttr",
+      "baseClassOnly": true
+    },
+    {
+      "id": "cancel.crit",
+      "kind": "calc",
+      "dispatchKey": "BlockCritAbAttr",
+      "provides": ["holder"],
+      "label": "While the game checks if I can be critically hit",
+      "group": "Cancel checks",
+      "modifies": "blockCrit",
+      "synonyms": ["battle armor", "shell armor", "no crits"]
+    },
+    {
+      "id": "cancel.item-theft",
+      "kind": "calc",
+      "dispatchKey": "BlockItemTheftAbAttr",
+      "provides": ["holder"],
+      "label": "While the game checks if my item can be stolen",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "synonyms": ["sticky hold", "item lock"]
+    },
+    {
+      "id": "cancel.indirect-damage",
+      "kind": "calc",
+      "dispatchKey": "BlockNonDirectDamageAbAttr",
+      "provides": ["holder"],
+      "label": "While the game checks if indirect damage hurts me",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "alsoDispatchKeys": ["BlockRecoilDamageAttr", "BlockStatusDamageAbAttr"],
+      "synonyms": ["magic guard", "rock head", "no recoil"]
+    },
+    {
+      "id": "cancel.one-hit-ko",
+      "kind": "calc",
+      "dispatchKey": "BlockOneHitKOAbAttr",
+      "provides": ["holder"],
+      "label": "While the game checks if a one-hit KO works on me",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "synonyms": ["sturdy", "ohko immunity"]
+    },
+    {
+      "id": "cancel.forced-switch",
+      "kind": "calc",
+      "dispatchKey": "ForceSwitchOutImmunityAbAttr",
+      "provides": ["holder"],
+      "label": "While the game checks if I can be forced out",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "synonyms": ["suction cups", "anchor", "no phazing"]
+    },
+    {
+      "id": "cancel.explosive-moves",
+      "kind": "calc",
+      "dispatchKey": "FieldPreventExplosiveMovesAbAttr",
+      "provides": ["holder", "simulated"],
+      "label": "While the game checks if explosive moves are blocked",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "synonyms": ["damp", "no explosions"]
+    },
+    {
+      "id": "cancel.berry-use",
+      "kind": "calc",
+      "dispatchKey": "PreventBerryUseAbAttr",
+      "provides": ["holder"],
+      "label": "While the game checks if a berry can be eaten",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "synonyms": ["unnerve", "block berries"]
+    },
+    {
+      "id": "cancel.reflect-status-move",
+      "kind": "calc",
+      "dispatchKey": "ReflectStatusMoveAbAttr",
+      "provides": ["holder", "other", "move"],
+      "label": "While the game checks if a status move is bounced back",
+      "group": "Cancel checks",
+      "modifies": "reflected",
+      "synonyms": ["magic bounce", "bounce"]
+    },
+    {
+      "id": "cancel.infiltrate",
+      "kind": "calc",
+      "dispatchKey": "InfiltratorAbAttr",
+      "provides": ["holder", "simulated"],
+      "label": "While the game checks if my move bypasses screens",
+      "group": "Cancel checks",
+      "modifies": "bypassed",
+      "synonyms": ["infiltrator", "ignore screens", "bypass substitute"]
+    },
+    {
+      "id": "calc.incoming-move",
+      "kind": "calc",
+      "dispatchKey": "PreDefendAbAttr",
+      "provides": ["holder", "other", "move", "moveUser", "damage", "simulated"],
+      "label": "Before I take a hit",
+      "group": "Damage and power",
+      "modifies": "damage",
+      "legacyHookId": "PreDefendAbAttr",
+      "baseClassOnly": true,
+      "moveUserIs": "other"
+    },
+    {
+      "id": "calc.outgoing-move",
+      "kind": "calc",
+      "dispatchKey": "PreAttackAbAttr",
+      "provides": ["holder", "other", "move", "moveUser", "simulated"],
+      "label": "Before I attack",
+      "group": "Damage and power",
+      "modifies": "power",
+      "legacyHookId": "PreAttackAbAttr",
+      "baseClassOnly": true,
+      "moveUserIs": "holder"
+    },
+    {
+      "id": "while.active",
+      "kind": "while-active",
+      "dispatchKey": null,
+      "flagKeys": [
+        "AlwaysHitAbAttr",
+        "BadDreamsImmunityAbAttr",
+        "BlockRedirectAbAttr",
+        "BugPowderImmunityAbAttr",
+        "DoubleSelfInflictedDamageAbAttr",
+        "DrenchImmunityAbAttr",
+        "FloatAbAttr",
+        "IgnoreContactAbAttr",
+        "IgnoreGenderInfatuationAbAttr",
+        "IgnoreProtectByFlagAbAttr",
+        "IgnoreProtectOnContactAbAttr",
+        "OverruleCritAbAttr",
+        "SpreadTargetByFlagAbAttr",
+        "StealthRockImmunityAbAttr",
+        "SuppressFieldAbilitiesWhenEnragedAbAttr",
+        "SuppressFieldEffectsAbAttr",
+        "SwitchWhileRampagingAbAttr"
+      ],
+      "provides": ["holder"],
+      "label": "While the ability is active",
+      "group": "Always on",
+      "synonyms": ["always", "passive", "permanent", "flag"]
+    }
+  ],
+  "conditions": [
+    {
+      "id": "hp.full",
+      "group": "HP",
+      "label": "{who} is at full HP",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "ally"]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "pokemon.isFullHp()",
+        "source": "src/field/pokemon.ts:2403 (isFullHp, hp >= getMaxHp())"
+      },
+      "synonyms": ["full health", "max hp", "untouched", "undamaged"],
+      "examples": ["Halve damage at full HP"]
+    },
+    {
+      "id": "hp.at-most",
+      "group": "HP",
+      "label": "{who} has at most {pct}% HP",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "ally"]
+        },
+        {
+          "id": "pct",
+          "label": "HP percent",
+          "control": "slider",
+          "default": 50,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "rounding",
+          "label": "HP rounding",
+          "control": "select",
+          "default": "exact",
+          "options": ["exact", "floor-half"]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "exact: hp * 100 <= maxHp * pct ; floor-half: hp <= floor(maxHp * pct / 100)",
+        "source": "src/field/pokemon.ts:2408 (getMaxHp); integer math, no float ratio"
+      },
+      "synonyms": ["low hp", "below half", "hurt", "weakened"],
+      "examples": ["Boost power when at most 33% HP"]
+    },
+    {
+      "id": "hp.at-least",
+      "group": "HP",
+      "label": "{who} has at least {pct}% HP",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "ally"]
+        },
+        {
+          "id": "pct",
+          "label": "HP percent",
+          "control": "slider",
+          "default": 50,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "rounding",
+          "label": "HP rounding",
+          "control": "select",
+          "default": "exact",
+          "options": ["exact", "floor-half"]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "exact: hp * 100 >= maxHp * pct ; floor-half: hp >= floor(maxHp * pct / 100)",
+        "source": "src/field/pokemon.ts:2408 (getMaxHp); integer math, no float ratio"
+      },
+      "synonyms": ["high hp", "healthy", "above half"],
+      "examples": ["Resist hits while above 75% HP"]
+    },
+    {
+      "id": "hp.between",
+      "group": "HP",
+      "label": "{who} has between {minPct}% and {maxPct}% HP",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "ally"]
+        },
+        {
+          "id": "minPct",
+          "label": "Lowest HP percent",
+          "control": "slider",
+          "default": 25,
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "maxPct",
+          "label": "Highest HP percent",
+          "control": "slider",
+          "default": 75,
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "rounding",
+          "label": "HP rounding",
+          "control": "select",
+          "default": "exact",
+          "options": ["exact", "floor-half"]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "at-least(minPct) && at-most(maxPct), same rounding for both",
+        "source": "src/field/pokemon.ts:2408 (getMaxHp); integer math"
+      },
+      "synonyms": ["mid hp", "hp range", "hp window"],
+      "examples": ["Heal only while between 10% and 50% HP"]
+    },
+    {
+      "id": "hp.crossed-below",
+      "group": "HP",
+      "label": "{who} just dropped below {ratio} of max HP",
+      "requires": ["damage"],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other"]
+        },
+        {
+          "id": "ratio",
+          "label": "Max HP ratio",
+          "control": "slider",
+          "default": 0.5,
+          "min": 0.01,
+          "max": 0.99,
+          "step": 0.01,
+          "integer": false
+        },
+        {
+          "id": "rounding",
+          "label": "HP rounding",
+          "control": "select",
+          "default": "exact",
+          "options": ["exact", "floor-half"]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "exact: hp + damage >= maxHp * ratio && hp - calculateShellBellRecovery(pokemon) < maxHp * ratio ; floor-half: t = floor(maxHp * ratio); hp <= t && hp + damage > t",
+        "source": "src/data/abilities/ab-attrs.ts hpCrossedBelow (moved from PostDamageForceSwitchAbAttr.canApply); floor-half form from archetypes/berserk-on-threshold.ts. The Shell Bell term belongs to the exact form."
+      },
+      "synonyms": ["dropped below", "fell under", "crossed threshold", "wimp out", "emergency exit"],
+      "examples": ["Switch out when HP drops below 35%"]
+    },
+    {
+      "id": "move.type",
+      "group": "Move",
+      "label": "The move is {type} type",
+      "requires": ["move", "moveUser"],
+      "params": [
+        {
+          "id": "type",
+          "label": "Type",
+          "control": "select",
+          "default": "FIRE",
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "effective",
+          "label": "Use the type after ability changes",
+          "control": "boolean",
+          "default": true
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "moveUser.getMoveType(move) === PokemonType[type]  (effective=false: move.type)",
+        "source": "src/data/elite-redux/ability-studio/rule-ab-attrs.ts matchesAbilityStudioMoveFilter"
+      },
+      "synonyms": ["fire move", "water move", "move element", "attack type"],
+      "examples": ["Boost Fire-type moves"]
+    },
+    {
+      "id": "move.category",
+      "group": "Move",
+      "label": "The move is {category}",
+      "requires": ["move"],
+      "params": [
+        {
+          "id": "category",
+          "label": "Category",
+          "control": "select",
+          "default": "PHYSICAL",
+          "options": ["PHYSICAL", "SPECIAL", "STATUS"]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "move.category === MoveCategory[category]",
+        "source": "src/data/moves/move.ts (Move.category)"
+      },
+      "synonyms": ["physical", "special", "status move", "attack category"],
+      "examples": ["Resist special moves"]
+    },
+    {
+      "id": "move.flag",
+      "group": "Move",
+      "label": "The move has the {flag} property",
+      "requires": ["move", "moveUser"],
+      "params": [
+        {
+          "id": "flag",
+          "label": "Move property",
+          "control": "select",
+          "default": "MAKES_CONTACT",
+          "options": [
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "move.doesFlagEffectApply({ flag: MoveFlags[flag], user: moveUser, target })",
+        "source": "src/data/moves/move.ts:986 (doesFlagEffectApply, so contact-ignoring abilities and substitutes count)"
+      },
+      "synonyms": ["contact", "sound move", "punching move", "biting move", "move flag"],
+      "examples": ["Trigger only on contact moves"]
+    },
+    {
+      "id": "move.power",
+      "group": "Move",
+      "label": "The move's power is {cmp} {n}",
+      "requires": ["move"],
+      "params": [
+        {
+          "id": "cmp",
+          "label": "Comparison",
+          "control": "select",
+          "default": "gte",
+          "options": ["lt", "lte", "eq", "gte", "gt"]
+        },
+        {
+          "id": "n",
+          "label": "Power",
+          "control": "number",
+          "default": 60,
+          "min": 0,
+          "max": 400,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "compare(move.power, cmp, n)",
+        "source": "src/data/moves/move.ts (Move.power)"
+      },
+      "synonyms": ["base power", "weak move", "strong move", "bp"],
+      "examples": ["Boost moves with 60 power or less"]
+    },
+    {
+      "id": "move.damaging",
+      "group": "Move",
+      "label": "The move deals damage",
+      "requires": ["move"],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "move.category is not STATUS",
+        "source": "rule-ab-attrs.ts matchesAbilityStudioMoveFilter"
+      },
+      "synonyms": ["attacking move", "not a status move", "damage move"],
+      "examples": ["Only react to damaging moves"]
+    },
+    {
+      "id": "move.target-kind",
+      "group": "Move",
+      "label": "The move targets {kind}",
+      "requires": ["move"],
+      "params": [
+        {
+          "id": "kind",
+          "label": "Target",
+          "control": "select",
+          "default": "single",
+          "options": ["single", "all-foes", "all-others", "user-or-ally", "field"]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "single: OTHER|NEAR_OTHER|RANDOM_NEAR_ENEMY ; all-foes: ALL_NEAR_ENEMIES|ENEMY_SIDE ; all-others: ALL_NEAR_OTHERS|ALL_OTHERS ; user-or-ally: USER|NEAR_ALLY|USER_AND_ALLIES ; field: BOTH_SIDES|USER_SIDE",
+        "source": "src/enums/move-target.ts"
+      },
+      "synonyms": ["spread move", "single target", "multi target"],
+      "examples": ["Only single-target moves"]
+    },
+    {
+      "id": "move.priority",
+      "group": "Move",
+      "label": "The move's priority is {cmp} {n}",
+      "requires": ["move"],
+      "params": [
+        {
+          "id": "cmp",
+          "label": "Comparison",
+          "control": "select",
+          "default": "gte",
+          "options": ["lt", "lte", "eq", "gte", "gt"]
+        },
+        {
+          "id": "n",
+          "label": "Priority",
+          "control": "number",
+          "default": 0,
+          "min": -7,
+          "max": 7,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "compare(move.priority, cmp, n)",
+        "source": "src/data/moves/move.ts:231 (Move.priority)"
+      },
+      "synonyms": ["priority move", "quick attack", "go first"],
+      "examples": ["Block priority moves"]
+    },
+    {
+      "id": "move.multi-hit",
+      "group": "Move",
+      "label": "The move hits more than once",
+      "requires": ["hits"],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "hits.count > 1",
+        "source": "src/phases/move-effect-phase.ts hit counters"
+      },
+      "synonyms": ["multi strike", "double hit", "multiple hits"],
+      "examples": ["Only for multi-hit moves"]
+    },
+    {
+      "id": "move.hit-index",
+      "group": "Move",
+      "label": "This is hit number {cmp} {n}",
+      "requires": ["hits"],
+      "params": [
+        {
+          "id": "cmp",
+          "label": "Comparison",
+          "control": "select",
+          "default": "gte",
+          "options": ["lt", "lte", "eq", "gte", "gt"]
+        },
+        {
+          "id": "n",
+          "label": "Hit number",
+          "control": "number",
+          "default": 1,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "compare(hits.index, cmp, n)  (hits.index is 1-based)",
+        "source": "src/phases/move-effect-phase.ts hit counters"
+      },
+      "synonyms": ["first hit", "second hit", "nth strike"],
+      "examples": ["Only on the first hit"]
+    },
+    {
+      "id": "move.last-hit",
+      "group": "Move",
+      "label": "This is the final hit of the move",
+      "requires": ["hits"],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "hits.index >= hits.count",
+        "source": "src/phases/move-effect-phase.ts hit counters (turnData.hitsLeft)"
+      },
+      "synonyms": ["last strike", "final hit", "after the last hit"],
+      "examples": ["Trigger after the final hit of a multi-hit move"]
+    },
+    {
+      "id": "move.effectiveness",
+      "group": "Move",
+      "label": "The move's effectiveness is {cmp} {n}x",
+      "requires": ["move", "moveUser", "other"],
+      "params": [
+        {
+          "id": "cmp",
+          "label": "Comparison",
+          "control": "select",
+          "default": "gte",
+          "options": ["lt", "lte", "eq", "gte", "gt"]
+        },
+        {
+          "id": "n",
+          "label": "Multiplier",
+          "control": "number",
+          "default": 2,
+          "min": 0,
+          "max": 16,
+          "step": 0.25,
+          "integer": false
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "compare(target.getMoveEffectiveness(moveUser, move), cmp, n)",
+        "source": "src/field/pokemon.ts:4138 (getMoveEffectiveness)"
+      },
+      "synonyms": ["super effective", "not very effective", "resisted", "type advantage"],
+      "examples": ["Take less damage from super effective moves (Filter)"]
+    },
+    {
+      "id": "move.has-effect-chance",
+      "group": "Move",
+      "label": "The move has a secondary effect chance",
+      "requires": ["move"],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "move.chance >= 0",
+        "source": "ab-attrs.ts:7437 PostDamageForceSwitchAbAttr (move.chance >= 0 Sheer Force test)"
+      },
+      "synonyms": ["secondary effect", "sheer force move", "extra effect"],
+      "examples": ["Boost moves that have an extra effect"]
+    },
+    {
+      "id": "move.is-move",
+      "group": "Move",
+      "label": "The move is {moveId}",
+      "requires": ["move"],
+      "params": [
+        {
+          "id": "moveId",
+          "label": "Move id (enum name)",
+          "control": "text",
+          "default": "SPLASH"
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "move.id === MoveId[moveId]",
+        "source": "src/enums/move-id.ts"
+      },
+      "synonyms": ["specific move", "this move", "named move"],
+      "examples": ["Only when the move is Earthquake"]
+    },
+    {
+      "id": "field.weather",
+      "group": "Field",
+      "label": "The weather is {weather}",
+      "requires": [],
+      "params": [
+        {
+          "id": "weather",
+          "label": "Weather",
+          "control": "select",
+          "default": "SUNNY",
+          "options": [
+            "NONE",
+            "SUNNY",
+            "RAIN",
+            "SANDSTORM",
+            "HAIL",
+            "SNOW",
+            "FOG",
+            "HEAVY_RAIN",
+            "HARSH_SUN",
+            "STRONG_WINDS",
+            "TEMPEST_STORM",
+            "SNOWY_WRATH",
+            "EERIE_FOG"
+          ]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "arena.weatherType === WeatherType[weather]",
+        "source": "src/field/arena.ts:219 (weatherType, suppression aware)"
+      },
+      "synonyms": ["rain", "sun", "sandstorm", "hail", "snow", "weather active"],
+      "examples": ["Boost Speed in rain"]
+    },
+    {
+      "id": "field.terrain",
+      "group": "Field",
+      "label": "The terrain is {terrain}",
+      "requires": [],
+      "params": [
+        {
+          "id": "terrain",
+          "label": "Terrain",
+          "control": "select",
+          "default": "ELECTRIC",
+          "options": ["NONE", "MISTY", "ELECTRIC", "GRASSY", "PSYCHIC", "TOXIC"]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "arena.terrainType === TerrainType[terrain]",
+        "source": "src/field/arena.ts:245 (terrainType)"
+      },
+      "synonyms": ["electric terrain", "grassy terrain", "misty terrain", "psychic terrain"],
+      "examples": ["Heal in Grassy Terrain"]
+    },
+    {
+      "id": "field.arena-tag",
+      "group": "Field",
+      "label": "{tag} is active on {side}",
+      "requires": [],
+      "params": [
+        {
+          "id": "tag",
+          "label": "Field effect (ArenaTagType name)",
+          "control": "text",
+          "default": "REFLECT"
+        },
+        {
+          "id": "side",
+          "label": "Side",
+          "control": "select",
+          "default": "holder-side",
+          "options": ["holder-side", "opposing-side", "both"]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "arena.getTagOnSide(ArenaTagType[tag], side)",
+        "source": "src/field/arena.ts getTagOnSide"
+      },
+      "synonyms": ["screens", "hazards", "reflect", "light screen", "spikes", "tailwind"],
+      "examples": ["Boost damage while Tailwind is up"]
+    },
+    {
+      "id": "field.gravity",
+      "group": "Field",
+      "label": "Gravity is active",
+      "requires": [],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "arena.hasActiveGravity()",
+        "source": "src/field/arena.ts:241 (hasActiveGravity: the tag is set and not suppressed)"
+      },
+      "synonyms": ["gravity", "grounded field"],
+      "examples": ["Only while Gravity is up"]
+    },
+    {
+      "id": "field.trick-room",
+      "group": "Field",
+      "label": "Trick Room is active",
+      "requires": [],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "arena.getTag(TRICK_ROOM) !== undefined",
+        "source": "src/field/arena.ts getTag"
+      },
+      "synonyms": ["trick room", "reversed speed"],
+      "examples": ["Boost Speed under Trick Room"]
+    },
+    {
+      "id": "status.has",
+      "group": "Status",
+      "label": "{who} has {status}",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "ally"]
+        },
+        {
+          "id": "status",
+          "label": "Status",
+          "control": "select",
+          "default": "ANY",
+          "options": ["ANY", "NONE", "POISON", "TOXIC", "PARALYSIS", "SLEEP", "FREEZE", "BURN"]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "ANY: pokemon.status != null ; NONE: pokemon.status == null ; else pokemon.status?.effect === StatusEffect[status]",
+        "source": "rule-ab-attrs.ts matchesStatus"
+      },
+      "synonyms": ["burned", "poisoned", "asleep", "paralyzed", "frozen", "no status"],
+      "examples": ["Boost power while burned (Guts)"]
+    },
+    {
+      "id": "status.confused",
+      "group": "Status",
+      "label": "{who} is confused",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "ally"]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "pokemon.getTag(CONFUSED) !== undefined",
+        "source": "src/field/pokemon.ts:6941 (getTag)"
+      },
+      "synonyms": ["confusion", "dazed", "befuddled"],
+      "examples": ["Boost power while confused"]
+    },
+    {
+      "id": "tag.has",
+      "group": "Status",
+      "label": "{who} is affected by {tag}",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "ally"]
+        },
+        {
+          "id": "tag",
+          "label": "Battle effect (BattlerTagType name)",
+          "control": "text",
+          "default": "TAUNT"
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "pokemon.getTag(BattlerTagType[tag]) !== undefined",
+        "source": "src/field/pokemon.ts:6941 (getTag)"
+      },
+      "synonyms": ["taunted", "flinching", "leech seed", "volatile status", "battle effect"],
+      "examples": ["React when the foe is taunted"]
+    },
+    {
+      "id": "stage.compare",
+      "group": "Stat stages",
+      "label": "{who}'s {stat} stage is {cmp} {n}",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "ally"]
+        },
+        {
+          "id": "stat",
+          "label": "Stat",
+          "control": "select",
+          "default": "ATK",
+          "options": ["ANY", "ATK", "DEF", "SPATK", "SPDEF", "SPD", "ACC", "EVA"]
+        },
+        {
+          "id": "cmp",
+          "label": "Comparison",
+          "control": "select",
+          "default": "gte",
+          "options": ["lt", "lte", "eq", "gte", "gt"]
+        },
+        {
+          "id": "n",
+          "label": "Stage",
+          "control": "number",
+          "default": 0,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "compare(pokemon.getStatStage(Stat[stat]), cmp, n)  (ANY: some stat matches)",
+        "source": "src/field/pokemon.ts:2034 (getStatStage)"
+      },
+      "synonyms": ["boosted", "lowered", "stat stage", "stat boost"],
+      "examples": ["Trigger when Attack is at +2 or more"]
+    },
+    {
+      "id": "stage.just-changed",
+      "group": "Stat stages",
+      "label": "The stat just changed",
+      "requires": ["stat", "stages"],
+      "params": [
+        {
+          "id": "direction",
+          "label": "Direction",
+          "control": "select",
+          "default": "any",
+          "options": ["any", "raised", "lowered"]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "any: stages !== 0 ; raised: stages > 0 ; lowered: stages < 0",
+        "source": "stat-stage-change-phase.ts:357"
+      },
+      "synonyms": ["stat changed", "just boosted", "just dropped"],
+      "examples": ["React to a stat drop"]
+    },
+    {
+      "id": "time.first-turn",
+      "group": "Time",
+      "label": "It is my first turn out",
+      "requires": [],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "holder.tempSummonData.waveTurnCount <= 1",
+        "source": "src/data/moves/move-condition.ts:57 (the Fake Out first-turn test: waveTurnCount === 1)"
+      },
+      "synonyms": ["first turn", "just arrived", "fake out", "turn one"],
+      "examples": ["Only on the first turn after entering"]
+    },
+    {
+      "id": "time.turn-count",
+      "group": "Time",
+      "label": "I have been out for {cmp} {n} turns",
+      "requires": [],
+      "params": [
+        {
+          "id": "cmp",
+          "label": "Comparison",
+          "control": "select",
+          "default": "gte",
+          "options": ["lt", "lte", "eq", "gte", "gt"]
+        },
+        {
+          "id": "n",
+          "label": "Turns",
+          "control": "number",
+          "default": 3,
+          "min": 1,
+          "max": 99,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "compare(holder.tempSummonData.turnCount, cmp, n)",
+        "source": "src/data/pokemon/pokemon-data.ts:503"
+      },
+      "synonyms": ["turns out", "time on field", "slow start"],
+      "examples": ["Stop working after 5 turns"]
+    },
+    {
+      "id": "time.last-move",
+      "group": "Time",
+      "label": "{who}'s last move was {moveId}",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "ally"]
+        },
+        {
+          "id": "moveId",
+          "label": "Move id (enum name)",
+          "control": "text",
+          "default": "SPLASH"
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "pokemon.getLastXMoves()[0]?.move === MoveId[moveId]",
+        "source": "src/field/pokemon.ts:7249 (getLastXMoves)"
+      },
+      "synonyms": ["previous move", "last used", "just used"],
+      "examples": ["Boost after using the same move twice"]
+    },
+    {
+      "id": "time.acted",
+      "group": "Time",
+      "label": "{who} has already moved this turn",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "ally"]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "pokemon.turnData?.acted ?? false",
+        "source": "src/data/pokemon/pokemon-data.ts PokemonTurnData.acted (Stall, Breakwater, Haste Makes Waste)"
+      },
+      "synonyms": ["already moved", "moved this turn", "acted", "went first"],
+      "examples": ["Take less damage until I have moved this turn"]
+    },
+    {
+      "id": "time.once-per",
+      "group": "Time",
+      "label": "Only once per {scope}",
+      "requires": [],
+      "params": [
+        {
+          "id": "scope",
+          "label": "Scope",
+          "control": "select",
+          "default": "battle",
+          "options": ["entry", "wave", "battle", "turn", "switch"]
+        },
+        {
+          "id": "key",
+          "label": "Memory key",
+          "control": "text",
+          "default": "once"
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "wave: holder.waveData.entryEffectsFired.has(key) ? false : (add(key), true) ; other scopes: WeakMap<battleData>(key) === scope marker ? false : (mark, true) ; marks only when not simulated and only when the rule applies",
+        "source": "the wave scope IS the per-wave memory the ER archetypes use (berserk-on-threshold, self-switch-on-stat-lower, entry-effect); other scopes are keyed by (pokemon.battleData, key), never static fields"
+      },
+      "synonyms": ["once", "one time", "once per battle", "once per turn", "single use"],
+      "examples": ["Only the first time per battle"]
+    },
+    {
+      "id": "time.nth-use",
+      "group": "Time",
+      "label": "On the {n}th time this triggers",
+      "requires": [],
+      "params": [
+        {
+          "id": "n",
+          "label": "Count",
+          "control": "number",
+          "default": 2,
+          "min": 1,
+          "max": 99,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "key",
+          "label": "Memory key",
+          "control": "text",
+          "default": "uses"
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "++counter(battleData, key) === n",
+        "source": "state keyed by (pokemon.battleData, key)"
+      },
+      "synonyms": ["every other", "third time", "counter", "nth"],
+      "examples": ["Fire on the third use"]
+    },
+    {
+      "id": "item.holds",
+      "group": "Items",
+      "label": "{who} holds {kind} item",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "ally"]
+        },
+        {
+          "id": "kind",
+          "label": "Item kind",
+          "control": "select",
+          "default": "any",
+          "options": ["any", "berry"]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "any: pokemon.getHeldItems().length > 0 ; berry: some BerryModifier",
+        "source": "src/field/pokemon.ts getHeldItems"
+      },
+      "synonyms": ["has item", "holding", "berry held", "item equipped"],
+      "examples": ["Boost power while holding an item"]
+    },
+    {
+      "id": "item.none",
+      "group": "Items",
+      "label": "{who} holds no item",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "ally"]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "pokemon.getHeldItems().length === 0",
+        "source": "src/field/pokemon.ts getHeldItems"
+      },
+      "synonyms": ["no item", "itemless", "unburden", "empty hands"],
+      "examples": ["Boost Speed when the item is gone"]
+    },
+    {
+      "id": "item.lost",
+      "group": "Items",
+      "label": "{who} lost an item this battle",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "ally"]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "pokemon.battleData.lostItems.length > 0 || pokemon.battleData.berriesEaten.length > 0",
+        "source": "src/data/pokemon/pokemon-data.ts PokemonBattleData.lostItems / berriesEaten ledgers"
+      },
+      "synonyms": ["item gone", "lost item", "used item"],
+      "examples": ["Boost Speed after the item is lost"]
+    },
+    {
+      "id": "side.is",
+      "group": "Party",
+      "label": "The other Pokemon is {kind}",
+      "requires": ["other"],
+      "params": [
+        {
+          "id": "kind",
+          "label": "Relation",
+          "control": "select",
+          "default": "foe",
+          "options": ["ally", "foe", "self"]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "ally: other.isPlayer() === holder.isPlayer() && other !== holder ; foe: other.isPlayer() !== holder.isPlayer() ; self: other === holder",
+        "source": "src/field/pokemon.ts isPlayer"
+      },
+      "synonyms": ["opponent", "teammate", "enemy", "foe or ally"],
+      "examples": ["Only react to opponents"]
+    },
+    {
+      "id": "side.is-player",
+      "group": "Party",
+      "label": "{who} is on the player's side",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "ally"]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "pokemon.isPlayer()",
+        "source": "src/field/pokemon.ts:1044 (isPlayer)"
+      },
+      "synonyms": ["player side", "my team", "not enemy"],
+      "examples": ["Only for player Pokemon"]
+    },
+    {
+      "id": "party.ally-exists",
+      "group": "Party",
+      "label": "I have an ally on the field",
+      "requires": [],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "holder.getAlly() !== undefined",
+        "source": "src/field/pokemon.ts:5368 (getAlly)"
+      },
+      "synonyms": ["has partner", "doubles partner", "ally present"],
+      "examples": ["Boost power when an ally is present"]
+    },
+    {
+      "id": "party.ally-ability",
+      "group": "Party",
+      "label": "My ally has the ability {ability}",
+      "requires": [],
+      "params": [
+        {
+          "id": "ability",
+          "label": "Ability id (enum name)",
+          "control": "text",
+          "default": "PLUS"
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "holder.getAlly()?.hasAbility(AbilityId[ability])",
+        "source": "src/field/pokemon.ts:3848 (hasAbility)"
+      },
+      "synonyms": ["partner ability", "plus minus", "ally has ability"],
+      "examples": ["Boost Sp. Atk while the ally has Minus"]
+    },
+    {
+      "id": "party.count",
+      "group": "Party",
+      "label": "I have {cmp} {n} Pokemon left",
+      "requires": [],
+      "params": [
+        {
+          "id": "cmp",
+          "label": "Comparison",
+          "control": "select",
+          "default": "gte",
+          "options": ["lt", "lte", "eq", "gte", "gt"]
+        },
+        {
+          "id": "n",
+          "label": "Pokemon",
+          "control": "number",
+          "default": 1,
+          "min": 0,
+          "max": 6,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "compare(party.filter(not fainted).length, cmp, n)",
+        "source": "src/battle-scene.ts getPlayerParty / getEnemyParty"
+      },
+      "synonyms": ["party size", "pokemon left", "team size"],
+      "examples": ["Boost power with 2 or fewer Pokemon left"]
+    },
+    {
+      "id": "party.fainted-count",
+      "group": "Party",
+      "label": "{cmp} {n} of my party have fainted",
+      "requires": [],
+      "params": [
+        {
+          "id": "cmp",
+          "label": "Comparison",
+          "control": "select",
+          "default": "gte",
+          "options": ["lt", "lte", "eq", "gte", "gt"]
+        },
+        {
+          "id": "n",
+          "label": "Pokemon",
+          "control": "number",
+          "default": 1,
+          "min": 0,
+          "max": 6,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "compare(party.filter(fainted).length, cmp, n)",
+        "source": "src/battle-scene.ts getPlayerParty / getEnemyParty"
+      },
+      "synonyms": ["fainted allies", "supreme overlord", "rage fist", "dead teammates"],
+      "examples": ["Boost power for each fainted teammate"]
+    },
+    {
+      "id": "party.last-pokemon",
+      "group": "Party",
+      "label": "I am the last Pokemon standing",
+      "requires": [],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "party.filter(not fainted).length === 1",
+        "source": "src/battle-scene.ts getPlayerParty / getEnemyParty"
+      },
+      "synonyms": ["last mon", "final pokemon", "last stand"],
+      "examples": ["Boost everything when it is the last Pokemon"]
+    },
+    {
+      "id": "party.doubles",
+      "group": "Party",
+      "label": "It is a double battle",
+      "requires": [],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "currentBattle.double",
+        "source": "src/battle.ts:227 (double view of the format)"
+      },
+      "synonyms": ["double battle", "doubles", "two on two"],
+      "examples": ["Only in double battles"]
+    },
+    {
+      "id": "mon.has-type",
+      "group": "Pokemon",
+      "label": "{who} is {type} type",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "ally"]
+        },
+        {
+          "id": "type",
+          "label": "Type",
+          "control": "select",
+          "default": "WATER",
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "pokemon.isOfType(PokemonType[type])",
+        "source": "src/field/pokemon.ts:2875 (isOfType)"
+      },
+      "synonyms": ["is fire type", "type check", "dual type"],
+      "examples": ["Only against Ghost types"]
+    },
+    {
+      "id": "mon.opposite-gender",
+      "group": "Pokemon",
+      "label": "The other Pokemon is of the opposite gender",
+      "requires": ["other"],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "holder.gender !== GENDERLESS && other.gender !== GENDERLESS && holder.gender !== other.gender",
+        "source": "src/enums/gender.ts (Rivalry, Empress)"
+      },
+      "synonyms": ["opposite sex", "different gender", "male versus female"],
+      "examples": ["Take less damage from the opposite gender"]
+    },
+    {
+      "id": "mon.grounded",
+      "group": "Pokemon",
+      "label": "{who} is on the ground",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "ally"]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "pokemon.isGrounded()",
+        "source": "src/field/pokemon.ts:3999 (isGrounded)"
+      },
+      "synonyms": ["grounded", "not flying", "not levitating", "touching ground"],
+      "examples": ["Only affects grounded targets"]
+    },
+    {
+      "id": "mon.has-ability",
+      "group": "Pokemon",
+      "label": "{who} has the ability {ability}",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "ally"]
+        },
+        {
+          "id": "ability",
+          "label": "Ability id (enum name)",
+          "control": "text",
+          "default": "LEVITATE"
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "pokemon.hasAbility(AbilityId[ability])",
+        "source": "src/field/pokemon.ts:3848 (hasAbility)"
+      },
+      "synonyms": ["has ability", "ability check", "owns ability"],
+      "examples": ["Only against Pokemon with Levitate"]
+    },
+    {
+      "id": "mon.ability-ignorable",
+      "group": "Pokemon",
+      "label": "My ability can be ignored by Mold Breaker style effects",
+      "requires": [],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "holder.getAbility().ignorable",
+        "source": "src/data/abilities/ability.ts:124 (ignorable)"
+      },
+      "synonyms": ["mold breaker", "ability ignored", "breakable ability"],
+      "examples": ["Only while my ability is breakable"]
+    },
+    {
+      "id": "mon.in-form",
+      "group": "Pokemon",
+      "label": "{who} is in the {key} form",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "ally"]
+        },
+        {
+          "id": "key",
+          "label": "Form key",
+          "control": "text",
+          "default": ""
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "pokemon.getFormKey() === key",
+        "source": "src/field/pokemon.ts getFormKey"
+      },
+      "synonyms": ["form", "current form", "transformed", "ape form"],
+      "examples": ["Only while in the battle form"]
+    },
+    {
+      "id": "mon.can-change-form",
+      "group": "Pokemon",
+      "label": "{who} can change to the {key} form",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "ally"]
+        },
+        {
+          "id": "key",
+          "label": "Form key",
+          "control": "text",
+          "default": ""
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "pokemon has a registered form change edge to key",
+        "source": "src/data/pokemon-forms.ts pokemonFormChanges"
+      },
+      "synonyms": ["can transform", "form available", "has form change"],
+      "examples": ["Only if the form change is wired"]
+    },
+    {
+      "id": "rng.chance",
+      "group": "Chance",
+      "label": "{pct}% chance",
+      "requires": [],
+      "params": [
+        {
+          "id": "pct",
+          "label": "Chance percent",
+          "control": "slider",
+          "default": 30,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "pure": false,
+      "formula": {
+        "expr": "simulated || pct >= 100 || holder.randBattleSeedInt(100) < pct  (evaluated at the position of the original draw)",
+        "source": "compile-ability-blueprint chance handling; runtime-components.ts carrier.canApply"
+      },
+      "synonyms": ["random", "percent chance", "luck", "sometimes"],
+      "examples": ["30% chance to paralyze on contact"]
+    },
+    {
+      "id": "escape.legacy-closure",
+      "group": "Advanced",
+      "label": "A built-in rule (works as one piece)",
+      "requires": [],
+      "params": [
+        {
+          "id": "note",
+          "label": "Note",
+          "control": "text",
+          "default": ""
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "the original constructor closure, reused as a whole",
+        "source": "bindings (opaque, reusable, not editable)"
+      },
+      "synonyms": ["built in rule", "opaque condition", "legacy"],
+      "examples": ["Keeps an original closure that has no library equivalent yet"],
+      "escapeHatch": true
+    },
+    {
+      "id": "escape.engine-guard",
+      "group": "Advanced",
+      "label": "Safety rule {name}",
+      "requires": [],
+      "params": [
+        {
+          "id": "name",
+          "label": "Guard name",
+          "control": "text",
+          "default": ""
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "guard registry entry (never removable)",
+        "source": "vocabulary/guards.ts"
+      },
+      "synonyms": ["safety rule", "guard", "locked rule"],
+      "examples": ["The not-already-forced-out rule of Wimp Out"],
+      "escapeHatch": true
+    }
+  ],
+  "groupOperators": ["all", "any", "not"],
+  "effects": [
+    {
+      "id": "effect.multiply-power",
+      "kind": "calc",
+      "label": "Multiply the move's power by {multiplier}",
+      "requires": [],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Multiplier",
+          "control": "number",
+          "default": 1.5,
+          "min": 0,
+          "max": 8,
+          "step": 0.05,
+          "integer": false
+        }
+      ],
+      "modifies": "power",
+      "implemented": true,
+      "synonyms": ["boost power", "power up", "stronger moves", "base power"],
+      "examples": ["Boost Fire moves by 1.5x"]
+    },
+    {
+      "id": "effect.multiply-damage-taken",
+      "kind": "calc",
+      "label": "Multiply damage I take by {multiplier}",
+      "requires": [],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Multiplier",
+          "control": "number",
+          "default": 0.5,
+          "min": 0,
+          "max": 4,
+          "step": 0.05,
+          "integer": false
+        },
+        {
+          "id": "affectsFixedDamage",
+          "label": "Also affects fixed damage",
+          "control": "boolean",
+          "default": false
+        }
+      ],
+      "modifies": "damage",
+      "implemented": true,
+      "synonyms": ["resist", "half damage", "damage reduction", "tank"],
+      "examples": ["Halve damage at full HP"]
+    },
+    {
+      "id": "effect.multiply-damage-dealt",
+      "kind": "calc",
+      "label": "Multiply damage I deal by {multiplier}",
+      "requires": [],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Multiplier",
+          "control": "number",
+          "default": 1.3,
+          "min": 0,
+          "max": 8,
+          "step": 0.05,
+          "integer": false
+        }
+      ],
+      "modifies": "damage",
+      "implemented": true,
+      "synonyms": ["deal more damage", "damage boost", "stronger hits"],
+      "examples": ["Deal 30% more damage to burned foes"]
+    },
+    {
+      "id": "effect.add-damage",
+      "kind": "calc",
+      "label": "Add {amount} damage",
+      "requires": [],
+      "params": [
+        {
+          "id": "amount",
+          "label": "Damage",
+          "control": "number",
+          "default": 10,
+          "min": -9999,
+          "max": 9999,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "modifies": "damage",
+      "implemented": false,
+      "synonyms": ["extra damage", "flat damage", "bonus damage"],
+      "examples": ["Deal 10 extra damage"]
+    },
+    {
+      "id": "effect.cap-damage",
+      "kind": "calc",
+      "label": "Never take more than {maxPct}% of max HP",
+      "requires": [],
+      "params": [
+        {
+          "id": "maxPct",
+          "label": "Max percent",
+          "control": "slider",
+          "default": 50,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "modifies": "damage",
+      "implemented": false,
+      "synonyms": ["damage cap", "limit damage", "survive", "endure"],
+      "examples": ["Cap each hit at 50% of max HP"]
+    },
+    {
+      "id": "effect.negate",
+      "kind": "calc",
+      "label": "Block it",
+      "requires": [],
+      "params": [],
+      "modifies": "cancelled",
+      "implemented": false,
+      "synonyms": ["immune", "prevent", "cancel", "block", "no effect"],
+      "examples": ["Block stat drops"]
+    },
+    {
+      "id": "effect.change-move-type",
+      "kind": "calc",
+      "label": "Change the move's type to {type}",
+      "requires": [],
+      "params": [
+        {
+          "id": "type",
+          "label": "Type",
+          "control": "select",
+          "default": "FLYING",
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "modifies": "moveType",
+      "implemented": false,
+      "synonyms": ["aerilate", "pixilate", "convert type", "normalize"],
+      "examples": ["Normal moves become Flying"]
+    },
+    {
+      "id": "effect.grant-stab",
+      "kind": "calc",
+      "label": "Treat the move as same-type (x{multiplier})",
+      "requires": [],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Multiplier",
+          "control": "number",
+          "default": 1.5,
+          "min": 1,
+          "max": 3,
+          "step": 0.05,
+          "integer": false
+        }
+      ],
+      "modifies": "stab",
+      "implemented": false,
+      "synonyms": ["stab", "adaptability", "same type bonus"],
+      "examples": ["Always get the same-type bonus"]
+    },
+    {
+      "id": "effect.multiply-stat",
+      "kind": "calc",
+      "label": "Multiply {stat} by {multiplier}",
+      "requires": [],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Stat",
+          "control": "select",
+          "default": "ATK",
+          "options": ["ATK", "DEF", "SPATK", "SPDEF", "SPD", "ACC", "EVA"]
+        },
+        {
+          "id": "multiplier",
+          "label": "Multiplier",
+          "control": "number",
+          "default": 1.5,
+          "min": 0,
+          "max": 8,
+          "step": 0.05,
+          "integer": false
+        }
+      ],
+      "modifies": "statValue",
+      "implemented": false,
+      "synonyms": ["stat boost", "attack up", "speed up", "huge power"],
+      "examples": ["Double Attack"]
+    },
+    {
+      "id": "effect.change-priority",
+      "kind": "calc",
+      "label": "Change the move's priority by {amount}",
+      "requires": [],
+      "params": [
+        {
+          "id": "amount",
+          "label": "Priority",
+          "control": "number",
+          "default": 1,
+          "min": -7,
+          "max": 7,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "modifies": "priority",
+      "implemented": true,
+      "synonyms": ["go first", "gale wings", "prankster", "priority"],
+      "examples": ["Give Flying moves +1 priority"]
+    },
+    {
+      "id": "effect.always-hit",
+      "kind": "calc",
+      "label": "Never miss",
+      "requires": [],
+      "params": [],
+      "modifies": "accuracy",
+      "implemented": false,
+      "synonyms": ["no guard", "never miss", "perfect accuracy"],
+      "examples": ["Moves never miss"]
+    },
+    {
+      "id": "effect.force-crit",
+      "kind": "calc",
+      "label": "Always land a critical hit",
+      "requires": [],
+      "params": [],
+      "modifies": "isCritical",
+      "implemented": false,
+      "synonyms": ["always crit", "guaranteed crit", "merciless"],
+      "examples": ["Always crit against poisoned foes"]
+    },
+    {
+      "id": "effect.hit-n-times",
+      "kind": "calc",
+      "label": "Hit {count} times",
+      "requires": [],
+      "params": [
+        {
+          "id": "count",
+          "label": "Hits",
+          "control": "number",
+          "default": 2,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "modifies": "hitCount",
+      "implemented": false,
+      "synonyms": ["multi hit", "parental bond", "extra strike"],
+      "examples": ["Hit twice"]
+    },
+    {
+      "id": "effect.immune-to-type",
+      "kind": "calc",
+      "label": "Be immune to {type} moves",
+      "requires": [],
+      "params": [
+        {
+          "id": "type",
+          "label": "Type",
+          "control": "select",
+          "default": "GROUND",
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "modifies": "cancelled",
+      "feasibility": [
+        "Does not block status moves or moves that treat Flying types neutrally (the same rule as Levitate)",
+        "Does not block moves that hit every Pokemon, or my own side"
+      ],
+      "implemented": true,
+      "synonyms": ["immunity", "levitate", "volt absorb", "water absorb", "ground immune"],
+      "examples": ["Immune to Ground moves"]
+    },
+    {
+      "id": "effect.stat-stage",
+      "kind": "event",
+      "label": "Change {target}'s {stat} by {stages} stages",
+      "requires": [],
+      "params": [
+        {
+          "id": "target",
+          "label": "Who",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "holder-side", "opposing-side"]
+        },
+        {
+          "id": "stat",
+          "label": "Stat",
+          "control": "select",
+          "default": "ATK",
+          "options": ["ATK", "DEF", "SPATK", "SPDEF", "SPD", "ACC", "EVA"]
+        },
+        {
+          "id": "stages",
+          "label": "Stages",
+          "control": "number",
+          "default": 1,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "v1Kind": "stat-stage",
+      "implemented": true,
+      "synonyms": ["raise stat", "lower stat", "boost", "drop", "intimidate", "stat stage"],
+      "examples": ["Raise Speed by 1 stage"]
+    },
+    {
+      "id": "effect.inflict-status",
+      "kind": "event",
+      "label": "Give {target} {status}",
+      "requires": [],
+      "params": [
+        {
+          "id": "target",
+          "label": "Who",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "holder-side", "opposing-side"]
+        },
+        {
+          "id": "status",
+          "label": "Status",
+          "control": "select",
+          "default": "POISON",
+          "options": ["POISON", "TOXIC", "PARALYSIS", "SLEEP", "FREEZE", "BURN"]
+        }
+      ],
+      "v1Kind": "status",
+      "implemented": true,
+      "synonyms": ["poison", "burn", "paralyze", "put to sleep", "freeze", "inflict status"],
+      "examples": ["Burn the attacker"]
+    },
+    {
+      "id": "effect.cure-status",
+      "kind": "event",
+      "label": "Cure {target}'s {status}",
+      "requires": [],
+      "params": [
+        {
+          "id": "target",
+          "label": "Who",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "holder-side", "opposing-side"]
+        },
+        {
+          "id": "status",
+          "label": "Status",
+          "control": "select",
+          "default": "ANY",
+          "options": ["ANY", "POISON", "TOXIC", "PARALYSIS", "SLEEP", "FREEZE", "BURN"]
+        }
+      ],
+      "v1Kind": "cure-status",
+      "implemented": true,
+      "synonyms": ["heal status", "remove burn", "cleanse", "cure"],
+      "examples": ["Cure my own status"]
+    },
+    {
+      "id": "effect.heal-percent",
+      "kind": "event",
+      "label": "Heal {target} by {percent}% of max HP",
+      "requires": [],
+      "params": [
+        {
+          "id": "target",
+          "label": "Who",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "holder-side", "opposing-side"]
+        },
+        {
+          "id": "percent",
+          "label": "Percent",
+          "control": "slider",
+          "default": 25,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "v1Kind": "heal-percent",
+      "implemented": true,
+      "synonyms": ["restore hp", "recover", "heal", "regenerate"],
+      "examples": ["Heal 1/8 of max HP"]
+    },
+    {
+      "id": "effect.set-weather",
+      "kind": "event",
+      "label": "Set the weather to {weather}",
+      "requires": [],
+      "params": [
+        {
+          "id": "weather",
+          "label": "Weather",
+          "control": "select",
+          "default": "RAIN",
+          "options": [
+            "NONE",
+            "SUNNY",
+            "RAIN",
+            "SANDSTORM",
+            "HAIL",
+            "SNOW",
+            "FOG",
+            "HEAVY_RAIN",
+            "HARSH_SUN",
+            "STRONG_WINDS",
+            "TEMPEST_STORM",
+            "SNOWY_WRATH",
+            "EERIE_FOG"
+          ]
+        }
+      ],
+      "v1Kind": "set-weather",
+      "implemented": true,
+      "synonyms": ["summon rain", "drizzle", "drought", "sand stream", "snow warning"],
+      "examples": ["Summon rain"]
+    },
+    {
+      "id": "effect.set-terrain",
+      "kind": "event",
+      "label": "Set the terrain to {terrain}",
+      "requires": [],
+      "params": [
+        {
+          "id": "terrain",
+          "label": "Terrain",
+          "control": "select",
+          "default": "ELECTRIC",
+          "options": ["NONE", "MISTY", "ELECTRIC", "GRASSY", "PSYCHIC", "TOXIC"]
+        }
+      ],
+      "v1Kind": "set-terrain",
+      "implemented": true,
+      "synonyms": ["surge", "electric surge", "grassy surge", "terrain"],
+      "examples": ["Set Electric Terrain"]
+    },
+    {
+      "id": "effect.apply-tag",
+      "kind": "event",
+      "label": "Apply {tag} to {target}",
+      "requires": [],
+      "params": [
+        {
+          "id": "target",
+          "label": "Who",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "holder-side", "opposing-side"]
+        },
+        {
+          "id": "tag",
+          "label": "Battle effect (BattlerTagType name)",
+          "control": "text",
+          "default": "TAUNT"
+        }
+      ],
+      "implemented": false,
+      "synonyms": ["taunt", "confuse", "leech seed", "apply volatile"],
+      "examples": ["Confuse the attacker"]
+    },
+    {
+      "id": "effect.remove-tag",
+      "kind": "event",
+      "label": "Remove {tag} from {target}",
+      "requires": [],
+      "params": [
+        {
+          "id": "target",
+          "label": "Who",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "holder-side", "opposing-side"]
+        },
+        {
+          "id": "tag",
+          "label": "Battle effect (BattlerTagType name)",
+          "control": "text",
+          "default": "TAUNT"
+        }
+      ],
+      "implemented": false,
+      "synonyms": ["cleanse tag", "remove volatile", "cure confusion"],
+      "examples": ["Remove Leech Seed"]
+    },
+    {
+      "id": "effect.recoil",
+      "kind": "event",
+      "label": "Take {percent}% of the damage as recoil",
+      "requires": ["damage"],
+      "params": [
+        {
+          "id": "percent",
+          "label": "Percent",
+          "control": "slider",
+          "default": 10,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "implemented": false,
+      "synonyms": ["recoil", "self damage", "life orb"],
+      "examples": ["Take 10% recoil"]
+    },
+    {
+      "id": "effect.drain",
+      "kind": "event",
+      "label": "Heal {percent}% of the damage dealt",
+      "requires": ["damage"],
+      "params": [
+        {
+          "id": "percent",
+          "label": "Percent",
+          "control": "slider",
+          "default": 25,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "implemented": false,
+      "synonyms": ["lifesteal", "drain", "leech", "absorb hp"],
+      "examples": ["Heal 25% of damage dealt"]
+    },
+    {
+      "id": "effect.arena-tag",
+      "kind": "event",
+      "label": "Set {tag} on {side}",
+      "requires": [],
+      "params": [
+        {
+          "id": "tag",
+          "label": "Field effect (ArenaTagType name)",
+          "control": "text",
+          "default": "REFLECT"
+        },
+        {
+          "id": "side",
+          "label": "Side",
+          "control": "select",
+          "default": "holder-side",
+          "options": ["holder-side", "opposing-side", "both"]
+        }
+      ],
+      "implemented": false,
+      "synonyms": ["set hazard", "tailwind", "screen", "field effect"],
+      "examples": ["Set Tailwind"]
+    },
+    {
+      "id": "effect.force-switch-out",
+      "kind": "event",
+      "label": "Switch out",
+      "requires": [],
+      "params": [],
+      "guards": ["not-own-hp-cost-move", "not-already-forced-out", "sheer-force-negates", "after-final-hit"],
+      "feasibility": ["A switch must be possible against every foe (nothing traps me or blocks it)"],
+      "implemented": true,
+      "synonyms": ["eject", "wimp out", "emergency exit", "pivot", "retreat"],
+      "examples": ["Switch out when HP drops below 35%"]
+    },
+    {
+      "id": "effect.scripted-move",
+      "kind": "event",
+      "label": "Use {moveId} with {power} power",
+      "requires": ["other"],
+      "params": [
+        {
+          "id": "moveId",
+          "label": "Move id (enum name)",
+          "control": "text",
+          "default": "STEAM_ERUPTION"
+        },
+        {
+          "id": "power",
+          "label": "Power",
+          "control": "number",
+          "default": 50,
+          "min": 1,
+          "max": 250,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "feasibility": [
+        "Both I and the foe must still be standing",
+        "Never starts from an indirect move, so a follow-up cannot trigger another follow-up"
+      ],
+      "implemented": true,
+      "synonyms": ["follow up move", "extra move", "free move", "steam eruption"],
+      "examples": ["50 power Steam Eruption after a Fire or Water move"]
+    },
+    {
+      "id": "effect.change-form",
+      "kind": "event",
+      "label": "Change to the {key} form",
+      "requires": [],
+      "params": [
+        {
+          "id": "key",
+          "label": "Form key",
+          "control": "text",
+          "default": ""
+        },
+        {
+          "id": "cureStatus",
+          "label": "Cure status when changing",
+          "control": "boolean",
+          "default": false
+        }
+      ],
+      "implemented": false,
+      "synonyms": ["transform", "form change", "shift form", "ape shift"],
+      "examples": ["Change form below half HP"]
+    },
+    {
+      "id": "effect.return-base-form",
+      "kind": "event",
+      "label": "Return to the base form",
+      "requires": [],
+      "params": [],
+      "implemented": false,
+      "synonyms": ["revert", "base form", "undo transform"],
+      "examples": ["Revert above half HP"]
+    },
+    {
+      "id": "effect.remove-item",
+      "kind": "event",
+      "label": "Remove {target}'s item",
+      "requires": [],
+      "params": [
+        {
+          "id": "target",
+          "label": "Who",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "holder-side", "opposing-side"]
+        }
+      ],
+      "implemented": false,
+      "synonyms": ["knock off", "remove held item", "destroy item"],
+      "examples": ["Knock off the attacker's item"]
+    },
+    {
+      "id": "effect.steal-item",
+      "kind": "event",
+      "label": "Steal {target}'s item",
+      "requires": ["other"],
+      "params": [
+        {
+          "id": "target",
+          "label": "Who",
+          "control": "select",
+          "default": "holder",
+          "options": ["holder", "other", "holder-side", "opposing-side"]
+        }
+      ],
+      "implemented": false,
+      "synonyms": ["thief", "magician", "pickpocket", "take item"],
+      "examples": ["Steal the foe's item"]
+    },
+    {
+      "id": "effect.use-item",
+      "kind": "event",
+      "label": "Use my held item now",
+      "requires": [],
+      "params": [],
+      "implemented": false,
+      "synonyms": ["eat berry", "consume item", "trigger item"],
+      "examples": ["Eat my berry immediately"]
+    },
+    {
+      "id": "effect.message",
+      "kind": "event",
+      "label": "Show the message \"{text}\"",
+      "requires": [],
+      "params": [
+        {
+          "id": "text",
+          "label": "Message",
+          "control": "text",
+          "default": ""
+        }
+      ],
+      "implemented": false,
+      "synonyms": ["text", "announce", "flavour text", "say"],
+      "examples": ["Show a short announcement"]
+    },
+    {
+      "id": "effect.arm-effect",
+      "kind": "event",
+      "label": "Arm another effect for later",
+      "requires": [],
+      "params": [
+        {
+          "id": "armKey",
+          "label": "Effect key",
+          "control": "text",
+          "default": ""
+        }
+      ],
+      "implemented": false,
+      "synonyms": ["delayed effect", "queue effect", "next time"],
+      "examples": ["Arm a boost for the next move"]
+    },
+    {
+      "id": "effect.package",
+      "kind": "package",
+      "label": "Works as one piece: {block}",
+      "requires": [],
+      "params": [
+        {
+          "id": "block",
+          "label": "Class declaration (block id)",
+          "control": "text",
+          "default": ""
+        }
+      ],
+      "implemented": false,
+      "synonyms": ["one piece", "whole mechanic", "package", "built in mechanic"],
+      "examples": ["A single-use mechanic that cannot be split"]
+    }
+  ],
+  "guards": [
+    {
+      "id": "not-own-hp-cost-move",
+      "label": "Does not trigger when my own move (Belly Drum, Substitute, Curse, Pain Split) cost the HP",
+      "why": "Self-inflicted HP costs are not damage taken from a foe; triggering would be a bug.",
+      "requires": [],
+      "formula": {
+        "expr": "![BELLY_DRUM, SUBSTITUTE, CURSE, PAIN_SPLIT].includes(holder.getLastXMoves()[0]?.move)",
+        "source": "src/data/abilities/ab-attrs.ts PostDamageForceSwitchAbAttr.canApply (forbiddenAttackingMoves)"
+      },
+      "synonyms": ["self damage", "hp cost move", "belly drum"]
+    },
+    {
+      "id": "not-already-forced-out",
+      "label": "Does not trigger when the attacker's move already forces a switch (Dragon Tail, Circle Throw, Sky Drop)",
+      "why": "The move switches the Pokemon out itself before the ability would act.",
+      "requires": ["other"],
+      "formula": {
+        "expr": "other has a last move AND it is not [DRAGON_TAIL, CIRCLE_THROW] AND not (SKY_DROP with result OTHER)",
+        "source": "src/data/abilities/ab-attrs.ts PostDamageForceSwitchAbAttr.canApply (forbiddenDefendingMoves)"
+      },
+      "synonyms": ["dragon tail", "circle throw", "sky drop", "phazing"]
+    },
+    {
+      "id": "sheer-force-negates",
+      "label": "Does not trigger when the attacker's move is boosted by Sheer Force",
+      "why": "Sheer Force removes secondary effects, and this effect counts as one.",
+      "requires": ["other"],
+      "formula": {
+        "expr": "!(allMoves[other.lastMove].chance >= 0 && other.hasAbility(SHEER_FORCE))",
+        "source": "src/data/abilities/ab-attrs.ts PostDamageForceSwitchAbAttr.canApply (Sheer Force TODO)"
+      },
+      "synonyms": ["sheer force", "secondary effect removed"]
+    },
+    {
+      "id": "after-final-hit",
+      "label": "Only triggers after the final hit of a multi-hit move",
+      "why": "Reacting to every strike of a multi-hit move would trigger early and repeatedly.",
+      "requires": ["other"],
+      "formula": {
+        "expr": "!(other.turnData.hitsLeft > 1)",
+        "source": "src/data/abilities/ab-attrs.ts PostDamageForceSwitchAbAttr.canApply (hitsLeft)"
+      },
+      "synonyms": ["multi hit", "last strike", "final hit"]
+    },
+    {
+      "id": "not-fainted",
+      "label": "Does not trigger once I have fainted",
+      "why": "A fainted Pokemon cannot change form or act; triggering would be a bug, not a design choice.",
+      "requires": [],
+      "formula": {
+        "expr": "!holder.isFainted()",
+        "source": "src/data/elite-redux/archetypes/hp-threshold-form-change.ts HpThresholdFormChangeAbAttr.canApply"
+      },
+      "synonyms": ["fainted", "knocked out", "alive"]
+    }
+  ],
+  "hash": "1264fa83dbcdc7"
+}

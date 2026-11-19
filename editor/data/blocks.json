@@ -1,0 +1,395 @@
+{
+  "schemaVersion": 1,
+  "vocabularyHash": "1264fa83dbcdc7",
+  "blocks": [
+    {
+      "id": "AttackTypeImmunityAbAttr",
+      "label": "Be immune to one type of attack",
+      "summary": "Immune to GROUND moves",
+      "when": "calc.move-immunity",
+      "kind": "calc-modifier",
+      "tier": "A",
+      "status": "verified",
+      "package": false,
+      "synonyms": ["immunity", "levitate", "ground immune", "no damage from a type", "type immunity", "float"],
+      "examples": ["Immune to Ground moves", "Immune to Dark moves"],
+      "params": [
+        {
+          "id": "type",
+          "label": "Immune to this type",
+          "control": "select",
+          "editable": true,
+          "default": "GROUND",
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Status moves and moves that treat Flying types neutrally (Thousand Arrows) are never blocked",
+        "Moves that hit every Pokemon or a whole side (Spikes, Rain Dance) are never blocked",
+        "A Pokemon never blocks its own move"
+      ],
+      "effect": {
+        "id": "effect.immune-to-type",
+        "params": ["type"]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      }
+    },
+    {
+      "id": "BerserkOnThresholdAbAttr",
+      "label": "Raise my stronger attack stat once when a hit drops me to half HP",
+      "summary": "Once per wave, the hit that takes me to half HP or less raises my higher attacking stat by one stage",
+      "when": "event.after-hit",
+      "kind": "event-effect",
+      "tier": "B",
+      "status": "verified",
+      "package": false,
+      "synonyms": ["berserk", "anger", "rage at half hp", "once per wave boost", "enrage", "power up when hurt"],
+      "examples": ["Raise my best attack by one stage the first time I fall to half HP"],
+      "params": [],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      }
+    },
+    {
+      "id": "FloatAbAttr",
+      "label": "I float above the ground",
+      "summary": "While I have this, the game treats me as not touching the ground",
+      "when": "while.active",
+      "kind": "engine-query",
+      "tier": "C",
+      "status": "verified",
+      "package": false,
+      "synonyms": ["levitate", "hover", "ungrounded", "airborne", "float", "flying"],
+      "examples": ["Spikes, terrain and Arena Trap do not affect me"],
+      "params": [],
+      "guards": [],
+      "feasibility": [
+        "The engine query 'grounded' decides the final answer: Iron Ball, Air Balloon, Gravity and Ingrain-style grounding tags override it"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      }
+    },
+    {
+      "id": "HpThresholdFormChangeAbAttr",
+      "label": "Change form depending on my HP",
+      "summary": "After I am hit, I change to the transformed form while my HP is at or below 50%",
+      "when": "event.after-hit",
+      "kind": "event-effect",
+      "tier": "B",
+      "status": "verified",
+      "package": false,
+      "synonyms": [
+        "ape shift",
+        "form change at low hp",
+        "transform when hurt",
+        "school form",
+        "hivemind",
+        "shift form"
+      ],
+      "examples": ["Change to the battle form at half HP or less and cure my status"],
+      "params": [
+        {
+          "id": "threshold",
+          "label": "HP percent line",
+          "control": "slider",
+          "editable": true,
+          "default": 50,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "formKey",
+          "label": "Form key (only wired keys work)",
+          "control": "text",
+          "editable": true,
+          "default": "transformed"
+        },
+        {
+          "id": "cureStatus",
+          "label": "Cure my status when I change form",
+          "control": "boolean",
+          "editable": true,
+          "default": false
+        },
+        {
+          "id": "direction",
+          "label": "I am in the form while my HP is",
+          "control": "select",
+          "editable": false,
+          "default": "at-or-below",
+          "options": ["at-or-below", "above"]
+        }
+      ],
+      "guards": ["not-fainted"],
+      "feasibility": [],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      }
+    },
+    {
+      "id": "IgnoreContactAbAttr",
+      "label": "My moves never count as making contact",
+      "summary": "While I have this, my moves make no contact",
+      "when": "while.active",
+      "kind": "while-active",
+      "tier": "C",
+      "status": "verified",
+      "package": false,
+      "synonyms": ["long reach", "no contact", "contactless", "ranged attacks", "never touch"],
+      "examples": ["My attacks never make contact"],
+      "params": [],
+      "guards": [],
+      "feasibility": [],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      }
+    },
+    {
+      "id": "PostDamageForceSwitchAbAttr",
+      "label": "Switch out when my HP gets low",
+      "summary": "After a hit that takes my HP below 50%, I switch out",
+      "when": "event.after-taking-damage",
+      "kind": "event-effect",
+      "tier": "B",
+      "status": "verified",
+      "package": false,
+      "synonyms": ["wimp out", "emergency exit", "eject", "retreat", "pivot out", "flee at low hp"],
+      "examples": ["Switch out when HP drops below 35%", "Switch out below half HP"],
+      "params": [
+        {
+          "id": "hpRatio",
+          "label": "Max HP ratio to drop below",
+          "control": "slider",
+          "editable": true,
+          "default": 0.5,
+          "min": 0.01,
+          "max": 0.99,
+          "step": 0.01
+        }
+      ],
+      "guards": ["not-own-hp-cost-move", "not-already-forced-out", "sheer-force-negates", "after-final-hit"],
+      "feasibility": ["A switch must be possible against every opponent (nothing traps me or blocks the switch)"],
+      "effect": {
+        "id": "effect.force-switch-out",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      }
+    },
+    {
+      "id": "PostDefendContactApplyStatusEffectAbAttr",
+      "label": "Sometimes give the attacker a status when it touches me",
+      "summary": "30% chance to give a contact attacker POISON",
+      "when": "event.after-hit",
+      "kind": "event-effect",
+      "tier": "B",
+      "status": "verified",
+      "package": false,
+      "synonyms": [
+        "static",
+        "flame body",
+        "poison point",
+        "contact status",
+        "touch me and suffer",
+        "paralyze on contact"
+      ],
+      "examples": ["30% chance to paralyze attackers that make contact"],
+      "params": [
+        {
+          "id": "chance",
+          "label": "Chance (%)",
+          "control": "slider",
+          "editable": true,
+          "default": 30,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "statuses",
+          "label": "Statuses (comma separated; one is picked at random when there are several)",
+          "control": "text",
+          "editable": true,
+          "default": "POISON",
+          "options": ["NONE", "POISON", "TOXIC", "PARALYSIS", "SLEEP", "FREEZE", "BURN", "FAINT"]
+        }
+      ],
+      "guards": [],
+      "feasibility": ["The attacker must be able to receive the status (it is not immune and nothing blocks it)"],
+      "effect": {
+        "id": "effect.inflict-status",
+        "params": ["statuses"]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      }
+    },
+    {
+      "id": "PostSummonCopyAbilityAbAttr",
+      "label": "Copy a foe's ability when I enter",
+      "summary": "When I enter the battle, I copy an adjacent foe's ability",
+      "when": "event.on-entry",
+      "kind": "package",
+      "tier": "C",
+      "status": "verified",
+      "package": true,
+      "synonyms": ["trace", "copy ability", "mimic ability", "borrow ability", "steal ability on entry"],
+      "examples": ["Copy the opposing Pokemon's ability when I enter"],
+      "params": [],
+      "guards": [],
+      "feasibility": [
+        "There must be an adjacent foe whose ability can be copied (not Trace itself, Wonder Guard or form-related abilities)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "reason": "Package, justified: the attr keeps `target` and `targetAbilityName` between canApply, apply and getTriggerMessage, and its apply replaces the holder's ability (setTempAbility) and suppresses the source for two turns. Splitting would re-implement the class. Users: Trace only. Honest bucket: package-only."
+    },
+    {
+      "id": "PostSummonWeatherChangeAbAttr",
+      "label": "Set the weather when I enter",
+      "summary": "When I enter the battle, set the weather to RAIN",
+      "when": "event.on-entry",
+      "kind": "event-effect",
+      "tier": "A",
+      "status": "verified",
+      "package": false,
+      "synonyms": ["summon weather", "drizzle", "drought", "sand stream", "snow warning", "weather setter"],
+      "examples": ["Summon rain when I enter the battle"],
+      "params": [
+        {
+          "id": "weather",
+          "label": "Weather",
+          "control": "select",
+          "editable": true,
+          "default": "RAIN",
+          "options": [
+            "NONE",
+            "SUNNY",
+            "RAIN",
+            "SANDSTORM",
+            "HAIL",
+            "SNOW",
+            "FOG",
+            "HEAVY_RAIN",
+            "HARSH_SUN",
+            "STRONG_WINDS",
+            "TEMPEST_STORM",
+            "SNOWY_WRATH",
+            "EERIE_FOG"
+          ]
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The weather must be replaceable: a primal weather (Heavy Rain, Harsh Sun, Strong Winds) cannot be overwritten by an ordinary one",
+        "The arena must accept this weather (it is not already active)"
+      ],
+      "effect": {
+        "id": "effect.set-weather",
+        "params": ["weather"]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      }
+    },
+    {
+      "id": "ReceivedMoveDamageMultiplierAbAttr",
+      "label": "Take less (or more) damage",
+      "summary": "Damage I take is multiplied by 0.5",
+      "when": "calc.damage-taken",
+      "kind": "calc-modifier",
+      "tier": "A",
+      "status": "verified",
+      "package": false,
+      "synonyms": ["resist", "half damage", "damage reduction", "tank", "take more damage", "weakness"],
+      "examples": ["Halve damage at full HP", "Take double damage from Fire moves"],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Damage multiplier",
+          "control": "number",
+          "editable": true,
+          "default": 0.5,
+          "min": 0,
+          "max": 4,
+          "step": 0.05
+        },
+        {
+          "id": "affectsFixedDamage",
+          "label": "Also affects fixed damage",
+          "control": "boolean",
+          "editable": true,
+          "default": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-damage-taken",
+        "params": ["multiplier", "affectsFixedDamage"]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      }
+    }
+  ]
+}
