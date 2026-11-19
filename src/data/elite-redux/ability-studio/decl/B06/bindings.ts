@@ -83,12 +83,48 @@ bindLegacyClosure(5379, 0, `Max Acceleration: ${SPEED_BOOST_REASON}`, "gate");
 // =============================================================================================
 // PostTurnFormChangeAbAttr, slot ctor:0: `formFunc(pokemon)`, a form NUMBER, not a yes/no condition (R-B06-8).
 // =============================================================================================
-bindLegacyClosure(161, 2, "Zen Mode: form number function (HP ratio <= 0.5 gives form 1, otherwise 0); needs a number-valued form picker (R-B06-8)");
-bindLegacyClosure(197, 2, "Shields Down: form number function (stays Core, Meteor becomes Core at HP ratio <= 0.5, keeps its colour); needs form index atoms (R-B06-8)");
-bindLegacyClosure(208, 2, "Schooling: form number function (level < 20 or HP ratio <= 0.25 gives form 0, otherwise 1); needs a level atom and a form picker (R-B06-8)");
-bindLegacyClosure(211, 2, "Power Construct: form number function (formIndex + 2) behind an attr-level condition; needs form index atoms (R-B06-8)");
-bindLegacyClosure(258, 0, "Hunger Switch attr 0: form number function (a form with a key gives form 0, otherwise form 1), one direction of a toggle; needs a form key atom (R-B06-8)");
-bindLegacyClosure(258, 1, "Hunger Switch attr 1: form number function (a form with a key gives form 1, otherwise form 0), the other direction of the toggle; needs a form key atom (R-B06-8)");
-bindLegacyClosure(5486, 0, "Two-Faced attr 0: form number function (a form with a key gives form 0, otherwise form 1), one direction of a toggle; needs a form key atom (R-B06-8)");
-bindLegacyClosure(5486, 1, "Two-Faced attr 1: form number function (a form with a key gives form 1, otherwise form 0), the other direction of the toggle; needs a form key atom (R-B06-8)");
-bindLegacyClosure(5586, 2, "Revelation: form number function (Revelation form while HP ratio > 0.25, otherwise a base form); needs HP and form index atoms (R-B06-8)");
+bindLegacyClosure(
+  161,
+  2,
+  "Zen Mode: form number function (HP ratio <= 0.5 gives form 1, otherwise 0); needs a number-valued form picker (R-B06-8)",
+);
+bindLegacyClosure(
+  197,
+  2,
+  "Shields Down: form number function (stays Core, Meteor becomes Core at HP ratio <= 0.5, keeps its colour); needs form index atoms (R-B06-8)",
+);
+bindLegacyClosure(
+  208,
+  2,
+  "Schooling: form number function (level < 20 or HP ratio <= 0.25 gives form 0, otherwise 1); needs a level atom and a form picker (R-B06-8)",
+);
+bindLegacyClosure(
+  211,
+  2,
+  "Power Construct: form number function (formIndex + 2) behind an attr-level condition; needs form index atoms (R-B06-8)",
+);
+bindLegacyClosure(
+  258,
+  0,
+  "Hunger Switch attr 0: form number function (a form with a key gives form 0, otherwise form 1), one direction of a toggle; needs a form key atom (R-B06-8)",
+);
+bindLegacyClosure(
+  258,
+  1,
+  "Hunger Switch attr 1: form number function (a form with a key gives form 1, otherwise form 0), the other direction of the toggle; needs a form key atom (R-B06-8)",
+);
+bindLegacyClosure(
+  5486,
+  0,
+  "Two-Faced attr 0: form number function (a form with a key gives form 0, otherwise form 1), one direction of a toggle; needs a form key atom (R-B06-8)",
+);
+bindLegacyClosure(
+  5486,
+  1,
+  "Two-Faced attr 1: form number function (a form with a key gives form 1, otherwise form 0), the other direction of the toggle; needs a form key atom (R-B06-8)",
+);
+bindLegacyClosure(
+  5586,
+  2,
+  "Revelation: form number function (Revelation form while HP ratio > 0.25, otherwise a base form); needs HP and form index atoms (R-B06-8)",
+);

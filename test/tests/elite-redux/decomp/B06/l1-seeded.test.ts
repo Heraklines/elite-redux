@@ -12,7 +12,11 @@
 // and the stock test reports a mismatch that is only noise (requests/B06.md, R-B06-H1). Here `Phaser.Math.RND.integerInRange` is
 // pinned to a constant, once to a value that passes the 30% roll and once to one that fails it, so both branches are compared.
 import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
-import { bindingCases, runAttrDifferential, runPredicateDifferential } from "#test/tests/elite-redux/decomp/harness/differential";
+import {
+  bindingCases,
+  runAttrDifferential,
+  runPredicateDifferential,
+} from "#test/tests/elite-redux/decomp/harness/differential";
 import { startWorld } from "#test/tests/elite-redux/decomp/harness/game";
 import { allAttrSites } from "#test/tests/elite-redux/decomp/harness/sites";
 import { buildStateGrid, extraHpValues } from "#test/tests/elite-redux/decomp/harness/world";
@@ -50,7 +54,9 @@ describe("B06 L1 differential with the global random stream pinned", () => {
       expect(problems.map(p => p.message)).toEqual([]);
       for (const pinned of [0, 99]) {
         // Only the 0..99 roll (randSeedInt(100)) is pinned; every other draw (the speed-order tie shuffle) stays real.
-        spy.mockImplementation((min: number, max: number) => (min === 0 && max === 99 ? pinned : realInteger(min, max)));
+        spy.mockImplementation((min: number, max: number) =>
+          min === 0 && max === 99 ? pinned : realInteger(min, max),
+        );
         const predicate = runPredicateDifferential(world, cases, states);
         const attr = runAttrDifferential(world, sites, declRegistry, states, 100);
         console.log(

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "096ef32b703c2f",
+  "hash": "0ba1cdc9c70110",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -124,6 +124,43 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.cud-chew-record-berry",
+      "className": "CudChewRecordBerryAbAttr",
+      "label": "Remember the berries I ate this turn",
+      "summary": "At the end of every turn, I remember which berries I ate during it, so another block can eat them again next turn. Example: Cud Chew.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "cud chew",
+        "remember eaten berries",
+        "berry memory",
+        "record berries",
+        "chew again later"
+      ],
+      "examples": [
+        "Remember this turn's berries so they can be eaten twice, like Cud Chew"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing useful without the block that eats the remembered berries next turn"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.float",
@@ -304,6 +341,46 @@
       "reusableAlone": {
         "when": true,
         "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.moody",
+      "className": "MoodyAbAttr",
+      "label": "Raise one random stat and lower another each turn",
+      "summary": "At the end of every turn, one random stat goes up by 2 stages and a different random stat goes down by 1. Stats already at +6 or -6 are skipped.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "mood swings",
+        "random stat change",
+        "stat roulette",
+        "random boost and drop",
+        "unpredictable stats",
+        "random stat each turn"
+      ],
+      "examples": [
+        "Each turn one random stat rises by 2 and another falls by 1, like a moody Pokemon"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A stat at +6 cannot be raised and a stat at -6 cannot be lowered; if none can be raised only the drop happens, and the other way round",
+        "The lowered stat is never the one that was just raised",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
         "do": true
       },
       "uses": 1
@@ -565,6 +642,231 @@
       "uses": 7
     },
     {
+      "id": "block.post-turn-form-change",
+      "className": "PostTurnFormChangeAbAttr",
+      "label": "Change form at the end of the turn when it is needed",
+      "summary": "At the end of every turn, if my form is not the one my ability asks for, I change form. Example: Zen Mode changes form below half HP, Schooling below 25%.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "zen mode",
+        "schooling",
+        "shields down",
+        "form change each turn",
+        "power construct",
+        "hunger switch",
+        "change form when hurt"
+      ],
+      "examples": [
+        "Check my form every turn and change it when my HP says so, like Zen Mode"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": false,
+          "editable": false,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The form my ability asks for must exist for my species",
+        "The form must differ from my current form",
+        "The species must have a form change registered for its ability (otherwise nothing happens)",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.change-form",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 9
+    },
+    {
+      "id": "block.post-turn-reset-status",
+      "className": "PostTurnResetStatusAbAttr",
+      "label": "Cure a status at the end of every turn",
+      "summary": "At the end of every turn, if I have a status (or Bleed, Frostbite, Fear), it is cured. Example: Shed Skin cures a burn.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "shed skin",
+        "cure status each turn",
+        "heal status",
+        "hydration",
+        "healer",
+        "cleanse ailments",
+        "clear burn or poison"
+      ],
+      "examples": [
+        "Cure my own status at the end of every turn, like Hydration",
+        "Cure my ally's status, like Healer"
+      ],
+      "params": [
+        {
+          "id": "target",
+          "label": "Who gets cured",
+          "control": "select",
+          "default": "Me",
+          "editable": true,
+          "options": [
+            "Me",
+            "An adjacent ally"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "There must be someone to cure: me, or an ally next to me that has a status or an ailment",
+        "A fainted ally is never picked",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.cure-status",
+        "params": [
+          "target"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 12
+    },
+    {
+      "id": "block.post-turn-restore-berry",
+      "className": "PostTurnRestoreBerryAbAttr",
+      "label": "Sometimes get back a berry I ate (like Harvest)",
+      "summary": "At the end of every turn, there is a chance to get back one berry I ate in this battle. Example: Harvest is 50%, or 100% in harsh sun.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "harvest",
+        "regrow berry",
+        "restore eaten berry",
+        "berry recycling",
+        "berry garden",
+        "get my berry back"
+      ],
+      "examples": [
+        "Get back an eaten berry at the end of the turn, always in the sun, like Harvest"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": false,
+          "editable": false,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "I must have eaten a berry in this battle that I can still get back (a berry already at its maximum stack does not count)",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 5
+    },
+    {
+      "id": "block.post-turn-status-heal",
+      "className": "PostTurnStatusHealAbAttr",
+      "label": "Heal each turn while I have certain statuses",
+      "summary": "At the end of every turn, while I have Poison, Toxic and am not at full HP, I heal 1/8 of my max HP. Example: 160 max HP heals 20 HP.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "poison heal",
+        "heal while poisoned",
+        "heal from status",
+        "status healing",
+        "recover each turn",
+        "regenerate when statused"
+      ],
+      "examples": [
+        "Heal 1/8 of max HP at the end of every turn while poisoned, like Poison Heal"
+      ],
+      "params": [
+        {
+          "id": "statuses",
+          "label": "Statuses that heal me (comma separated, for example Poison, Toxic)",
+          "control": "text",
+          "default": "POISON,TOXIC",
+          "editable": true,
+          "options": [
+            "NONE",
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN",
+            "FAINT"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "hp.full",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only while I have one of the chosen statuses (the setting above, checked first)",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.heal-percent",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.received-move-damage-multiplier",
       "className": "ReceivedMoveDamageMultiplierAbAttr",
       "label": "Take less (or more) damage",
@@ -628,6 +930,51 @@
         "do": true
       },
       "uses": 64
+    },
+    {
+      "id": "block.speed-boost",
+      "className": "SpeedBoostAbAttr",
+      "label": "Raise Speed by 1 stage every turn",
+      "summary": "At the end of every turn, my Speed goes up by 1 stage. Example: Speed Boost. It does not trigger on the turn I switched in or after I failed to run away.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "speed boost",
+        "speed up each turn",
+        "get faster",
+        "max acceleration",
+        "turn end speed",
+        "gradual speed"
+      ],
+      "examples": [
+        "Raise Speed by 1 stage at the end of every turn, like Speed Boost"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The stage can only go up to +6 (the stat change itself fails at the limit)"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
     }
   ]
 }

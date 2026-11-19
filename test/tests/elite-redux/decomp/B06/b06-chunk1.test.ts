@@ -4,21 +4,19 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type {
+  MoodyAbAttr,
+  PostTurnFormChangeAbAttr,
+  PostTurnResetStatusAbAttr,
+  PostTurnStatusHealAbAttr,
+  SpeedBoostAbAttr,
+} from "#abilities/ab-attrs";
 // B06 chunk 1: what the shared L1 and L2 suites cannot see. Every test drives the ORIGINAL attr of a real ability and, where the
 // class is rebuildable, its REBUILD side by side, or characterises the original clause by clause (random draw order, memory,
 // ER ailment tags, an ally pick, the parked declaration). Classes: PostTurnStatusHealAbAttr, PostTurnResetStatusAbAttr,
 // PostTurnRestoreBerryAbAttr, CudChewConsumeBerryAbAttr, CudChewRecordBerryAbAttr, MoodyAbAttr, SpeedBoostAbAttr and
 // PostTurnFormChangeAbAttr.
-import {
-  CudChewConsumeBerryAbAttr,
-  CudChewRecordBerryAbAttr,
-  MoodyAbAttr,
-  PostTurnFormChangeAbAttr,
-  PostTurnResetStatusAbAttr,
-  PostTurnRestoreBerryAbAttr,
-  PostTurnStatusHealAbAttr,
-  SpeedBoostAbAttr,
-} from "#abilities/ab-attrs";
+import { CudChewConsumeBerryAbAttr, CudChewRecordBerryAbAttr, PostTurnRestoreBerryAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { buildAttr, recomposeAttr } from "#data/elite-redux/ability-studio/build-attr";
 import { lintDecl } from "#data/elite-redux/ability-studio/decl-lint";
@@ -61,7 +59,12 @@ describe("PostTurnStatusHealAbAttr (Poison Heal)", () => {
   it("heals only with a listed status and below full HP, in that order, and a rebuilt gate can be swapped", async () => {
     const { holder } = await startWorld(phaserGame);
     const original = liveAbility(POISON_HEAL).attrs[0] as PostTurnStatusHealAbAttr;
-    const rebuilt = recomposeAttr(moduleOf("PostTurnStatusHealAbAttr"), original, POISON_HEAL, 0) as PostTurnStatusHealAbAttr;
+    const rebuilt = recomposeAttr(
+      moduleOf("PostTurnStatusHealAbAttr"),
+      original,
+      POISON_HEAL,
+      0,
+    ) as PostTurnStatusHealAbAttr;
     expect(rebuilt).not.toBe(original);
     for (const status of [StatusEffect.NONE, StatusEffect.POISON, StatusEffect.TOXIC, StatusEffect.BURN]) {
       for (const hp of [holder.getMaxHp(), holder.getMaxHp() - 1, 1]) {
@@ -102,9 +105,15 @@ describe("PostTurnResetStatusAbAttr (Shed Skin, Hydration, Healer ...)", () => {
   it("cures a status or an ER ailment tag on me; the rebuild agrees, and the FAINT status is the one documented difference", async () => {
     const { holder } = await startWorld(phaserGame);
     const original = liveAbility(SHED_SKIN).attrs[0] as PostTurnResetStatusAbAttr;
-    const rebuilt = recomposeAttr(moduleOf("PostTurnResetStatusAbAttr"), original, SHED_SKIN, 0) as PostTurnResetStatusAbAttr;
+    const rebuilt = recomposeAttr(
+      moduleOf("PostTurnResetStatusAbAttr"),
+      original,
+      SHED_SKIN,
+      0,
+    ) as PostTurnResetStatusAbAttr;
     const tags = new Set<BattlerTagType>();
-    vi.spyOn(holder, "getTag").mockImplementation(((type: BattlerTagType) => (tags.has(type) ? ({} as never) : undefined)) as never);
+    vi.spyOn(holder, "getTag").mockImplementation(((type: BattlerTagType) =>
+      tags.has(type) ? ({} as never) : undefined) as never);
     const cases: [string, StatusEffect, BattlerTagType[], boolean][] = [
       ["nothing", StatusEffect.NONE, [], false],
       ["burn", StatusEffect.BURN, [], true],
@@ -257,7 +266,7 @@ describe("MoodyAbAttr (Moody)", () => {
   async function run(stages: Record<number, number>) {
     const { game, holder } = await startWorld(phaserGame);
     const attr = liveAbility(MOODY).attrs[0] as MoodyAbAttr;
-    const stats = [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD];
+    const stats = [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD] as const;
     for (const stat of stats) {
       holder.setStatStage(stat, stages[stat] ?? 0);
     }
@@ -358,7 +367,9 @@ describe("PostTurnRestoreBerryAbAttr (Harvest)", () => {
     ] as const) {
       const attr = liveAbility(id).attrs[index];
       expect(attr.constructor.name).toBe("PostTurnRestoreBerryAbAttr");
-      expect(() => recomposeAttr(moduleOf("PostTurnRestoreBerryAbAttr"), attr, id, index)).toThrow(/no library binding/);
+      expect(() => recomposeAttr(moduleOf("PostTurnRestoreBerryAbAttr"), attr, id, index)).toThrow(
+        /no library binding/,
+      );
     }
   });
 });
@@ -393,7 +404,9 @@ describe("Cud Chew: CudChewRecordBerryAbAttr and CudChewConsumeBerryAbAttr", () 
     holder.summonData.berriesEatenLast = [BerryType.SITRUS];
     expect(attr.canApply(base(holder))).toBe(true);
     // The parked declaration builds the same class with a swapped gate.
-    const pending = (await import("#data/elite-redux/ability-studio/decl/B06/pending/CudChewConsumeBerryAbAttr.decl.pending")).default;
+    const pending = (
+      await import("#data/elite-redux/ability-studio/decl/B06/pending/CudChewConsumeBerryAbAttr.decl.pending")
+    ).default;
     const free = buildAttr(pending, {}, { gate: { all: [] } }) as CudChewConsumeBerryAbAttr;
     holder.summonData.berriesEatenLast = [];
     expect(free.canApply(base(holder))).toBe(true);
@@ -406,7 +419,9 @@ describe("Cud Chew: CudChewRecordBerryAbAttr and CudChewConsumeBerryAbAttr", () 
   });
 
   it("the parked declaration is complete: its only lint problem is the trigger that does not exist yet", async () => {
-    const pending = (await import("#data/elite-redux/ability-studio/decl/B06/pending/CudChewConsumeBerryAbAttr.decl.pending")).default;
+    const pending = (
+      await import("#data/elite-redux/ability-studio/decl/B06/pending/CudChewConsumeBerryAbAttr.decl.pending")
+    ).default;
     const problems = lintDecl(pending);
     expect(problems).toEqual(['CudChewConsumeBerryAbAttr: when "event.berry-phase-end" is not in WHEN_REGISTRY']);
   });
@@ -418,7 +433,11 @@ describe("PostTurnFormChangeAbAttr (Zen Mode and friends)", () => {
     expect(holder.species.forms.length).toBeGreaterThan(1);
     const module = moduleOf("PostTurnFormChangeAbAttr");
     const target = { value: 0 };
-    const attr = buildAttr(module, {}, { "ctor:0": ((_p: Pokemon) => target.value) as never }) as PostTurnFormChangeAbAttr;
+    const attr = buildAttr(
+      module,
+      {},
+      { "ctor:0": ((_p: Pokemon) => target.value) as never },
+    ) as PostTurnFormChangeAbAttr;
     expect(attr.constructor.name).toBe("PostTurnFormChangeAbAttr");
     holder.formIndex = 0;
     for (const [value, expected] of [
