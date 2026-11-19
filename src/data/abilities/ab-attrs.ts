@@ -532,9 +532,15 @@ export class AttackTypeImmunityAbAttr extends TypeImmunityAbAttr {
 }
 
 export class TypeImmunityHealAbAttr extends TypeImmunityAbAttr {
-  // biome-ignore lint/complexity/noUselessConstructor: Changes the type of `immuneType`
-  constructor(immuneType: PokemonType) {
+  /**
+   * The share of max HP restored when a move of the immune type is absorbed (a quarter by default). Kept as a field so
+   * the ability studio declaration can read it back from a live instance.
+   */
+  private readonly healShare: number;
+
+  constructor(immuneType: PokemonType, healShare = 1 / 4) {
     super(immuneType);
+    this.healShare = healShare;
   }
 
   override apply(params: TypeMultiplierAbAttrParams): void {
@@ -545,7 +551,7 @@ export class TypeImmunityHealAbAttr extends TypeImmunityAbAttr {
       globalScene.phaseManager.unshiftNew(
         "PokemonHealPhase",
         pokemon.getBattlerIndex(),
-        toDmgValue(pokemon.getMaxHp() / 4),
+        toDmgValue(pokemon.getMaxHp() * this.healShare),
         i18next.t("abilityTriggers:typeImmunityHeal", {
           pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
           abilityName,
@@ -606,11 +612,23 @@ export class TypeImmunityAddBattlerTagAbAttr extends TypeImmunityAbAttr {
 }
 
 export class NonSuperEffectiveImmunityAbAttr extends TypeImmunityAbAttr {
+  /**
+   * Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. Declared with
+   * `declare` so it is not an own field of ordinary instances (the runtime configuration snapshot ignores it).
+   */
+  public declare gateOverride: ((params: TypeMultiplierAbAttrParams) => boolean) | undefined;
+
   constructor(condition?: AbAttrCondition) {
     super(null, condition);
   }
 
-  override canApply({ move, typeMultiplier }: TypeMultiplierAbAttrParams): boolean {
+  /** Tier B split (ability studio spec 3.1): the whole old `canApply` is the replaceable gate, there is no residual. */
+  override canApply(params: TypeMultiplierAbAttrParams): boolean {
+    return gatedCanApply<TypeMultiplierAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: "the move deals damage and its type matchup is below super effective". */
+  public gate({ move, typeMultiplier }: TypeMultiplierAbAttrParams): boolean {
     return move.is("AttackMove") && typeMultiplier.value < 2;
   }
 
@@ -632,18 +650,49 @@ export class NonSuperEffectiveImmunityAbAttr extends TypeImmunityAbAttr {
  * When the source is at full HP, incoming attacks will have a maximum 0.5x type effectiveness multiplier.
  */
 export class FullHpResistTypeAbAttr extends PreDefendAbAttr {
-  override canApply({ typeMultiplier, move, pokemon }: TypeMultiplierAbAttrParams): boolean {
-    return (
-      typeMultiplier instanceof NumberHolder
-      && !move?.hasAttr("FixedDamageAttr")
-      && pokemon.isFullHp()
-      && typeMultiplier.value > 0.5
-    );
+  /**
+   * Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. Declared with
+   * `declare` so it is not an own field of ordinary instances (the runtime configuration snapshot ignores it).
+   */
+  public declare gateOverride: ((params: TypeMultiplierAbAttrParams) => boolean) | undefined;
+
+  /**
+   * The type matchup that incoming attacks are capped at (0.5 = "not very effective"). Kept as a field so the ability
+   * studio declaration can read it back from a live instance.
+   */
+  private readonly matchupCeiling: number;
+
+  constructor(matchupCeiling = 0.5) {
+    super();
+    this.matchupCeiling = matchupCeiling;
+  }
+
+  /**
+   * Tier B split (ability studio spec 3.1): `guards`, then `gate`, then `residual`, in the original clause order and
+   * with the original short-circuiting. {@linkcode TimeLimitedEffectivenessFloorAbAttr} overrides `canApply`.
+   */
+  override canApply(params: TypeMultiplierAbAttrParams): boolean {
+    return gatedCanApply<TypeMultiplierAbAttrParams>(this, params);
+  }
+
+  /** Clauses 1 and 2 of the old `canApply`: a real number holder, and not a fixed-damage move (Seismic Toss). */
+  public guards({ typeMultiplier, move }: TypeMultiplierAbAttrParams): boolean {
+    return typeMultiplier instanceof NumberHolder && !move?.hasAttr("FixedDamageAttr");
+  }
+
+  /** The replaceable condition: "I am at full HP" (library atom `hp.full`), clause 3 of the old `canApply`. */
+  public gate({ pokemon }: TypeMultiplierAbAttrParams): boolean {
+    return pokemon.isFullHp();
+  }
+
+  /** The feasibility that stays in the class (clause 4): the matchup is above the ceiling, so there is something to cap. */
+  public residual({ typeMultiplier }: TypeMultiplierAbAttrParams): boolean {
+    return typeMultiplier.value > this.matchupCeiling;
   }
 
   override apply({ typeMultiplier, pokemon }: TypeMultiplierAbAttrParams): void {
-    typeMultiplier.value = 0.5;
-    pokemon.turnData.moveEffectiveness = 0.5;
+    typeMultiplier.value = this.matchupCeiling;
+    pokemon.turnData.moveEffectiveness = this.matchupCeiling;
   }
 
   getTriggerMessage({ pokemon }: TypeMultiplierAbAttrParams, _abilityName: string): string {
@@ -659,8 +708,33 @@ export interface FieldPriorityMoveImmunityAbAttrParams extends AugmentMoveIntera
 }
 
 export class FieldPriorityMoveImmunityAbAttr extends PreDefendAbAttr {
-  override canApply({ move, opponent: attacker, cancelled, pokemon }: FieldPriorityMoveImmunityAbAttrParams): boolean {
-    return !cancelled.value && move.getPriority(attacker) > 0 && !move.isAllyTarget() && attacker.isOpponent(pokemon);
+  /**
+   * Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. Declared with
+   * `declare` so it is not an own field of ordinary instances (the runtime configuration snapshot ignores it).
+   */
+  public declare gateOverride: ((params: FieldPriorityMoveImmunityAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1): `guards`, then `gate`, then `residual`, in the original clause order and
+   * with the original short-circuiting.
+   */
+  override canApply(params: FieldPriorityMoveImmunityAbAttrParams): boolean {
+    return gatedCanApply<FieldPriorityMoveImmunityAbAttrParams>(this, params);
+  }
+
+  /** Clause 1 of the old `canApply`: another ability has not already blocked the move. */
+  public guards({ cancelled }: FieldPriorityMoveImmunityAbAttrParams): boolean {
+    return !cancelled.value;
+  }
+
+  /** The replaceable condition: "the move's priority is above 0 for the attacker", clause 2 of the old `canApply`. */
+  public gate({ move, opponent: attacker }: FieldPriorityMoveImmunityAbAttrParams): boolean {
+    return move.getPriority(attacker) > 0;
+  }
+
+  /** The feasibility that stays in the class (clauses 3 and 4): not aimed at the attacker's own side, and the attacker is a foe. */
+  public residual({ move, opponent: attacker, pokemon }: FieldPriorityMoveImmunityAbAttrParams): boolean {
+    return !move.isAllyTarget() && attacker.isOpponent(pokemon);
   }
 
   override apply({ cancelled }: FieldPriorityMoveImmunityAbAttrParams): void {

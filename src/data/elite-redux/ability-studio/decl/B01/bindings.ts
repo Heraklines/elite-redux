@@ -58,3 +58,89 @@ bindLegacyClosure(
 // The other three clauses (max HP above 1, a lethal hit, no STURDY tag yet) stay in the class as `residual`.
 bindCondition(5, 0, { id: "hp.full", who: "holder" }, "gate");
 bindCondition(5490, 1, { id: "hp.full", who: "holder" }, "gate");
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Chunk 2 (the type immunity family). Every line below was read from the live attr (closure source printed from the
+// running game), not from the source text.
+//
+// TypeImmunityAbAttr, TypeImmunityHealAbAttr, TypeImmunityStatStageChangeAbAttr and TypeImmunityAddBattlerTagAbAttr have
+// NO user with a constructor closure (every `condition` field is null, an optional slot), so nothing is bound for them.
+
+// FullHpResistTypeAbAttr (Tier B). Slot "gate": clause 3 of the old canApply, `pokemon.isFullHp()` on the holder.
+// Clauses 1, 2 (guards) and 4 (residual) stay in the class.
+bindCondition(308, 0, { id: "hp.full", who: "holder" }, "gate");
+bindCondition(309, 2, { id: "hp.full", who: "holder" }, "gate");
+
+// NonSuperEffectiveImmunityAbAttr (Tier B). Slot "gate": `move.is("AttackMove") && typeMultiplier.value < 2`.
+bindLegacyClosure(
+  25,
+  0,
+  "Wonder Guard gate: `move.is('AttackMove') && typeMultiplier.value < 2`. The frame has no typeMultiplier slot and no atom reads the matchup computed so far (move.effectiveness would recurse into this very check); `instanceof AttackMove` also has no exact atom (R-B01-14).",
+  "gate",
+);
+
+// FieldPriorityMoveImmunityAbAttr (Tier B). Slot "gate": clause 2 of the old canApply, `move.getPriority(attacker) > 0`.
+// The same function for every user; the six weather/terrain users also carry an attr-level condition that is carried
+// over as it is. No atom calls `move.getPriority(user)` (R-B01-13).
+const PRIORITY_GATE =
+  "gate is `move.getPriority(attacker) > 0`, the priority AFTER the user's abilities and the move's own attrs (Prankster, Gale Wings); the atom move.priority reads the static field. Needs `move.effective-priority` (R-B01-13).";
+bindLegacyClosure(214, 0, `Queenly Majesty: ${PRIORITY_GATE}`, "gate");
+bindLegacyClosure(219, 0, `Dazzling: ${PRIORITY_GATE}`, "gate");
+bindLegacyClosure(296, 0, `Armor Tail: ${PRIORITY_GATE}`, "gate");
+bindLegacyClosure(5194, 4, `Jungle's Guard (attr-level condition: Grassy Terrain): ${PRIORITY_GATE}`, "gate");
+bindLegacyClosure(5213, 1, `Sand Guard (attr-level condition: weather helper): ${PRIORITY_GATE}`, "gate");
+bindLegacyClosure(5293, 1, `Sun Basking (attr-level condition: weather helper): ${PRIORITY_GATE}`, "gate");
+bindLegacyClosure(5506, 2, `Sepia Lens (attr-level condition: weather helper): ${PRIORITY_GATE}`, "gate");
+bindLegacyClosure(5558, 0, `Royal Decree: ${PRIORITY_GATE}`, "gate");
+bindLegacyClosure(5601, 3, `Sand Fiend (attr-level condition: weather helper): ${PRIORITY_GATE}`, "gate");
+bindLegacyClosure(5625, 0, `Empress: ${PRIORITY_GATE}`, "gate");
+bindLegacyClosure(5660, 1, `Rain Shroud (attr-level condition: Rain or Heavy rain): ${PRIORITY_GATE}`, "gate");
+bindLegacyClosure(5686, 0, `Lucha Libre: ${PRIORITY_GATE}`, "gate");
+bindLegacyClosure(6074, 0, `Moonarch: ${PRIORITY_GATE}`, "gate");
+bindLegacyClosure(20010, 1, `Duplicity: ${PRIORITY_GATE}`, "gate");
+bindLegacyClosure(20019, 2, `Radiant Jewel: ${PRIORITY_GATE}`, "gate");
+
+// MoveImmunityAbAttr (Tier A). Slot ctor:0, a `(pokemon, attacker, move)` closure.
+// (c) `pokemon !== attacker && move.doesFlagEffectApply({ flag: SOUND_BASED, user: attacker })`, exact: the attacker is not
+// me, and the move has the sound property by the same engine predicate the atom move.flag calls.
+bindCondition(43, 0, {
+  all: [
+    { not: { id: "side.is", kind: "self" } },
+    { id: "move.flag", flag: "SOUND_BASED" },
+  ],
+});
+bindCondition(5272, 1, {
+  all: [
+    { not: { id: "side.is", kind: "self" } },
+    { id: "move.flag", flag: "SOUND_BASED" },
+  ],
+});
+
+// (a) `pokemon !== attacker && move.hasFlag(POWDER_MOVE)`: the plain flag, not doesFlagEffectApply (which also counts a flag
+// that an ability injects). Needs `move.has-built-in-flag` (R-B01-10).
+const POWDER =
+  "closure is `pokemon !== attacker && move.hasFlag(POWDER_MOVE)` (the plain built-in flag); the atom move.flag calls doesFlagEffectApply, which also counts flags injected by abilities. Needs `move.has-built-in-flag` (R-B01-10).";
+bindLegacyClosure(19, 1, `Shield Dust: ${POWDER}`);
+bindLegacyClosure(142, 1, `Overcoat: ${POWDER}`);
+bindLegacyClosure(5243, 1, `Powder Burst: ${POWDER}`);
+bindLegacyClosure(5539, 2, `Guardian Coat: ${POWDER}`);
+
+// (b) `pokemon !== attacker && move.hasFlag(BALLBOMB_MOVE)`, same reason.
+const BALLBOMB =
+  "closure is `pokemon !== attacker && move.hasFlag(BALLBOMB_MOVE)` (the plain built-in flag); the atom move.flag calls doesFlagEffectApply, which also counts flags injected by abilities. Needs `move.has-built-in-flag` (R-B01-10).";
+bindLegacyClosure(171, 0, `Bulletproof: ${BALLBOMB}`);
+bindLegacyClosure(5657, 1, `Chestnut Shield: ${BALLBOMB}`);
+
+// (d) Telepathy.
+bindLegacyClosure(
+  140,
+  0,
+  "Telepathy: closure is `pokemon.getAlly() === attacker && move.is('AttackMove')`. getAlly() is the FIRST ally (the atom side.is ally accepts any teammate) and `instanceof AttackMove` has no exact atom. Needs `mon.is-first-ally` and `move.is-attack-move` (R-B01-12).",
+);
+
+// (e) Good as Gold.
+bindLegacyClosure(
+  283,
+  0,
+  "Good as Gold: closure is `pokemon !== attacker && move.category === STATUS && ![BOTH_SIDES, ENEMY_SIDE, USER_SIDE].includes(move.moveTarget)`. The not-self and status-category parts have atoms (side.is, move.category) but 'targets a whole side' has none exact (move.target-kind groups other targets as well). Needs `move.targets-whole-side` (R-B01-11).",
+);
