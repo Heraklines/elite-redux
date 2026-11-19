@@ -63,7 +63,7 @@ export default defineDecl(SpeedBoostAbAttr, {
   ],
   guards: [],
   feasibility: ["The stage can only go up to +6 (the stat change itself fails at the limit)"],
-  effect: { id: "effect.stat-stage", params: [] },
+  effect: { id: "effect.stat-stage", params: ["stat", "stages"] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "none", simulated: "respects" },
   probes: [{ name: "end of turn at full HP and at 1 HP", axes: { hp: ["max", 1] } }],

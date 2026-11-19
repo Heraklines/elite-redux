@@ -12,7 +12,7 @@
 //   - `apply`: `pokemon.summonData.berriesEatenLast = pokemon.turnData.berriesEaten`. It does NOT check `simulated` and
 //     it stores the SAME array object, not a copy (see notes).
 // It only means something together with CudChewConsumeBerryAbAttr, which replays the remembered berries one turn later (that
-// class has its own declaration, parked in pending/ until the librarian adds its trigger).
+// class has its own declaration, in this folder).
 import { CudChewRecordBerryAbAttr } from "#abilities/ab-attrs";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 

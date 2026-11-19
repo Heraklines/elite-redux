@@ -61,7 +61,7 @@ export default defineDecl(PostTurnStatusHealAbAttr, {
     "Only while I have one of the chosen statuses (the setting above, checked first)",
     "Does nothing in a simulated preview",
   ],
-  effect: { id: "effect.heal-percent", params: [] },
+  effect: { id: "effect.package", params: [] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "none", simulated: "respects" },
   probes: [
@@ -72,5 +72,5 @@ export default defineDecl(PostTurnStatusHealAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "Users: Poison Heal (90, attr 0, statuses Toxic and Poison, no ability-level closure). The ability also carries BlockStatusDamageAbAttr, which keeps poison damage away. The heal is 1/8 as `toDmgValue(maxHp / 8)` (floor, at least 1) written as a literal in apply; there is no constructor argument for it, so it cannot be a typed setting without a constructor change that class agents may not make (request R-B06-1: a ratio setting, and an effect whose percent is not limited to whole numbers; effect.heal-percent is the nearest block but its percent slider is whole numbers and 12.5 does not fit). The message and the ability popup (showAbility false) are untouched. Oddity, not fixed: `canApply` ignores `simulated` but is pure, and `apply` skips simulated calls, so `simulated` is respected. Engine side: ER turn-end code checks the same ability by identity (abilityQuery POISON_HEAL_RECOVERY) for the Toxic terrain chip; that is the foundation engine-query track, not this class.",
+    "Users: Poison Heal (90, attr 0, statuses Toxic and Poison, no ability-level closure). The ability also carries BlockStatusDamageAbAttr, which keeps poison damage away. The heal is 1/8 as `toDmgValue(maxHp / 8)` (floor, at least 1) written as a literal in apply; there is no constructor argument for it, so it cannot be a typed setting without a constructor change that class agents may not make (request R-B06-1: a ratio setting, and an effect whose percent is not limited to whole numbers; the effect is therefore a PACKAGE with this written reason: effect.heal-percent has a whole-number percent slider (default 25) and cannot express 12.5 percent with toDmgValue rounding, so declaring it would show a slider that does not match the shipped ability; it can retire once R-B06-1 lands). The message and the ability popup (showAbility false) are untouched. Oddity, not fixed: `canApply` ignores `simulated` but is pure, and `apply` skips simulated calls, so `simulated` is respected. Engine side: ER turn-end code checks the same ability by identity (abilityQuery POISON_HEAL_RECOVERY) for the Toxic terrain chip; that is the foundation engine-query track, not this class.",
 });
