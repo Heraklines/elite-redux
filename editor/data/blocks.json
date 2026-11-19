@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "096ef32b703c2f",
+  "hash": "0ea6aa28e2e5a8",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -124,6 +124,51 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.copy-fainted-ally-ability",
+      "className": "CopyFaintedAllyAbilityAbAttr",
+      "label": "Copy the ability of a fainted ally",
+      "summary": "When a Pokemon on my side faints, I take its ability for the rest of the battle (if that ability can be copied). Example: a fainted partner passes on its ability.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-ko",
+      "whenLabel": "When I knock out a Pokemon",
+      "synonyms": [
+        "receiver",
+        "power of alchemy",
+        "inherit ability",
+        "take a fainted ally's ability",
+        "ability copy on faint"
+      ],
+      "examples": [
+        "When my partner faints, I copy its ability"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The fainted Pokemon's ability must be one that can be copied",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.float",
@@ -309,6 +354,361 @@
       "uses": 1
     },
     {
+      "id": "block.ignore-opponent-stat-stages",
+      "className": "IgnoreOpponentStatStagesAbAttr",
+      "label": "Ignore the foe's stat boosts and drops",
+      "summary": "The foe's boosts and drops to Attack, Defense, Sp. Atk, Sp. Def, Accuracy, Evasion are treated as zero. Example: a foe at +6 Attack hits me as if it were at +0.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.ignore-stat-stages",
+      "whenLabel": "While the game applies the foe's stat stages",
+      "synonyms": [
+        "unaware",
+        "ignore boosts",
+        "ignore stat changes",
+        "ignore evasion",
+        "ignore defense boosts",
+        "ignore accuracy changes",
+        "ignore stat drops",
+        "no stat stages"
+      ],
+      "examples": [
+        "Ignore all of the foe's stat boosts and drops like Unaware",
+        "Ignore only the foe's Evasion boosts",
+        "Ignore the foe's Defense and Sp. Def changes while the foe is trapped"
+      ],
+      "params": [
+        {
+          "id": "stats",
+          "label": "Foe stats whose changes I ignore (comma separated names)",
+          "control": "text",
+          "default": "ATK,DEF,SPATK,SPDEF,ACC,EVA",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:1",
+          "removable": true,
+          "editable": true,
+          "optional": true
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "It is skipped when the move being used ignores the target's ability (Mold Breaker style), except for accuracy and evasion"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": false
+      },
+      "uses": 10
+    },
+    {
+      "id": "block.intimidate-immunity",
+      "className": "IntimidateImmunityAbAttr",
+      "label": "Block Intimidate and similar stat drops on me",
+      "summary": "While the game checks whether Intimidate lands on me, it is blocked. Example: a foe's Intimidate does not lower my Attack.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.intimidate",
+      "whenLabel": "While the game checks if Intimidate lands on me",
+      "synonyms": [
+        "immune to intimidate",
+        "inner focus",
+        "own tempo",
+        "oblivious",
+        "scrappy",
+        "block attack drop on entry",
+        "ignore intimidate"
+      ],
+      "examples": [
+        "Intimidate and Scare no longer lower my stats",
+        "Immune to Intimidate like Inner Focus"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Nothing else has already blocked the same Intimidate"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 15
+    },
+    {
+      "id": "block.post-attack-ability-give",
+      "className": "PostAttackAbilityGiveAbAttr",
+      "label": "Give the target a chosen ability when I hit it with contact",
+      "summary": "After my damaging move makes contact, the target's ability is replaced by ability number 5377 (if its ability can be replaced).",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "mummy",
+        "lingering aroma",
+        "blood stain",
+        "spread my ability",
+        "change the target's ability",
+        "ability infection"
+      ],
+      "examples": [
+        "Replace the ability of any Pokemon my contact move hits with my own ability"
+      ],
+      "params": [
+        {
+          "id": "ability",
+          "label": "Ability to give (ability number from the ability list)",
+          "control": "number",
+          "default": 5377,
+          "editable": true,
+          "min": 1,
+          "max": 29999,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The target must not be the user itself",
+        "The target's ability must be one that can be replaced",
+        "The target must not already have this ability-giving effect"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.post-attack-apply-battler-tag",
+      "className": "PostAttackApplyBattlerTagAbAttr",
+      "label": "Sometimes inflict a battle effect on the target after I hit",
+      "summary": "After my damaging attack lands, a chance roll can put Confused on the target. Set the chance and any extra conditions in the conditions list.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "chance to flinch",
+        "chance to confuse",
+        "chance to infatuate",
+        "bleed on hit",
+        "frostbite on hit",
+        "cute charm",
+        "stench",
+        "poison touch",
+        "extra effect on hit"
+      ],
+      "examples": [
+        "20% chance to confuse the target when my move makes contact",
+        "10% chance to make the target flinch with my damaging moves"
+      ],
+      "params": [
+        {
+          "id": "contactRequired",
+          "label": "Needs contact (shown only; the contact condition in the conditions list decides)",
+          "control": "boolean",
+          "default": false,
+          "editable": false
+        },
+        {
+          "id": "effects",
+          "label": "Battle effects (comma separated; one is picked at random when there are several)",
+          "control": "text",
+          "default": "CONFUSED",
+          "editable": true,
+          "options": [
+            "RECHARGING",
+            "FLINCHED",
+            "INTERRUPTED",
+            "SKY_DROP",
+            "CONFUSED",
+            "INFATUATED",
+            "SEEDED",
+            "NIGHTMARE",
+            "FRENZY",
+            "CHARGING",
+            "ENCORE",
+            "HELPING_HAND",
+            "INGRAIN",
+            "OCTOLOCK",
+            "AQUA_RING",
+            "DROWSY",
+            "TRAPPED",
+            "BIND",
+            "WRAP",
+            "FIRE_SPIN",
+            "WHIRLPOOL",
+            "CLAMP",
+            "SAND_TOMB",
+            "MAGMA_STORM",
+            "SNAP_TRAP",
+            "THUNDER_CAGE",
+            "INFESTATION",
+            "PROTECTED",
+            "SPIKY_SHIELD",
+            "KINGS_SHIELD",
+            "OBSTRUCT",
+            "SILK_TRAP",
+            "MIND_READER",
+            "BANEFUL_BUNKER",
+            "BURNING_BULWARK",
+            "ER_PARALYZING_SHIELD",
+            "ER_TANGLING_HUSK",
+            "ENDURING",
+            "STURDY",
+            "PERISH_SONG",
+            "TRUANT",
+            "SLOW_START",
+            "PROTOSYNTHESIS",
+            "QUARK_DRIVE",
+            "FLYING",
+            "UNDERGROUND",
+            "UNDERWATER",
+            "HIDDEN",
+            "FIRE_BOOST",
+            "CRIT_BOOST",
+            "ALWAYS_CRIT",
+            "IGNORE_ACCURACY",
+            "IGNORE_FLYING",
+            "SALT_CURED",
+            "CURSED",
+            "ER_SLAB_CURSE",
+            "CHARGED",
+            "ROOSTED",
+            "FLOATING",
+            "MINIMIZED",
+            "DESTINY_BOND",
+            "CENTER_OF_ATTENTION",
+            "STOCKPILING",
+            "RECEIVE_DOUBLE_DAMAGE",
+            "ALWAYS_GET_HIT",
+            "DISABLED",
+            "SUBSTITUTE",
+            "IGNORE_GHOST",
+            "IGNORE_DARK",
+            "GULP_MISSILE_ARROKUDA",
+            "GULP_MISSILE_PIKACHU",
+            "BEAK_BLAST_CHARGING",
+            "SHELL_TRAP",
+            "DRAGON_CHEER",
+            "NO_RETREAT",
+            "GORILLA_TACTICS",
+            "UNBURDEN",
+            "THROAT_CHOPPED",
+            "TAR_SHOT",
+            "BURNED_UP",
+            "DOUBLE_SHOCKED",
+            "AUTOTOMIZED",
+            "MYSTERY_ENCOUNTER_POST_SUMMON",
+            "POWER_TRICK",
+            "HEAL_BLOCK",
+            "TORMENT",
+            "TAUNT",
+            "IMPRISON",
+            "SYRUP_BOMB",
+            "ELECTRIFIED",
+            "TELEKINESIS",
+            "COMMANDED",
+            "GRUDGE",
+            "PSYCHO_SHIFT",
+            "ENDURE_TOKEN",
+            "POWDER",
+            "MAGIC_COAT",
+            "SUPREME_OVERLORD",
+            "BYPASS_SPEED",
+            "SNATCH",
+            "ME_FIRST",
+            "ER_BLEED",
+            "ER_FROSTBITE",
+            "ER_FEAR",
+            "ER_ITEM_DISABLED",
+            "ER_SILKEN_DECREE",
+            "ER_ICE_STATUE",
+            "ER_PARASITIC_SPORES",
+            "ER_DESPAIR",
+            "ER_DRENCHED",
+            "ER_ENRAGE",
+            "ER_QUASHED",
+            "ER_EMPOWERED_SWITCH_IN",
+            "ER_COMMANDED",
+            "ER_SAFE_PASSAGE",
+            "ER_SAGE_POWER_LOCK",
+            "ER_BLIND_JUSTICE",
+            "ER_CONFECTED",
+            "ER_IRRADIATED_TOXIC",
+            "ER_IRRADIATED_LOCK",
+            "ER_BREACHED",
+            "ER_EMBEDDED",
+            "ER_DECAY_POISON"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The target's ability must not ignore the extra effects of attacks (like Shield Dust does)",
+        "The target must not be the user itself"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": [
+          "effects"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 24
+    },
+    {
       "id": "block.post-damage-force-switch",
       "className": "PostDamageForceSwitchAbAttr",
       "label": "Switch out when my HP gets low",
@@ -463,6 +863,530 @@
       "uses": 9
     },
     {
+      "id": "block.post-defend-steal-held-item",
+      "className": "PostDefendStealHeldItemAbAttr",
+      "label": "Steal the attacker's held item when it hits me",
+      "summary": "When a move hits me and the condition you set is true (contact, for example), I take one random item the attacker holds and can carry.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "pickpocket",
+        "thief",
+        "steal item on contact",
+        "take the attacker's item",
+        "item theft",
+        "magician"
+      ],
+      "examples": [
+        "Steal the held item of any attacker that makes contact with me"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": true
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "It does nothing in a preview",
+        "The hit must have landed (not missed, blocked or immune)",
+        "The attacker must hold an item that can be taken, and I must be able to carry it"
+      ],
+      "effect": {
+        "id": "effect.steal-item",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.post-intimidate-stat-stage-change",
+      "className": "PostIntimidateStatStageChangeAbAttr",
+      "label": "Change my stats when Intimidate hits me",
+      "summary": "When a foe's Intimidate reaches me, my Speed change by 1 stage(s). Example: Rattled raises my Speed by 1 stage.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.intimidated",
+      "whenLabel": "When Intimidate hits me",
+      "synonyms": [
+        "rattled",
+        "guard dog",
+        "intimidate reaction",
+        "scared boost",
+        "speed boost when intimidated",
+        "react to intimidate"
+      ],
+      "examples": [
+        "Raise my Speed by one stage when a foe's Intimidate hits me"
+      ],
+      "params": [
+        {
+          "id": "stats",
+          "label": "Stats to change (comma separated names)",
+          "control": "text",
+          "default": "SPD",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ]
+        },
+        {
+          "id": "stages",
+          "label": "Stages to change (+1 raises one stage, -1 lowers one stage)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "overwrites",
+          "label": "Also cancel the incoming Intimidate drop (yes = the drop does not happen)",
+          "control": "boolean",
+          "default": false,
+          "editable": true
+        },
+        {
+          "id": "mirrorIncoming",
+          "label": "Raise the same stat by the same amount that was about to drop (instead of the stats above)",
+          "control": "boolean",
+          "default": false,
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The stat must not be at its limit (the game then only says it cannot go any higher)"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stats",
+          "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.post-knock-out-stat-stage-change",
+      "className": "PostKnockOutStatStageChangeAbAttr",
+      "label": "Raise one of my stats whenever a Pokemon faints",
+      "summary": "Whenever any other Pokemon is knocked out, my Sp. Atk changes by 1 stage(s). Example: +1 Sp. Atk.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-ko",
+      "whenLabel": "When I knock out a Pokemon",
+      "synonyms": [
+        "soul heart",
+        "pure good",
+        "fae heart",
+        "boost when anyone faints",
+        "faint boost",
+        "snowball on faint"
+      ],
+      "examples": [
+        "Raise my Sp. Atk by one stage whenever any Pokemon faints"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat",
+          "control": "select",
+          "default": "SPATK",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ]
+        },
+        {
+          "id": "stages",
+          "label": "Stages to change (+1 raises one stage, -1 lowers one stage)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The stat must not be at its limit (the game then only says it cannot go any higher)"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stat",
+          "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.post-summon-add-arena-tag",
+      "className": "PostSummonAddArenaTagAbAttr",
+      "label": "Set a field effect when I enter",
+      "summary": "When I enter the battle, Inverse room is set on Both sides for 5 turn(s) (0 = until something removes it). Example: Inverse Room for 5 turns.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "neutralizing gas",
+        "set a room",
+        "summon field effect",
+        "inverse room",
+        "entry field effect",
+        "start a room on entry"
+      ],
+      "examples": [
+        "Set Inverse Room for 5 turns when I enter",
+        "Switch off all other abilities while I am on the field"
+      ],
+      "params": [
+        {
+          "id": "showAbility",
+          "label": "Show my ability name when it triggers",
+          "control": "boolean",
+          "default": true,
+          "editable": true
+        },
+        {
+          "id": "arenaTag",
+          "label": "Field effect to set",
+          "control": "select",
+          "default": "INVERSE_ROOM",
+          "editable": true,
+          "options": [
+            "MUD_SPORT",
+            "WATER_SPORT",
+            "SPIKES",
+            "TOXIC_SPIKES",
+            "MIST",
+            "ER_SMOKESCREEN",
+            "STEALTH_ROCK",
+            "STICKY_WEB",
+            "TRICK_ROOM",
+            "INVERSE_ROOM",
+            "MAGIC_ROOM",
+            "WONDER_ROOM",
+            "SWIRLY_ROOM",
+            "GRAVITY",
+            "REFLECT",
+            "LIGHT_SCREEN",
+            "AURORA_VEIL",
+            "QUICK_GUARD",
+            "WIDE_GUARD",
+            "MAT_BLOCK",
+            "CRAFTY_SHIELD",
+            "TAILWIND",
+            "HAPPY_HOUR",
+            "SAFEGUARD",
+            "NO_CRIT",
+            "IMPRISON",
+            "ION_DELUGE",
+            "FIRE_GRASS_PLEDGE",
+            "WATER_FIRE_PLEDGE",
+            "GRASS_WATER_PLEDGE",
+            "FAIRY_LOCK",
+            "NEUTRALIZING_GAS",
+            "PENDING_HEAL",
+            "HOT_COALS",
+            "FOAMY_WEB",
+            "CREEPING_THORNS",
+            "ER_WEATHER_LOCK",
+            "ER_INFESTATION_TRAP",
+            "SEDIMENT_BLOOM",
+            "GRAVE_MARKER",
+            "ER_DRILL_BITS"
+          ]
+        },
+        {
+          "id": "turnCount",
+          "label": "Number of turns it lasts (0 = until something removes it)",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 0,
+          "max": 99,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "side",
+          "label": "Which side gets it",
+          "control": "select",
+          "default": "BOTH_SIDES",
+          "editable": true,
+          "options": [
+            "BOTH_SIDES",
+            "PLAYER_SIDE",
+            "ENEMY_SIDE"
+          ]
+        },
+        {
+          "id": "quiet",
+          "label": "Hide the field effect's own start message",
+          "control": "boolean",
+          "default": false,
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A field effect of that kind already on that side is not added a second time",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.arena-tag",
+        "params": [
+          "arenaTag",
+          "side"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.post-summon-add-battler-tag",
+      "className": "PostSummonAddBattlerTagAbAttr",
+      "label": "Put a battle effect on myself when I enter",
+      "summary": "When I enter the battle, I get the Slow start effect for 5 turn(s) (0 = no time limit). Example: Slow Start lasts 5 turns.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "slow start",
+        "truant",
+        "self effect on entry",
+        "apply volatile to self",
+        "protosynthesis",
+        "quark drive",
+        "start with a status effect"
+      ],
+      "examples": [
+        "Start every battle with Slow Start for 5 turns",
+        "Get the Truant effect when I enter the battle"
+      ],
+      "params": [
+        {
+          "id": "tagType",
+          "label": "Battle effect to put on me",
+          "control": "select",
+          "default": "SLOW_START",
+          "editable": true,
+          "options": [
+            "RECHARGING",
+            "FLINCHED",
+            "INTERRUPTED",
+            "SKY_DROP",
+            "CONFUSED",
+            "INFATUATED",
+            "SEEDED",
+            "NIGHTMARE",
+            "FRENZY",
+            "CHARGING",
+            "ENCORE",
+            "HELPING_HAND",
+            "INGRAIN",
+            "OCTOLOCK",
+            "AQUA_RING",
+            "DROWSY",
+            "TRAPPED",
+            "BIND",
+            "WRAP",
+            "FIRE_SPIN",
+            "WHIRLPOOL",
+            "CLAMP",
+            "SAND_TOMB",
+            "MAGMA_STORM",
+            "SNAP_TRAP",
+            "THUNDER_CAGE",
+            "INFESTATION",
+            "PROTECTED",
+            "SPIKY_SHIELD",
+            "KINGS_SHIELD",
+            "OBSTRUCT",
+            "SILK_TRAP",
+            "MIND_READER",
+            "BANEFUL_BUNKER",
+            "BURNING_BULWARK",
+            "ER_PARALYZING_SHIELD",
+            "ER_TANGLING_HUSK",
+            "ENDURING",
+            "STURDY",
+            "PERISH_SONG",
+            "TRUANT",
+            "SLOW_START",
+            "PROTOSYNTHESIS",
+            "QUARK_DRIVE",
+            "FLYING",
+            "UNDERGROUND",
+            "UNDERWATER",
+            "HIDDEN",
+            "FIRE_BOOST",
+            "CRIT_BOOST",
+            "ALWAYS_CRIT",
+            "IGNORE_ACCURACY",
+            "IGNORE_FLYING",
+            "SALT_CURED",
+            "CURSED",
+            "ER_SLAB_CURSE",
+            "CHARGED",
+            "ROOSTED",
+            "FLOATING",
+            "MINIMIZED",
+            "DESTINY_BOND",
+            "CENTER_OF_ATTENTION",
+            "STOCKPILING",
+            "RECEIVE_DOUBLE_DAMAGE",
+            "ALWAYS_GET_HIT",
+            "DISABLED",
+            "SUBSTITUTE",
+            "IGNORE_GHOST",
+            "IGNORE_DARK",
+            "GULP_MISSILE_ARROKUDA",
+            "GULP_MISSILE_PIKACHU",
+            "BEAK_BLAST_CHARGING",
+            "SHELL_TRAP",
+            "DRAGON_CHEER",
+            "NO_RETREAT",
+            "GORILLA_TACTICS",
+            "UNBURDEN",
+            "THROAT_CHOPPED",
+            "TAR_SHOT",
+            "BURNED_UP",
+            "DOUBLE_SHOCKED",
+            "AUTOTOMIZED",
+            "MYSTERY_ENCOUNTER_POST_SUMMON",
+            "POWER_TRICK",
+            "HEAL_BLOCK",
+            "TORMENT",
+            "TAUNT",
+            "IMPRISON",
+            "SYRUP_BOMB",
+            "ELECTRIFIED",
+            "TELEKINESIS",
+            "COMMANDED",
+            "GRUDGE",
+            "PSYCHO_SHIFT",
+            "ENDURE_TOKEN",
+            "POWDER",
+            "MAGIC_COAT",
+            "SUPREME_OVERLORD",
+            "BYPASS_SPEED",
+            "SNATCH",
+            "ME_FIRST",
+            "ER_BLEED",
+            "ER_FROSTBITE",
+            "ER_FEAR",
+            "ER_ITEM_DISABLED",
+            "ER_SILKEN_DECREE",
+            "ER_ICE_STATUE",
+            "ER_PARASITIC_SPORES",
+            "ER_DESPAIR",
+            "ER_DRENCHED",
+            "ER_ENRAGE",
+            "ER_QUASHED",
+            "ER_EMPOWERED_SWITCH_IN",
+            "ER_COMMANDED",
+            "ER_SAFE_PASSAGE",
+            "ER_SAGE_POWER_LOCK",
+            "ER_BLIND_JUSTICE",
+            "ER_CONFECTED",
+            "ER_IRRADIATED_TOXIC",
+            "ER_IRRADIATED_LOCK",
+            "ER_BREACHED",
+            "ER_EMBEDDED",
+            "ER_DECAY_POISON"
+          ]
+        },
+        {
+          "id": "turnCount",
+          "label": "Number of turns it lasts (0 = no time limit)",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 0,
+          "max": 999,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "showAbility",
+          "label": "Show my ability name when it triggers",
+          "control": "boolean",
+          "default": true,
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The battle effect must be one that can be put on me right now",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": [
+          "tagType"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 10
+    },
+    {
       "id": "block.post-summon-copy-ability",
       "className": "PostSummonCopyAbilityAbAttr",
       "label": "Copy a foe's ability when I enter",
@@ -499,6 +1423,221 @@
       },
       "packageReason": "Package, justified: the attr keeps `target` and `targetAbilityName` between canApply, apply and getTriggerMessage, and its apply replaces the holder's ability (setTempAbility) and suppresses the source for two turns. Splitting would re-implement the class. Users: Trace only. Honest bucket: package-only.",
       "uses": 1
+    },
+    {
+      "id": "block.post-summon-message",
+      "className": "PostSummonMessageAbAttr",
+      "label": "Show a built-in announcement with my name when I enter",
+      "summary": "When I enter the battle, show the \"Pressure\" announcement with my name. Example: Pressure shows \"<my name> is exerting its Pressure!\".",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "pressure message",
+        "mold breaker message",
+        "aura message",
+        "entry announcement",
+        "show text on entry",
+        "ability announcement",
+        "shuddered"
+      ],
+      "examples": [
+        "Show the Pressure announcement when I enter",
+        "Announce that I am radiating a Dark Aura when I enter"
+      ],
+      "params": [
+        {
+          "id": "message",
+          "label": "Which announcement to show",
+          "control": "select",
+          "default": "PRESSURE",
+          "editable": true,
+          "options": [
+            "PRESSURE",
+            "MOLD_BREAKER",
+            "ANTICIPATION",
+            "TURBOBLAZE",
+            "TERAVOLT",
+            "DARK_AURA",
+            "FAIRY_AURA",
+            "AURA_BREAK",
+            "TWO_ABILITIES_GLASTRIER",
+            "TWO_ABILITIES_SPECTRIER",
+            "VESSEL_OF_RUIN",
+            "SWORD_OF_RUIN",
+            "TABLETS_OF_RUIN",
+            "BEADS_OF_RUIN",
+            "ZERO_TO_HERO_TRANSFORMATION"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.message",
+        "params": [
+          "message"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 23
+    },
+    {
+      "id": "block.post-summon-remove-arena-tag",
+      "className": "PostSummonRemoveArenaTagAbAttr",
+      "label": "Clear field effects when I enter",
+      "summary": "When I enter the battle, remove Reflect, Light screen, Aurora veil from Both sides. Example: Screen Cleaner clears Reflect, Light Screen and Aurora Veil.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "screen cleaner",
+        "remove hazards",
+        "clear spikes",
+        "remove screens",
+        "defog on entry",
+        "clear reflect",
+        "pickup"
+      ],
+      "examples": [
+        "Remove Reflect, Light Screen and Aurora Veil from the foe's side when I enter",
+        "Clear Spikes and Stealth Rock from my side when I enter"
+      ],
+      "params": [
+        {
+          "id": "arenaTags",
+          "label": "Field effects to remove (comma separated names)",
+          "control": "text",
+          "default": "REFLECT,LIGHT_SCREEN,AURORA_VEIL",
+          "editable": true,
+          "options": [
+            "MUD_SPORT",
+            "WATER_SPORT",
+            "SPIKES",
+            "TOXIC_SPIKES",
+            "MIST",
+            "ER_SMOKESCREEN",
+            "STEALTH_ROCK",
+            "STICKY_WEB",
+            "TRICK_ROOM",
+            "INVERSE_ROOM",
+            "MAGIC_ROOM",
+            "WONDER_ROOM",
+            "SWIRLY_ROOM",
+            "GRAVITY",
+            "REFLECT",
+            "LIGHT_SCREEN",
+            "AURORA_VEIL",
+            "QUICK_GUARD",
+            "WIDE_GUARD",
+            "MAT_BLOCK",
+            "CRAFTY_SHIELD",
+            "TAILWIND",
+            "HAPPY_HOUR",
+            "SAFEGUARD",
+            "NO_CRIT",
+            "IMPRISON",
+            "ION_DELUGE",
+            "FIRE_GRASS_PLEDGE",
+            "WATER_FIRE_PLEDGE",
+            "GRASS_WATER_PLEDGE",
+            "FAIRY_LOCK",
+            "NEUTRALIZING_GAS",
+            "PENDING_HEAL",
+            "HOT_COALS",
+            "FOAMY_WEB",
+            "CREEPING_THORNS",
+            "ER_WEATHER_LOCK",
+            "ER_INFESTATION_TRAP",
+            "SEDIMENT_BLOOM",
+            "GRAVE_MARKER",
+            "ER_DRILL_BITS"
+          ]
+        },
+        {
+          "id": "side",
+          "label": "Which side to clear",
+          "control": "select",
+          "default": "BOTH_SIDES",
+          "editable": true,
+          "options": [
+            "OWN_SIDE",
+            "FOE_SIDE",
+            "BOTH_SIDES"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one of the listed field effects must be active on either side, otherwise nothing happens and the ability does not show",
+        "It does nothing in a preview"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": false
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.post-summon-unnamed-message",
+      "className": "PostSummonUnnamedMessageAbAttr",
+      "label": "Show a fixed text message when I enter",
+      "summary": "When I enter the battle, show the text \"The effects of the weather disappeared.\" exactly as written. Example: Air Lock shows \"The effects of the weather disappeared.\"",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "entry message",
+        "announce on entry",
+        "show text on entry",
+        "air lock message",
+        "custom entry text",
+        "flavour text"
+      ],
+      "examples": [
+        "Show \"The effects of the weather disappeared.\" when I enter"
+      ],
+      "params": [
+        {
+          "id": "message",
+          "label": "Text to show (shown exactly as written, in English only)",
+          "control": "text",
+          "default": "The effects of the weather disappeared.",
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.message",
+        "params": [
+          "message"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.post-summon-weather-change",
@@ -565,6 +1704,123 @@
       "uses": 7
     },
     {
+      "id": "block.post-victory-form-change",
+      "className": "PostVictoryFormChangeAbAttr",
+      "label": "Change form after I knock out a Pokemon",
+      "summary": "After I knock out a Pokemon, I change into my special form if I am not in it yet. Example: Greninja turning into its Ash form.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-win",
+      "whenLabel": "When I win the fight",
+      "synonyms": [
+        "battle bond",
+        "ash greninja",
+        "transform on ko",
+        "form change on victory",
+        "evolve after a ko"
+      ],
+      "examples": [
+        "Change into my battle form after I knock out a Pokemon"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": false,
+          "editable": false,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "My species must have a form change registered for this ability",
+        "It does nothing in a preview",
+        "It does nothing when I am already in the form I should have"
+      ],
+      "effect": {
+        "id": "effect.change-form",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.post-victory-stat-stage-change",
+      "className": "PostVictoryStatStageChangeAbAttr",
+      "label": "Raise my stats after I knock out a Pokemon",
+      "summary": "After I knock out a Pokemon, my stats change by 1 stage(s): Attack (Highest means my best stat). Example: +1 Attack.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-win",
+      "whenLabel": "When I win the fight",
+      "synonyms": [
+        "moxie",
+        "beast boost",
+        "chilling neigh",
+        "grim neigh",
+        "snowball",
+        "boost after a ko",
+        "attack boost on ko"
+      ],
+      "examples": [
+        "Raise my Attack by one stage every time I knock out a Pokemon"
+      ],
+      "params": [
+        {
+          "id": "stats",
+          "label": "Stats to change (comma separated names, or Highest for my best stat)",
+          "control": "text",
+          "default": "ATK",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA",
+            "HIGHEST"
+          ]
+        },
+        {
+          "id": "stages",
+          "label": "Stages to change (+1 raises one stage, -1 lowers one stage)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The stat must not be at its limit (the game then only says it cannot go any higher)"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stats",
+          "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 12
+    },
+    {
       "id": "block.received-move-damage-multiplier",
       "className": "ReceivedMoveDamageMultiplierAbAttr",
       "label": "Take less (or more) damage",
@@ -628,6 +1884,52 @@
         "do": true
       },
       "uses": 64
+    },
+    {
+      "id": "block.synchronize-status",
+      "className": "SynchronizeStatusAbAttr",
+      "label": "Pass a burn, paralysis or poison back to whoever caused it",
+      "summary": "When another Pokemon burns, paralyzes or poisons me, it gets the same status. Example: a foe's Will-O-Wisp burns me, and the foe is burned too.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.got-status",
+      "whenLabel": "When I get a status condition",
+      "synonyms": [
+        "synchronize",
+        "share status",
+        "reflect status",
+        "give the status back",
+        "status mirror",
+        "copycat status"
+      ],
+      "examples": [
+        "When a foe burns or poisons me, it gets the same status"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A Pokemon must have caused the status (weather and hazards do not count)",
+        "It does not check that the other Pokemon can really receive the status: the ability still shows"
+      ],
+      "effect": {
+        "id": "effect.inflict-status",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     }
   ]
 }

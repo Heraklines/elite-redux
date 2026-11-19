@@ -187,3 +187,22 @@ bindEach(
   [[222, 0, "Receiver"]],
   "gate",
 );
+
+// =============================================================================================
+// IgnoreOpponentStatStagesAbAttr (Tier A, chunk 2). Optional slot ctor:1, `opponentCondition(opponent)`. Only the two
+// "trapped foe" abilities pass one; the other eight need no binding.
+// =============================================================================================
+const TRAPPED_FOE_REASON =
+  "the closure is `opponent.getTag(TrappedTag) !== undefined`, an instanceof test over every trapping effect (Trapped, Ingrain, Octolock, Bind, Wrap and more); `tag.has` reads one battle effect name, so no atom answers 'the foe is trapped' (request `mon.is-trapped` in requests/B03.md)";
+bindLegacyClosure(
+  5110,
+  1,
+  `Grip Pincer (Defense and Sp. Def ignored while the foe is trapped): ${TRAPPED_FOE_REASON}`,
+  "ctor:1",
+);
+bindLegacyClosure(
+  5354,
+  3,
+  `Venoblaze Pincers (Defense and Sp. Def ignored while the foe is trapped): ${TRAPPED_FOE_REASON}`,
+  "ctor:1",
+);
