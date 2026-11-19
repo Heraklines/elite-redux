@@ -301,7 +301,7 @@ describe("worker saved-ability validation", () => {
 
 describe("editor worker deploy workflow", () => {
   it("redeploys when the bundled vocabulary changes and runs the catalog drift gate", () => {
-    const wf = readFileSync(new URL("../../../../.github/workflows/deploy-editor-worker.yml", import.meta.url), "utf8");
+    const wf = read(".github/workflows/deploy-editor-worker.yml");
     expect(wf).toContain('"editor/data/vocabulary.json"');
     expect(wf).toContain('"src/data/elite-redux/ability-studio/vocabulary/**"');
     expect(wf).toContain("test/tests/elite-redux/decomp/catalog.test.ts");
