@@ -26,7 +26,18 @@ export default defineDecl(PostFaintFormChangeAbAttr, {
   label: "Go back to my normal form when I faint",
   summary: () =>
     "When I faint, if I am not already in the form I should be in, I change form. Example: Disguise puts Mimikyu back in its disguised form after it faints.",
-  synonyms: ["disguise", "battle bond", "power construct", "revert form on faint", "form change on faint", "patchwork", "revert form", "back to base form", "normal form", "go back"],
+  synonyms: [
+    "disguise",
+    "battle bond",
+    "power construct",
+    "revert form on faint",
+    "form change on faint",
+    "patchwork",
+    "revert form",
+    "back to base form",
+    "normal form",
+    "go back",
+  ],
   examples: ["Go back to my first form when I faint, like Disguise"],
   params: [],
   noParamsReason:
