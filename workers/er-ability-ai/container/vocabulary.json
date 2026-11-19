@@ -616,6 +616,24 @@
       ]
     },
     {
+      "id": "event.foe-switches-out",
+      "kind": "event",
+      "dispatchKey": "OnOpponentSwitchOutAbAttr",
+      "provides": [
+        "holder",
+        "other"
+      ],
+      "label": "When a foe switches out",
+      "group": "Entry and exit",
+      "synonyms": [
+        "pursuit",
+        "foe leaves the field",
+        "opponent withdraws",
+        "punish switching",
+        "tag"
+      ]
+    },
+    {
       "id": "calc.redirect-move",
       "kind": "calc",
       "dispatchKey": "RedirectMoveAbAttr",
@@ -1231,6 +1249,24 @@
       ]
     },
     {
+      "id": "calc.my-type-chart-override",
+      "kind": "calc",
+      "dispatchKey": "OffensiveTypeChartOverrideAbAttr",
+      "provides": [
+        "holder"
+      ],
+      "label": "While the game works out how well my attacks match the target's types",
+      "group": "Type",
+      "modifies": "typeMultiplier",
+      "synonyms": [
+        "super effective against",
+        "hit immune types",
+        "change type matchup",
+        "corrosion",
+        "molten down"
+      ]
+    },
+    {
       "id": "calc.ability-bypass",
       "kind": "calc",
       "dispatchKey": "MoveAbilityBypassAbAttr",
@@ -1730,6 +1766,7 @@
         "IgnoreGenderInfatuationAbAttr",
         "IgnoreProtectByFlagAbAttr",
         "IgnoreProtectOnContactAbAttr",
+        "IgnoreResistancesAbAttr",
         "OverruleCritAbAttr",
         "SpreadTargetByFlagAbAttr",
         "StealthRockImmunityAbAttr",
@@ -5022,5 +5059,5 @@
       ]
     }
   ],
-  "hash": "1264fa83dbcdc7"
+  "hash": "1d31fe5b65dc1a"
 }

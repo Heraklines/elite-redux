@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "096ef32b703c2f",
+  "vocabularyHash": "1d31fe5b65dc1a",
+  "hash": "08fd6a5527f44b",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -307,6 +307,415 @@
         "do": true
       },
       "uses": 1
+    },
+    {
+      "id": "block.ignore-resistances",
+      "className": "IgnoreResistancesAbAttr",
+      "label": "My moves ignore type resistances",
+      "summary": "While I have this, a target that resists my move takes normal damage instead of reduced damage. Immunities still block the move.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "normalize",
+        "ignore resistance",
+        "no resisted hits",
+        "resist breaker",
+        "hits resists normally"
+      ],
+      "examples": [
+        "My attacks are never resisted, but a Ghost type is still immune to Normal moves"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only a matchup between 0 and 1 is raised to 1: immunities (0) and weaknesses (above 1) are left alone",
+        "Does not work while my ability is being ignored (for example by a Mold Breaker foe)"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.nullify-first-n-hits",
+      "className": "NullifyFirstNHitsAbAttr",
+      "label": "Take no damage from the first few hits each battle",
+      "summary": "The first 2 hits that would damage me in each battle do 0 damage. The moves still connect and their extra effects still happen. Example: 2 = the first two hits.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.damage-taken",
+      "whenLabel": "While the game calculates damage I take",
+      "synonyms": [
+        "cheating death",
+        "gallantry",
+        "free hits",
+        "ignore the first hit",
+        "first hit does nothing",
+        "damage shield",
+        "negate the first hits"
+      ],
+      "examples": [
+        "The first two hits I take each battle do no damage, like Cheating Death"
+      ],
+      "params": [
+        {
+          "id": "n",
+          "label": "Number of hits to cancel in each battle (1 = only the first hit)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only a hit that would really do damage uses up one of the free hits",
+        "A preview of the damage shows 0 but does not use up a free hit",
+        "The free hits are counted per Pokemon and come back at the start of every new battle"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "n"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.offensive-type-chart-override",
+      "className": "OffensiveTypeChartOverrideAbAttr",
+      "label": "Change how my moves match up against a type",
+      "summary": "My moves use the damage multiplier you set against a target that has the chosen type, even through an immunity. Example: Poison > Steel = 2 makes my Poison moves super effective on Steel types.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.my-type-chart-override",
+      "whenLabel": "While the game works out how well my attacks match the target's types",
+      "synonyms": [
+        "super effective against",
+        "hit immune types",
+        "pierce immunity",
+        "change type matchup",
+        "corrosion",
+        "molten down",
+        "ground shock",
+        "draconize"
+      ],
+      "examples": [
+        "My Fire moves are super effective against Rock types, like Molten Down"
+      ],
+      "params": [
+        {
+          "id": "rules",
+          "label": "Matchups to change: my move type > target type = new multiplier (separate several with ;)",
+          "control": "text",
+          "default": "Poison > Steel = 2",
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only the part of the matchup that comes from the chosen target type is replaced: a second type on the target still counts",
+        "Only the first matching matchup in the list is used",
+        "Does not work while my ability is being ignored (for example by a Mold Breaker foe)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "rules"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 26
+    },
+    {
+      "id": "block.on-crit-stat-boost-lowest",
+      "className": "OnCritStatBoostLowestAbAttr",
+      "label": "Raise my lowest stats when I land a critical hit",
+      "summary": "When my move lands a critical hit, raise my 3 lowest stats by 1 stage each. Works once per turn. Example: 3 stats, 1 stage.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "home run",
+        "crit boost",
+        "critical hit boost",
+        "boost weakest stats",
+        "lowest stats up",
+        "reward crits"
+      ],
+      "examples": [
+        "Landing a critical hit raises my three lowest stats by one stage, once per turn"
+      ],
+      "params": [
+        {
+          "id": "n",
+          "label": "How many of my lowest stats to raise (1-5)",
+          "control": "number",
+          "default": 3,
+          "editable": true,
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "stages",
+          "label": "Number of stages to change each of them by (1-6, negative lowers)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Works only once per turn for each Pokemon",
+        "Needs a target, and the first hit that target took this turn must have been a critical hit",
+        "The five stats are ranked by their current stage (Attack, Defense, Sp. Atk, Sp. Def, Speed); ties keep that order"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "n",
+          "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package, justified (see the header). Only user: Home Run (n = 3, stages = 1), nothing to bind. Suspected game bugs, NOT fixed: (1) the once-per-turn memory is a Symbol property written on the Pokemon object with the battle's turn NUMBER, which is never cleared, so a Pokemon that landed a crit on turn 3 of one battle is blocked on turn 3 of the next battle (a party member survives between waves); (2) the crit is read from the TARGET's `attacksReceived[0]`, the first hit the target took this turn, which in doubles or after an ally hit first may be somebody else's hit; (3) a dead code block reads `attacksReceived[0]` of the holder and does nothing. The L1 grid and the L2 twin cannot see the turn memory, so the B10 test (test/tests/elite-redux/decomp/B10/on-crit-stat-boost-lowest.test.ts) drives canApply and apply on the original and the rebuild.",
+      "uses": 1
+    },
+    {
+      "id": "block.on-faint-effect",
+      "className": "OnFaintEffectAbAttr",
+      "label": "Do something when I faint",
+      "summary": "When I faint: Set the weather: Sandstorm",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.faint",
+      "whenLabel": "When I faint",
+      "synonyms": [
+        "last words",
+        "aftermath",
+        "revenge when knocked out",
+        "curse the attacker",
+        "guilt trip",
+        "ill will",
+        "haunted spirit",
+        "vengeful spirit"
+      ],
+      "examples": [
+        "When I am knocked out, curse the attacker unless it is a Ghost type",
+        "Set the weather: Sandstorm",
+        "Hurt the Pokemon that knocked me out: 25% of its max HP",
+        "Change the stats of the Pokemon that knocked me out: Attack -2, Sp. Atk -2; its allies: Attack -1, Sp. Atk -1",
+        "Put a lasting effect on the Pokemon that knocked me out: Cursed, not against Ghost",
+        "Set a hazard on the foe's side: Stealth rock x1",
+        "Drain the PP of the move that knocked me out"
+      ],
+      "params": [
+        {
+          "id": "effect",
+          "label": "What happens when I faint (one sentence, written like the examples)",
+          "control": "text",
+          "default": "Set the weather: Sandstorm",
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Setting the weather or terrain only works if the field accepts it (a stronger weather cannot be replaced)",
+        "Hurting the attacker needs a known attacker and move, and does nothing to a Pokemon that blocks indirect damage (like Magic Guard)",
+        "Anything aimed at the attacker needs a living attacker; a lasting effect skips the types you list",
+        "Draining PP needs a damaging move that is in the attacker's moveset with PP left",
+        "Nothing happens in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "effect"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package, justified (see the header). Users (5 attrs): Haunted Spirit (cursed attacker, not against Ghost), Vengeful Spirit (the same), Guilt Trip (attacker Attack -2 and Sp. Atk -2, its allies -1 each), Ill Will (drain PP) and Cursed Spirit (inherits the Haunted Spirit part); nothing to bind. The text codec round-trips every live payload (checked by the B10 test, test/tests/elite-redux/decomp/B10/on-faint-effect.test.ts). set-weather, set-terrain, set-hazard are not used by a live ability today but are declared and covered by the codec test. Oddities, not fixed: a lasting effect written without 'for N turns' lasts until lifted (the class treats a missing number as 0); the hazard payload is added to the side opposite the fainting Pokemon even when the attacker is on the same side as the fainter.",
+      "uses": 5
+    },
+    {
+      "id": "block.on-opponent-stat-raise",
+      "className": "OnOpponentStatRaiseAbAttr",
+      "label": "Copy a foe's stat boost onto myself",
+      "summary": "When a foe raises a stat, I raise the same stat by the same number of stages. A boost I copied is never copied again. Example: a foe's +2 Defense gives me +2 Defense.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.foe-raised-stat",
+      "whenLabel": "When a foe raises a stat",
+      "synonyms": [
+        "egoist",
+        "opportunist",
+        "copy stat boosts",
+        "mirror boosts",
+        "steal the boost",
+        "me too"
+      ],
+      "examples": [
+        "When the opposing Pokemon raises its Attack by 2, my Attack goes up by 2 as well"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only a boost the game allows to be copied counts (a boost that was itself a copy does not)",
+        "Nothing happens in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package, justified: the library has no effect 'raise the same stat by the same stages as the foe just raised' (request R-B10-11 in requests/B10.md); the WHEN `event.foe-raised-stat` already exists and provides the stat and stages slots. Only user: Egoist, nothing to bind. Same hook as vanilla Opportunist (StatStageChangeCopyAbAttr), so the dispatcher's attr-level conditions apply as usual.",
+      "uses": 1
+    },
+    {
+      "id": "block.on-opponent-stat-raise-scripted-move",
+      "className": "OnOpponentStatRaiseScriptedMoveAbAttr",
+      "label": "Strike back with a move when a foe raises a stat",
+      "summary": "When a foe raises a stat, I use the move Hyper Beam at 150 power on a foe at once. It never misses and has no recharge. Example: a 150 power Hyper Beam.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.foe-raised-stat",
+      "whenLabel": "When a foe raises a stat",
+      "synonyms": [
+        "retribution blow",
+        "punish stat boosts",
+        "counter boosts",
+        "answer a boost",
+        "free attack on boost"
+      ],
+      "examples": [
+        "When the opposing Pokemon boosts its stats, I fire a 150 power Hyper Beam at it, like Retribution Blow"
+      ],
+      "params": [
+        {
+          "id": "move",
+          "label": "Move to use, with its power if you want to change it (for example: Hyper Beam at 150 power)",
+          "control": "text",
+          "default": "Hyper Beam at 150 power",
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one foe must still be standing",
+        "The move goes at the first foe still standing, not necessarily the one that raised its stat",
+        "The move is a free extra move: it uses no PP, never misses and leaves me with no recharge turn",
+        "Nothing happens in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "move"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package, justified (see the header). Only user: Retribution Blow (Hyper Beam at 150 power), nothing to bind. Oddity, not fixed: unlike its switch-out sibling this attr never checks that the holder is still standing. The move name is typed as text because the move list has hundreds of entries; the codec rejects a name that is not a move.",
+      "uses": 1
+    },
+    {
+      "id": "block.on-opponent-switch-out",
+      "className": "OnOpponentSwitchOutAbAttr",
+      "label": "Strike a foe with a move as it switches out",
+      "summary": "When a foe switches out, I use the move Pursuit on it before it leaves. Example: a 20 power Pursuit.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.foe-switches-out",
+      "whenLabel": "When a foe switches out",
+      "synonyms": [
+        "tag",
+        "super sniper",
+        "pursuit",
+        "punish switching",
+        "hit the foe that leaves",
+        "catch switchers"
+      ],
+      "examples": [
+        "When the opposing Pokemon switches out, I hit it with a 20 power Pursuit, like Super Sniper"
+      ],
+      "params": [
+        {
+          "id": "move",
+          "label": "Move to use, with its power if you want to change it (for example: Pursuit at 20 power)",
+          "control": "text",
+          "default": "Pursuit",
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The foe that is leaving must not have fainted",
+        "The move is a free extra move: it uses no PP"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "move"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.post-damage-force-switch",

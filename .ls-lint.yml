@@ -26,9 +26,15 @@ ls:
    # Ability studio declarations are named after the AbAttr class they describe (decl/<batch>/<ClassName>.decl.ts).
    src/data/elite-redux/ability-studio/decl:
       <<: *src
+      # One folder per decomposition batch (B01 .. B20).
+      .dir: kebab-case | regex:@types | regex:B[0-9][0-9]
       .ts: pascalcase | kebab-case
       .*.ts: pascalcase | kebab-case
    test: *src
+   # Per-batch decomposition tests live in test/tests/elite-redux/decomp/B01 .. B20.
+   test/tests/elite-redux/decomp:
+      <<: *src
+      .dir: kebab-case | regex:@types | regex:B[0-9][0-9]
 ignore:
    - .pnpm-store
    - node_modules

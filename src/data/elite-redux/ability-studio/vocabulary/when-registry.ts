@@ -263,6 +263,9 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
   event("event.foe-raised-stat", "StatStageChangeCopyAbAttr", [H, ST, SG], "When a foe raises a stat", "Stat stages", {
     synonyms: ["opportunist", "copy boost", "foe boosted"],
   }),
+  event("event.foe-switches-out", "OnOpponentSwitchOutAbAttr", [H, O], "When a foe switches out", "Entry and exit", {
+    synonyms: ["pursuit", "foe leaves the field", "opponent withdraws", "punish switching", "tag"],
+  }),
 
   // ---- Move flow ------------------------------------------------------------------------
   calc(
@@ -647,6 +650,17 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     },
   ),
   calc(
+    "calc.my-type-chart-override",
+    "OffensiveTypeChartOverrideAbAttr",
+    [H],
+    "While the game works out how well my attacks match the target's types",
+    "Type",
+    "typeMultiplier",
+    {
+      synonyms: ["super effective against", "hit immune types", "change type matchup", "corrosion", "molten down"],
+    },
+  ),
+  calc(
     "calc.ability-bypass",
     "MoveAbilityBypassAbAttr",
     [H, M],
@@ -981,6 +995,7 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
       "IgnoreGenderInfatuationAbAttr",
       "IgnoreProtectByFlagAbAttr",
       "IgnoreProtectOnContactAbAttr",
+      "IgnoreResistancesAbAttr",
       "OverruleCritAbAttr",
       "SpreadTargetByFlagAbAttr",
       "StealthRockImmunityAbAttr",
