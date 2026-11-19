@@ -58,7 +58,10 @@ function applyGateParams(
 
 function isEmptyAll(node: unknown): boolean {
   return (
-    typeof node === "object" && node !== null && Array.isArray((node as Json).all) && (node as Json).all.length === 0
+    typeof node === "object"
+    && node !== null
+    && Array.isArray((node as Json).all)
+    && ((node as Json).all as unknown[]).length === 0
   );
 }
 
@@ -121,7 +124,11 @@ describe("tools - dump composition builder data", () => {
         continue;
       }
       const { decl } = module;
-      const effectDef = effectsById.get(decl.effect.id);
+      const declEffect = decl.effect;
+      if (declEffect === undefined) {
+        continue;
+      }
+      const effectDef = effectsById.get(declEffect.id);
       const whenDef = whensById.get(decl.when);
       if (effectDef === undefined || whenDef === undefined) {
         continue;
@@ -132,7 +139,7 @@ describe("tools - dump composition builder data", () => {
         attrIndex: site.attrIndex,
         className: site.className,
         when: decl.when,
-        effect: decl.effect.id,
+        effect: declEffect.id,
       };
       if (whenDef.composable !== true || effectDef.implemented !== true) {
         gates[key] = {
@@ -177,7 +184,7 @@ describe("tools - dump composition builder data", () => {
         continue;
       }
       const doParams: Json = {};
-      for (const id of decl.effect.params) {
+      for (const id of declEffect.params) {
         if (params[id] !== undefined) {
           doParams[id] = params[id];
         }
@@ -186,7 +193,7 @@ describe("tools - dump composition builder data", () => {
         ...base,
         unpackable: true,
         if: ifList,
-        do: [{ block: decl.effect.id, ...(Object.keys(doParams).length > 0 ? { params: doParams } : {}) }],
+        do: [{ block: declEffect.id, ...(Object.keys(doParams).length > 0 ? { params: doParams } : {}) }],
         guards: decl.guards,
         params,
         paramPaths: Object.fromEntries(decl.params.filter(p => p.path !== undefined).map(p => [p.id, p.path])),

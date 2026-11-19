@@ -1648,7 +1648,7 @@
     const details = compatible
       ? [parameters, effect.summary || effect.sourceOwner].filter(Boolean).join(" · ")
       : reason;
-    return `<button type="button" data-as-action="choose-component-effect" data-as-id="${effect.source.abilityId}" data-as-index="${effect.source.attrIndex}" data-as-type="${esc(effect.source.attrType)}"${compatible ? "" : ` disabled title="${esc(reason)}"`}><b>${esc(effect.label)}</b><span>${esc(ability.name)} #${ability.id}</span><small>${esc(details)}</small></button>`;
+    return `<button type="button" data-as-action="choose-component-effect" data-as-id="${effect.source.abilityId}" data-as-index="${effect.source.attrIndex}" data-as-type="${esc(effect.source.attrType)}"${compatible ? "" : ` disabled title="${esc(reason)}"`}><b>${esc(effect.label)}</b>${packageBadgeHtml(effect.source.attrType)}<span>${esc(ability.name)} #${ability.id}</span><small>${esc(details)}</small></button>`;
   }
 
   function renderComponentPartSearch(input, results, entry, query) {
@@ -2256,6 +2256,7 @@
           + entry.includes.length
           + entry.mechanics.length
           + entry.componentRules.length
+          + (Array.isArray(entry.composition) ? entry.composition.length : 0)
           + entry.modifiers.length
           > 0,
         "At least one mechanic is defined",

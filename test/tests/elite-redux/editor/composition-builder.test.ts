@@ -643,6 +643,66 @@ describe("the three-column builder", () => {
     expect(packageRow.hasAttribute("disabled")).toBe(true);
   });
 
+  it("badges a whole mechanic in the classic effect search too, so nobody takes one for a primitive", () => {
+    const copy = { abilityId: 5217, attrIndex: 0, attrType: "PostSummonCopyAbilityAbAttr" };
+    const weather = { abilityId: 5218, attrIndex: 0, attrType: "PostSummonWeatherChangeAbAttr" };
+    const component = (source: typeof copy, label: string, owner: string) => ({
+      id: source.abilityId,
+      name: `${label} probe`,
+      rules: [
+        {
+          id: `probe-${source.abilityId}`,
+          label,
+          summary: label,
+          scope: "primitive",
+          parameters: [],
+          source,
+          hook: {
+            id: "PostSummonAbAttr",
+            label: "On entry",
+            mode: "event",
+            context: ["holder"],
+            effectContext: ["holder"],
+            source,
+          },
+          conditions: [],
+          effects: [
+            {
+              id: `e-${source.abilityId}`,
+              label,
+              summary: label,
+              scope: "primitive",
+              kind: "effect",
+              sourceOwner: owner,
+              parameters: [],
+              source,
+            },
+          ],
+        },
+      ],
+    });
+    const entry = {
+      ...v2Entry(),
+      componentRules: [{ key: "entry", hook: copy, chance: 100, conditions: [], effects: [] }],
+    };
+    initStudio(
+      { "block-test": entry },
+      {
+        components: [
+          component(copy, "Copy a foe's ability", copy.attrType),
+          component(weather, "Change the weather", weather.attrType),
+        ],
+      },
+    );
+    const input = q<HTMLInputElement>("[data-as-mechanic-search][data-as-component-part='effect']");
+    studio.handleClick({ target: input });
+    input.value = "a";
+    studio.handleInput(input);
+    const rows = [...root.querySelectorAll("[data-as-action='choose-component-effect']")];
+    const byType = (type: string) => rows.find(row => row.getAttribute("data-as-type") === type);
+    expect(byType(copy.attrType)?.querySelector(".cb-badge-package")?.textContent).toBe("Works as one piece");
+  });
+
   it("Escape closes the picker and Enter picks the first usable result", () => {
     initStudio({ "block-test": v2Entry() });
     click("[data-cb-action='add-rule']");

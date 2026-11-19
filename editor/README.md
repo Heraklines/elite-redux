@@ -63,7 +63,24 @@ node scripts/gen-editor-data.mjs
 # tables after the full init chain — this is what fixed the missing-starter
 # gap; the old egg-move-key roster dropped e.g. Pikachu):
 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/tools/dump-editor-data.test.ts
+
+# vocabulary.json + blocks.json + gates.json (the Ability Studio block builder:
+# triggers, conditions, effects, safety rules, one entry per class declaration,
+# and the library form of each legacy gate for "Unpack"). Small, committed, and
+# read straight from the hand-written declarations; a test pins their hash to
+# the game vocabulary, so a stale file fails CI:
+ER_SCENARIO=1 npx vitest run test/tests/elite-redux/tools/dump-composition-data.test.ts
 ```
+
+### Ability Studio block builder
+
+`composition-builder.js` is the WHEN / IF / DO builder for the V2 `composition`
+field (abilities that open as version 1 keep opening and saving byte-for-byte
+until someone clicks **Upgrade to blocks**, which only adds `composition: []`).
+It loads before `ability-studio.js`; without the three data files above the
+studio simply keeps the classic builder. The golden recipes can be authored and
+battle-tested through the real editor in Chrome with
+`ER_BROWSER=1 npx vitest run test/tests/elite-redux/editor/composition-builder.browser.test.ts`.
 
 The `Refresh ER Editor` GitHub workflow now runs these generators and validates
 their cross-references on every push to `feat/elite-redux-port`, then deploys a

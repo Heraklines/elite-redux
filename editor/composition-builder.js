@@ -210,6 +210,11 @@
     const moveNames = Array.isArray(opts.moveNames) ? opts.moveNames : [];
 
     const slotLabel = slot => slotsById.get(slot)?.label.toLowerCase() ?? slot;
+    // For display only (the validation messages must stay identical to the game's, which lower-case everything).
+    const slotDisplay = slot => {
+      const label = slotsById.get(slot)?.label ?? slot;
+      return label.length > 1 && label[1] === label[1].toLowerCase() ? label[0].toLowerCase() + label.slice(1) : label;
+    };
 
     // ---- plain-language rendering ----
 
@@ -342,7 +347,7 @@
         if (missing.length > 0) {
           return {
             ok: false,
-            reason: `needs ${missing.map(slotLabel).join(" and ")}, which "${when.label}" does not provide`,
+            reason: `needs ${missing.map(slotDisplay).join(" and ")}, which "${when.label}" does not provide`,
           };
         }
       }
@@ -360,7 +365,7 @@
       if (missing.length > 0) {
         return {
           ok: false,
-          reason: `needs ${missing.map(slotLabel).join(" and ")}, which "${when.label}" does not provide`,
+          reason: `needs ${missing.map(slotDisplay).join(" and ")}, which "${when.label}" does not provide`,
         };
       }
       for (const guardId of def.guards ?? []) {
@@ -369,7 +374,7 @@
         if (guardMissing.length > 0) {
           return {
             ok: false,
-            reason: `its safety rule needs ${guardMissing.map(slotLabel).join(" and ")}, which "${when.label}" does not provide`,
+            reason: `its safety rule needs ${guardMissing.map(slotDisplay).join(" and ")}, which "${when.label}" does not provide`,
           };
         }
       }
@@ -854,6 +859,7 @@
       guard: id => guards.get(id),
       block: className => blocksByClass.get(className),
       slotLabel,
+      slotDisplay,
       defaultParams,
       renderLabel,
       describeCondition,
@@ -1142,7 +1148,9 @@
     const when = model.when(rule.when?.block);
     const picker =
       ui.picker && ui.picker.rule === ruleIndex && ui.picker.part === "when" ? pickerHtml(model, rule) : "";
-    const provides = when ? when.provides.filter(slot => slot !== "simulated").map(slot => model.slotLabel(slot)) : [];
+    const provides = when
+      ? when.provides.filter(slot => slot !== "simulated").map(slot => model.slotDisplay(slot))
+      : [];
     const kindLabel = when ? (when.kind === "calc" ? "While the game calculates…" : "Something happens") : "";
     const errors = (errorMap.get("when") || [])
       .map(message => `<p class="cb-error">${esc(friendly(model, message))}</p>`)
