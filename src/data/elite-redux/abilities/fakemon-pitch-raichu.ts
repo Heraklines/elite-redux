@@ -19,6 +19,7 @@ import {
 import type { AbBuilder } from "#abilities/ability";
 import type { Battle } from "#app/battle";
 import { globalScene } from "#app/global-scene";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { GroundedEntryHazardImmunityAbAttr } from "#data/elite-redux/archetypes/entry-hazard-immunity";
 import { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
@@ -135,8 +136,8 @@ export function partnerHasRaichuBoostCondition(partner: Pokemon): boolean {
   return (
     floatingTag?.sourceMove === MoveId.MAGNET_RISE
     || magneticFluxTarget
-    || partner.hasAbility(AbilityId.PLUS)
-    || partner.hasAbility(AbilityId.MINUS)
+    || abilityQuery(partner, ENGINE_QUERY.PLUS_PAIRING)
+    || abilityQuery(partner, ENGINE_QUERY.MINUS_PAIRING)
   );
 }
 

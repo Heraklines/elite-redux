@@ -193,7 +193,11 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { GroundedTag } from "#data/battler-tags";
 import { allAbilities, allMoves } from "#data/data-lists";
-import { ABILITY_STUDIO_RUNTIME_CAPABILITIES } from "#data/elite-redux/ability-studio/runtime-capabilities";
+import {
+  ABILITY_STUDIO_RUNTIME_CAPABILITIES,
+  abilityQuery,
+  ENGINE_QUERY,
+} from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { AbilityStudioRuntimeCapabilityAbAttr } from "#data/elite-redux/ability-studio/runtime-components";
 import { OffensiveTypeChartOverrideAbAttr } from "#data/elite-redux/archetypes/offensive-type-chart-override";
 import { PostWeatherMoveFollowUpAbAttr } from "#data/elite-redux/archetypes/post-weather-move-follow-up";
@@ -390,7 +394,7 @@ export function initAbilities() {
       .attr(PostSummonStatStageChangeAbAttr, [Stat.ATK], -1, false, true)
       .build(),
     new AbBuilder(AbilityId.SHADOW_TAG, 3) //
-      .attr(ArenaTrapAbAttr, (_user, target) => !target.hasAbility(AbilityId.SHADOW_TAG))
+      .attr(ArenaTrapAbAttr, (_user, target) => !abilityQuery(target, ENGINE_QUERY.SHADOW_TAG_TRAP_IMMUNITY))
       .build(),
     new AbBuilder(AbilityId.ROUGH_SKIN, 3) //
       .attr(PostDefendContactDamageAbAttr, 8)
@@ -551,7 +555,11 @@ export function initAbilities() {
           // Multi-battle (was `double`, dead in triples): activate if ANY ally has Plus/Minus.
           // `getBattlerCount() > 1` is byte-identical to `double` for singles/doubles.
           globalScene.currentBattle.getBattlerCount() > 1
-          && p.getAllies().some(ally => [AbilityId.PLUS, AbilityId.MINUS].some(a => ally.hasAbility(a))),
+          && p
+            .getAllies()
+            .some(
+              ally => abilityQuery(ally, ENGINE_QUERY.PLUS_PAIRING) || abilityQuery(ally, ENGINE_QUERY.MINUS_PAIRING),
+            ),
         StatMultiplierAbAttr,
         Stat.SPATK,
         1.5,
@@ -563,7 +571,11 @@ export function initAbilities() {
           // Multi-battle (was `double`, dead in triples): activate if ANY ally has Plus/Minus.
           // `getBattlerCount() > 1` is byte-identical to `double` for singles/doubles.
           globalScene.currentBattle.getBattlerCount() > 1
-          && p.getAllies().some(ally => [AbilityId.PLUS, AbilityId.MINUS].some(a => ally.hasAbility(a))),
+          && p
+            .getAllies()
+            .some(
+              ally => abilityQuery(ally, ENGINE_QUERY.PLUS_PAIRING) || abilityQuery(ally, ENGINE_QUERY.MINUS_PAIRING),
+            ),
         StatMultiplierAbAttr,
         Stat.SPATK,
         1.5,
@@ -1335,20 +1347,22 @@ export function initAbilities() {
     new AbBuilder(AbilityId.AURA_BREAK, 6) //
       .ignorable()
       .conditionalAttr(
-        _pokemon => globalScene.getField(true).some(p => p.hasAbility(AbilityId.DARK_AURA)),
+        _pokemon => globalScene.getField(true).some(p => abilityQuery(p, ENGINE_QUERY.DARK_AURA_FIELD)),
         FieldMoveTypePowerBoostAbAttr,
         PokemonType.DARK,
         9 / 16,
       )
       .conditionalAttr(
-        _pokemon => globalScene.getField(true).some(p => p.hasAbility(AbilityId.FAIRY_AURA)),
+        _pokemon => globalScene.getField(true).some(p => abilityQuery(p, ENGINE_QUERY.FAIRY_AURA_FIELD)),
         FieldMoveTypePowerBoostAbAttr,
         PokemonType.FAIRY,
         9 / 16,
       )
       .conditionalAttr(
         _pokemon =>
-          globalScene.getField(true).some(p => p.hasAbility(AbilityId.DARK_AURA) || p.hasAbility(AbilityId.FAIRY_AURA)),
+          globalScene
+            .getField(true)
+            .some(p => abilityQuery(p, ENGINE_QUERY.DARK_AURA_FIELD) || abilityQuery(p, ENGINE_QUERY.FAIRY_AURA_FIELD)),
         PostSummonMessageAbAttr,
         (pokemon: Pokemon) =>
           i18next.t("abilityTriggers:postSummonAuraBreak", { pokemonNameWithAffix: getPokemonNameWithAffix(pokemon) }),
@@ -1718,7 +1732,7 @@ export function initAbilities() {
         if (move.type === PokemonType.DRAGON) {
           powerMult.value *= 0.5;
         }
-        if (pokemon.hasAbility(AbilityId.LEVITATE) || pokemon.isOfType(PokemonType.FLYING)) {
+        if (abilityQuery(pokemon, ENGINE_QUERY.LEVITATE_FLOAT) || pokemon.isOfType(PokemonType.FLYING)) {
           return;
         }
         if (move.id === MoveId.MISTY_EXPLOSION) {
@@ -2413,7 +2427,8 @@ const sheerForceHitDisableAbCondition: AbAttrCondition = (pokemon: Pokemon): boo
 
   /** `true` if the last move's chance is above 0 and the last attacker's ability is sheer force */
   const sheerForceAffected =
-    allMoves[lastReceivedAttack.move].chance >= 0 && lastAttacker.hasAbility(AbilityId.SHEER_FORCE);
+    allMoves[lastReceivedAttack.move].chance >= 0
+    && abilityQuery(lastAttacker, ENGINE_QUERY.SHEER_FORCE_SECONDARY_EFFECTS);
 
   return !sheerForceAffected;
 };

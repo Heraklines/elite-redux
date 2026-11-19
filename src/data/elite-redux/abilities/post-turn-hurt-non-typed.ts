@@ -36,6 +36,7 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { allAbilities } from "#data/data-lists";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { AbilityId } from "#enums/ability-id";
 import { HitResult } from "#enums/hit-result";
 import type { PokemonType } from "#enums/pokemon-type";
@@ -188,7 +189,7 @@ export class PostTurnHurtNonTypedAbAttr extends PostTurnAbAttr {
       }
       const amount = toDmgValue(opp.getMaxHp() * this.damageFraction);
       // Poison Heal holders RECOVER the fraction instead of taking it.
-      if (this.poisonHealRecovers && opp.hasAbility(AbilityId.POISON_HEAL)) {
+      if (this.poisonHealRecovers && abilityQuery(opp, ENGINE_QUERY.POISON_HEAL_RECOVERY)) {
         if (!opp.isFullHp()) {
           globalScene.phaseManager.unshiftNew(
             "PokemonHealPhase",

@@ -1,5 +1,12 @@
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { allAbilities } from "#data/data-lists";
+import {
+  abilityIsById,
+  abilityQuery,
+  abilityQueryById,
+  ENGINE_QUERY,
+} from "#data/elite-redux/ability-studio/runtime-capabilities";
 import type { SpeciesFormChange } from "#data/pokemon-forms";
 import { AbilityId } from "#enums/ability-id";
 import { Challenges } from "#enums/challenges";
@@ -196,7 +203,7 @@ export class MeloettaFormChangePostMoveTrigger extends SpeciesFormChangePostMove
       return false;
     }
     // Meloetta will not transform if it has the ability Sheer Force when using Relic Song
-    if (pokemon.hasAbility(AbilityId.SHEER_FORCE)) {
+    if (abilityQuery(pokemon, ENGINE_QUERY.SHEER_FORCE_SECONDARY_EFFECTS)) {
       return false;
     }
     return super.canChange(pokemon);
@@ -265,7 +272,7 @@ export class SpeciesFormChangeWeatherTrigger extends SpeciesFormChangeTrigger {
     return (
       !isAbilitySuppressed
       && !isWeatherSuppressed
-      && pokemon.hasAbility(this.ability)
+      && abilityQueryById(pokemon, this.ability)
       && this.weathers.includes(currentWeather)
     );
   }
@@ -296,12 +303,14 @@ export class SpeciesFormChangeRevertWeatherFormTrigger extends SpeciesFormChange
    * @returns `true` if the Pokemon will revert to its original form, `false` otherwise
    */
   canChange(pokemon: Pokemon): boolean {
-    if (pokemon.hasAbility(this.ability, false, true)) {
+    if (abilityQueryById(pokemon, this.ability, { canApply: false, ignoreOverride: true })) {
       const currentWeather = globalScene.arena.weather?.weatherType ?? WeatherType.NONE;
       const isWeatherSuppressed = globalScene.arena.weather?.isEffectSuppressed();
       const isAbilitySuppressed = pokemon.summonData.abilitySuppressed;
       const summonDataAbility = pokemon.summonData.ability;
-      const isAbilityChanged = summonDataAbility !== this.ability && summonDataAbility !== AbilityId.NONE;
+      const isAbilityChanged =
+        summonDataAbility !== AbilityId.NONE
+        && (summonDataAbility === undefined || !abilityIsById(allAbilities[summonDataAbility], this.ability, pokemon));
 
       if (this.weathers.includes(currentWeather) || isWeatherSuppressed || isAbilitySuppressed || isAbilityChanged) {
         return true;

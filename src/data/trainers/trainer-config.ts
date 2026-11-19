@@ -5,6 +5,7 @@ import { signatureSpecies } from "#balance/signature-species";
 import { tmSpecies } from "#balance/tm-species-map";
 import { modifierTypes } from "#data/data-lists";
 import { doubleBattleDialogue } from "#data/double-battle-dialogue";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { Gender } from "#data/gender";
 import type { PokemonSpecies, PokemonSpeciesFilter } from "#data/pokemon-species";
 import { AbilityId } from "#enums/ability-id";
@@ -5477,7 +5478,10 @@ export const trainerConfigs: TrainerConfigs = {
     .setGenModifiersFunc(party => {
       const ursaluna = party[3];
       const modifiers: PokemonHeldItemModifier[] = [];
-      if (ursaluna?.hasAbility(AbilityId.GUTS, false, true)) {
+      if (
+        ursaluna != null
+        && abilityQuery(ursaluna, ENGINE_QUERY.GUTS_STATUS_BOOST, { canApply: false, ignoreOverride: true })
+      ) {
         // If ursaluna spawned with guts, give it flame orb
         const modifier = modifierTypes
           .FLAME_ORB()
@@ -5579,7 +5583,7 @@ export const trainerConfigs: TrainerConfigs = {
       const bird = party[1]; // Rival's second Pokemon is always a bird Pokemon
       switch (bird.species.speciesId) {
         case SpeciesId.SWELLOW:
-          if (bird.hasAbility(AbilityId.GUTS, false, true)) {
+          if (abilityQuery(bird, ENGINE_QUERY.GUTS_STATUS_BOOST, { canApply: false, ignoreOverride: true })) {
             const modifier = modifierTypes
               .FLAME_ORB()
               .withIdFromFunc(modifierTypes.FLAME_ORB)
@@ -5615,7 +5619,7 @@ export const trainerConfigs: TrainerConfigs = {
       const bird = party[1]; // Rival's second Pokemon is always a bird Pokemon
       switch (bird.species.speciesId) {
         case SpeciesId.SWELLOW:
-          if (bird.hasAbility(AbilityId.GUTS, false, true)) {
+          if (abilityQuery(bird, ENGINE_QUERY.GUTS_STATUS_BOOST, { canApply: false, ignoreOverride: true })) {
             const modifier = modifierTypes
               .FLAME_ORB()
               .withIdFromFunc(modifierTypes.FLAME_ORB)

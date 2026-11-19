@@ -55,6 +55,12 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { CommonBattleAnim, MoveChargeAnim } from "#data/battle-anims";
 import { allAbilities, allMoves } from "#data/data-lists";
+import {
+  abilityHasEngineQuery,
+  abilityQuery,
+  abilityQueryById,
+  ENGINE_QUERY,
+} from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { healEntranceFromConfusion } from "#data/elite-redux/ability-upgrades/requested-field-effects";
 import { recordDirectCoopCommonAnimPresentation } from "#data/elite-redux/coop/coop-common-anim-presentation";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
@@ -2596,7 +2602,7 @@ export class TruantTag extends AbilityBattlerTag {
   }
 
   lapse(pokemon: Pokemon, lapseType: BattlerTagLapseType): boolean {
-    if (!pokemon.hasAbility(AbilityId.TRUANT)) {
+    if (!abilityQuery(pokemon, ENGINE_QUERY.TRUANT_LOAFING)) {
       // remove tag if mon lacks ability
       return super.lapse(pokemon, lapseType);
     }
@@ -2609,7 +2615,7 @@ export class TruantTag extends AbilityBattlerTag {
     }
 
     // Interrupt move usage in favor of slacking off
-    const passive = pokemon.getAbility().id !== AbilityId.TRUANT;
+    const passive = !abilityHasEngineQuery(pokemon.getAbility(), ENGINE_QUERY.TRUANT_LOAFING, pokemon);
     (globalScene.phaseManager.getCurrentPhase() as MovePhase).cancel();
     // TODO: Ability displays should be handled by the ability
     globalScene.phaseManager.queueAbilityDisplay(pokemon, passive, true);
@@ -2641,7 +2647,7 @@ export class SlowStartTag extends AbilityBattlerTag {
   }
 
   lapse(pokemon: Pokemon, lapseType: BattlerTagLapseType): boolean {
-    if (!pokemon.hasAbility(this.ability)) {
+    if (!abilityQueryById(pokemon, this.ability)) {
       this.turnCount = 1;
     }
 

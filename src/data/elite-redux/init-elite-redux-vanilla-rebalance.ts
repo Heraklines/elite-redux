@@ -113,6 +113,7 @@ import type { Ability } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import {
   AllyHigherStatMultiplierAbAttr,
   BallRecoveryAbAttr,
@@ -629,7 +630,9 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
         new ProvenanceBypassSpeedChanceAbAttr(30, "quick-draw:proc"),
         new MovePowerBoostAbAttr(
           (user, target) =>
-            hasCommandAbilityProvenance(user, "quick-draw:proc") && (target?.hasAbility(AbilityId.QUICK_DRAW) ?? false),
+            hasCommandAbilityProvenance(user, "quick-draw:proc")
+            && target != null
+            && abilityQuery(target, ENGINE_QUERY.QUICK_DRAW_TARGET),
           2,
         ),
       );
@@ -1553,14 +1556,18 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
     AbilityId.PLUS,
     ab => {
       ab.attrs = ab.attrs.filter(a => !(a instanceof StatMultiplierAbAttr));
-      ab.attrs.push(new MovePowerBoostAbAttr(user => user.getAllies().some(a => a.hasAbility(AbilityId.MINUS)), 2));
+      ab.attrs.push(
+        new MovePowerBoostAbAttr(user => user.getAllies().some(a => abilityQuery(a, ENGINE_QUERY.MINUS_PAIRING)), 2),
+      );
     },
   ],
   [
     AbilityId.MINUS,
     ab => {
       ab.attrs = ab.attrs.filter(a => !(a instanceof StatMultiplierAbAttr));
-      ab.attrs.push(new MovePowerBoostAbAttr(user => user.getAllies().some(a => a.hasAbility(AbilityId.PLUS)), 2));
+      ab.attrs.push(
+        new MovePowerBoostAbAttr(user => user.getAllies().some(a => abilityQuery(a, ENGINE_QUERY.PLUS_PAIRING)), 2),
+      );
     },
   ],
 

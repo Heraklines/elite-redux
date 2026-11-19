@@ -24,8 +24,9 @@ import {
   type TypeMultiplierAbAttrParams,
 } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
-import { AbilityId } from "#enums/ability-id";
+import type { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -70,7 +71,7 @@ export class TelekineticStruggleOnEntryAbAttr extends PostSummonAbAttr {
       !opponent
       || opponent.isOfType(PokemonType.PSYCHIC)
       || opponent.isOfType(PokemonType.DARK)
-      || opponent.hasAbility(AbilityId.HEAVY_METAL)
+      || abilityQuery(opponent, ENGINE_QUERY.HEAVY_METAL_WEIGHT)
       || (superheavyId !== undefined && opponent.hasAbility(superheavyId))
     ) {
       return;

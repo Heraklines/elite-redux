@@ -42,7 +42,11 @@ import {
   // biome-ignore lint/suspicious/noImportCycles: Signature hooks run at the universal accuracy/heal/hazard chokepoints.
 } from "#data/elite-redux/abilities/newcomer-signature-mechanics";
 import { erRendezvousPowerMultiplier } from "#data/elite-redux/abilities/rendezvous";
-import { ABILITY_STUDIO_RUNTIME_CAPABILITIES } from "#data/elite-redux/ability-studio/runtime-capabilities";
+import {
+  ABILITY_STUDIO_RUNTIME_CAPABILITIES,
+  abilityQuery,
+  ENGINE_QUERY,
+} from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { hasCommandAbilityProvenance } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import { getMoveHpCostFraction } from "#data/elite-redux/ability-upgrades/attrs/move-hp-cost";
 import { HitMultiplierAbAttr } from "#data/elite-redux/archetypes/hit-multiplier";
@@ -547,7 +551,11 @@ export abstract class Move implements Localizable {
         }
         break;
       case PokemonType.DARK:
-        if (user.hasAbility(AbilityId.PRANKSTER) && this.category === MoveCategory.STATUS && user.isOpponent(target)) {
+        if (
+          abilityQuery(user, ENGINE_QUERY.PRANKSTER_DARK_IMMUNITY)
+          && this.category === MoveCategory.STATUS
+          && user.isOpponent(target)
+        ) {
           return true;
         }
         break;
@@ -1274,7 +1282,10 @@ export abstract class Move implements Localizable {
         if (biomeRule.accuracyMult != null) {
           biomeAcc *= biomeRule.accuracyMult;
         }
-        if (biomeRule.darkness && !globalScene.getField(true).some(p => p?.hasAbility(AbilityId.ILLUMINATE))) {
+        if (
+          biomeRule.darkness
+          && !globalScene.getField(true).some(p => p != null && abilityQuery(p, ENGINE_QUERY.ILLUMINATE_DARK_ACCURACY))
+        ) {
           biomeAcc *= 0.9;
         }
         if (biomeRule.groundedAccuracyMult != null && user.isGrounded()) {
@@ -3559,7 +3570,7 @@ export class WaterShurikenMultiHitTypeAttr extends ChangeMultiHitTypeAttr {
     }
     if (
       user.species.speciesId === SpeciesId.GRENINJA
-      && user.hasAbility(AbilityId.BATTLE_BOND)
+      && abilityQuery(user, ENGINE_QUERY.BATTLE_BOND_FORM)
       && user.formIndex === 2
     ) {
       (args[0] as NumberHolder).value = MultiHitType.THREE;
@@ -6214,7 +6225,7 @@ export class WaterShurikenPowerAttr extends VariablePowerAttr {
   apply(user: Pokemon, _target: Pokemon, _move: Move, args: any[]): boolean {
     if (
       user.species.speciesId === SpeciesId.GRENINJA
-      && user.hasAbility(AbilityId.BATTLE_BOND)
+      && abilityQuery(user, ENGINE_QUERY.BATTLE_BOND_FORM)
       && user.formIndex === 2
     ) {
       (args[0] as NumberHolder).value = 20;
@@ -7980,7 +7991,7 @@ export class GulpMissileTagAttr extends MoveEffectAttr {
       return false;
     }
 
-    if (user.hasAbility(AbilityId.GULP_MISSILE) && user.species.speciesId === SpeciesId.CRAMORANT) {
+    if (abilityQuery(user, ENGINE_QUERY.GULP_MISSILE_FORM) && user.species.speciesId === SpeciesId.CRAMORANT) {
       if (user.getHpRatio() >= 0.5) {
         user.addTag(BattlerTagType.GULP_MISSILE_ARROKUDA, 0, move.id);
       } else {
@@ -7993,7 +8004,8 @@ export class GulpMissileTagAttr extends MoveEffectAttr {
   }
 
   getUserBenefitScore(user: Pokemon, _target: Pokemon, _move: Move): number {
-    const isCramorant = user.hasAbility(AbilityId.GULP_MISSILE) && user.species.speciesId === SpeciesId.CRAMORANT;
+    const isCramorant =
+      abilityQuery(user, ENGINE_QUERY.GULP_MISSILE_FORM) && user.species.speciesId === SpeciesId.CRAMORANT;
     return isCramorant && !user.getTag(GulpMissileTag) ? 10 : 0;
   }
 }
@@ -9418,8 +9430,8 @@ export class ChangeTypeAttr extends MoveEffectAttr {
   getCondition(): MoveConditionFunc {
     return (_user, target) =>
       !target.isTerastallized
-      && !target.hasAbility(AbilityId.MULTITYPE)
-      && !target.hasAbility(AbilityId.RKS_SYSTEM)
+      && !abilityQuery(target, ENGINE_QUERY.MULTITYPE_TYPE_LOCK)
+      && !abilityQuery(target, ENGINE_QUERY.RKS_SYSTEM_TYPE_LOCK)
       && !(target.getTypes().length === 1 && target.getTypes()[0] === this.type);
   }
 }
@@ -13356,7 +13368,9 @@ export function initMoves() {
       .attr(StatStageChangeAttr, [Stat.SPATK, Stat.SPDEF, Stat.SPD], 2, true),
     new StatusMove(MoveId.MAGNETIC_FLUX, PokemonType.ELECTRIC, -1, 20, -1, 0, 6)
       .attr(MagneticFluxStatStageChangeAttr, [Stat.DEF, Stat.SPDEF], 1, false, {
-        condition: (_user, target, _move) => !![AbilityId.PLUS, AbilityId.MINUS].find(a => target.hasAbility(a, false)),
+        condition: (_user, target, _move) =>
+          abilityQuery(target, ENGINE_QUERY.PLUS_PAIRING, { canApply: false })
+          || abilityQuery(target, ENGINE_QUERY.MINUS_PAIRING, { canApply: false }),
       })
       .ignoresSubstitute()
       .target(MoveTarget.USER_AND_ALLIES)
@@ -13364,7 +13378,12 @@ export function initMoves() {
         (user, _target, _move) =>
           !![user, user.getAlly()]
             .filter(p => p?.isActive())
-            .find(p => !![AbilityId.PLUS, AbilityId.MINUS].find(a => p?.hasAbility(a, false))),
+            .find(
+              p =>
+                p != null
+                && (abilityQuery(p, ENGINE_QUERY.PLUS_PAIRING, { canApply: false })
+                  || abilityQuery(p, ENGINE_QUERY.MINUS_PAIRING, { canApply: false })),
+            ),
       ),
     new StatusMove(MoveId.HAPPY_HOUR, PokemonType.NORMAL, -1, 30, -1, 0, 6) // No animation
       .attr(AddArenaTagAttr, ArenaTagType.HAPPY_HOUR, 0, true)
@@ -13574,7 +13593,9 @@ export function initMoves() {
       ),
     new StatusMove(MoveId.GEAR_UP, PokemonType.STEEL, -1, 20, -1, 0, 7)
       .attr(StatStageChangeAttr, [Stat.ATK, Stat.SPATK], 1, false, {
-        condition: (_user, target, _move) => !![AbilityId.PLUS, AbilityId.MINUS].find(a => target.hasAbility(a, false)),
+        condition: (_user, target, _move) =>
+          abilityQuery(target, ENGINE_QUERY.PLUS_PAIRING, { canApply: false })
+          || abilityQuery(target, ENGINE_QUERY.MINUS_PAIRING, { canApply: false }),
       })
       .ignoresSubstitute()
       .target(MoveTarget.USER_AND_ALLIES)
@@ -13582,7 +13603,12 @@ export function initMoves() {
         (user, _target, _move) =>
           !![user, user.getAlly()]
             .filter(p => p?.isActive())
-            .find(p => !![AbilityId.PLUS, AbilityId.MINUS].find(a => p?.hasAbility(a, false))),
+            .find(
+              p =>
+                p != null
+                && (abilityQuery(p, ENGINE_QUERY.PLUS_PAIRING, { canApply: false })
+                  || abilityQuery(p, ENGINE_QUERY.MINUS_PAIRING, { canApply: false })),
+            ),
       ),
     new AttackMove(MoveId.THROAT_CHOP, PokemonType.DARK, MoveCategory.PHYSICAL, 80, 100, 15, 100, 0, 7) //
       .attr(AddBattlerTagAttr, BattlerTagType.THROAT_CHOPPED),

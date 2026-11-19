@@ -96,6 +96,7 @@ function erUserHasConditionalAlwaysHit(user: Pokemon, move: import("#moves/move"
   return false;
 }
 
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import {
   ContactHeldItemTransferChanceModifier,
   DamageMoneyRewardModifier,
@@ -976,7 +977,8 @@ export class MoveEffectPhase extends PokemonPhase {
     // contact damage from the target. Both gated on damage actually dealt.
     // ER Sheer Force (125): moves it power-boosts (those with a secondary effect,
     // move.chance >= 1) do NOT incur Life Orb recoil.
-    const sheerForceSuppressesRecoil = user.hasAbility(AbilityId.SHEER_FORCE) && this.move.chance >= 1;
+    const sheerForceSuppressesRecoil =
+      abilityQuery(user, ENGINE_QUERY.SHEER_FORCE_SECONDARY_EFFECTS) && this.move.chance >= 1;
     if (!sheerForceSuppressesRecoil && !this.isMoodyCoordinatorSpectral(user)) {
       queueErLifeOrbRecoil(user, finalDmg);
     }

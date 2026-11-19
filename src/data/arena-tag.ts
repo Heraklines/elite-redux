@@ -50,6 +50,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { CommonBattleAnim } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { recordDirectCoopCommonAnimPresentation } from "#data/elite-redux/coop/coop-common-anim-presentation";
 import { erApplyRoomServiceOnTrickRoom, erTacticalBlocksHazards } from "#data/elite-redux/er-tactical-items";
 import { AbilityId } from "#enums/ability-id";
@@ -1696,7 +1697,7 @@ class TailwindTag extends SerializableArenaTag {
     for (const pokemon of source.getAlliesGenerator()) {
       // Apply the CHARGED tag to party members with the WIND_POWER ability
       // TODO: This should not be handled here
-      if (pokemon.hasAbility(AbilityId.WIND_POWER) && !pokemon.getTag(BattlerTagType.CHARGED)) {
+      if (abilityQuery(pokemon, ENGINE_QUERY.WIND_POWER_CHARGE) && !pokemon.getTag(BattlerTagType.CHARGED)) {
         pokemon.addTag(BattlerTagType.CHARGED);
         globalScene.phaseManager.queueMessage(
           i18next.t("abilityTriggers:windPowerCharged", {
@@ -1708,7 +1709,7 @@ class TailwindTag extends SerializableArenaTag {
 
       // Raise attack by one stage if party member has WIND_RIDER ability
       // TODO: Ability displays should be handled by the ability
-      if (pokemon.hasAbility(AbilityId.WIND_RIDER)) {
+      if (abilityQuery(pokemon, ENGINE_QUERY.WIND_RIDER_BOOST)) {
         globalScene.phaseManager.queueAbilityDisplay(pokemon, false, true);
         globalScene.phaseManager.unshiftNew(
           "StatStageChangePhase",

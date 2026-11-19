@@ -8,7 +8,11 @@ import { CenterOfAttentionTag, type EncoreTag } from "#data/battler-tags";
 import { sleepingInBlocksMove } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
 import { erLibraryRecordFoeMove } from "#data/elite-redux/abilities/library";
 import { erOmniformOnMoveStart } from "#data/elite-redux/abilities/omniform";
-import { ABILITY_STUDIO_RUNTIME_CAPABILITIES } from "#data/elite-redux/ability-studio/runtime-capabilities";
+import {
+  ABILITY_STUDIO_RUNTIME_CAPABILITIES,
+  abilityQuery,
+  ENGINE_QUERY,
+} from "#data/elite-redux/ability-studio/runtime-capabilities";
 import {
   isCoopRecording,
   recordCoopEvent,
@@ -715,7 +719,8 @@ export class MovePhase extends PokemonPhase {
       if (
         redirectTag
         && (!redirectTag.powder
-          || (!this.pokemon.isOfType(PokemonType.GRASS) && !this.pokemon.hasAbility(AbilityId.OVERCOAT)))
+          || (!this.pokemon.isOfType(PokemonType.GRASS)
+            && !abilityQuery(this.pokemon, ENGINE_QUERY.OVERCOAT_POWDER_IMMUNITY)))
         && this.canRedirectTo(p)
       ) {
         redirectTarget.value = p.getBattlerIndex();

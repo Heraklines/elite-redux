@@ -1,6 +1,10 @@
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
-import { ABILITY_STUDIO_RUNTIME_CAPABILITIES } from "#data/elite-redux/ability-studio/runtime-capabilities";
+import {
+  ABILITY_STUDIO_RUNTIME_CAPABILITIES,
+  abilityQuery,
+  ENGINE_QUERY,
+} from "#data/elite-redux/ability-studio/runtime-capabilities";
 import {
   MeloettaFormChangePostMoveTrigger,
   SpeciesDefaultFormMatchTrigger,
@@ -379,23 +383,23 @@ export const pokemonFormChanges: PokemonFormChanges = {
     new SpeciesFormChange(SpeciesId.SHAYMIN, "land", "sky", new SpeciesFormChangeItemTrigger(FormChangeItem.GRACIDEA)),
   ],
   [SpeciesId.ARCEUS]: [
-    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "fighting", new SpeciesFormChangeItemTrigger(FormChangeItem.FIST_PLATE), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.MULTITYPE))),
-    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "flying", new SpeciesFormChangeItemTrigger(FormChangeItem.SKY_PLATE), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.MULTITYPE))),
-    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "poison", new SpeciesFormChangeItemTrigger(FormChangeItem.TOXIC_PLATE), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.MULTITYPE))),
-    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "ground", new SpeciesFormChangeItemTrigger(FormChangeItem.EARTH_PLATE), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.MULTITYPE))),
-    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "rock", new SpeciesFormChangeItemTrigger(FormChangeItem.STONE_PLATE), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.MULTITYPE))),
-    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "bug", new SpeciesFormChangeItemTrigger(FormChangeItem.INSECT_PLATE), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.MULTITYPE))),
-    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "ghost", new SpeciesFormChangeItemTrigger(FormChangeItem.SPOOKY_PLATE), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.MULTITYPE))),
-    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "steel", new SpeciesFormChangeItemTrigger(FormChangeItem.IRON_PLATE), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.MULTITYPE))),
-    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "fire", new SpeciesFormChangeItemTrigger(FormChangeItem.FLAME_PLATE), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.MULTITYPE))),
-    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "water", new SpeciesFormChangeItemTrigger(FormChangeItem.SPLASH_PLATE), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.MULTITYPE))),
-    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "grass", new SpeciesFormChangeItemTrigger(FormChangeItem.MEADOW_PLATE), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.MULTITYPE))),
-    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "electric", new SpeciesFormChangeItemTrigger(FormChangeItem.ZAP_PLATE), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.MULTITYPE))),
-    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "psychic", new SpeciesFormChangeItemTrigger(FormChangeItem.MIND_PLATE), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.MULTITYPE))),
-    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "ice", new SpeciesFormChangeItemTrigger(FormChangeItem.ICICLE_PLATE), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.MULTITYPE))),
-    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "dragon", new SpeciesFormChangeItemTrigger(FormChangeItem.DRACO_PLATE), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.MULTITYPE))),
-    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "dark", new SpeciesFormChangeItemTrigger(FormChangeItem.DREAD_PLATE), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.MULTITYPE))),
-    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "fairy", new SpeciesFormChangeItemTrigger(FormChangeItem.PIXIE_PLATE), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.MULTITYPE))),
+    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "fighting", new SpeciesFormChangeItemTrigger(FormChangeItem.FIST_PLATE), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.MULTITYPE_PLATE_FORMS))),
+    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "flying", new SpeciesFormChangeItemTrigger(FormChangeItem.SKY_PLATE), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.MULTITYPE_PLATE_FORMS))),
+    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "poison", new SpeciesFormChangeItemTrigger(FormChangeItem.TOXIC_PLATE), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.MULTITYPE_PLATE_FORMS))),
+    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "ground", new SpeciesFormChangeItemTrigger(FormChangeItem.EARTH_PLATE), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.MULTITYPE_PLATE_FORMS))),
+    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "rock", new SpeciesFormChangeItemTrigger(FormChangeItem.STONE_PLATE), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.MULTITYPE_PLATE_FORMS))),
+    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "bug", new SpeciesFormChangeItemTrigger(FormChangeItem.INSECT_PLATE), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.MULTITYPE_PLATE_FORMS))),
+    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "ghost", new SpeciesFormChangeItemTrigger(FormChangeItem.SPOOKY_PLATE), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.MULTITYPE_PLATE_FORMS))),
+    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "steel", new SpeciesFormChangeItemTrigger(FormChangeItem.IRON_PLATE), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.MULTITYPE_PLATE_FORMS))),
+    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "fire", new SpeciesFormChangeItemTrigger(FormChangeItem.FLAME_PLATE), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.MULTITYPE_PLATE_FORMS))),
+    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "water", new SpeciesFormChangeItemTrigger(FormChangeItem.SPLASH_PLATE), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.MULTITYPE_PLATE_FORMS))),
+    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "grass", new SpeciesFormChangeItemTrigger(FormChangeItem.MEADOW_PLATE), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.MULTITYPE_PLATE_FORMS))),
+    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "electric", new SpeciesFormChangeItemTrigger(FormChangeItem.ZAP_PLATE), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.MULTITYPE_PLATE_FORMS))),
+    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "psychic", new SpeciesFormChangeItemTrigger(FormChangeItem.MIND_PLATE), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.MULTITYPE_PLATE_FORMS))),
+    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "ice", new SpeciesFormChangeItemTrigger(FormChangeItem.ICICLE_PLATE), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.MULTITYPE_PLATE_FORMS))),
+    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "dragon", new SpeciesFormChangeItemTrigger(FormChangeItem.DRACO_PLATE), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.MULTITYPE_PLATE_FORMS))),
+    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "dark", new SpeciesFormChangeItemTrigger(FormChangeItem.DREAD_PLATE), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.MULTITYPE_PLATE_FORMS))),
+    new SpeciesFormChange(SpeciesId.ARCEUS, "normal", "fairy", new SpeciesFormChangeItemTrigger(FormChangeItem.PIXIE_PLATE), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.MULTITYPE_PLATE_FORMS))),
   ],
   [SpeciesId.DARMANITAN]: [
     new SpeciesFormChange(SpeciesId.DARMANITAN, "", "zen", new SpeciesFormChangeAbilityTrigger(), true),
@@ -448,8 +452,8 @@ export const pokemonFormChanges: PokemonFormChanges = {
     // stuck in Shield forever (live report: "Aegislash spammed Vacuum Wave for 2 turns
     // and never changed stance"). Gated on STANCE_CHANGE, which ER relocates into an
     // innate slot — abilityDrivesFormChange unlocks that innate so the swap fires.
-    new SpeciesFormChange(SpeciesId.AEGISLASH, "shield", "blade", new SpeciesFormChangePreMoveTrigger(m => allMoves[m].category !== MoveCategory.STATUS), true, new SpeciesFormChangeCondition(p => p.hasAbility(AbilityId.STANCE_CHANGE))),
-    new SpeciesFormChange(SpeciesId.AEGISLASH, "blade", "shield", new SpeciesFormChangePreMoveTrigger(m => m === MoveId.KINGS_SHIELD), true, new SpeciesFormChangeCondition(p => p.hasAbility(AbilityId.STANCE_CHANGE))),
+    new SpeciesFormChange(SpeciesId.AEGISLASH, "shield", "blade", new SpeciesFormChangePreMoveTrigger(m => allMoves[m].category !== MoveCategory.STATUS), true, new SpeciesFormChangeCondition(p => abilityQuery(p, ENGINE_QUERY.STANCE_CHANGE_FORMS))),
+    new SpeciesFormChange(SpeciesId.AEGISLASH, "blade", "shield", new SpeciesFormChangePreMoveTrigger(m => m === MoveId.KINGS_SHIELD), true, new SpeciesFormChangeCondition(p => abilityQuery(p, ENGINE_QUERY.STANCE_CHANGE_FORMS))),
     new SpeciesFormChange(SpeciesId.AEGISLASH, "blade", "shield", new SpeciesFormChangeActiveTrigger(false), true)
   ],
   [SpeciesId.XERNEAS]: [
@@ -473,23 +477,23 @@ export const pokemonFormChanges: PokemonFormChanges = {
     new SpeciesFormChange(SpeciesId.WISHIWASHI, "school", "", new SpeciesFormChangeAbilityTrigger(), true)
   ],
   [SpeciesId.SILVALLY]: [
-    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "fighting", new SpeciesFormChangeItemTrigger(FormChangeItem.FIGHTING_MEMORY), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.RKS_SYSTEM))),
-    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "flying", new SpeciesFormChangeItemTrigger(FormChangeItem.FLYING_MEMORY), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.RKS_SYSTEM))),
-    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "poison", new SpeciesFormChangeItemTrigger(FormChangeItem.POISON_MEMORY), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.RKS_SYSTEM))),
-    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "ground", new SpeciesFormChangeItemTrigger(FormChangeItem.GROUND_MEMORY), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.RKS_SYSTEM))),
-    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "rock", new SpeciesFormChangeItemTrigger(FormChangeItem.ROCK_MEMORY), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.RKS_SYSTEM))),
-    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "bug", new SpeciesFormChangeItemTrigger(FormChangeItem.BUG_MEMORY), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.RKS_SYSTEM))),
-    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "ghost", new SpeciesFormChangeItemTrigger(FormChangeItem.GHOST_MEMORY), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.RKS_SYSTEM))),
-    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "steel", new SpeciesFormChangeItemTrigger(FormChangeItem.STEEL_MEMORY), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.RKS_SYSTEM))),
-    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "fire", new SpeciesFormChangeItemTrigger(FormChangeItem.FIRE_MEMORY), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.RKS_SYSTEM))),
-    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "water", new SpeciesFormChangeItemTrigger(FormChangeItem.WATER_MEMORY), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.RKS_SYSTEM))),
-    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "grass", new SpeciesFormChangeItemTrigger(FormChangeItem.GRASS_MEMORY), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.RKS_SYSTEM))),
-    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "electric", new SpeciesFormChangeItemTrigger(FormChangeItem.ELECTRIC_MEMORY), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.RKS_SYSTEM))),
-    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "psychic", new SpeciesFormChangeItemTrigger(FormChangeItem.PSYCHIC_MEMORY), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.RKS_SYSTEM))),
-    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "ice", new SpeciesFormChangeItemTrigger(FormChangeItem.ICE_MEMORY), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.RKS_SYSTEM))),
-    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "dragon", new SpeciesFormChangeItemTrigger(FormChangeItem.DRAGON_MEMORY), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.RKS_SYSTEM))),
-    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "dark", new SpeciesFormChangeItemTrigger(FormChangeItem.DARK_MEMORY), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.RKS_SYSTEM))),
-    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "fairy", new SpeciesFormChangeItemTrigger(FormChangeItem.FAIRY_MEMORY), true, new SpeciesFormChangeCondition((p) => p.hasAbility(AbilityId.RKS_SYSTEM)))
+    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "fighting", new SpeciesFormChangeItemTrigger(FormChangeItem.FIGHTING_MEMORY), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.RKS_SYSTEM_MEMORY_FORMS))),
+    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "flying", new SpeciesFormChangeItemTrigger(FormChangeItem.FLYING_MEMORY), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.RKS_SYSTEM_MEMORY_FORMS))),
+    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "poison", new SpeciesFormChangeItemTrigger(FormChangeItem.POISON_MEMORY), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.RKS_SYSTEM_MEMORY_FORMS))),
+    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "ground", new SpeciesFormChangeItemTrigger(FormChangeItem.GROUND_MEMORY), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.RKS_SYSTEM_MEMORY_FORMS))),
+    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "rock", new SpeciesFormChangeItemTrigger(FormChangeItem.ROCK_MEMORY), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.RKS_SYSTEM_MEMORY_FORMS))),
+    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "bug", new SpeciesFormChangeItemTrigger(FormChangeItem.BUG_MEMORY), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.RKS_SYSTEM_MEMORY_FORMS))),
+    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "ghost", new SpeciesFormChangeItemTrigger(FormChangeItem.GHOST_MEMORY), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.RKS_SYSTEM_MEMORY_FORMS))),
+    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "steel", new SpeciesFormChangeItemTrigger(FormChangeItem.STEEL_MEMORY), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.RKS_SYSTEM_MEMORY_FORMS))),
+    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "fire", new SpeciesFormChangeItemTrigger(FormChangeItem.FIRE_MEMORY), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.RKS_SYSTEM_MEMORY_FORMS))),
+    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "water", new SpeciesFormChangeItemTrigger(FormChangeItem.WATER_MEMORY), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.RKS_SYSTEM_MEMORY_FORMS))),
+    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "grass", new SpeciesFormChangeItemTrigger(FormChangeItem.GRASS_MEMORY), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.RKS_SYSTEM_MEMORY_FORMS))),
+    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "electric", new SpeciesFormChangeItemTrigger(FormChangeItem.ELECTRIC_MEMORY), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.RKS_SYSTEM_MEMORY_FORMS))),
+    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "psychic", new SpeciesFormChangeItemTrigger(FormChangeItem.PSYCHIC_MEMORY), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.RKS_SYSTEM_MEMORY_FORMS))),
+    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "ice", new SpeciesFormChangeItemTrigger(FormChangeItem.ICE_MEMORY), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.RKS_SYSTEM_MEMORY_FORMS))),
+    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "dragon", new SpeciesFormChangeItemTrigger(FormChangeItem.DRAGON_MEMORY), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.RKS_SYSTEM_MEMORY_FORMS))),
+    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "dark", new SpeciesFormChangeItemTrigger(FormChangeItem.DARK_MEMORY), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.RKS_SYSTEM_MEMORY_FORMS))),
+    new SpeciesFormChange(SpeciesId.SILVALLY, "normal", "fairy", new SpeciesFormChangeItemTrigger(FormChangeItem.FAIRY_MEMORY), true, new SpeciesFormChangeCondition((p) => abilityQuery(p, ENGINE_QUERY.RKS_SYSTEM_MEMORY_FORMS)))
   ],
   [SpeciesId.MINIOR]: [
     new SpeciesFormChange(SpeciesId.MINIOR, "red-meteor", "red", new SpeciesFormChangeAbilityTrigger(), true),

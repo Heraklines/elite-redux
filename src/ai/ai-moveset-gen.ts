@@ -39,6 +39,7 @@ import { SUPERCEDED_MOVES } from "#balance/moves/superceded-moves";
 import { speciesTmMoves, tmPoolTiers } from "#balance/tms";
 import { IS_TEST, isBeta, isDev } from "#constants/app-constants";
 import { allMoves } from "#data/data-lists";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { ModifierTier } from "#enums/modifier-tier";
@@ -798,7 +799,10 @@ function shouldRemoveSunnyDay(pokemon: Pokemon): boolean {
       return false;
     }
   }
-  const hasSolarPower = pokemon.hasAbility(AbilityId.SOLAR_POWER, false, true);
+  const hasSolarPower = abilityQuery(pokemon, ENGINE_QUERY.SOLAR_POWER_MOVESET, {
+    canApply: false,
+    ignoreOverride: true,
+  });
   for (const pokemonMove of pokemon.moveset) {
     const move = pokemonMove.getMove();
     if (
@@ -856,7 +860,7 @@ function shouldRemoveSandstorm(pokemon: Pokemon, willTera: boolean): boolean {
     return false;
   }
   if (
-    pokemon.hasAbility(AbilityId.SAND_FORCE, false, true)
+    abilityQuery(pokemon, ENGINE_QUERY.SAND_FORCE_MOVESET, { canApply: false, ignoreOverride: true })
     && !getExistingDamageMoveTypes(pokemon, false).isDisjointFrom(
       new Set([PokemonType.GROUND, PokemonType.STEEL, PokemonType.ROCK]),
     )
@@ -928,7 +932,7 @@ function filterUselessMoves(pokemon: Pokemon, willTera: boolean): boolean {
       || (move.hasCondition(userSleptOrComatoseCondition) && !hasSleepInducingMove(pokemon, true))
       || (move.id === MoveId.AURORA_VEIL // Aurora veil without hail / snowscape
         && !(
-          pokemon.hasAbility(AbilityId.SNOW_WARNING, false, true)
+          abilityQuery(pokemon, ENGINE_QUERY.SNOW_WARNING_MOVESET, { canApply: false, ignoreOverride: true })
           || moveset.some(m => [MoveId.HAIL, MoveId.SNOWSCAPE].includes(m.moveId))
         ))
       // TODO: Add condition for venom drench
