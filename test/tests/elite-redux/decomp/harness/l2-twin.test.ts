@@ -28,6 +28,7 @@ import {
   signatureSites,
   type TwinScenario,
   twinById,
+  unreachedWhens,
 } from "#test/tests/elite-redux/decomp/harness/twin";
 import Phaser from "phaser";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -110,7 +111,11 @@ describe("L2 battle twin (live registry)", () => {
             const key = `${scenario.template.id}|${JSON.stringify(scenario.axes)}|${scenario.when}`;
             const entry = scenarios.get(key) ?? { scenario, attrs: [] };
             // A presence flag (while-active, engine-query) is never dispatched, so no trace can show it evaluated.
-            if (getWhen(declRegistry.get(attr.constructor.name)!.decl.when)?.dispatchKey != null) {
+            // A declaration with a written l2StaticReason for a WHEN that no template reaches is verified statically
+            // (ClassDecl.l2StaticReason): the original cannot be shown evaluating the attr there.
+            const decl = declRegistry.get(attr.constructor.name)!.decl;
+            const staticOnly = decl.l2StaticReason !== undefined && unreachedWhens()[decl.when] !== undefined;
+            if (getWhen(decl.when)?.dispatchKey != null && !staticOnly) {
               entry.attrs.push({ attrIndex: index, className: attr.constructor.name });
             }
             scenarios.set(key, entry);

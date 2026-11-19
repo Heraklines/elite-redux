@@ -1,8 +1,360 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "096ef32b703c2f",
+  "hash": "096675f66e47af",
   "blocks": [
+    {
+      "id": "block.absorbant",
+      "className": "AbsorbantAbAttr",
+      "label": "Leech Seed the target after my draining move",
+      "summary": "After a draining move of mine hits, the target is planted with Leech Seed. My draining moves also heal 1.5 times as much (Drain Punch heals 50% more).",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "leech seed",
+        "draining move",
+        "drain punch",
+        "giga drain",
+        "heal more from drain",
+        "seed after drain",
+        "absorb health"
+      ],
+      "examples": [
+        "After Drain Punch hits, the target gets Leech Seed and Drain Punch heals 50% more"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "My move must be a draining move (one that heals me by a share of the damage it deals)",
+        "The target must not be protected from added effects (like Shield Dust)",
+        "The target must be able to receive Leech Seed (it is not Grass type and not already seeded)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package, justified: the same class is read two ways (dispatched after my hit for the Leech Seed, and found BY NAME in HitHealAttr.getHealAmount for the x1.5 heal), and its draining-move test is a fixed closure of the parent class. Users: Absorbant (5161 attr 0), and two studio-built abilities that reuse the attr as a TRIGGER SOURCE (Extermination Vector 20003 attr 4, External Combustion 20018 attr 0): their instances are carriers whose canApply, apply and getCondition are replaced by the rule runtime (runtime-components.ts), so they are carried over unchanged by a rebuild and are not part of what this declaration rebuilds. Nothing to bind (no constructor closure). The by-name fire() scan is an engine call site, not a moment; it is recorded here and left untouched.",
+      "uses": 3
+    },
+    {
+      "id": "block.add-type-to-attacker-on-contact",
+      "className": "AddTypeToAttackerOnContactAbAttr",
+      "label": "Give the attacker an extra type when it touches me",
+      "summary": "When a move that makes contact hits me, the attacker gains the Grass type on top of its own. Example: a Normal attacker becomes Normal and Grass.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "extra type",
+        "add a type",
+        "forest's curse",
+        "grass type on contact",
+        "type change on touch",
+        "woodland curse",
+        "infect type"
+      ],
+      "examples": [
+        "Attackers that touch me gain the Grass type"
+      ],
+      "params": [
+        {
+          "id": "addedType",
+          "label": "Type the attacker gains",
+          "control": "select",
+          "default": "GRASS",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.flag",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Does nothing to an attacker that is Terastallized",
+        "Does nothing when the attacker already has that type"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.ally-attack-power-boost",
+      "className": "AllyAttackPowerBoostAbAttr",
+      "label": "Boost my ally's attacks (more for recoil moves)",
+      "summary": "My ally's damaging moves get 1.25 times their power, or 1.5 times when the move hurts the user with recoil. Example: 1.25 means 25% stronger.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "ally power boost",
+        "boost partner attacks",
+        "power spot",
+        "battery",
+        "ally damage aura",
+        "recoil move boost",
+        "mosh pit"
+      ],
+      "examples": [
+        "My ally's attacks are 25% stronger, and 50% stronger if they cause recoil"
+      ],
+      "params": [
+        {
+          "id": "baseMultiplier",
+          "label": "Power multiplier for my ally's attacks (1.25 = 25% stronger)",
+          "control": "number",
+          "default": 1.25,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05
+        },
+        {
+          "id": "recoilMultiplier",
+          "label": "Power multiplier when the ally's attack causes recoil (1.5 = 50% stronger)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only my ally's damaging moves are boosted (a status move has no power)",
+        "A move that causes recoil uses the recoil multiplier instead of the first one"
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "baseMultiplier",
+          "recoilMultiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.ate-conditional-status",
+      "className": "AteConditionalStatusAbAttr",
+      "label": "Add a bonus effect to my attacks of my own type",
+      "summary": "If I am Fire type, each of my Fire attacks that hits has a 10% chance to leave the target burned.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "secondary effect",
+        "bonus effect on own type",
+        "chance to burn",
+        "chance to poison",
+        "chance to confuse",
+        "intoxicate",
+        "immolate",
+        "fertilize",
+        "mineralize"
+      ],
+      "examples": [
+        "If I am Fire type, my Fire moves have a 10% chance to burn the target"
+      ],
+      "params": [
+        {
+          "id": "newType",
+          "label": "Type (I must be this type, and so must the move)",
+          "control": "select",
+          "default": "FIRE",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "outcome",
+          "label": "What the hit does",
+          "control": "select",
+          "default": "Burned",
+          "editable": false,
+          "options": [
+            "Poisoned",
+            "Badly poisoned",
+            "Paralyzed",
+            "Asleep",
+            "Frozen",
+            "Burned",
+            "Confused",
+            "Bleeding",
+            "Frostbitten",
+            "Heal 10% of the damage dealt",
+            "Heal 25% of the damage dealt",
+            "Heal 50% of the damage dealt"
+          ]
+        },
+        {
+          "id": "chance",
+          "label": "Chance (%) (not used by the heal)",
+          "control": "slider",
+          "default": 10,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must be a damaging hit that connected on another Pokemon",
+        "The target must not be protected from added effects (like Shield Dust), except for the heal",
+        "The target must be able to receive the status or lasting effect",
+        "The heal needs damage dealt and missing HP"
+      ],
+      "gateParams": [
+        {
+          "param": "newType",
+          "block": "mon.has-type",
+          "field": "type"
+        },
+        {
+          "param": "newType",
+          "block": "move.type",
+          "field": "type"
+        },
+        {
+          "param": "chance",
+          "block": "rng.chance",
+          "field": "pct"
+        }
+      ],
+      "branches": [
+        {
+          "label": "Leave the target with a status condition",
+          "conditions": [
+            "mon.has-type (holder)",
+            "move.type",
+            "rng.chance"
+          ],
+          "effect": {
+            "id": "effect.inflict-status",
+            "params": [
+              "outcome"
+            ]
+          }
+        },
+        {
+          "label": "Leave the target confused, bleeding or frostbitten",
+          "conditions": [
+            "mon.has-type (holder)",
+            "move.type",
+            "rng.chance"
+          ],
+          "effect": {
+            "id": "effect.apply-tag",
+            "params": [
+              "outcome"
+            ]
+          }
+        },
+        {
+          "label": "Heal me by a share of the damage dealt",
+          "conditions": [
+            "mon.has-type (holder)",
+            "move.type"
+          ],
+          "effect": {
+            "id": "effect.drain",
+            "params": [
+              "outcome"
+            ]
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 13
+    },
     {
       "id": "block.attack-type-immunity",
       "className": "AttackTypeImmunityAbAttr",
@@ -124,6 +476,174 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.chance-dodge",
+      "className": "ChanceDodgeAbAttr",
+      "label": "Sometimes dodge an attack completely",
+      "summary": "Each time an attack aimed at one target is about to hit me, there is a 20% chance it misses completely. Example: 20 means 1 attack in 5.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.incoming-move",
+      "whenLabel": "Before I take a hit",
+      "synonyms": [
+        "evade",
+        "dodge",
+        "avoid attacks",
+        "random miss",
+        "evasion",
+        "sidestep",
+        "ole"
+      ],
+      "examples": [
+        "20% chance to dodge single-target attacks"
+      ],
+      "params": [
+        {
+          "id": "chance",
+          "label": "Dodge chance (%)",
+          "control": "slider",
+          "default": 20,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "singleTargetOnly",
+          "label": "Only dodge attacks aimed at a single target",
+          "control": "boolean",
+          "default": true,
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only attacking moves can be dodged (a status move is never dodged)",
+        "A move I use myself is never dodged"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.chance-status-on-hit",
+      "className": "ChanceStatusOnHitAbAttr",
+      "label": "Chance to give the attacker a status when it hits me",
+      "summary": "When a move that makes contact hits me, there is a 30% chance the attacker gets Poison. If several are listed, one is picked at random.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "static",
+        "flame body",
+        "poison point",
+        "paralyze on hit",
+        "burn on hit",
+        "status when hit",
+        "counter status",
+        "touch me and suffer"
+      ],
+      "examples": [
+        "30% chance to paralyze attackers that make contact",
+        "20% chance to burn attackers that do not make contact"
+      ],
+      "params": [
+        {
+          "id": "chance",
+          "label": "Chance (%)",
+          "control": "slider",
+          "default": 30,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "statuses",
+          "label": "Statuses (comma separated; one is picked at random when there are several)",
+          "control": "text",
+          "default": "POISON",
+          "editable": true,
+          "options": [
+            "NONE",
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN",
+            "FAINT"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "tags",
+          "label": "Extra lasting effects in the same random pick (comma separated, may be empty)",
+          "control": "text",
+          "default": "",
+          "editable": false
+        },
+        {
+          "id": "contactRequired",
+          "label": "The move must make contact",
+          "control": "boolean",
+          "default": true,
+          "editable": false
+        },
+        {
+          "id": "contactExcluded",
+          "label": "Only moves that do not make contact (and only damaging hits)",
+          "control": "boolean",
+          "default": false,
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The attacker must be able to receive the status or lasting effect (it is not immune and nothing blocks it)"
+      ],
+      "gateParams": [
+        {
+          "param": "chance",
+          "block": "rng.chance",
+          "field": "pct"
+        }
+      ],
+      "effect": {
+        "id": "effect.inflict-status",
+        "params": [
+          "statuses",
+          "tags"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 10
     },
     {
       "id": "block.float",

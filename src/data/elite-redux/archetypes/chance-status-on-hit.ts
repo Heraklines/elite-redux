@@ -55,6 +55,7 @@
 // =============================================================================
 
 import { PostAttackAbAttr, PostDefendAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
 import type { MoveCategory } from "#enums/move-category";
@@ -193,7 +194,10 @@ export interface ChanceStatusOnHitOptions {
  * The proc fires by calling `attacker.trySetStatus(effect, pokemon)` — the
  * same call pokerogue uses for Static and friends.
  */
-export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
+export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr implements GatedAttr<PostMoveInteractionAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
   private readonly chance: number;
   private readonly effects: readonly StatusEffect[];
   // Unified outcome pool ([...statuses, ...tags]) picked from under the single
@@ -264,17 +268,19 @@ export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
   }
 
   /**
-   * Roll the proc and decide whether it should fire. We mirror pokerogue's
-   * existing {@linkcode PostDefendContactApplyStatusEffectAbAttr.canApply}
-   * down to the order-of-operations: contact check, status-already check on
-   * the attacker, random roll, can-set-status check.
-   *
-   * Note that pokerogue's canApply runs the random roll *inside* canApply
-   * because the AbAttr's apply phase doesn't get any per-pokemon randomness
-   * state — running the roll in canApply is the convention. We follow it
-   * here exactly.
+   * Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `gate` (contact tiers, move filter,
+   * attacker status, then the chance roll) and `residual` (the outcome pick and the feasibility check).
    */
   public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /**
+   * The replaceable condition. We mirror pokerogue's existing
+   * {@linkcode PostDefendContactApplyStatusEffectAbAttr.canApply} down to the order-of-operations: contact check,
+   * status-already check on the attacker, random roll (the roll is the LAST clause of the gate).
+   */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
     const { pokemon, move, opponent: attacker } = params;
     // User-aware contact: factors in the attacker's contact-suppressing
     // abilities (Long Reach / Twinkle Toes → IgnoreContactAbAttr) and
@@ -336,6 +342,15 @@ export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
         return false;
       }
     }
+    return true;
+  }
+
+  /**
+   * Feasibility that stays in the class, after the gate passed: pick the outcome (a random draw when the pool has
+   * several) and check that the attacker can receive it.
+   */
+  public residual(params: PostMoveInteractionAbAttrParams): boolean {
+    const { pokemon, opponent: attacker } = params;
     // Pick an outcome (uniform random across the status+tag pool) and verify the
     // attacker can actually receive it. The same index is recomputed in apply via
     // the same RNG seed (pokerogue convention — apply gets the matching index

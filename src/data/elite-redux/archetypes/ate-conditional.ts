@@ -42,6 +42,7 @@ import type { AbAttr } from "#abilities/ab-attrs";
 import { PostAttackAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { StabAddAbAttr } from "#data/elite-redux/archetypes/stab-add";
 import { TypeConversionAbAttr } from "#data/elite-redux/archetypes/type-conversion";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -83,10 +84,13 @@ export interface AteConditionalOptions {
  * <status>" branch. When the holder is NOT <T>-type this never fires and the
  * paired {@linkcode StabAddAbAttr} grants STAB instead.
  */
-export class AteConditionalStatusAbAttr extends PostAttackAbAttr {
+export class AteConditionalStatusAbAttr extends PostAttackAbAttr implements GatedAttr<PostMoveInteractionAbAttrParams> {
   private readonly newType: PokemonType;
   private readonly outcome: AteSecondaryOutcome;
   private readonly chance: number;
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
 
   constructor(opts: AteConditionalOptions) {
     // Default attackCondition (damaging moves only) is exactly what we want —
@@ -122,11 +126,25 @@ export class AteConditionalStatusAbAttr extends PostAttackAbAttr {
     return this.outcome;
   }
 
+  /**
+   * Tier B split (ability studio spec 3.1): `guards`, then `gate`, then `residual`.
+   *
+   * The original clause order was: damaging move, not myself, the hit connected, the holder-type and move-type test,
+   * (heal outcome: return the heal feasibility), the target's Shield Dust style block, the chance roll, the status or
+   * tag feasibility. The Shield Dust check is a pure read, so it now sits in `guards` BEFORE the type test; moving a
+   * pure check ahead of another pure check changes neither the result nor the random draws, because the only random
+   * draw (the chance roll) is still reached only when every earlier check passed.
+   */
   public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Safety rules that stay in the class: a damaging hit that connected on someone else, and (not for the heal) no block of added effects. */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
     if (!super.canApply(params)) {
       return false;
     }
-    const { pokemon, opponent: target, move, hitResult } = params;
+    const { pokemon, opponent: target, hitResult } = params;
     if (pokemon === target) {
       return false;
     }
@@ -135,25 +153,36 @@ export class AteConditionalStatusAbAttr extends PostAttackAbAttr {
     if (hitResult >= HitResult.NO_EFFECT) {
       return false;
     }
-    // Branch gate: holder IS <T>-type AND the move's resolved (post-conversion)
-    // type is <T>. `getMoveType` runs the paired TypeConversionAbAttr, so a
-    // converted Normal → <T> move counts, as do natively-<T> moves.
+    // The heal outcome targets the HOLDER, so the target-facing block of added effects does not apply to it.
+    return this.outcome.kind === "heal" || !target.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr");
+  }
+
+  /**
+   * The replaceable condition. Branch gate: holder IS <T>-type AND the move's resolved (post-conversion)
+   * type is <T>. `getMoveType` runs the paired TypeConversionAbAttr, so a
+   * converted Normal → <T> move counts, as do natively-<T> moves. The status and tag outcomes then roll
+   * their chance (the one random draw); the heal outcome is deterministic and never rolls.
+   */
+  public gate({ pokemon, move }: PostMoveInteractionAbAttrParams): boolean {
     if (!pokemon.isOfType(this.newType) || pokemon.getMoveType(move) !== this.newType) {
       return false;
     }
+    if (this.outcome.kind === "heal") {
+      return true;
+    }
+    // 10% roll.
+    return this.chance === 100 || pokemon.randBattleSeedInt(100) < this.chance;
+  }
+
+  /** Feasibility that stays in the class: the heal needs damage and missing HP, the others need a target that can receive the status or tag. */
+  public residual(params: PostMoveInteractionAbAttrParams): boolean {
+    const { pokemon, opponent: target } = params;
     // Heal branch (Fertilize / er 507): DETERMINISTIC self-heal off damage dealt
     // — no random roll, and it targets the HOLDER, so the target-facing gates
     // (IgnoreMoveEffects / canSetStatus / canAddTag) don't apply. Only require a
     // genuine damaging hit and that the holder can still benefit from healing.
     if (this.outcome.kind === "heal") {
       return params.damage > 0 && !pokemon.isFullHp();
-    }
-    if (target.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr")) {
-      return false;
-    }
-    // 10% roll.
-    if (this.chance !== 100 && pokemon.randBattleSeedInt(100) >= this.chance) {
-      return false;
     }
     if (this.outcome.kind === "status") {
       return target.canSetStatus(this.outcome.effect, true, false, pokemon);
