@@ -7,8 +7,8 @@
 // B05 / calc modifier, Tier C (no condition, no closure). See ../PRECEDENTS.md.
 //
 // `Pokemon.getCritStage` (pokemon.ts:2063) asks `applyAbAttrs("BonusCritAbAttr", { pokemon: source, critStage })` for the
-// ATTACKER after the move's own high-crit attribute and the held-item boosters, and the class adds a literal 1:
-// `critStage.value += 1`. There is no `canApply` (the base answers true), no constructor argument and no random draw.
+// ATTACKER after the move's own high-crit attribute and the held-item boosters, and the class adds `stages` (constructor default 1):
+// `critStage.value += stages`. There is no `canApply` (the base answers true), one optional constructor argument (stages, default 1) and no random draw.
 // The stage then picks the odds from [1/24, 1/8, 1/2, always] (pokemon.ts:6437).
 import { BonusCritAbAttr } from "#abilities/ab-attrs";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
@@ -29,14 +29,25 @@ export default defineDecl(BonusCritAbAttr, {
     "lucky strikes",
   ],
   examples: ["All my moves crit more often, like Super Luck"],
-  params: [],
-  noParamsReason:
-    "The class adds a fixed 1 to the critical hit level: the number is a literal in apply and the constructor takes nothing, so there is nothing to configure. The library effect that will own the number is requested in requests/B05.md (R-B05-9).",
+  params: [
+    {
+      id: "stages",
+      ctorIndex: 0,
+      path: "stages",
+      control: "slider",
+      min: 1,
+      max: 3,
+      step: 1,
+      label: "Critical hit levels added (1 = one level more likely)",
+      editable: true,
+      default: 1,
+    },
+  ],
   conditions: [],
   guards: [],
   feasibility: [],
   // No library effect changes the critical hit level yet (effect.force-crit is "always"), see R-B05-9.
-  effect: { id: "effect.package", params: [] },
+  effect: { id: "effect.package", params: ["stages"] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "none", simulated: "ignores" },
   probes: [{ name: "the crit stage starts at 0 and goes up by one", axes: {} }],

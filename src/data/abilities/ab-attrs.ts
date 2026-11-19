@@ -4623,15 +4623,19 @@ export interface BonusCritAbAttrParams extends AbAttrBaseParams {
 }
 
 export class BonusCritAbAttr extends AbAttr {
-  constructor() {
+  /** How many critical hit levels this adds (Super Luck: 1) */
+  public stages: number;
+
+  constructor(stages = 1) {
     super(false);
+    this.stages = stages;
   }
 
   /**
-   * Apply the bonus crit ability by increasing the value in the provided number holder by 1
+   * Apply the bonus crit ability by increasing the value in the provided number holder by {@linkcode stages} (default 1)
    */
   override apply({ critStage }: BonusCritAbAttrParams): void {
-    critStage.value += 1;
+    critStage.value += this.stages;
   }
 }
 

@@ -59,7 +59,7 @@ export default defineDecl(ChangeMovePriorityAbAttr, {
   feasibility: [],
   effect: { id: "effect.change-priority", params: ["amount"] },
   // Constructor argument 0 is the closure that the gate replaces. A rebuilt attr gets this stand-in so that it has a closure
-  // like the original (the identity fingerprint compares it); it is never called because the gate slot is mandatory.
+  // like the original (the identity fingerprint compares it); it is only called if staff remove the gate block, and then the change applies to every move.
   fixedCtorArgs: { 0: () => true },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "none", simulated: "ignores" },

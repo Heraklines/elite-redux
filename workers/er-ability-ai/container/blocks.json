@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "196f9dd9ea831d",
+  "hash": "0c8f05ea51c377",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -279,13 +279,26 @@
       "examples": [
         "All my moves crit more often, like Super Luck"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "stages",
+          "label": "Critical hit levels added (1 = one level more likely)",
+          "control": "slider",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 3,
+          "step": 1
+        }
+      ],
       "conditions": [],
       "guards": [],
       "feasibility": [],
       "effect": {
         "id": "effect.package",
-        "params": []
+        "params": [
+          "stages"
+        ]
       },
       "reusableAlone": {
         "when": true,
@@ -358,7 +371,7 @@
     {
       "id": "block.change-move-priority-in-bracket",
       "className": "ChangeMovePriorityInBracketAbAttr",
-      "label": "Move first or last among moves of equal priority",
+      "label": "Go first or last among moves of equal priority",
       "summary": "Moves that fit the rule go last among moves of the same priority, whatever the Speed. Example: Mycelium Might status moves go last.",
       "tier": "B",
       "kind": "calc-modifier",
@@ -368,10 +381,9 @@
       "synonyms": [
         "go last",
         "move last",
-        "turn order in bracket",
+        "act first or last",
         "mycelium might",
         "lagging tail",
-        "quick claw",
         "act first among equals"
       ],
       "examples": [

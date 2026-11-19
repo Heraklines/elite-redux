@@ -20,16 +20,15 @@ export default defineDecl(ChangeMovePriorityInBracketAbAttr, {
   tier: "B",
   kind: "calc-modifier",
   when: "calc.priority",
-  label: "Move first or last among moves of equal priority",
+  label: "Go first or last among moves of equal priority",
   summary: params =>
     `Moves that fit the rule go ${String(params.position).toLowerCase()} among moves of the same priority, whatever the Speed. Example: Mycelium Might status moves go last.`,
   synonyms: [
     "go last",
     "move last",
-    "turn order in bracket",
+    "act first or last",
     "mycelium might",
     "lagging tail",
-    "quick claw",
     "act first among equals",
   ],
   examples: ["Status moves always go last among equal-priority moves, like Mycelium Might"],
@@ -60,7 +59,7 @@ export default defineDecl(ChangeMovePriorityInBracketAbAttr, {
   // The library effect `effect.change-priority` ADDS to the priority number; this one picks the place inside a bracket.
   effect: { id: "effect.package", params: ["position"] },
   // Constructor argument 0 is the closure that the gate replaces. A rebuilt attr gets this stand-in so that it has a closure
-  // like the original (the identity fingerprint compares it); it is never called because the gate slot is mandatory.
+  // like the original (the identity fingerprint compares it); it is only called if staff remove the gate block, and then the change applies to every move.
   fixedCtorArgs: { 0: () => true },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "none", simulated: "ignores" },
