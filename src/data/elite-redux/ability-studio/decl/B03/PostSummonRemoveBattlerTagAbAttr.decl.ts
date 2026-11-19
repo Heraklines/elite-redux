@@ -11,7 +11,7 @@
 //                             `simulated`, and it does not look at which effect was present
 //
 // The only clause is the yes/no fact "I am affected by one of these battle effects", so it is the replaceable gate
-// (an IF staff can swap or drop); there is no guard, no residual and no draw. The list is read twice: by the gate
+// (an IF staff can swap but not drop: without it the ability would fire on every entry with nothing to remove); there is no guard, no residual and no draw. The list is read twice: by the gate
 // (which effects make the ability fire) and by `apply` (which effects it removes). The library has no "affected by any
 // of a list" atom, so every user's gate is spelled as an `any` of single-effect atoms and the list param is NOT
 // editable on a live ability (moving it would leave the gate behind); `tag.has-any` is requested in requests/B03.md.
@@ -59,7 +59,7 @@ export default defineDecl(PostSummonRemoveBattlerTagAbAttr, {
       spread: true,
     },
   ],
-  conditions: [{ slot: "gate", ctx: "params", removable: true, editable: true }],
+  conditions: [{ slot: "gate", ctx: "params", removable: false, editable: true }],
   guards: [],
   feasibility: [
     "It acts only when I am affected by at least one of the listed battle effects (this is the condition above)",

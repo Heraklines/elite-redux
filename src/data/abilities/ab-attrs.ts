@@ -3232,7 +3232,21 @@ export class DownloadAbAttr extends PostSummonAbAttr {
   private enemyCountTally: number;
   private stats: BattleStat[];
 
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /**
+   * Ability studio split (spec 3.1, pure move of code): `prepare` reads the adjacent foes and writes the two rounded
+   * averages, then `residual` is the feasibility (a foe exists and both averages are above 0). The compare itself is
+   * {@linkcode gate}, which `apply` reads to pick the stat; it is NOT part of `canApply` because both outcomes act.
+   */
+  override canApply(params: AbAttrBaseParams): boolean {
+    this.prepare(params);
+    return this.residual();
+  }
+
+  /** Reads every adjacent foe (empty slots skipped) and stores the rounded average Defense and Sp. Def. */
+  private prepare({ pokemon }: AbAttrBaseParams): void {
     this.enemyDef = 0;
     this.enemySpDef = 0;
     this.enemyCountTally = 0;
@@ -3250,19 +3264,32 @@ export class DownloadAbAttr extends PostSummonAbAttr {
       this.enemyDef += opponent.getEffectiveStat(Stat.DEF);
       this.enemySpDef += opponent.getEffectiveStat(Stat.SPDEF);
     }
+    if (this.enemyCountTally > 0) {
+      this.enemyDef = Math.round(this.enemyDef / this.enemyCountTally);
+      this.enemySpDef = Math.round(this.enemySpDef / this.enemyCountTally);
+    }
+  }
+
+  /** Feasibility that stays in the class: there is a foe to read and both averages are above 0. */
+  private residual(): boolean {
     if (this.enemyCountTally === 0) {
       return false; // no opponents to read -> Download has nothing to compare
     }
-    this.enemyDef = Math.round(this.enemyDef / this.enemyCountTally);
-    this.enemySpDef = Math.round(this.enemySpDef / this.enemyCountTally);
     return this.enemyDef > 0 && this.enemySpDef > 0;
   }
 
-  override apply({ pokemon, simulated }: AbAttrBaseParams): void {
+  /** The replaceable condition: the foes' average Defense is not higher than their average Sp. Def (a tie raises Attack). */
+  public gate(_params: AbAttrBaseParams): boolean {
+    return this.enemyDef <= this.enemySpDef;
+  }
+
+  override apply(params: AbAttrBaseParams): void {
+    const { pokemon, simulated } = params;
     // ER 2.65 dex: "If Special Defense is higher OR EQUAL, raise Attack." On an
     // exact Def==SpDef tie the dex raises Attack (vanilla used strict `<`, which
     // raised Special Attack on a tie).
-    if (this.enemyDef <= this.enemySpDef) {
+    const raiseAttack = this.gateOverride === undefined ? this.gate(params) : this.gateOverride(params);
+    if (raiseAttack) {
       this.stats = [Stat.ATK];
     } else {
       this.stats = [Stat.SPATK];

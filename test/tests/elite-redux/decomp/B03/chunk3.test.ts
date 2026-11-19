@@ -59,8 +59,22 @@ const CLASSES = [
 
 const sitesOf = (className: string): AttrSite[] => allAttrSites().filter(site => site.className === className);
 
+/**
+ * Download's gate has no library atom yet (`foe.average-defense-not-higher` is requested in requests/B03.md), so its
+ * binding is a legacy closure. This closure is written by hand from the same formula the atom will use (adjacent foes,
+ * empty slots skipped, rounded per stat average, a tie is true) and is passed as an override, so the rebuild proves the
+ * gate plumbing (`gateOverride` read by `apply`) against the original.
+ */
+const downloadGate = ({ pokemon }: { pokemon: Pokemon }): boolean => {
+  const foes = pokemon.getAdjacentOpponents().filter(foe => foe != null);
+  const def = Math.round(foes.reduce((sum, foe) => sum + foe.getEffectiveStat(Stat.DEF), 0) / foes.length);
+  const spdef = Math.round(foes.reduce((sum, foe) => sum + foe.getEffectiveStat(Stat.SPDEF), 0) / foes.length);
+  return def <= spdef;
+};
+
 function rebuild(site: AttrSite): AbAttr {
-  return recomposeAttr(declRegistry.get(site.className)!, site.attr, site.abilityId, site.attrIndex);
+  const overrides = site.className === "DownloadAbAttr" ? { conds: { gate: downloadGate as never } } : {};
+  return recomposeAttr(declRegistry.get(site.className)!, site.attr, site.abilityId, site.attrIndex, overrides);
 }
 
 const STATUSES = [

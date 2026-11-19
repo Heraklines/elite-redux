@@ -263,3 +263,14 @@ bindEach(
   ],
   "gate",
 );
+
+// =============================================================================================
+// DownloadAbAttr (Tier B). Slot "gate": `enemyDef <= enemySpDef`, the foes' rounded average Defense is not higher than
+// their rounded average Sp. Def (a tie is true). No atom reads the foes' averages yet; it stays the class's own gate.
+// =============================================================================================
+bindLegacyClosure(
+  88,
+  0,
+  "Download: the gate compares the foes' rounded average Defense with their rounded average Sp. Def; needs the atom foe.average-defense-not-higher (request in requests/B03.md)",
+  "gate",
+);

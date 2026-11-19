@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "120253dedee3b0",
+  "hash": "18dbd2e8156534",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -175,8 +175,8 @@
       "className": "DownloadAbAttr",
       "label": "Raise Attack or Sp. Atk to match the foes' weaker defense",
       "summary": "When I enter the battle, my Attack rises by 1 stage if the foes' Defense is not higher than their Sp. Def, otherwise my Sp. Atk rises by 1 stage.",
-      "tier": "C",
-      "kind": "package",
+      "tier": "B",
+      "kind": "event-effect",
       "status": "decomposed",
       "when": "event.on-entry",
       "whenLabel": "When I enter the battle",
@@ -192,23 +192,47 @@
         "Raise Attack or Sp. Atk by one stage depending on the foes' weaker defense, the way the download ability does"
       ],
       "params": [],
-      "conditions": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": false,
+          "editable": true,
+          "optional": false
+        }
+      ],
       "guards": [],
       "feasibility": [
         "At least one foe next to me must exist, and the foes' average Defense and average Sp. Def must both be above 0 (they include stat stages), otherwise nothing happens and the ability does not show",
-        "The comparison uses the foes' Defense and Sp. Def after boosts and drops, rounded to a whole number per stat",
+        "The foes' Defense and Sp. Def are read after boosts and drops, rounded to a whole number per stat",
         "It does nothing in a preview"
       ],
-      "effect": {
-        "id": "effect.package",
-        "params": []
-      },
+      "branches": [
+        {
+          "label": "Raise my Attack",
+          "conditions": [
+            "foe.average-defense-not-higher (requested)"
+          ],
+          "effect": {
+            "id": "effect.stat-stage",
+            "params": []
+          }
+        },
+        {
+          "label": "Raise my Sp. Atk",
+          "conditions": [
+            "not foe.average-defense-not-higher (requested)"
+          ],
+          "effect": {
+            "id": "effect.stat-stage",
+            "params": []
+          }
+        }
+      ],
       "reusableAlone": {
         "when": true,
         "if": true,
         "do": true
       },
-      "packageReason": "Package, 1 user: Download (88 attr 0). Reason it cannot be split further today: the stat choice (the foes' average Defense against their average Sp. Def) is computed in canApply and stored on the shared instance, then read by apply; a library IF 'foes' average Defense is not higher than Sp. Def' and a two-branch form (raise Attack / raise Sp. Atk) do not exist (requests/B03.md: `foe.average-defense-not-higher`, plus an effect that raises a stat by a fixed amount for the holder that both branches can use; `effect.stat-stage` already exists for that). Trigger is separate (on entry), feasibility is written out, and extra IFs can only be ANDed on top. Quirks recorded, not fixed: the average is rounded per stat before the compare (round half up), so two foes at 100/101 Defense compare as 101; `canApply` mutates `enemyDef`, `enemySpDef`, `enemyCountTally` on the shared instance, and `apply` writes `stats` even for a simulated call, so a simulated check followed by a real one reuses the numbers of the last canApply (they are recomputed every canApply, so it is harmless); `getAdjacentOpponents` skips an empty slot, the null guard comes from a daily-run crash fix.",
       "uses": 1
     },
     {
@@ -1465,7 +1489,7 @@
           "id": "showAnim",
           "label": "Play the healing animation",
           "control": "boolean",
-          "default": false,
+          "default": true,
           "editable": true
         }
       ],
@@ -1475,12 +1499,6 @@
         "At least one active ally standing next to me must exist, otherwise nothing happens and the ability does not show",
         "It does nothing in a preview"
       ],
-      "effect": {
-        "id": "effect.heal-percent",
-        "params": [
-          "healRatio"
-        ]
-      },
       "reusableAlone": {
         "when": true,
         "if": true,
@@ -1990,7 +2008,7 @@
       "conditions": [
         {
           "slot": "gate",
-          "removable": true,
+          "removable": false,
           "editable": true,
           "optional": false
         }
