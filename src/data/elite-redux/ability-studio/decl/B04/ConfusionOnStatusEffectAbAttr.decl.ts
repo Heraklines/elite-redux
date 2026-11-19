@@ -96,7 +96,7 @@ export default defineDecl(ConfusionOnStatusEffectAbAttr, {
       max: 10,
       step: 1,
       integer: true,
-      label: "Longest time it lasts (turns)",
+      label: "Longest time it lasts (turns, not shorter than the shortest)",
       editable: true,
       default: 5,
     },

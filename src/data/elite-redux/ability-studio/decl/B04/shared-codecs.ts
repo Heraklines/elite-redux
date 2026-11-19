@@ -48,7 +48,6 @@ export const STATUS_CHOICES: readonly string[] = STATUS_NAMES.map(([name]) => na
 /** Player name of each battle effect the confusion-after-status class can apply for a chosen number of turns. */
 const TAG_NAMES: ReadonlyArray<readonly [string, BattlerTagType]> = [
   ["Confusion", BattlerTagType.CONFUSED],
-  ["Heal Block", BattlerTagType.HEAL_BLOCK],
 ];
 
 /** The battle effect choices staff see. */
