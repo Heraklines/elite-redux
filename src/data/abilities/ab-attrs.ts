@@ -1267,12 +1267,30 @@ export class PostDefendContactDamageAbAttr extends PostDefendAbAttr {
     this.damageRatio = damageRatio;
   }
 
-  override canApply({ simulated, move, opponent: attacker, pokemon }: PostMoveInteractionAbAttrParams): boolean {
-    return (
-      !simulated
-      && move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
-      && !attacker.hasAbilityWithAttr("BlockNonDirectDamageAbAttr")
-    );
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `guards` (not a simulated call), `gate`
+   * (the move makes contact), `residual` (the attacker does not block indirect damage).
+   */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Engine plumbing, not a game rule: a simulated call never damages anyone. */
+  public guards({ simulated }: PostMoveInteractionAbAttrParams): boolean {
+    return !simulated;
+  }
+
+  /** The replaceable condition: the move makes contact. */
+  public gate({ move, opponent: attacker, pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    return move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon });
+  }
+
+  /** Feasibility that stays in the class: an attacker with Magic Guard (and the like) takes no indirect damage. */
+  public residual({ opponent: attacker }: PostMoveInteractionAbAttrParams): boolean {
+    return !attacker.hasAbilityWithAttr("BlockNonDirectDamageAbAttr");
   }
 
   override apply({ opponent: attacker }: PostMoveInteractionAbAttrParams): void {
@@ -1302,11 +1320,22 @@ export class PostDefendPerishSongAbAttr extends PostDefendAbAttr {
     this.turns = turns;
   }
 
-  override canApply({ move, opponent: attacker, pokemon }: PostMoveInteractionAbAttrParams): boolean {
-    return (
-      move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
-      && !attacker.getTag(BattlerTagType.PERISH_SONG)
-    );
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `gate` (contact), then `residual`. */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the move makes contact. */
+  public gate({ move, opponent: attacker, pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    return move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon });
+  }
+
+  /** Feasibility that stays in the class: the attacker must not already carry the Perish Song countdown. */
+  public residual({ opponent: attacker }: PostMoveInteractionAbAttrParams): boolean {
+    return !attacker.getTag(BattlerTagType.PERISH_SONG);
   }
 
   override apply({ simulated, opponent: attacker, pokemon }: PostMoveInteractionAbAttrParams): void {
@@ -1353,10 +1382,23 @@ export class PostDefendWeatherChangeAbAttr extends PostDefendAbAttr {
 }
 
 export class PostDefendAbilitySwapAbAttr extends PostDefendAbAttr {
-  override canApply({ move, opponent: attacker, pokemon }: PostMoveInteractionAbAttrParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `gate` (contact), then `residual`. */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the move makes contact. */
+  public gate({ move, opponent: attacker, pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    return move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon });
+  }
+
+  /** Feasibility that stays in the class: the attacker's ability can be swapped, and the Wandering Spirit pairing rule. */
+  public residual({ opponent: attacker, pokemon }: PostMoveInteractionAbAttrParams): boolean {
     return (
-      move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
-      && attacker.getAbility().swappable
+      attacker.getAbility().swappable
       && !(
         abilityQuery(pokemon, ENGINE_QUERY.WANDERING_SPIRIT_SWAP)
         && (attacker.hasAbility(AbilityId.MUMMY)
@@ -1389,15 +1431,32 @@ export class PostDefendAbilityGiveAbAttr extends PostDefendAbAttr {
     this.ability = ability;
   }
 
-  override canApply({ move, opponent: attacker, pokemon }: PostMoveInteractionAbAttrParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `gate` (contact), then `residual`. */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the move makes contact. */
+  public gate({ move, opponent: attacker, pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    return move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon });
+  }
+
+  /**
+   * Feasibility that stays in the class: the attacker's ability can be suppressed, it is not itself a giving ability,
+   * and the Mummy family never overwrites another Mummy-family ability. (The family test is side-effect free, so
+   * evaluating it after the contact test instead of before it changes nothing.)
+   */
+  public residual({ opponent: attacker }: PostMoveInteractionAbAttrParams): boolean {
     const mummyFamily =
       [AbilityId.MUMMY, AbilityId.LINGERING_AROMA].includes(this.ability)
       && (attacker.hasAbility(AbilityId.MUMMY)
         || attacker.hasAbility(AbilityId.LINGERING_AROMA)
         || abilityQuery(attacker, ENGINE_QUERY.WANDERING_SPIRIT_SWAP));
     return (
-      move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
-      && attacker.getAbility().suppressable
+      attacker.getAbility().suppressable
       && !attacker.getAbility().hasAttr("PostDefendAbilityGiveAbAttr")
       && !mummyFamily
     );
@@ -1426,7 +1485,20 @@ export class PostDefendMoveDisableAbAttr extends PostDefendAbAttr {
     this.chance = chance;
   }
 
-  override canApply({ move, opponent: attacker, pokemon }: PostMoveInteractionAbAttrParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1). The whole rule is the gate, in the ORIGINAL clause order: the attacker is
+   * not disabled yet, the move makes contact, then the chance roll (the only random draw, never reached for a
+   * non-contact hit or an already disabled attacker). There is no residual.
+   */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: not disabled yet, contact, and the chance roll. */
+  public gate({ move, opponent: attacker, pokemon }: PostMoveInteractionAbAttrParams): boolean {
     return (
       attacker.getTag(BattlerTagType.DISABLED) == null
       && move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
