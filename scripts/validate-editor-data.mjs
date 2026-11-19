@@ -164,6 +164,17 @@ const tmLearnsets = requireObject("tm-learnsets.json", 1_500);
 const speciesAbilities = requireObject("species-abilities.json", 1_500);
 const evolutions = requireObject("evolutions.json", 500);
 const formulaCatalog = requireObject("formulas.json", 3);
+// The ability vocabulary catalog (test/tests/elite-redux/tools/catalog-writer.ts): the three files must come from
+// the same vocabulary and the same blocks, or the editor and the AI would read a mixed state.
+const vocabularyCatalog = requireObject("vocabulary.json", 5);
+const blockCatalog = requireObject("blocks.json", 4);
+const instanceCatalog = requireObject("instances.json", 4);
+if (blockCatalog.vocabularyHash !== vocabularyCatalog.hash) {
+  failures.push("blocks.json: generated from a different vocabulary than vocabulary.json");
+}
+if (instanceCatalog.vocabularyHash !== vocabularyCatalog.hash || instanceCatalog.blocksHash !== blockCatalog.hash) {
+  failures.push("instances.json: generated from a different vocabulary or blocks than vocabulary.json and blocks.json");
+}
 
 const speciesById = uniqueIndex(allSpecies, "id", "all-species.json");
 const speciesByConst = uniqueIndex(allSpecies, "const", "all-species.json");
