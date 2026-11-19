@@ -19,7 +19,6 @@ bindCondition(5065, 0, { id: "move.is-move", moveId: "HYPNOSIS" }, "gate"); // H
 bindCondition(5103, 2, { id: "move.is-move", moveId: "HYPNOSIS" }, "gate"); // Lunar Eclipse, [HYPNOSIS], 90
 bindCondition(5487, 0, { id: "move.is-move", moveId: "SING" }, "gate"); // Lullaby, [SING], 90
 
-
 // =============================================================================================
 // Chunk 2 of 4. Written by hand from the live attrs (the dump printed every closure and field).
 // =============================================================================================
@@ -126,3 +125,50 @@ bindLegacyClosure(
   "Penta-Punch: the rule is move.id === ErMoveId.FIVE_STAR_FURY (5156), an Elite Redux move id; move.is-move only names MoveId members (request R-B05-13)",
   "gate",
 ); // Penta-Punch
+
+// =============================================================================================
+// Chunk 3 of 4. Written by hand from the live attrs (the dump printed every field).
+// BlockWeatherDamageAttr, SuppressWeatherEffectAbAttr, FriskAbAttr and PostWeatherChangeFormChangeAbAttr have no closure and
+// no gate (their settings are constructor values), so they need no binding. The four Tier B classes below each have ONE gate.
+// =============================================================================================
+
+// The new weather is hail or snow: `weather === WeatherType.HAIL || weather === WeatherType.SNOW`.
+bindCondition(
+  248,
+  3,
+  {
+    any: [
+      { id: "field.weather", weather: "HAIL" },
+      { id: "field.weather", weather: "SNOW" },
+    ],
+  },
+  "gate",
+); // Ice Face (IceFaceFormChangeAbAttr, form 1)
+
+// The weather is fog or eerie fog: `isFogWeather(weather)` = `weather === FOG || weather === EERIE_FOG`. The attr is told the NEW weather
+// (arena.ts:537) and the arena has already stored it, so `arena.weatherType` (the atom) is the same value.
+const IS_FOG = {
+  any: [
+    { id: "field.weather", weather: "FOG" },
+    { id: "field.weather", weather: "EERIE_FOG" },
+  ],
+};
+bindCondition(209, 5, IS_FOG, "gate"); // Disguise, when fog is set (FogRestoreDisguiseFormChangeAbAttr)
+bindCondition(5396, 5, IS_FOG, "gate"); // Patchwork, when fog is set
+bindCondition(5396, 7, IS_FOG, "gate"); // Patchwork, when fog is set (second copy of the pair)
+bindCondition(209, 6, IS_FOG, "gate"); // Disguise, on entry in fog (PostSummonFogRestoreDisguiseAbAttr)
+bindCondition(5396, 6, IS_FOG, "gate"); // Patchwork, on entry in fog
+bindCondition(5396, 8, IS_FOG, "gate"); // Patchwork, on entry in fog (second copy of the pair)
+
+// The new weather is one of the listed ones: `weatherTypes.includes(weather)` with [SUNNY, HARSH_SUN].
+bindCondition(
+  281,
+  1,
+  {
+    any: [
+      { id: "field.weather", weather: "SUNNY" },
+      { id: "field.weather", weather: "HARSH_SUN" },
+    ],
+  },
+  "gate",
+); // Protosynthesis (PostWeatherChangeAddBattlerTagAbAttr)

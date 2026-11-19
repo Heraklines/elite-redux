@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "01f4130a832567",
+  "hash": "0c66eea3ba085d",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -257,6 +257,58 @@
         "do": true
       },
       "uses": 6
+    },
+    {
+      "id": "block.block-weather-damage-attr",
+      "className": "BlockWeatherDamageAttr",
+      "label": "Take no damage from chosen weather",
+      "summary": "I take no end-of-turn damage from these weathers: Sandstorm. Example: no sandstorm chip damage, like Sand Veil.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.weather-damage",
+      "whenLabel": "While the game checks if weather damage hurts me",
+      "synonyms": [
+        "sand veil",
+        "overcoat",
+        "ice body",
+        "no sandstorm damage",
+        "no hail damage",
+        "weather immunity",
+        "weather chip immunity"
+      ],
+      "examples": [
+        "No damage in a sandstorm, like Sand Veil",
+        "No damage from hail or snow, like Slush Rush",
+        "Immune to every weather, like Overcoat"
+      ],
+      "params": [
+        {
+          "id": "weathers",
+          "label": "Weathers it protects from (comma separated names, empty = every weather)",
+          "control": "text",
+          "default": "SANDSTORM",
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when there is no weather",
+        "Does nothing when the damage was already blocked by something earlier"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": [
+          "weathers"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 21
     },
     {
       "id": "block.bonus-crit",
@@ -585,6 +637,110 @@
       "uses": 5
     },
     {
+      "id": "block.fog-restore-disguise-form-change",
+      "className": "FogRestoreDisguiseFormChangeAbAttr",
+      "label": "Restore my broken disguise when fog sets in",
+      "summary": "When the weather changes to fog and I am in form number 1 (my broken disguise), my disguise is restored.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.weather-changed",
+      "whenLabel": "When the weather changes",
+      "synonyms": [
+        "disguise",
+        "patchwork",
+        "mimikyu",
+        "restore disguise",
+        "repair disguise in fog",
+        "fog heal form",
+        "busted form"
+      ],
+      "examples": [
+        "Put my disguise back when fog is set, like Patchwork"
+      ],
+      "params": [
+        {
+          "id": "bustedFormIndex",
+          "label": "Form number of my broken disguise (0 = first form, 1 = second form)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 0,
+          "max": 30,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "field.weather",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only while I am in the broken-disguise form named by the setting above, so fog never breaks an intact disguise",
+        "Which form I return to comes from the species' own form-change table",
+        "Nothing happens during a simulated check"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "bustedFormIndex"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.frisk",
+      "className": "FriskAbAttr",
+      "label": "Reveal the foes' held items",
+      "summary": "When I enter, I look at what every foe is holding and list the items in the battle log. Example: Garchomp is holding Leftovers.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "frisk",
+        "gleam eyes",
+        "reveal items",
+        "check held items",
+        "scout items",
+        "search foe items",
+        "show foe items"
+      ],
+      "examples": [
+        "Show every foe's held items when I enter, like Gleam Eyes"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A foe that holds nothing is skipped and gets no message",
+        "Nothing is revealed during a simulated check"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
       "id": "block.hp-threshold-form-change",
       "className": "HpThresholdFormChangeAbAttr",
       "label": "Change form depending on my HP",
@@ -701,6 +857,69 @@
         "do": true
       },
       "uses": 2
+    },
+    {
+      "id": "block.ice-face-form-change",
+      "className": "IceFaceFormChangeAbAttr",
+      "label": "Restore my ice face when hail or snow starts",
+      "summary": "When the weather changes and I am in form number 1 (my broken-face form), I get my face back if the new weather is hail or snow.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.weather-changed",
+      "whenLabel": "When the weather changes",
+      "synonyms": [
+        "ice face",
+        "eiscue",
+        "restore face",
+        "ice head",
+        "regain ice face",
+        "repair face in snow"
+      ],
+      "examples": [
+        "Get my ice face back when it starts to hail or snow, like Ice Face"
+      ],
+      "params": [
+        {
+          "id": "formIndex",
+          "label": "Form number of my broken-face form (0 = first form, 1 = second form)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 0,
+          "max": 30,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "field.weather",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only while I am in the broken-face form named by the setting above",
+        "Which form I return to comes from the species' own form-change table",
+        "Nothing happens during a simulated check"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "formIndex"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.ignore-contact",
@@ -1014,6 +1233,70 @@
       "uses": 1
     },
     {
+      "id": "block.post-summon-fog-restore-disguise",
+      "className": "PostSummonFogRestoreDisguiseAbAttr",
+      "label": "Restore my broken disguise when I enter in fog",
+      "summary": "When I enter the battle during fog and I am in form number 1 (my broken disguise), my disguise is restored.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "disguise",
+        "patchwork",
+        "mimikyu",
+        "restore disguise on entry",
+        "repair disguise in fog",
+        "busted form"
+      ],
+      "examples": [
+        "Put my disguise back when I switch in while it is foggy, like Patchwork"
+      ],
+      "params": [
+        {
+          "id": "bustedFormIndex",
+          "label": "Form number of my broken disguise (0 = first form, 1 = second form)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 0,
+          "max": 30,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "field.weather",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only while I am in the broken-disguise form named by the setting above",
+        "It does not run again when I change form during the battle, so a disguise that just broke is not restored at once",
+        "Which form I return to comes from the species' own form-change table",
+        "Nothing happens during a simulated check"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "bustedFormIndex"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
       "id": "block.post-summon-weather-change",
       "className": "PostSummonWeatherChangeAbAttr",
       "label": "Set the weather when I enter",
@@ -1076,6 +1359,269 @@
         "do": true
       },
       "uses": 7
+    },
+    {
+      "id": "block.post-weather-change-add-battler-tag",
+      "className": "PostWeatherChangeAddBattlerTagAbAttr",
+      "label": "Gain a battle effect when a chosen weather starts",
+      "summary": "When the weather changes to one of: Sun, Extremely harsh sunlight, I gain the effect Protosynthesis. Example: Protosynthesis starts when the sun comes out.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.weather-changed",
+      "whenLabel": "When the weather changes",
+      "synonyms": [
+        "protosynthesis",
+        "weather boost start",
+        "gain effect in sun",
+        "start boost when weather changes",
+        "weather tag",
+        "sun boost"
+      ],
+      "examples": [
+        "Start my sun boost when the sun comes out, like Protosynthesis"
+      ],
+      "params": [
+        {
+          "id": "tag",
+          "label": "Battle effect I gain",
+          "control": "select",
+          "default": "PROTOSYNTHESIS",
+          "editable": true,
+          "options": [
+            "RECHARGING",
+            "FLINCHED",
+            "INTERRUPTED",
+            "SKY_DROP",
+            "CONFUSED",
+            "INFATUATED",
+            "SEEDED",
+            "NIGHTMARE",
+            "FRENZY",
+            "CHARGING",
+            "ENCORE",
+            "HELPING_HAND",
+            "INGRAIN",
+            "OCTOLOCK",
+            "AQUA_RING",
+            "DROWSY",
+            "TRAPPED",
+            "BIND",
+            "WRAP",
+            "FIRE_SPIN",
+            "WHIRLPOOL",
+            "CLAMP",
+            "SAND_TOMB",
+            "MAGMA_STORM",
+            "SNAP_TRAP",
+            "THUNDER_CAGE",
+            "INFESTATION",
+            "PROTECTED",
+            "SPIKY_SHIELD",
+            "KINGS_SHIELD",
+            "OBSTRUCT",
+            "SILK_TRAP",
+            "MIND_READER",
+            "BANEFUL_BUNKER",
+            "BURNING_BULWARK",
+            "ER_PARALYZING_SHIELD",
+            "ER_TANGLING_HUSK",
+            "ENDURING",
+            "STURDY",
+            "PERISH_SONG",
+            "TRUANT",
+            "SLOW_START",
+            "PROTOSYNTHESIS",
+            "QUARK_DRIVE",
+            "FLYING",
+            "UNDERGROUND",
+            "UNDERWATER",
+            "HIDDEN",
+            "FIRE_BOOST",
+            "CRIT_BOOST",
+            "ALWAYS_CRIT",
+            "IGNORE_ACCURACY",
+            "IGNORE_FLYING",
+            "SALT_CURED",
+            "CURSED",
+            "ER_SLAB_CURSE",
+            "CHARGED",
+            "ROOSTED",
+            "FLOATING",
+            "MINIMIZED",
+            "DESTINY_BOND",
+            "CENTER_OF_ATTENTION",
+            "STOCKPILING",
+            "RECEIVE_DOUBLE_DAMAGE",
+            "ALWAYS_GET_HIT",
+            "DISABLED",
+            "SUBSTITUTE",
+            "IGNORE_GHOST",
+            "IGNORE_DARK",
+            "GULP_MISSILE_ARROKUDA",
+            "GULP_MISSILE_PIKACHU",
+            "BEAK_BLAST_CHARGING",
+            "SHELL_TRAP",
+            "DRAGON_CHEER",
+            "NO_RETREAT",
+            "GORILLA_TACTICS",
+            "UNBURDEN",
+            "THROAT_CHOPPED",
+            "TAR_SHOT",
+            "BURNED_UP",
+            "DOUBLE_SHOCKED",
+            "AUTOTOMIZED",
+            "MYSTERY_ENCOUNTER_POST_SUMMON",
+            "POWER_TRICK",
+            "HEAL_BLOCK",
+            "TORMENT",
+            "TAUNT",
+            "IMPRISON",
+            "SYRUP_BOMB",
+            "ELECTRIFIED",
+            "TELEKINESIS",
+            "COMMANDED",
+            "GRUDGE",
+            "PSYCHO_SHIFT",
+            "ENDURE_TOKEN",
+            "POWDER",
+            "MAGIC_COAT",
+            "SUPREME_OVERLORD",
+            "BYPASS_SPEED",
+            "SNATCH",
+            "ME_FIRST",
+            "ER_BLEED",
+            "ER_FROSTBITE",
+            "ER_FEAR",
+            "ER_ITEM_DISABLED",
+            "ER_SILKEN_DECREE",
+            "ER_ICE_STATUE",
+            "ER_PARASITIC_SPORES",
+            "ER_DESPAIR",
+            "ER_DRENCHED",
+            "ER_ENRAGE",
+            "ER_QUASHED",
+            "ER_EMPOWERED_SWITCH_IN",
+            "ER_COMMANDED",
+            "ER_SAFE_PASSAGE",
+            "ER_SAGE_POWER_LOCK",
+            "ER_BLIND_JUSTICE",
+            "ER_CONFECTED",
+            "ER_IRRADIATED_TOXIC",
+            "ER_IRRADIATED_LOCK",
+            "ER_BREACHED",
+            "ER_EMBEDDED",
+            "ER_DECAY_POISON"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "turns",
+          "label": "Turns the effect lasts (0 = until something removes it)",
+          "control": "number",
+          "default": 0,
+          "editable": true,
+          "min": 0,
+          "max": 99,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "weathers",
+          "label": "Weathers that start it (comma separated names)",
+          "control": "text",
+          "default": "SUNNY,HARSH_SUN",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "field.weather",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "I must be able to take that battle effect (for example I do not already have it)",
+        "Nothing happens during a simulated check"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "tag",
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.post-weather-change-form-change",
+      "className": "PostWeatherChangeFormChangeAbAttr",
+      "label": "Change form with the weather (like Forecast)",
+      "summary": "When the weather changes, my form follows it, and goes back to my normal form in: None, Sandstorm, Strong winds. Works only for Castform and Cherrim.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.weather-changed",
+      "whenLabel": "When the weather changes",
+      "synonyms": [
+        "forecast",
+        "flower gift",
+        "weather form",
+        "castform form",
+        "cherrim form",
+        "change form with weather",
+        "sunny form"
+      ],
+      "examples": [
+        "Castform turns into its Sunny, Rainy or Snowy form when the weather changes, like Forecast"
+      ],
+      "params": [
+        {
+          "id": "ability",
+          "label": "Which ability's form change this is (Forecast for Castform, Flower Gift for Cherrim)",
+          "control": "text",
+          "default": "FORECAST",
+          "editable": false
+        },
+        {
+          "id": "revertWeathers",
+          "label": "Weathers that send me back to my normal form (comma separated names)",
+          "control": "text",
+          "default": "NONE,SANDSTORM,STRONG_WINDS",
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only Castform with Forecast and Cherrim with Flower Gift do anything; any other Pokemon is skipped",
+        "The target form comes from the species' own form-change table, not from this block",
+        "Nothing happens during a simulated check"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "ability",
+          "revertWeathers"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package, justified: canApply is an identity test (Castform with Forecast, Cherrim with Flower Gift) and apply does not use the weather of the call but asks the arena to re-run every form change on the field, so it cannot be split into a rule and a change without inventing behaviour. Typed params: the ability (not editable, it names the species) and the weather list. Users: Forecast (59 attr 2, revert list NONE, SANDSTORM, STRONG_WINDS) and Flower Gift (122 attr 2, revert list NONE, SANDSTORM, STRONG_WINDS, FOG, HAIL, HEAVY_RAIN, SNOW, RAIN). Nothing to bind (no closure). Oddity, not fixed: apply reads `globalScene.arena.weather` instead of the weather it was given (the class carries a TODO for it). The arena methods it calls (triggerWeatherBasedFormChanges and triggerWeatherBasedFormChangesToNormal, arena.ts:555 and :574) look for the Pokemon by ability IDENTITY with abilityQuery(FORECAST_FORM / FLOWER_GIFT_FORM), so a staff-made ability built from this block changes form only if it is Forecast or Flower Gift itself (an engine-query dependency owned by the foundation, R-B05-23). The species check also means a staff-made ability that uses this block on another species does nothing. The shared L2 holder is not Castform, so the whole-battle twin only proves the attr is skipped; the real form changes are driven in test/tests/elite-redux/decomp/B05/chunk3-sites.test.ts.",
+      "uses": 2
     },
     {
       "id": "block.received-move-damage-multiplier",
@@ -1391,6 +1937,58 @@
         "do": true
       },
       "uses": 1
+    },
+    {
+      "id": "block.suppress-weather-effect",
+      "className": "SuppressWeatherEffectAbAttr",
+      "label": "Switch off the weather while I am out",
+      "summary": "While I am on the field, the weather does nothing: no damage, no boosts or penalties. This includes Heavy rain, Extremely harsh sunlight and Strong winds.",
+      "tier": "A",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "cancel.weather-suppress",
+      "whenLabel": "While the game checks if weather is suppressed",
+      "synonyms": [
+        "cloud nine",
+        "air lock",
+        "no weather",
+        "weather off",
+        "ignore weather",
+        "negate weather",
+        "in the clouds"
+      ],
+      "examples": [
+        "Rain and sun have no effect while I am out, like Cloud Nine",
+        "Weather stops hurting and boosting everyone, like Air Lock"
+      ],
+      "params": [
+        {
+          "id": "affectsImmutable",
+          "label": "Also switch off Heavy rain, Extremely harsh sunlight and Strong winds",
+          "control": "boolean",
+          "default": true,
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "It stops working while the holder's own ability is suppressed (Neutralizing Gas, Gastro Acid style effects)",
+        "The weather stays set and counts again when the holder leaves the field",
+        "Does nothing when there is no weather or an earlier ability already cancelled the damage"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": [
+          "affectsImmutable"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 4
     }
   ]
 }

@@ -299,6 +299,32 @@ export const TEMPLATES: Readonly<Record<string, ScenarioSpec>> = {
       }
     },
   },
+  /** B05 chunk 3. A damaging weather is already up (the axis picks which) and the holder sits through its end-of-turn ticks. */
+  "holder-in-damaging-weather": {
+    ...BASE,
+    id: "holder-in-damaging-weather",
+    label: "A damaging weather blows and the holder sits through three turns",
+    weather: WeatherType.SANDSTORM,
+    foeMoves: [MoveId.CELEBRATE],
+    turns: [celebrate(), celebrate(), celebrate()],
+    // Abilities such as Sand Veil or Slush Rush only count while THEIR weather is up (an ability-level condition), so the engine
+    // does not even look at their attrs in another weather. The holder therefore gets the first damaging weather its own
+    // weather-block lists (Sandstorm when it lists none, as for Cloud Nine and Overcoat).
+    setup: ({ game, holder }) => {
+      const listed = holder
+        .getAbility()
+        .getAttrs("PreWeatherDamageAbAttr")
+        .flatMap(attr => ((attr as unknown as { weatherTypes?: readonly WeatherType[] }).weatherTypes ?? []).slice());
+      const damaging = listed.find(
+        type =>
+          type === WeatherType.SANDSTORM
+          || type === WeatherType.HAIL
+          || type === WeatherType.TEMPEST_STORM
+          || type === WeatherType.SNOWY_WRATH,
+      );
+      setWeatherOf(game, damaging ?? WeatherType.SANDSTORM);
+    },
+  },
   /** The holder is low enough to want its berry; the enemy hits it. */
   "holder-low-hp-turns": {
     ...BASE,
@@ -351,6 +377,7 @@ const t = {
   flags: "while-active-flags",
   holderCrits: "holder-crits-foe",
   statusTurns: "holder-status-turns",
+  damagingWeather: "holder-in-damaging-weather",
 } as const;
 
 /** WHEN id to the template that reaches it. Reviewed by hand; `reach.test.ts` proves it with a probe attr. */
@@ -435,9 +462,9 @@ const WHEN_TEMPLATE: Readonly<Record<string, string>> = {
   "cancel.battle-effect": t.inflicted,
   "cancel.battle-effect-immunity": t.inflicted,
   "cancel.battle-effect-immunity-field": t.inflicted,
-  "cancel.weather-damage": t.weather,
-  "cancel.weather-effect": t.weather,
-  "cancel.weather-suppress": t.weather,
+  "cancel.weather-damage": t.damagingWeather,
+  "cancel.weather-effect": t.damagingWeather,
+  "cancel.weather-suppress": t.damagingWeather,
   "cancel.interaction": t.hit,
   "cancel.crit": t.crit,
   "cancel.item-theft": t.item,

@@ -13,6 +13,7 @@
 // status / weather / stage / type variants that matter, instead of a full cartesian product. The
 // world is mutated once per state and every binding is evaluated inside that state.
 
+import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import { Gender } from "#data/gender";
 import { Status } from "#data/status-effect";
@@ -403,4 +404,18 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
   // Cancel checks with no opponent (turn-end-phase.ts:89, move.ts:4713).
   "cancel.indirect-damage": ctx => ({ pokemon: ctx.holder, cancelled: new BooleanHolder(false) }),
   "cancel.one-hit-ko": ctx => ({ pokemon: ctx.holder, cancelled: new BooleanHolder(false) }),
+  // Added by B05 chunk 3. WeatherEffectPhase (weather-effect-phase.ts:94 and :101): the holder and the weather on the field
+  // (null when there is none), a fresh "cancelled" flag.
+  "cancel.weather-damage": ctx => ({
+    pokemon: ctx.holder,
+    weather: globalScene.arena.weather,
+    cancelled: new BooleanHolder(false),
+  }),
+  "cancel.weather-suppress": ctx => ({
+    pokemon: ctx.holder,
+    weather: globalScene.arena.weather,
+    cancelled: new BooleanHolder(false),
+  }),
+  // Arena.trySetWeather (arena.ts:537): the weather it was just changed to (the arena has stored it already).
+  "event.weather-changed": ctx => ({ pokemon: ctx.holder, weather: globalScene.arena.weatherType, simulated: false }),
 };
