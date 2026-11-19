@@ -6560,6 +6560,9 @@ async function init() {
       customAbilitiesLive,
       formulasData,
       observedData,
+      abilityVocabularyData,
+      abilityBlocksData,
+      abilityGatesData,
     ] = await Promise.all([
       fetch("./data/species.json").then(r => r.json()),
       fetch("./data/moves.json").then(r => r.json()),
@@ -6613,6 +6616,11 @@ async function init() {
       fetchJson(`${LIVE_BASE}/er-custom-abilities.json${bust}`, {}),
       fetchJson("./data/formulas.json", { operations: [], functions: [], formulas: [] }),
       fetchJson(BALANCE_OBSERVATIONS_URL, { windows: {} }),
+      // Ability Studio block builder (generated from the game: triggers, conditions, effects, safety rules).
+      // Missing files only switch the block builder off; the classic builder keeps working.
+      fetchJson("./data/vocabulary.json", null),
+      fetchJson("./data/blocks.json", null),
+      fetchJson("./data/gates.json", null),
     ]);
     SPECIES = species;
     MOVES = moves;
@@ -6666,6 +6674,9 @@ async function init() {
         moves: MOVES_RICH,
         mechanics: abilityMechanicsData,
         components: abilityComponentsData,
+        vocabulary: abilityVocabularyData,
+        blocks: abilityBlocksData,
+        gates: abilityGatesData,
         blueprints: customAbilitiesLive,
         aiEndpoint: ABILITY_AI_URL,
         loadSavedBlueprints: () => fetchJson(`${LIVE_BASE}/er-custom-abilities.json?t=${Date.now()}`, {}),
