@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "191c35e760f03c",
+  "hash": "0395808edf8e04",
   "blocks": [
     {
       "id": "block.add-second-strike",
       "className": "AddSecondStrikeAbAttr",
-      "label": "Add an extra strike to my attacking moves",
-      "summary": "My single-target damaging moves hit one extra time. Moves that already hit several times, charging moves, spread moves and status moves are left alone.",
+      "label": "Add extra strikes to my attacking moves",
+      "summary": "My single-target damaging moves hit 1 extra time(s). Moves that already hit several times, charging moves, spread moves and status moves are left alone. Example: 1 = Parental Bond.",
       "tier": "C",
       "kind": "calc-modifier",
       "status": "decomposed",
@@ -24,7 +24,20 @@
       "examples": [
         "Every attacking move hits twice, like Parental Bond"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "strikes",
+          "label": "Extra strikes added to the move (1 = Parental Bond)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 4,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
       "conditions": [],
       "guards": [],
       "feasibility": [
@@ -32,7 +45,9 @@
       ],
       "effect": {
         "id": "effect.package",
-        "params": []
+        "params": [
+          "strikes"
+        ]
       },
       "reusableAlone": {
         "when": true,
@@ -44,9 +59,9 @@
     {
       "id": "block.all-attacks-multi-hit",
       "className": "AllAttacksMultiHitAbAttr",
-      "label": "Make my single-hit attacks hit 2 to 5 times",
-      "summary": "My single-hit damaging moves hit 2 to 5 times: 2 or 3 hits 35% of the time each, 4 or 5 hits 15% each. Skill Link makes it 5 every time.",
-      "tier": "C",
+      "label": "Make my single-hit attacks hit several times",
+      "summary": "My single-hit damaging moves hit 2, 3, 4 or 5 times, with 35%, 35% and 15% chances for the first three. Skill Link: always the last.",
+      "tier": "B",
       "kind": "calc-modifier",
       "status": "decomposed",
       "when": "calc.hit-count",
@@ -62,16 +77,116 @@
       "examples": [
         "Every attacking move hits 2 to 5 times, like Unrelenting"
       ],
-      "params": [],
-      "conditions": [],
+      "params": [
+        {
+          "id": "lowHits",
+          "label": "Number of hits in the first outcome (Unrelenting: 2 hits)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "midHits",
+          "label": "Number of hits in the second outcome (Unrelenting: 3 hits)",
+          "control": "number",
+          "default": 3,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "highHits",
+          "label": "Number of hits in the third outcome (Unrelenting: 4 hits)",
+          "control": "number",
+          "default": 4,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "topHits",
+          "label": "Number of hits in the last outcome, which gets the remaining chance (Unrelenting: 5 hits)",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "lowPct",
+          "label": "Chance in percent of the first number of hits (Unrelenting: 35 percent, steps of 5)",
+          "control": "number",
+          "default": 35,
+          "editable": true,
+          "min": 0,
+          "max": 100,
+          "step": 5,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "midPct",
+          "label": "Chance in percent of the second number of hits (Unrelenting: 35 percent, steps of 5)",
+          "control": "number",
+          "default": 35,
+          "editable": true,
+          "min": 0,
+          "max": 100,
+          "step": 5,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "highPct",
+          "label": "Chance in percent of the third number of hits (Unrelenting: 15 percent, steps of 5)",
+          "control": "number",
+          "default": 15,
+          "editable": true,
+          "min": 0,
+          "max": 100,
+          "step": 5,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "not move.multi-hit",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
       "guards": [],
       "feasibility": [
-        "The move must still be a single hit (it never shrinks a move that already hits more than once)",
         "The move must be able to take extra strikes: a damaging move that is not a charging move, not a spread move with several targets, not already a multi-hit or self-sacrificing move, and not Fling, Uproar, Rollout, Ice Ball or Endeavor"
       ],
       "effect": {
         "id": "effect.package",
-        "params": []
+        "params": [
+          "lowHits",
+          "midHits",
+          "highHits",
+          "topHits",
+          "lowPct",
+          "midPct",
+          "highPct"
+        ]
       },
       "reusableAlone": {
         "when": true,
@@ -613,9 +728,7 @@
         }
       ],
       "guards": [],
-      "feasibility": [
-        "Moves whose type is fixed by the move itself (Weather Ball, Judgment, Multi Attack, Terrain Pulse, Natural Gift, Techno Blast, Hidden Power, Revelation Dance) are never changed by the Normalize family"
-      ],
+      "feasibility": [],
       "effect": {
         "id": "effect.change-move-type",
         "params": [

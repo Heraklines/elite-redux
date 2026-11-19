@@ -1821,12 +1821,23 @@ export interface AddSecondStrikeAbAttrParams extends Omit<AugmentMoveInteraction
  * @see {@linkcode MoveId.PARENTAL_BOND | Parental Bond}
  */
 export class AddSecondStrikeAbAttr extends PreAttackAbAttr {
+  /**
+   * How many extra strikes are added (Parental Bond: 1). Behaviour-identical refactor for the ability studio: the
+   * number used to be a literal in {@linkcode apply}. Subclasses call `super()` and override `apply`.
+   */
+  public readonly strikesToAdd: number;
+
+  constructor(strikesToAdd = 1) {
+    super();
+    this.strikesToAdd = strikesToAdd;
+  }
+
   override canApply({ pokemon, opponent, move }: AddSecondStrikeAbAttrParams): boolean {
     return move.canBeMultiStrikeEnhanced(pokemon, true, opponent);
   }
 
   override apply({ hitCount }: AddSecondStrikeAbAttrParams): void {
-    hitCount.value += 1;
+    hitCount.value += this.strikesToAdd;
   }
 }
 
@@ -1837,10 +1848,47 @@ export class AddSecondStrikeAbAttr extends PreAttackAbAttr {
  * {@linkcode MultiHitType.TWO_TO_FIVE}. Only fires when the move is still a
  * single hit (so it never shrinks an existing multi-hit move) and passes the
  * standard multi-strike eligibility filter (excludes OHKO/charge/etc.).
+ *
+ * Ability studio refactor (behaviour-identical): the hit counts and the odds are constructor arguments whose
+ * defaults are the old literals (2/3/4/5 hits at 35/35/15/15 percent, on one 20-sided roll, so every percentage is a
+ * multiple of 5), and `canApply` is split into `gate` (still a single hit) and `residual` (the eligibility filter).
  */
 export class AllAttacksMultiHitAbAttr extends PreAttackAbAttr {
-  override canApply({ pokemon, opponent, move, hitCount }: AddSecondStrikeAbAttrParams): boolean {
-    return hitCount.value === 1 && move.canBeMultiStrikeEnhanced(pokemon, true, opponent);
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AddSecondStrikeAbAttrParams) => boolean) | undefined;
+
+  constructor(
+    /** Hit count of the first outcome, the highest rolls (default 2, 35 percent). */
+    public readonly lowHits = 2,
+    /** Hit count of the second outcome (default 3, 35 percent). */
+    public readonly midHits = 3,
+    /** Hit count of the third outcome (default 4, 15 percent). */
+    public readonly highHits = 4,
+    /** Hit count of the last outcome, which gets the remaining percent (default 5, 15 percent). */
+    public readonly topHits = 5,
+    /** Chance in percent (a multiple of 5) of {@linkcode lowHits}. */
+    public readonly lowPct = 35,
+    /** Chance in percent (a multiple of 5) of {@linkcode midHits}. */
+    public readonly midPct = 35,
+    /** Chance in percent (a multiple of 5) of {@linkcode highHits}. */
+    public readonly highPct = 15,
+  ) {
+    super();
+  }
+
+  /** Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `gate` (still one hit), then `residual`. */
+  override canApply(params: AddSecondStrikeAbAttrParams): boolean {
+    return gatedCanApply<AddSecondStrikeAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the move would still hit once. */
+  public gate({ hitCount }: AddSecondStrikeAbAttrParams): boolean {
+    return hitCount.value === 1;
+  }
+
+  /** Feasibility that stays in the class: the move can take extra strikes. */
+  public residual({ pokemon, opponent, move }: AddSecondStrikeAbAttrParams): boolean {
+    return move.canBeMultiStrikeEnhanced(pokemon, true, opponent);
   }
 
   override apply({ pokemon, hitCount }: AddSecondStrikeAbAttrParams): void {
@@ -1848,7 +1896,18 @@ export class AllAttacksMultiHitAbAttr extends PreAttackAbAttr {
     // Skill Link (MaxMultiHitAbAttr) override, so the distribution matches.
     const hitValue = new NumberHolder(pokemon.randBattleSeedInt(20));
     applyAbAttrs("MaxMultiHitAbAttr", { pokemon, hits: hitValue });
-    hitCount.value = hitValue.value >= 13 ? 2 : hitValue.value >= 6 ? 3 : hitValue.value >= 3 ? 4 : 5;
+    // The defaults give the old cut-offs 13, 6 and 3.
+    const lowCut = 20 - this.lowPct / 5;
+    const midCut = 20 - (this.lowPct + this.midPct) / 5;
+    const highCut = 20 - (this.lowPct + this.midPct + this.highPct) / 5;
+    hitCount.value =
+      hitValue.value >= lowCut
+        ? this.lowHits
+        : hitValue.value >= midCut
+          ? this.midHits
+          : hitValue.value >= highCut
+            ? this.highHits
+            : this.topHits;
   }
 }
 

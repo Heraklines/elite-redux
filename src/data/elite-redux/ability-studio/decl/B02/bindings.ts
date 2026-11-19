@@ -180,3 +180,9 @@ for (const [abilityId, attrIndex] of [
 ] as const) {
   bindLegacyClosure(abilityId, attrIndex, SOUND_AND_NORMAL_AND_ANY_REASON, "ctor:1");
 }
+
+// =============================================================================================
+// AllAttacksMultiHitAbAttr (Tier B). Slot "gate": `hitCount.value === 1` is `not move.multi-hit` (hits.count > 1; the
+// count starts at 1 and is only raised). The canBeMultiStrikeEnhanced eligibility test is the residual.
+// =============================================================================================
+bindEach({ not: { id: "move.multi-hit" } }, [[5695, 0, "Unrelenting"]], "gate");

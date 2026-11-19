@@ -370,7 +370,11 @@ export function runAttrDifferential(
               say("getCondition", origCondValue, newCondValue);
             }
             if (pair.calc && origCan && newCan) {
+              // Both sides start from the same random stream, otherwise an apply that draws (Unrelenting) would
+              // compare two different draws.
+              rng.reset();
               pair.site.attr.apply(origParams as never);
+              rng.reset();
               pair.rebuilt.apply(newParams as never);
               const a = numberHolderValues(origParams);
               const b = numberHolderValues(newParams);

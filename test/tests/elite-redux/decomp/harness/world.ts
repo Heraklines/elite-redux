@@ -366,6 +366,14 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     cancelled: new BooleanHolder(false),
     simulated: false,
   }),
+  // B02-16 (calc.hit-count only): the frame AddSecondStrikeAbAttr and AllAttacksMultiHitAbAttr are dispatched with.
+  "calc.hit-count": ctx => ({
+    pokemon: ctx.holder,
+    opponent: ctx.foe,
+    move: ctx.move,
+    hitCount: new NumberHolder(1),
+    simulated: true,
+  }),
   "calc.move-power": ctx => ({
     pokemon: ctx.holder,
     opponent: ctx.foe,

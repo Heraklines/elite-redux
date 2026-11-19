@@ -11,14 +11,14 @@
 //  - Ruin family and Eternal Flower: stand-in Pokemon (a Mega, an ordinary foe, the holder, an ally).
 //  - Parental Bond and Unrelenting: canApply over real moves, the exact draw order and result table of Unrelenting.
 //  - Protean family: the type change of apply, and nothing when simulated.
-import type {
+import {
   AddSecondStrikeAbAttr,
   AllAttacksMultiHitAbAttr,
-  FieldMultiplyStatAbAttr,
-  IgnoreMoveEffectsAbAttr,
-  MoveEffectChanceMultiplierAbAttr,
-  OpposingMegaStatSuppressAbAttr,
-  PokemonTypeChangeAbAttr,
+  type FieldMultiplyStatAbAttr,
+  type IgnoreMoveEffectsAbAttr,
+  type MoveEffectChanceMultiplierAbAttr,
+  type OpposingMegaStatSuppressAbAttr,
+  type PokemonTypeChangeAbAttr,
 } from "#abilities/ab-attrs";
 import { allMoves } from "#data/data-lists";
 import { recomposeAttr } from "#data/elite-redux/ability-studio/build-attr";
@@ -316,6 +316,30 @@ describe("B02 chunk 2: extra strikes (Parental Bond, Unrelenting)", () => {
     }
     const share = (n: number) => table.filter(v => v === n).length / 20;
     expect([share(2), share(3), share(4), share(5)]).toEqual([0.35, 0.35, 0.15, 0.15]);
+  });
+
+  it("Unrelenting and Parental Bond: the new settings change the numbers, the defaults are the old literals", async () => {
+    const { holder, foe } = await startWorld(phaserGame);
+    // 1 hit, 4 hits, 5 hits... all three chances 100 percent means the first outcome always
+    const always = new AllAttacksMultiHitAbAttr(7, 3, 4, 5, 100, 0, 0);
+    // 50 / 25 / 25 / 0: cut-offs 10, 5, 0
+    const spread = new AllAttacksMultiHitAbAttr(2, 3, 4, 5, 50, 25, 25);
+    for (let roll = 0; roll < 20; roll++) {
+      const spy = vi.spyOn(holder, "randBattleSeedInt").mockReturnValue(roll);
+      const a = new NumberHolder(1);
+      always.apply({ pokemon: holder, opponent: foe, move: allMoves[MoveId.TACKLE], hitCount: a } as never);
+      const b = new NumberHolder(1);
+      spread.apply({ pokemon: holder, opponent: foe, move: allMoves[MoveId.TACKLE], hitCount: b } as never);
+      spy.mockRestore();
+      expect(a.value).toBe(7);
+      expect(b.value, `roll ${roll}`).toBe(roll >= 10 ? 2 : roll >= 5 ? 3 : 4);
+    }
+    const strikes = new NumberHolder(1);
+    new AddSecondStrikeAbAttr(3).apply({ hitCount: strikes } as never);
+    expect(strikes.value).toBe(4);
+    const dflt = new NumberHolder(1);
+    new AddSecondStrikeAbAttr().apply({ hitCount: dflt } as never);
+    expect(dflt.value).toBe(2);
   });
 });
 
