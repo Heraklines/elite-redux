@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "0cf0d263056480",
+  "hash": "02360d6e2afcea",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -349,6 +349,75 @@
       "uses": 1
     },
     {
+      "id": "block.ignore-protect-by-flag",
+      "className": "IgnoreProtectByFlagAbAttr",
+      "label": "My chosen kind of move goes through protection",
+      "summary": "While I have this, my moves of the kind \"Slicing move\" ignore protection moves such as Protect and hit anyway. Example: slicing moves break through Protect.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "pinnacle blade",
+        "puncture",
+        "keen edge",
+        "slicing moves ignore protect",
+        "break through protect",
+        "bypass protect",
+        "ignore protection for a kind of move"
+      ],
+      "examples": [
+        "My slicing moves break through Protect, like Pinnacle Blade",
+        "My punching moves ignore Protect and Detect"
+      ],
+      "params": [
+        {
+          "id": "flag",
+          "label": "Kind of move that goes through protection",
+          "control": "select",
+          "default": "SLICING_MOVE",
+          "editable": true,
+          "options": [
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only moves that really carry that trait go through; a trait that another ability adds to a move does not count here"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
       "id": "block.ignore-protect-on-contact",
       "className": "IgnoreProtectOnContactAbAttr",
       "label": "My contact moves go through protection",
@@ -382,6 +451,234 @@
         "do": true
       },
       "uses": 2
+    },
+    {
+      "id": "block.ignore-type-immunity",
+      "className": "IgnoreTypeImmunityAbAttr",
+      "label": "My moves hit a type that is normally immune",
+      "summary": "My Normal, Fighting moves hit Ghost-type Pokemon even though they are normally immune. Example: Normal and Fighting moves hit Ghost types.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.ignore-type-immunity",
+      "whenLabel": "While the game checks the foe's type immunity",
+      "synonyms": [
+        "scrappy",
+        "mind's eye",
+        "hit ghost types",
+        "ignore type immunity",
+        "normal hits ghost",
+        "get past an immunity",
+        "ghost immunity ignored"
+      ],
+      "examples": [
+        "Normal and Fighting moves hit Ghost types, like Scrappy",
+        "Ghost moves hit Normal types, like Phantom Pain"
+      ],
+      "params": [
+        {
+          "id": "immuneType",
+          "label": "Type that is normally immune",
+          "control": "select",
+          "default": "GHOST",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "moveTypes",
+          "label": "Move types that can hit it (comma separated)",
+          "control": "text",
+          "default": "NORMAL,FIGHTING",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when the immunity was already ignored by something earlier, and is skipped when the target's ability is being ignored on purpose"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 10
+    },
+    {
+      "id": "block.ignore-type-status-effect-immunity",
+      "className": "IgnoreTypeStatusEffectImmunityAbAttr",
+      "label": "My status effects get past a type's normal immunity",
+      "summary": "I can inflict Poison, Toxic even on Steel, Poison-type Pokemon that are normally immune to it. Example: poison works on Steel types.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.status-type-immunity",
+      "whenLabel": "While the game checks type-based status immunity",
+      "synonyms": [
+        "corrosion",
+        "poison steel types",
+        "poison poison types",
+        "burn fire types",
+        "ignore status immunity",
+        "status ignores type immunity",
+        "mycelium might"
+      ],
+      "examples": [
+        "I can poison Steel and Poison types, like Corrosion",
+        "My status moves can burn Fire types, like Mycelium Might"
+      ],
+      "params": [
+        {
+          "id": "statuses",
+          "label": "Status effects that get through (comma separated)",
+          "control": "text",
+          "default": "POISON,TOXIC",
+          "editable": true,
+          "options": [
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN"
+          ]
+        },
+        {
+          "id": "types",
+          "label": "Types that are normally immune (comma separated)",
+          "control": "text",
+          "default": "STEEL,POISON",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "statusMovesOnly",
+          "label": "Only with status moves, not damaging moves",
+          "control": "boolean",
+          "default": false,
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when the immunity was already ignored by something earlier",
+        "Only asked when the status comes from a Pokemon; hazards such as Toxic Spikes never get past a type immunity"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 9
+    },
+    {
+      "id": "block.infiltrator",
+      "className": "InfiltratorAbAttr",
+      "label": "My moves bypass screens, Substitute, Safeguard and Mist",
+      "summary": "My moves ignore the foe's Light Screen, Reflect, Aurora Veil, Safeguard, Mist and Substitute. Example: my Tackle still hits a Pokemon hiding behind a Substitute.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.infiltrate",
+      "whenLabel": "While the game checks if my move bypasses screens",
+      "synonyms": [
+        "infiltrator",
+        "ignore screens",
+        "bypass substitute",
+        "ignore reflect and light screen",
+        "ignore safeguard",
+        "ignore mist",
+        "get past barriers"
+      ],
+      "examples": [
+        "My moves ignore Reflect, Light Screen and Substitute, like the classic screen-ignoring ability"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when something earlier already decided that the protection is bypassed"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 8
     },
     {
       "id": "block.move-ability-bypass",
@@ -790,6 +1087,47 @@
         "do": true
       },
       "uses": 2
+    },
+    {
+      "id": "block.reflect-status-move",
+      "className": "ReflectStatusMoveAbAttr",
+      "label": "Bounce status moves back at the user",
+      "summary": "Status moves that can be bounced and are aimed at me are sent back at the foe who used them, as if I had used them. Example: a foe's Toxic is bounced back onto them.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.reflect-status-move",
+      "whenLabel": "While the game checks if a status move is bounced back",
+      "synonyms": [
+        "magic bounce",
+        "magic coat",
+        "reflect status moves",
+        "bounce back",
+        "send back status moves",
+        "duplicity",
+        "conjurer of deceit"
+      ],
+      "examples": [
+        "Status moves like Toxic and Stealth Rock are bounced back, like Magic Bounce"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only moves that can be bounced (marked as reflectable) and are status moves are sent back; a move that was itself bounced is never bounced again",
+        "A Pokemon that is in the middle of a semi-invulnerable move cannot bounce",
+        "Magic Coat, when active, is used instead of this"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 4
     },
     {
       "id": "block.super-effective-move-ability-bypass",
