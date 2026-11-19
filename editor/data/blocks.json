@@ -1,8 +1,85 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "096ef32b703c2f",
+  "hash": "191c35e760f03c",
   "blocks": [
+    {
+      "id": "block.add-second-strike",
+      "className": "AddSecondStrikeAbAttr",
+      "label": "Add an extra strike to my attacking moves",
+      "summary": "My single-target damaging moves hit one extra time. Moves that already hit several times, charging moves, spread moves and status moves are left alone.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.hit-count",
+      "whenLabel": "While the game decides how many times a move hits",
+      "synonyms": [
+        "parental bond",
+        "hit twice",
+        "double hit",
+        "extra strike",
+        "second hit",
+        "multi hit"
+      ],
+      "examples": [
+        "Every attacking move hits twice, like Parental Bond"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The move must be able to take an extra strike: a damaging move that is not a charging move, not a spread move with several targets, not already a multi-hit or self-sacrificing move, and not Fling, Uproar, Rollout, Ice Ball or Endeavor"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.all-attacks-multi-hit",
+      "className": "AllAttacksMultiHitAbAttr",
+      "label": "Make my single-hit attacks hit 2 to 5 times",
+      "summary": "My single-hit damaging moves hit 2 to 5 times: 2 or 3 hits 35% of the time each, 4 or 5 hits 15% each. Skill Link makes it 5 every time.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.hit-count",
+      "whenLabel": "While the game decides how many times a move hits",
+      "synonyms": [
+        "unrelenting",
+        "hit 2 to 5 times",
+        "multi hit",
+        "triple kick style",
+        "fury swipes for everything",
+        "extra hits"
+      ],
+      "examples": [
+        "Every attacking move hits 2 to 5 times, like Unrelenting"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The move must still be a single hit (it never shrinks a move that already hits more than once)",
+        "The move must be able to take extra strikes: a damaging move that is not a charging move, not a spread move with several targets, not already a multi-hit or self-sacrificing move, and not Fling, Uproar, Rollout, Ice Ball or Endeavor"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
     {
       "id": "block.attack-type-immunity",
       "className": "AttackTypeImmunityAbAttr",
@@ -124,6 +201,77 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.field-multiply-stat",
+      "className": "FieldMultiplyStatAbAttr",
+      "label": "Change one stat of every other Pokemon on the field",
+      "summary": "While I am on the field, every other Pokemon's Attack is multiplied by 0.75. It does not stack with another aura of the same stat. Example: 0.75 = 25% lower.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.foe-stat-value",
+      "whenLabel": "While the game calculates a foe's stat",
+      "synonyms": [
+        "sword of ruin",
+        "vessel of ruin",
+        "tablets of ruin",
+        "beads of ruin",
+        "ruin aura",
+        "lower everyone's stat",
+        "field stat drop",
+        "aura"
+      ],
+      "examples": [
+        "Lower the Defense of every other Pokemon by 25%, like Sword of Ruin"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat",
+          "control": "select",
+          "default": "ATK",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Stat multiplier for the others (0.75 = 25% lower)",
+          "control": "number",
+          "default": 0.75,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only one aura of the same kind counts: once one has applied, the others are skipped",
+        "A Pokemon that has an aura of the same stat itself (me, or an ally with the same one) is not affected"
+      ],
+      "effect": {
+        "id": "effect.multiply-stat",
+        "params": [
+          "stat",
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 6
     },
     {
       "id": "block.float",
@@ -309,6 +457,290 @@
       "uses": 1
     },
     {
+      "id": "block.ignore-move-effects",
+      "className": "IgnoreMoveEffectsAbAttr",
+      "label": "Block the extra effects of moves that hit me",
+      "summary": "Moves that hit me lose their extra effects (flinch, burn, stat drops). The damage still happens. Example: a 30% flinch chance becomes 0%.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.incoming-effect-chance",
+      "whenLabel": "While the game calculates effect chance against me",
+      "synonyms": [
+        "shield dust",
+        "block secondary effects",
+        "no side effects",
+        "flinch immunity",
+        "extra effect immunity",
+        "ignore added effects"
+      ],
+      "examples": [
+        "Moves that hit me never burn, flinch or lower stats as a side effect, like Shield Dust"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The move's extra effect must have a chance above 0 (a guaranteed or missing effect is left alone)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.move-effect-chance-multiplier",
+      "className": "MoveEffectChanceMultiplierAbAttr",
+      "label": "Multiply the chance of my moves' extra effects",
+      "summary": "The chance of my moves' extra effects (flinch, burn, stat drops) is multiplied by 2, never above 100%. Example: 2 = doubled, 0 = no extra effects.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.effect-chance",
+      "whenLabel": "While the game calculates my move's effect chance",
+      "synonyms": [
+        "serene grace",
+        "sheer force",
+        "double effect chance",
+        "secondary effect chance",
+        "more flinches",
+        "remove side effects",
+        "extra effect chance"
+      ],
+      "examples": [
+        "Double the chance of extra effects, like Serene Grace",
+        "Remove the extra effects of my moves (x0)"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Chance multiplier (2 = doubled, 0 = no extra effects)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 0,
+          "max": 10,
+          "step": 0.1
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The move must have an extra effect with a chance above 0 (a guaranteed or missing effect is left alone)",
+        "Order Up and Electro Shot are never changed",
+        "The result never goes above 100%"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 4
+    },
+    {
+      "id": "block.move-type-change",
+      "className": "MoveTypeChangeAbAttr",
+      "label": "Change the type of my moves",
+      "summary": "My moves that pass the condition become Steel type. Example: add the condition \"the move is Normal type\" and pick Flying to get Aerilate.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-type",
+      "whenLabel": "While the game decides a move's type",
+      "synonyms": [
+        "aerilate",
+        "pixilate",
+        "refrigerate",
+        "galvanize",
+        "normalize",
+        "liquid voice",
+        "convert moves",
+        "change move type",
+        "ate ability"
+      ],
+      "examples": [
+        "Normal moves become Flying type, like Aerilate",
+        "All of my moves become Normal type, like Normalize"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Moves become this type",
+          "control": "select",
+          "default": "STEEL",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:1",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Moves whose type is fixed by the move itself (Weather Ball, Judgment, Multi Attack, Terrain Pulse, Natural Gift, Techno Blast, Hidden Power, Revelation Dance) are never changed by the Normalize family"
+      ],
+      "effect": {
+        "id": "effect.change-move-type",
+        "params": [
+          "type"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 27
+    },
+    {
+      "id": "block.opposing-mega-stat-suppress",
+      "className": "OpposingMegaStatSuppressAbAttr",
+      "label": "Change one stat of every opposing Mega Pokemon",
+      "summary": "While I am on the field, Attack of every opposing Mega or Primal Pokemon is multiplied by 0.8. Example: 0.8 = 20% lower.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.foe-stat-value",
+      "whenLabel": "While the game calculates a foe's stat",
+      "synonyms": [
+        "eternal flower",
+        "weaken mega",
+        "lower mega stats",
+        "anti mega",
+        "mega suppression",
+        "primal debuff"
+      ],
+      "examples": [
+        "Lower Attack of every opposing Mega Pokemon by 20%, like Eternal Flower"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat",
+          "control": "select",
+          "default": "ATK",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Stat multiplier for opposing Megas (0.8 = 20% lower)",
+          "control": "number",
+          "default": 0.8,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only Pokemon on the other side that are in a Mega or Primal form are affected (not me, not my allies, not ordinary forms)",
+        "Only one aura of the same kind counts: once one has applied, the others are skipped",
+        "A Pokemon that has an aura of the same stat itself is not affected"
+      ],
+      "effect": {
+        "id": "effect.multiply-stat",
+        "params": [
+          "stat",
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 5
+    },
+    {
+      "id": "block.pokemon-type-change",
+      "className": "PokemonTypeChangeAbAttr",
+      "label": "Change my type to match the move I use",
+      "summary": "Just before I use a move, my type changes to the type of that move. Nothing happens if I am already that type, I am Terastallized, or the move calls another move.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.before-i-use-move",
+      "whenLabel": "Just before I use a move",
+      "synonyms": [
+        "protean",
+        "libero",
+        "become the move's type",
+        "type of the move",
+        "adapt type",
+        "color change before attacking"
+      ],
+      "examples": [
+        "Become the type of every move I use, like Protean"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A Terastallized Pokemon keeps its type",
+        "Struggle never changes the type",
+        "Moves that call another move (Metronome, Nature Power and the like) do not trigger it; the move they call does",
+        "Nothing happens when every type I have already equals the move's type"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 6
+    },
+    {
       "id": "block.post-damage-force-switch",
       "className": "PostDamageForceSwitchAbAttr",
       "label": "Switch out when my HP gets low",
@@ -369,6 +801,424 @@
       ],
       "effect": {
         "id": "effect.force-switch-out",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.post-defend-ability-give",
+      "className": "PostDefendAbilityGiveAbAttr",
+      "label": "Give attackers an ability when they touch me",
+      "summary": "When a contact move hits me, the attacker's ability becomes Mummy. It does not overwrite abilities that cannot be suppressed.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "mummy",
+        "lingering aroma",
+        "spread ability",
+        "ability contagion",
+        "overwrite ability on contact",
+        "infect ability"
+      ],
+      "examples": [
+        "Turn the ability of attackers that touch me into Mummy"
+      ],
+      "params": [
+        {
+          "id": "ability",
+          "label": "Ability to give",
+          "control": "select",
+          "default": "MUMMY",
+          "editable": true,
+          "options": [
+            "STENCH",
+            "DRIZZLE",
+            "SPEED_BOOST",
+            "BATTLE_ARMOR",
+            "STURDY",
+            "DAMP",
+            "LIMBER",
+            "SAND_VEIL",
+            "STATIC",
+            "VOLT_ABSORB",
+            "WATER_ABSORB",
+            "OBLIVIOUS",
+            "CLOUD_NINE",
+            "COMPOUND_EYES",
+            "INSOMNIA",
+            "COLOR_CHANGE",
+            "IMMUNITY",
+            "FLASH_FIRE",
+            "SHIELD_DUST",
+            "OWN_TEMPO",
+            "SUCTION_CUPS",
+            "INTIMIDATE",
+            "SHADOW_TAG",
+            "ROUGH_SKIN",
+            "WONDER_GUARD",
+            "LEVITATE",
+            "EFFECT_SPORE",
+            "SYNCHRONIZE",
+            "CLEAR_BODY",
+            "NATURAL_CURE",
+            "LIGHTNING_ROD",
+            "SERENE_GRACE",
+            "SWIFT_SWIM",
+            "CHLOROPHYLL",
+            "ILLUMINATE",
+            "TRACE",
+            "HUGE_POWER",
+            "POISON_POINT",
+            "INNER_FOCUS",
+            "MAGMA_ARMOR",
+            "WATER_VEIL",
+            "MAGNET_PULL",
+            "SOUNDPROOF",
+            "RAIN_DISH",
+            "SAND_STREAM",
+            "PRESSURE",
+            "THICK_FAT",
+            "EARLY_BIRD",
+            "FLAME_BODY",
+            "RUN_AWAY",
+            "KEEN_EYE",
+            "HYPER_CUTTER",
+            "PICKUP",
+            "TRUANT",
+            "HUSTLE",
+            "CUTE_CHARM",
+            "PLUS",
+            "MINUS",
+            "FORECAST",
+            "STICKY_HOLD",
+            "SHED_SKIN",
+            "GUTS",
+            "MARVEL_SCALE",
+            "LIQUID_OOZE",
+            "OVERGROW",
+            "BLAZE",
+            "TORRENT",
+            "SWARM",
+            "ROCK_HEAD",
+            "DROUGHT",
+            "ARENA_TRAP",
+            "VITAL_SPIRIT",
+            "WHITE_SMOKE",
+            "PURE_POWER",
+            "SHELL_ARMOR",
+            "AIR_LOCK",
+            "TANGLED_FEET",
+            "MOTOR_DRIVE",
+            "RIVALRY",
+            "STEADFAST",
+            "SNOW_CLOAK",
+            "GLUTTONY",
+            "ANGER_POINT",
+            "UNBURDEN",
+            "HEATPROOF",
+            "SIMPLE",
+            "DRY_SKIN",
+            "DOWNLOAD",
+            "IRON_FIST",
+            "POISON_HEAL",
+            "ADAPTABILITY",
+            "SKILL_LINK",
+            "HYDRATION",
+            "SOLAR_POWER",
+            "QUICK_FEET",
+            "NORMALIZE",
+            "SNIPER",
+            "MAGIC_GUARD",
+            "NO_GUARD",
+            "STALL",
+            "TECHNICIAN",
+            "LEAF_GUARD",
+            "KLUTZ",
+            "MOLD_BREAKER",
+            "SUPER_LUCK",
+            "AFTERMATH",
+            "ANTICIPATION",
+            "FOREWARN",
+            "UNAWARE",
+            "TINTED_LENS",
+            "FILTER",
+            "SLOW_START",
+            "SCRAPPY",
+            "STORM_DRAIN",
+            "ICE_BODY",
+            "SOLID_ROCK",
+            "SNOW_WARNING",
+            "HONEY_GATHER",
+            "FRISK",
+            "RECKLESS",
+            "MULTITYPE",
+            "FLOWER_GIFT",
+            "BAD_DREAMS",
+            "PICKPOCKET",
+            "SHEER_FORCE",
+            "CONTRARY",
+            "UNNERVE",
+            "DEFIANT",
+            "DEFEATIST",
+            "CURSED_BODY",
+            "HEALER",
+            "FRIEND_GUARD",
+            "WEAK_ARMOR",
+            "HEAVY_METAL",
+            "LIGHT_METAL",
+            "MULTISCALE",
+            "TOXIC_BOOST",
+            "FLARE_BOOST",
+            "HARVEST",
+            "TELEPATHY",
+            "MOODY",
+            "OVERCOAT",
+            "POISON_TOUCH",
+            "REGENERATOR",
+            "BIG_PECKS",
+            "SAND_RUSH",
+            "WONDER_SKIN",
+            "ANALYTIC",
+            "ILLUSION",
+            "IMPOSTER",
+            "INFILTRATOR",
+            "MUMMY",
+            "MOXIE",
+            "JUSTIFIED",
+            "RATTLED",
+            "MAGIC_BOUNCE",
+            "SAP_SIPPER",
+            "PRANKSTER",
+            "SAND_FORCE",
+            "IRON_BARBS",
+            "ZEN_MODE",
+            "VICTORY_STAR",
+            "TURBOBLAZE",
+            "TERAVOLT",
+            "AROMA_VEIL",
+            "FLOWER_VEIL",
+            "CHEEK_POUCH",
+            "PROTEAN",
+            "FUR_COAT",
+            "MAGICIAN",
+            "BULLETPROOF",
+            "COMPETITIVE",
+            "STRONG_JAW",
+            "REFRIGERATE",
+            "SWEET_VEIL",
+            "STANCE_CHANGE",
+            "GALE_WINGS",
+            "MEGA_LAUNCHER",
+            "GRASS_PELT",
+            "SYMBIOSIS",
+            "TOUGH_CLAWS",
+            "PIXILATE",
+            "GOOEY",
+            "AERILATE",
+            "PARENTAL_BOND",
+            "DARK_AURA",
+            "FAIRY_AURA",
+            "AURA_BREAK",
+            "PRIMORDIAL_SEA",
+            "DESOLATE_LAND",
+            "DELTA_STREAM",
+            "STAMINA",
+            "WIMP_OUT",
+            "EMERGENCY_EXIT",
+            "WATER_COMPACTION",
+            "MERCILESS",
+            "SHIELDS_DOWN",
+            "STAKEOUT",
+            "WATER_BUBBLE",
+            "STEELWORKER",
+            "BERSERK",
+            "SLUSH_RUSH",
+            "LONG_REACH",
+            "LIQUID_VOICE",
+            "TRIAGE",
+            "GALVANIZE",
+            "SURGE_SURFER",
+            "SCHOOLING",
+            "DISGUISE",
+            "BATTLE_BOND",
+            "POWER_CONSTRUCT",
+            "CORROSION",
+            "COMATOSE",
+            "QUEENLY_MAJESTY",
+            "INNARDS_OUT",
+            "DANCER",
+            "BATTERY",
+            "FLUFFY",
+            "DAZZLING",
+            "SOUL_HEART",
+            "TANGLING_HAIR",
+            "RECEIVER",
+            "POWER_OF_ALCHEMY",
+            "BEAST_BOOST",
+            "RKS_SYSTEM",
+            "ELECTRIC_SURGE",
+            "PSYCHIC_SURGE",
+            "MISTY_SURGE",
+            "GRASSY_SURGE",
+            "FULL_METAL_BODY",
+            "SHADOW_SHIELD",
+            "PRISM_ARMOR",
+            "NEUROFORCE",
+            "INTREPID_SWORD",
+            "DAUNTLESS_SHIELD",
+            "LIBERO",
+            "BALL_FETCH",
+            "COTTON_DOWN",
+            "PROPELLER_TAIL",
+            "MIRROR_ARMOR",
+            "GULP_MISSILE",
+            "STALWART",
+            "STEAM_ENGINE",
+            "PUNK_ROCK",
+            "SAND_SPIT",
+            "ICE_SCALES",
+            "RIPEN",
+            "ICE_FACE",
+            "POWER_SPOT",
+            "MIMICRY",
+            "SCREEN_CLEANER",
+            "STEELY_SPIRIT",
+            "PERISH_BODY",
+            "WANDERING_SPIRIT",
+            "GORILLA_TACTICS",
+            "NEUTRALIZING_GAS",
+            "PASTEL_VEIL",
+            "HUNGER_SWITCH",
+            "QUICK_DRAW",
+            "UNSEEN_FIST",
+            "CURIOUS_MEDICINE",
+            "TRANSISTOR",
+            "DRAGONS_MAW",
+            "CHILLING_NEIGH",
+            "GRIM_NEIGH",
+            "AS_ONE_GLASTRIER",
+            "AS_ONE_SPECTRIER",
+            "LINGERING_AROMA",
+            "SEED_SOWER",
+            "THERMAL_EXCHANGE",
+            "ANGER_SHELL",
+            "PURIFYING_SALT",
+            "WELL_BAKED_BODY",
+            "WIND_RIDER",
+            "GUARD_DOG",
+            "ROCKY_PAYLOAD",
+            "WIND_POWER",
+            "ZERO_TO_HERO",
+            "COMMANDER",
+            "ELECTROMORPHOSIS",
+            "PROTOSYNTHESIS",
+            "QUARK_DRIVE",
+            "GOOD_AS_GOLD",
+            "VESSEL_OF_RUIN",
+            "SWORD_OF_RUIN",
+            "TABLETS_OF_RUIN",
+            "BEADS_OF_RUIN",
+            "ORICHALCUM_PULSE",
+            "HADRON_ENGINE",
+            "OPPORTUNIST",
+            "CUD_CHEW",
+            "SHARPNESS",
+            "SUPREME_OVERLORD",
+            "COSTAR",
+            "TOXIC_DEBRIS",
+            "ARMOR_TAIL",
+            "EARTH_EATER",
+            "MYCELIUM_MIGHT",
+            "MINDS_EYE",
+            "SUPERSWEET_SYRUP",
+            "HOSPITALITY",
+            "TOXIC_CHAIN",
+            "EMBODY_ASPECT_TEAL",
+            "EMBODY_ASPECT_WELLSPRING",
+            "EMBODY_ASPECT_HEARTHFLAME",
+            "EMBODY_ASPECT_CORNERSTONE",
+            "TERA_SHIFT",
+            "TERA_SHELL",
+            "TERAFORM_ZERO",
+            "POISON_PUPPETEER",
+            "BLOOD_STAIN"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.flag",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The attacker's ability must be one that can be suppressed",
+        "The attacker's ability must not already be one that gives abilities on contact",
+        "Mummy and Lingering Aroma are never given to an attacker that already has Mummy, Lingering Aroma or the swapping capability"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "ability"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 4
+    },
+    {
+      "id": "block.post-defend-ability-swap",
+      "className": "PostDefendAbilitySwapAbAttr",
+      "label": "Swap abilities with an attacker that touches me",
+      "summary": "When a contact move hits me, the attacker and I swap abilities. Abilities that cannot be swapped stay where they are.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "wandering spirit",
+        "trade abilities",
+        "ability swap",
+        "swap ability on contact",
+        "exchange abilities"
+      ],
+      "examples": [
+        "Swap abilities with any attacker that makes contact, like Wandering Spirit"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.flag",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The attacker's ability must be swappable",
+        "A holder with the swapping capability never swaps with an attacker that has Mummy, Lingering Aroma or the swapping capability itself"
+      ],
+      "effect": {
+        "id": "effect.package",
         "params": []
       },
       "reusableAlone": {
@@ -461,6 +1311,401 @@
         "do": true
       },
       "uses": 9
+    },
+    {
+      "id": "block.post-defend-contact-damage",
+      "className": "PostDefendContactDamageAbAttr",
+      "label": "Hurt attackers that touch me",
+      "summary": "Attackers that make contact lose 1/8 of their max HP. Example: 8 = one eighth, 6 = one sixth.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "rough skin",
+        "iron barbs",
+        "rocky helmet",
+        "contact damage",
+        "thorns",
+        "damage on touch",
+        "spiky skin"
+      ],
+      "examples": [
+        "Attackers that make contact lose 1/8 of their max HP, like Rough Skin"
+      ],
+      "params": [
+        {
+          "id": "damageRatio",
+          "label": "Attacker loses 1/this number of its max HP (8 = one eighth)",
+          "control": "number",
+          "default": 8,
+          "editable": true,
+          "min": 1,
+          "max": 64,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.flag",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The attacker must be able to take indirect damage (Magic Guard and similar abilities block it)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "damageRatio"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 9
+    },
+    {
+      "id": "block.post-defend-move-disable",
+      "className": "PostDefendMoveDisableAbAttr",
+      "label": "Sometimes disable the move of an attacker that touches me",
+      "summary": "30% chance that an attacker that makes contact cannot use the move it last used for a few turns. Example: 30 = 3 times in 10.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "cursed body",
+        "disable on contact",
+        "lock a move",
+        "seal the last move",
+        "move lock",
+        "contact disable"
+      ],
+      "examples": [
+        "30% chance to disable the move of an attacker that makes contact, like Cursed Body"
+      ],
+      "params": [
+        {
+          "id": "chance",
+          "label": "Chance (%)",
+          "control": "slider",
+          "default": 30,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The attacker must have used a move before (there has to be a move to disable)"
+      ],
+      "gateParams": [
+        {
+          "param": "chance",
+          "block": "rng.chance",
+          "field": "pct"
+        }
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.post-defend-perish-song",
+      "className": "PostDefendPerishSongAbAttr",
+      "label": "Start a Perish Song countdown when a move touches me",
+      "summary": "When a contact move hits me, the attacker and I both start a Perish Song countdown of 4. Example: 4 = the same as the move.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "perish body",
+        "perish song",
+        "doom countdown",
+        "faint in three turns",
+        "fainting countdown",
+        "contact curse"
+      ],
+      "examples": [
+        "Both Pokemon get the fainting countdown when a contact move hits me, like Perish Body"
+      ],
+      "params": [
+        {
+          "id": "turns",
+          "label": "Countdown length (4 = the same as the move Perish Song)",
+          "control": "number",
+          "default": 4,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.flag",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The attacker must not already be counting down to Perish Song"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.post-defend-weather-change",
+      "className": "PostDefendWeatherChangeAbAttr",
+      "label": "Change the weather when I am hit",
+      "summary": "When I am hit, the weather changes to Sandstorm. Add a condition to limit which hits count.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "sand spit",
+        "weather on hit",
+        "summon weather when hit",
+        "sandstorm on hit",
+        "hail when hit",
+        "hit trigger weather"
+      ],
+      "examples": [
+        "Whip up a sandstorm when a damaging move hits me, like Sand Spit"
+      ],
+      "params": [
+        {
+          "id": "weather",
+          "label": "Weather",
+          "control": "select",
+          "default": "SANDSTORM",
+          "editable": true,
+          "options": [
+            "NONE",
+            "SUNNY",
+            "RAIN",
+            "SANDSTORM",
+            "HAIL",
+            "SNOW",
+            "FOG",
+            "HEAVY_RAIN",
+            "HARSH_SUN",
+            "STRONG_WINDS",
+            "TEMPEST_STORM",
+            "SNOWY_WRATH",
+            "EERIE_FOG"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:1",
+          "removable": true,
+          "editable": true,
+          "optional": true
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The weather must be replaceable: a primal weather (Heavy Rain, Harsh Sun, Strong Winds) cannot be overwritten by an ordinary one",
+        "The arena must accept this weather (it is not already active)"
+      ],
+      "effect": {
+        "id": "effect.set-weather",
+        "params": [
+          "weather"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.post-receive-crit-stat-stage-change",
+      "className": "PostReceiveCritStatStageChangeAbAttr",
+      "label": "Change a stat when a critical hit lands on me",
+      "summary": "When a critical hit lands on me, my Attack changes by 12 stages. Example: 12 stages sends it straight to the maximum.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-crit-taken",
+      "whenLabel": "When I take a critical hit",
+      "synonyms": [
+        "anger point",
+        "crit boost",
+        "maximize on crit",
+        "rage when crit",
+        "stat boost on critical hit",
+        "crit received"
+      ],
+      "examples": [
+        "Raise Attack to the maximum when I take a critical hit, like Anger Point"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat",
+          "control": "select",
+          "default": "ATK",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ]
+        },
+        {
+          "id": "stages",
+          "label": "Number of stages (12 = as high as possible, negative lowers)",
+          "control": "number",
+          "default": 12,
+          "editable": true,
+          "min": -12,
+          "max": 12,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The stat must be able to move: a stat already at +6 cannot rise further"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stat",
+          "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 11
+    },
+    {
+      "id": "block.post-stat-stage-change-stat-stage-change",
+      "className": "PostStatStageChangeStatStageChangeAbAttr",
+      "label": "Change my stats after a foe changes one of mine",
+      "summary": "When a foe lowers one of my stats, my Attack change by 2 stages, like Defiant. Swap the \"lowered\" test for another condition if you want.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.stat-changed",
+      "whenLabel": "When one of my stats changes",
+      "synonyms": [
+        "defiant",
+        "competitive",
+        "retaliate on stat drop",
+        "boost after stat drop",
+        "punish intimidate",
+        "stat drop reaction"
+      ],
+      "examples": [
+        "Raise Attack by 2 stages whenever a foe lowers one of my stats"
+      ],
+      "params": [
+        {
+          "id": "statsToChange",
+          "label": "Stats to change (comma separated list)",
+          "control": "text",
+          "default": "ATK",
+          "editable": true
+        },
+        {
+          "id": "stages",
+          "label": "Number of stages (negative lowers)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only reacts to a change caused by someone else, never to a change from my own move (no library test for this yet)",
+        "The stat must be able to move: a stat already at +6 cannot rise further"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "statsToChange",
+          "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 6
     },
     {
       "id": "block.post-summon-copy-ability",

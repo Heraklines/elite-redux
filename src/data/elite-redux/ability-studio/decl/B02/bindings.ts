@@ -112,3 +112,71 @@ for (const [abilityId, attrIndex] of [
 ] as const) {
   bindLegacyClosure(abilityId, attrIndex, STAT_CHANGE_REASON, "ctor:0");
 }
+
+// =============================================================================================
+// B02 chunk 2.
+// MoveTypeChangeAbAttr (Tier A). Slot ctor:1, a PokemonAttackCondition `(user, target, move)`. The frame's holder and
+// move user are the user. Every line was read from the live closure source (init-abilities.ts, init-elite-redux-*.ts).
+// The atom move.type is always used with `effective: false` here: `effective: true` asks `user.getMoveType(move)`,
+// which dispatches MoveTypeChangeAbAttr itself and would recurse; the closures read the raw `move.type`.
+// =============================================================================================
+
+// `(_u, _t, move) => !!move && move.type === PokemonType.NORMAL`. The frame always has a move, so `!!move` is implied.
+const RAW_NORMAL = { id: "move.type", type: "NORMAL", effective: false };
+bindEach(
+  RAW_NORMAL,
+  [
+    [200, 0, "Steelworker"],
+    [5053, 0, "Hydrate"],
+    [5123, 0, "Spectralize"],
+    [5501, 0, "Deviate"],
+    [5530, 1, "Stainless Steel"],
+    [5689, 0, "Waterborne"],
+    [5714, 1, "Mob Boss"],
+    [5938, 0, "Weighted Scales"],
+    [5955, 0, "Waterborne (second id)"],
+    [5995, 1, "Crude Steel"],
+    [6003, 1, "Stainless Steel (second id)"],
+    [6028, 3, "Solar Panel"],
+  ],
+  "ctor:1",
+);
+
+// Two-Faced (5486) `fullBelly(user) && move.type === NORMAL`, fullBelly = `user.getFormKey() !== "hangry"`.
+bindCondition(5486, 8, { all: [{ not: { id: "mon.in-form", who: "holder", key: "hangry" } }, RAW_NORMAL] }, "ctor:1");
+// `hangry(user) && move.type === NORMAL`, hangry = `user.getFormKey() === "hangry"`.
+bindCondition(5486, 10, { all: [{ id: "mon.in-form", who: "holder", key: "hangry" }, RAW_NORMAL] }, "ctor:1");
+
+// `anyTypeMoveConversionCondition(user, target, move)` (init-abilities.ts:2380) = "the move may have its type changed
+// by an ability": not one of the eight fixed-type moves (Weather Ball, Judgment, Revelation Dance, Multi Attack, Terrain
+// Pulse, Natural Gift, Techno Blast, Hidden Power), and, for a Terastallized user, not Tera Blast and not Tera Starstorm
+// of a Stellar Terapagos. The Terastallized, Tera type and species tests have no atom: request B02-14.
+const ANY_TYPE_REASON =
+  "The closure calls anyTypeMoveConversionCondition (the move may have its type changed by an ability: not Weather Ball, Judgment, Revelation Dance, Multi Attack, Terrain Pulse, Natural Gift, Techno Blast or Hidden Power, and for a Terastallized user not Tera Blast or Stellar Tera Starstorm of Terapagos); there is no atom for the Terastallized state, the Tera type or the species yet (request B02-14 in requests/B02.md)";
+const NORMAL_AND_ANY_REASON = `Normal-type move AND anyTypeMoveConversionCondition. ${ANY_TYPE_REASON}`;
+const SOUND_AND_NORMAL_AND_ANY_REASON = `Sound move (library atom move.flag SOUND_BASED) AND Normal-type move AND anyTypeMoveConversionCondition. ${ANY_TYPE_REASON}`;
+
+// Normalize: the condition alone.
+bindLegacyClosure(96, 0, ANY_TYPE_REASON, "ctor:1");
+// Normal-type AND convertible: the "-ate" family and its ER copies.
+for (const [abilityId, attrIndex] of [
+  [174, 0], // Refrigerate
+  [182, 0], // Pixilate
+  [184, 0], // Aerilate
+  [206, 0], // Galvanize
+  [5152, 1], // Atomic Burst
+  [5954, 0], // Pixilate (second id)
+  [6019, 0], // Fluttering Spirit
+  [20005, 2], // Thunder Gods Vessel
+  [20006, 2], // Malicious Empathy
+  [20007, 0], // Fae Heart
+] as const) {
+  bindLegacyClosure(abilityId, attrIndex, NORMAL_AND_ANY_REASON, "ctor:1");
+}
+// Liquid Voice and Siren's Song: `move.doesFlagEffectApply({ flag: SOUND_BASED, user }) && normalTypeMoveConversionCondition`.
+for (const [abilityId, attrIndex] of [
+  [204, 0], // Liquid Voice
+  [20015, 1], // Siren's Song
+] as const) {
+  bindLegacyClosure(abilityId, attrIndex, SOUND_AND_NORMAL_AND_ANY_REASON, "ctor:1");
+}
