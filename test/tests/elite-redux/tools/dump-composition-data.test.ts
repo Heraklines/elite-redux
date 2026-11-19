@@ -7,15 +7,14 @@
 // Run with:
 //   ER_SCENARIO=1 npx vitest run test/tests/elite-redux/tools/dump-composition-data.test.ts
 // Output (all small, committed):
-//   editor/data/vocabulary.json - the pure vocabulary (whens, conditions, effects, guards, slots) with its hash
-//   editor/data/blocks.json     - one entry per class declaration (label, params, guards, package flag, ...)
+// (vocabulary.json and blocks.json come from dump-catalog.test.ts; this writes only the Unpack table)
 //   editor/data/gates.json      - per (abilityId, attrIndex): the library form of the attr's gate, used by "Unpack"
 // This only READS the declarations and bindings that humans wrote; it never invents one.
 import { allAbilities } from "#data/data-lists";
 import { getBinding } from "#data/elite-redux/ability-studio/bindings";
 import { readDeclParams } from "#data/elite-redux/ability-studio/build-attr";
 import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
-import type { DeclGateParam, DeclModule } from "#data/elite-redux/ability-studio/define-decl";
+import type { DeclGateParam } from "#data/elite-redux/ability-studio/define-decl";
 import { getVocabularyJson } from "#data/elite-redux/ability-studio/vocabulary/vocabulary-json";
 import { allAttrSites } from "#test/tests/elite-redux/decomp/harness/sites";
 import { writeFileSync } from "node:fs";
@@ -65,57 +64,11 @@ function isEmptyAll(node: unknown): boolean {
   );
 }
 
-function blockEntry(module: DeclModule): Json {
-  const { decl } = module;
-  const defaults = Object.fromEntries(decl.params.map(param => [param.id, param.default]));
-  let summary = "";
-  try {
-    summary = decl.summary(defaults);
-  } catch {
-    summary = decl.label;
-  }
-  return {
-    id: module.className,
-    label: decl.label,
-    summary,
-    when: decl.when,
-    kind: decl.kind,
-    tier: decl.tier,
-    status: decl.status,
-    package: decl.kind === "package",
-    synonyms: decl.synonyms,
-    examples: decl.examples,
-    params: decl.params.map(param => ({
-      id: param.id,
-      label: param.label,
-      control: param.control,
-      editable: param.editable,
-      default: param.default,
-      ...(param.min === undefined ? {} : { min: param.min }),
-      ...(param.max === undefined ? {} : { max: param.max }),
-      ...(param.step === undefined ? {} : { step: param.step }),
-      ...(param.options === undefined ? {} : { options: param.options }),
-      ...(param.integer === undefined ? {} : { integer: param.integer }),
-    })),
-    guards: decl.guards,
-    feasibility: decl.feasibility,
-    ...(decl.effect === undefined ? {} : { effect: decl.effect }),
-    reusableAlone: decl.reusableAlone,
-    // A package must say why it cannot be split; the editor shows this in the "Works as one piece" popover.
-    ...(decl.kind === "package" ? { reason: decl.notes } : {}),
-  };
-}
-
 describe("tools - dump composition builder data", () => {
-  it.skipIf(process.env.ER_SCENARIO !== "1")("writes editor/data/{vocabulary,blocks,gates}.json", () => {
+  it.skipIf(process.env.ER_SCENARIO !== "1")("writes editor/data/gates.json", () => {
     const vocabulary = getVocabularyJson();
     const effectsById = new Map(vocabulary.effects.map(effect => [effect.id, effect]));
     const whensById = new Map(vocabulary.whens.map(when => [when.id, when]));
-
-    const blocks = declRegistry
-      .all()
-      .map(blockEntry)
-      .sort((a, b) => String(a.id).localeCompare(String(b.id)));
 
     const gates: Record<string, Json> = {};
     for (const site of allAttrSites()) {
@@ -200,15 +153,10 @@ describe("tools - dump composition builder data", () => {
       };
     }
 
-    writeFileSync("editor/data/vocabulary.json", `${JSON.stringify(vocabulary, null, 1)}\n`);
-    writeFileSync(
-      "editor/data/blocks.json",
-      `${JSON.stringify({ schemaVersion: 1, vocabularyHash: vocabulary.hash, blocks }, null, 1)}\n`,
-    );
     writeFileSync(
       "editor/data/gates.json",
       `${JSON.stringify({ schemaVersion: 1, vocabularyHash: vocabulary.hash, gates }, null, 1)}\n`,
     );
-    expect(blocks.length).toBeGreaterThan(0);
+    expect(Object.keys(gates).length).toBeGreaterThan(0);
   });
 });

@@ -292,9 +292,15 @@ describe("worker saved-ability validation", () => {
   });
 
   it("counts a composition rule as content, so an ability with only a composition is not empty", () => {
-    expect(validateCustomAbilitiesDelta({ "half-at-full": ability({ composition: [] }) })).toEqual({
+    expect(validateCustomAbilitiesDelta({ "half-at-full": ability() })).toEqual({ ok: true });
+    // An empty composition is version 1 with nothing in it: the ability is empty. (Version 2 with an empty
+    // composition is rejected earlier, with its own message.)
+    expect(validateCustomAbilitiesDelta({ "half-at-full": ability({ version: 1, composition: undefined }) })).toEqual({
       ok: false,
       error: "half-at-full: add an include, component rule, mechanic, rule, or modifier",
+    });
+    expect(validateCustomAbilitiesDelta({ "half-at-full": ability({ composition: [] }) })).toMatchObject({
+      ok: false,
     });
   });
 });

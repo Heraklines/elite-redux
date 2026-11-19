@@ -205,7 +205,7 @@
     const effects = new Map(vocabulary.effects.map(def => [def.id, def]));
     const guards = new Map(vocabulary.guards.map(def => [def.id, def]));
     const blockList = Array.isArray(blocks?.blocks) ? blocks.blocks : [];
-    const blocksByClass = new Map(blockList.map(block => [block.id, block]));
+    const blocksByClass = new Map(blockList.map(block => [block.className ?? block.id, block]));
     const gateTable = isObject(gates?.gates) ? gates.gates : {};
     const moveNames = Array.isArray(opts.moveNames) ? opts.moveNames : [];
 
@@ -772,8 +772,8 @@
 
     // ---- packages and "Unpack" ----
 
-    const isPackageClass = className => blocksByClass.get(className)?.package === true;
-    const packageReason = className => blocksByClass.get(className)?.reason ?? "";
+    const isPackageClass = className => blocksByClass.get(className)?.kind === "package";
+    const packageReason = className => blocksByClass.get(className)?.packageReason ?? "";
 
     function uniqueRuleKey(list, wanted) {
       const used = new Set((list ?? []).map(rule => rule.key));
