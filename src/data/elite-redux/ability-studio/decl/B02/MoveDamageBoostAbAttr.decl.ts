@@ -58,7 +58,9 @@ export default defineDecl(MoveDamageBoostAbAttr, {
   effect: { id: "effect.multiply-damage-dealt", params: ["multiplier"] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "none", simulated: "respects" },
-  probes: [{ name: "my attack at full HP and at half HP", axes: { hp: ["max", "50%"] } }],
+  probes: [
+    { name: "my attack on a foe that resists it and on one that does not", axes: { foeMove: ["TACKLE", "WATER_GUN"] } },
+  ],
   status: "decomposed",
   notes:
     "Tier A, 4 attrs. Tinted Lens, Sepia Lens and Drake Of Rage pass `(target?.getMoveEffectiveness(user, move) ?? 1) <= .5` (bound to move.effectiveness lte 0.5, a missing target answers false in both forms). Parental Bond (attr 1) passes `user.turnData.hitCount > 1 && user.turnData.hitsLeft === 1 && move.canBeMultiStrikeEnhanced(user, true, target)` (the extra strike of a multi-strike move): no library atom reads the turn's hit counters in an attack frame (the frame has no hits slot there) and the strike-eligibility rule is request B02-12b, so it stays legacy-closure (request B02-18). The subclass HitMultiplierPowerAbAttr (archetype) is a separate class. The class ignores `simulated` in apply (the preview calculation applies the same multiplier). toDmgValue rounds down and never goes below 1.",

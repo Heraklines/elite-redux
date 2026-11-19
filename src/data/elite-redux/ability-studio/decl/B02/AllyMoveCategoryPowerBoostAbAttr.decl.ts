@@ -14,14 +14,13 @@
 //   canApply: always true (the class comment says the logic lives in move.ts)                    -> nothing
 //   apply:    `if (condition(pokemon, opponent, move)) power.value *= powerMultiplier`, with the closure
 //             `boostedCategories.includes(move.category)`                                         -> the `categories` setting
-// Constructor: (boostedCategories, powerMultiplier). 
+// Constructor: (boostedCategories, powerMultiplier).
 // The class is not touched: the live value is read back by asking the closure (boosted-codecs.ts), because a new instance field would change the configuration snapshot that the frozen fingerprints of the saved abilities guard.
 // The archetype subclass AllyAttackPowerBoostAbAttr overrides apply and is a separate class.
 // No random draw, no state. Tier A.
 import { AllyMoveCategoryPowerBoostAbAttr } from "#abilities/ab-attrs";
-import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 import { boostedCategoriesCodec } from "#data/elite-redux/ability-studio/decl/B02/boosted-codecs";
-import { CATEGORY_OPTIONS } from "#data/elite-redux/ability-studio/vocabulary/enums";
+import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 
 export default defineDecl(AllyMoveCategoryPowerBoostAbAttr, {
   tier: "A",
@@ -49,10 +48,10 @@ export default defineDecl(AllyMoveCategoryPowerBoostAbAttr, {
       ctorIndex: 0,
       path: "condition",
       control: "text",
-      label: "Move kinds that are boosted (comma separated: physical, special, status)",
+      label: "Move kinds that are boosted (type physical, special and/or status, separated by commas)",
       editable: true,
-      default: "SPECIAL",
-      options: [...CATEGORY_OPTIONS],
+      default: "special",
+      options: ["physical", "special", "status"],
       codec: boostedCategoriesCodec,
     },
     {

@@ -14,13 +14,15 @@
 //             -> the `type` setting is that condition (it is the move.type atom with effective = true)
 //   apply:    parent's `power.value *= powerMultiplier`                                           -> effect
 // Constructor: (boostedType, powerMultiplier?, skipDuringMovesetGen?). `powerMultiplier || 1.5`, so 0 would silently become 1.5
-// (the setting starts above 0). `skipDuringMovesetGen` is false for all 21 users and never read (the parent canApply that
-// reads it is overridden), so it is a fixed argument. The class is not touched; the live value is read back by asking the closure (boosted-codecs.ts) because a new instance field would change the configuration snapshot that the frozen fingerprints of the saved abilities guard.
+// (the setting starts above 0). `skipDuringMovesetGen` is false for all 21 live users (vanilla Sand Force passes true, but the Elite Redux Sand Force replaces it and is not a user)
+// (init-abilities.ts SAND_FORCE: `.attr(MoveTypePowerBoostAbAttr, ROCK/GROUND/STEEL, 1.3, true)`). It is read back from the
+// instance field through a hidden (not editable) setting so a rebuild keeps it. Today the field is dead (the parent canApply
+// that reads it is overridden by MovePowerBoostAbAttr.canApply without a super call), but it must survive a rebuild. The class is not touched; the live value is read back by asking the closure (boosted-codecs.ts) because a new instance field would change the configuration snapshot that the frozen fingerprints of the saved abilities guard.
 // No random draw, no state. Tier A. Extra attr-level conditions (Blaze's "HP above 33%" on the 1.2x copy) are carried by
 // `addCondition` and rebuilt with the attr.
 import { MoveTypePowerBoostAbAttr } from "#abilities/ab-attrs";
-import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 import { boostedTypeCodec } from "#data/elite-redux/ability-studio/decl/B02/boosted-codecs";
+import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 import { TYPE_OPTIONS } from "#data/elite-redux/ability-studio/vocabulary/enums";
 
 export default defineDecl(MoveTypePowerBoostAbAttr, {
@@ -69,9 +71,18 @@ export default defineDecl(MoveTypePowerBoostAbAttr, {
       editable: true,
       default: 1.5,
     },
+    {
+      id: "skipDuringMovesetGen",
+      ctorIndex: 2,
+      path: "skipDuringMovesetGen",
+      control: "boolean",
+      label: "Skip this boost while the game builds opponent move sets (not used by the battle today)",
+      // Not editable: only the vanilla Sand Force (replaced in Elite Redux, so no live user) passes true, and the game never reads it for this class today. It is a setting so that a
+      // rebuilt attr keeps its value and a future fix of the game cannot make original and rebuild differ.
+      editable: false,
+      default: false,
+    },
   ],
-  // ctor 2 is `skipDuringMovesetGen` (false for every user, never read): not exposed.
-  fixedCtorArgs: { 2: false },
   conditions: [],
   guards: [],
   feasibility: ["Moves that deal a fixed amount of damage are not changed"],
@@ -80,8 +91,10 @@ export default defineDecl(MoveTypePowerBoostAbAttr, {
   flags: { rng: "none", state: "none", simulated: "respects" },
   l2StaticReason:
     "The shared reach table (decomp-l2-reach.json) lists calc.move-power as unreached, although the original's attrs ARE evaluated in the shared scenario (the run shows no attr-not-evaluated problem for this class and every twin trace is identical): the engine dispatches the moment under the key VariableMovePowerAbAttr. Request B02-37 asks B20 to move the trigger to reached. B02/power-boost.test.ts proves the closures over a wide move list.",
-  probes: [{ name: "my attack in sun, rain and fog", axes: { weather: ["NONE", "SUNNY", "RAIN"] } }],
+  probes: [
+    { name: "my attack against a foe that uses different move types", axes: { foeMove: ["TACKLE", "WATER_GUN"] } },
+  ],
   status: "decomposed",
   notes:
-    "Tier A, 21 attrs; nothing to bind because the constructor takes the type, not a closure (the type test is the `type` setting, the same rule as the move.type atom with effective = true, which is exactly `user.getMoveType(move) === type`). The free-form version of this rule is MovePowerBoostAbAttr with a move.type binding. 'Blaze' style abilities carry a second copy of this class (1.2x) with an attr-level HP condition (`getHpRatio() > .33`, set with addCondition); recomposeAttr carries it over. Lepidopteran, Blaze, Overgrow, Swarm and Torrent also have a LowHpMoveTypePowerBoostAbAttr (another declaration). Several users sit at different attr indices in several ids (Dirty Snowball, Earthbound, Vengeance, Vengeful Spirit, Rocky Payload each also have a MovePowerBoostAbAttr). `powerMultiplier || 1.5` means a multiplier of exactly 0 cannot be built (it becomes 1.5); the setting starts at 0.05.",
+    "Tier A, 21 attrs (skipDuringMovesetGen is false on all 21 live attrs, read back by the hidden setting; the vanilla Sand Force passes true but Elite Redux replaces that ability, so none of the 21 is a Sand Force attr); nothing to bind because the constructor takes the type, not a closure (the type test is the `type` setting, the same rule as the move.type atom with effective = true, which is exactly `user.getMoveType(move) === type`). The free-form version of this rule is MovePowerBoostAbAttr with a move.type binding. 'Blaze' style abilities carry a second copy of this class (1.2x) with an attr-level HP condition (`getHpRatio() > .33`, set with addCondition); recomposeAttr carries it over. Lepidopteran, Blaze, Overgrow, Swarm and Torrent also have a LowHpMoveTypePowerBoostAbAttr (another declaration). Several users sit at different attr indices in several ids (Dirty Snowball, Earthbound, Vengeance, Vengeful Spirit, Rocky Payload each also have a MovePowerBoostAbAttr). `powerMultiplier || 1.5` means a multiplier of exactly 0 cannot be built (it becomes 1.5); the setting starts at 0.05.",
 });

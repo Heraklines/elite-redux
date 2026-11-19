@@ -16,10 +16,8 @@
 // Clauses: the filter is the only condition (ctor:1 -> field `condition`); the granted flags are a typed list setting.
 // No random draw, no state. Tier A.
 import { AddMoveFlagAbAttr } from "#abilities/ab-attrs";
+import { MOVE_PROPERTY_WORDS, moveFlagWordsCodec } from "#data/elite-redux/ability-studio/decl/B02/boosted-codecs";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
-import { enumListCodec } from "#data/elite-redux/ability-studio/param-codecs";
-import { MOVE_FLAG_OPTIONS } from "#data/elite-redux/ability-studio/vocabulary/enums";
-import { MoveFlags } from "#enums/move-flags";
 
 export default defineDecl(AddMoveFlagAbAttr, {
   tier: "A",
@@ -40,7 +38,7 @@ export default defineDecl(AddMoveFlagAbAttr, {
   ],
   examples: [
     "Make my Dragon moves count as punching moves, like Brawling Wyvern",
-    "Make my Normal moves count as sound moves, like Reverberate",
+    "Make my kicking moves count as punching moves too, like Junshi Sanda",
   ],
   params: [
     {
@@ -49,11 +47,11 @@ export default defineDecl(AddMoveFlagAbAttr, {
       ctorOption: "flags",
       path: "grantedFlags",
       control: "text",
-      label: "Move properties to add (comma separated list)",
+      label: "Move properties to add (type words such as punching, kicking, sound, slicing, separated by commas)",
       editable: true,
-      default: "PUNCHING_MOVE",
-      options: [...MOVE_FLAG_OPTIONS],
-      codec: enumListCodec(MoveFlags, "move property"),
+      default: "punching",
+      options: MOVE_PROPERTY_WORDS,
+      codec: moveFlagWordsCodec,
     },
   ],
   conditions: [{ slot: "ctor:1", ctx: "attack", path: "condition", removable: true, editable: true }],
@@ -61,6 +59,7 @@ export default defineDecl(AddMoveFlagAbAttr, {
   feasibility: [
     "Only works while my ability is active (a suppressed Pokemon grants nothing)",
     "Only abilities that look for the property notice it; it never changes the move itself",
+    "Today only the punching and slicing properties are looked at by any ability (Iron Fist family, Sharpness), so granting sound, pulse or kicking has no visible effect until an ability asks for them",
   ],
   effect: { id: "effect.package", params: ["flags"] },
   reusableAlone: { when: true, if: true, do: true },
@@ -70,5 +69,5 @@ export default defineDecl(AddMoveFlagAbAttr, {
   probes: [{ name: "a move that the filter accepts and one that it rejects", axes: {} }],
   status: "decomposed",
   notes:
-    "Tier A, 7 attrs (Brawling Wyvern, Junshi Sanda x2, Gunman, Reverberate, Mixed Martial Arts, Kyokushin). The class is not in the AbilityAttrs registry and is never dispatched; the engine scans it with instanceof. The WHEN `while.active` does not list this class in its flagKeys yet: request B02-19 (library). The effect has no library block (grant a move property), effect.package with the list as typed setting: request B02-20. Filters: `user.getMoveType(move) === DRAGON / NORMAL` (move.type, effective), `move.hasFlag(PUNCHING)` / `move.hasFlag(KICKING)` (move.flag; the engine only injects the dance and sound properties, so for these two flags doesFlagEffectApply equals hasFlag), `move.category === STATUS`. Suspected game bug (not fixed): userGrantsFlag is only asked about PUNCHING_MOVE (init-abilities.ts:740) and SLICING_MOVE (:2213), so what Reverberate (sound), Gunman (pulse) and the kicking part of Junshi Sanda, Mixed Martial Arts and Kyokushin grant is read by nothing; only the punching grants have an effect today. Oddity (not a bug): Junshi Sanda has two of these (punching moves also count as kicking, kicking moves also count as punching); there is no endless loop because both filters read the printed move flag, not the granted one. Only the two consumers in init-abilities.ts (Iron Fist family, Sharpness) call userGrantsFlag, so granting any other property (sound, pulse) has no effect today unless another ability asks for it.",
+    "Tier A, 7 attrs (Brawling Wyvern, Junshi Sanda x2, Gunman, Reverberate, Mixed Martial Arts, Kyokushin). The class is not in the AbilityAttrs registry and is never dispatched; the engine scans it with instanceof. The WHEN `while.active` does not list this class in its flagKeys yet: request B02-19 (library). The effect has no library block (grant a move property), effect.package with the list as typed setting: request B02-20. Filters: `user.getMoveType(move) === DRAGON / NORMAL` (move.type, effective), `move.hasFlag(PUNCHING)` / `move.hasFlag(KICKING)` (move.flag; the engine only injects dance, sound, horn and slicing, so for these two flags doesFlagEffectApply equals hasFlag), `move.category === STATUS`. Suspected game bug (not fixed): userGrantsFlag is only asked about PUNCHING_MOVE (init-abilities.ts:740) and SLICING_MOVE (:2213), so what Reverberate (sound), Gunman (pulse) and the kicking part of Junshi Sanda, Mixed Martial Arts and Kyokushin grant is read by nothing; only the punching grants have an effect today. Oddity (not a bug): Junshi Sanda has two of these (punching moves also count as kicking, kicking moves also count as punching); there is no endless loop because both filters read the printed move flag, not the granted one. Only the two consumers in init-abilities.ts (Iron Fist family, Sharpness) call userGrantsFlag, so granting any other property (sound, pulse) has no effect today unless another ability asks for it.",
 });

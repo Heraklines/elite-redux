@@ -234,7 +234,7 @@ bindEach(
   "ctor:1",
 );
 // Junshi Sanda: `move.hasFlag(PUNCHING)` and `move.hasFlag(KICKING)`. move.flag asks doesFlagEffectApply, which only differs from
-// hasFlag for contact, ignore-abilities, ignore-protect and the two injected flags (dance, sound); punching and kicking are none of them.
+// hasFlag for contact, ignore-abilities, ignore-protect and the two injected flags (dance, sound) and the horn/slicing pair injected by RapierFlagInjectionAbAttr (barbaracle-mechanics.ts); punching and kicking are none of them.
 bindEach({ id: "move.flag", flag: "PUNCHING_MOVE" }, [[5470, 0, "JunshiSanda (punching moves also kick)"]], "ctor:1");
 bindEach({ id: "move.flag", flag: "KICKING_MOVE" }, [[5470, 1, "JunshiSanda (kicking moves also punch)"]], "ctor:1");
 // Gunman: `move.category === STATUS`.
@@ -274,21 +274,36 @@ bindEach(
   {
     all: [
       { id: "move.category", category: "PHYSICAL" },
-      { any: [{ id: "status.has", who: "holder", status: "POISON" }, { id: "status.has", who: "holder", status: "TOXIC" }] },
+      {
+        any: [
+          { id: "status.has", who: "holder", status: "POISON" },
+          { id: "status.has", who: "holder", status: "TOXIC" },
+        ],
+      },
     ],
   },
   [[137, 0, "Toxic Boost"]],
 );
 // Flare Boost `move.category === SPECIAL && user.status?.effect === BURN`.
 bindEach(
-  { all: [{ id: "move.category", category: "SPECIAL" }, { id: "status.has", who: "holder", status: "BURN" }] },
+  {
+    all: [
+      { id: "move.category", category: "SPECIAL" },
+      { id: "status.has", who: "holder", status: "BURN" },
+    ],
+  },
   [[138, 0, "Flare Boost"]],
 );
 // Normalize `move?.type === NORMAL`: the raw printed type (effective: false), like the MoveTypeChange bindings above.
 bindEach({ id: "move.type", type: "NORMAL", effective: false }, [[96, 1, "Normalize (1.1x)"]]);
 // Two-Faced: `fullBelly(user) && move.type === NORMAL` (fullBelly = `user.getFormKey() !== "hangry"`).
 bindEach(
-  { all: [{ not: { id: "mon.in-form", who: "holder", key: "hangry" } }, { id: "move.type", type: "NORMAL", effective: false }] },
+  {
+    all: [
+      { not: { id: "mon.in-form", who: "holder", key: "hangry" } },
+      { id: "move.type", type: "NORMAL", effective: false },
+    ],
+  },
   [[5486, 9, "Two-Faced"]],
 );
 // Sound moves: `move.doesFlagEffectApply({ flag: SOUND_BASED, user })`, the very call the atom makes (the target only matters for contact).
@@ -300,7 +315,7 @@ bindEach({ id: "move.flag", flag: "SOUND_BASED" }, [
   [20015, 2, "Siren's Song"],
 ]);
 // Printed move flags read with `move.hasFlag(F)`. For F other than contact, ignore-abilities, ignore-protect, dance and sound,
-// doesFlagEffectApply(F) is `hasFlag(F)` (the only flag injectors in the game inject dance and sound), so the atom is the same test.
+// doesFlagEffectApply(F) is `hasFlag(F)` (the only flag injectors in the game inject dance and sound, and horn/slicing through RapierFlagInjectionAbAttr; no bound atom reads horn or slicing), so the atom is the same test.
 bindEach({ id: "move.flag", flag: "RECKLESS_MOVE" }, [
   [120, 0, "Reckless"],
   [5459, 1, "Brute Force"],
@@ -364,14 +379,24 @@ bindEach({ id: "move.is-move", moveId: "POISON_STING" }, [[5175, 3, "Angel's Wra
 bindEach({ id: "move.is-move", moveId: "ELECTROWEB" }, [[5175, 4, "Angel's Wrath (Electroweb)"]]);
 bindEach({ id: "move.is-move", moveId: "BUG_BITE" }, [[5175, 5, "Angel's Wrath (Bug Bite)"]]);
 bindEach(
-  { any: [{ id: "move.is-move", moveId: "HIDDEN_POWER" }, { id: "move.is-move", moveId: "SECRET_POWER" }] },
+  {
+    any: [
+      { id: "move.is-move", moveId: "HIDDEN_POWER" },
+      { id: "move.is-move", moveId: "SECRET_POWER" },
+    ],
+  },
   [[5477, 1, "Unown Power"]],
 );
 bindEach({ id: "move.is-move", moveId: "WATER_SHURIKEN" }, [[5659, 0, "Giant Shuriken"]]);
 bindEach({ id: "move.is-move", moveId: "FLYING_PRESS" }, [[5663, 0, "Wrestle Showman"]]);
 // Fog: `isFogWeather(arena.weather?.weatherType)` = FOG or EERIE_FOG, read from the weather object the atom also reads
 // (arena.weatherType is `weather?.weatherType ?? NONE`; neither looks at weather suppression).
-const FOG = { any: [{ id: "field.weather", weather: "FOG" }, { id: "field.weather", weather: "EERIE_FOG" }] };
+const FOG = {
+  any: [
+    { id: "field.weather", weather: "FOG" },
+    { id: "field.weather", weather: "EERIE_FOG" },
+  ],
+};
 bindEach(FOG, [[5646, 0, "Echolocation"]]);
 bindEach({ all: [FOG, { id: "move.type", type: "GHOST", effective: true }] }, [
   [5523, 0, "Ominous Shroud"],
@@ -395,10 +420,13 @@ legacyEach(CONTACT_RAW_REASON, [
   [5704, 0, "Bird of Prey"],
   [5726, 0, "Reaper's Embarce"],
 ]);
-legacyEach(`Physical move that does not make contact: \`category === PHYSICAL && !move.hasFlag(MAKES_CONTACT)\`. ${CONTACT_RAW_REASON}`, [
-  [5550, 0, "World Serpent"],
-  [5933, 2, "First Serpent"],
-]);
+legacyEach(
+  `Physical move that does not make contact: \`category === PHYSICAL && !move.hasFlag(MAKES_CONTACT)\`. ${CONTACT_RAW_REASON}`,
+  [
+    [5550, 0, "World Serpent"],
+    [5933, 2, "First Serpent"],
+  ],
+);
 const GRANTED_REASON =
   "Closure `move.hasFlag(F) || AddMoveFlagAbAttr.userGrantsFlag(user, move, F)`: the move has the property printed OR one of my abilities grants it (Brawling Wyvern, Junshi Sanda, ...). No atom reads the granted properties (request B02-23 in requests/B02.md)";
 legacyEach(GRANTED_REASON, [
@@ -434,9 +462,10 @@ legacyEach(
     [5625, 1, "Empress"],
   ],
 );
-legacyEach("Closure `!!user && user.summonData.illusion != null`: no atom says that I am disguised by an illusion (request B02-28 in requests/B02.md)", [
-  [149, 3, "Illusion"],
-]);
+legacyEach(
+  "Closure `!!user && user.summonData.illusion != null`: no atom says that I am disguised by an illusion (request B02-28 in requests/B02.md)",
+  [[149, 3, "Illusion"]],
+);
 legacyEach(
   "Closure `!phaseManager.hasPhaseOfType(MovePhase, phase => phase.pokemon.id !== user.id)`: nobody else still has a move waiting this turn, i.e. I move last; the atom time.acted tests the turn data of one Pokemon, not the move queue (request B02-29 in requests/B02.md)",
   [

@@ -20,20 +20,26 @@ import {
   type LowHpMoveTypePowerBoostAbAttr,
 } from "#abilities/ab-attrs";
 import { allMoves } from "#data/data-lists";
+import { getBinding } from "#data/elite-redux/ability-studio/bindings";
+import { adaptCondition, readDeclParams, recomposeAttr } from "#data/elite-redux/ability-studio/build-attr";
+import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
+import { compileCondition } from "#data/elite-redux/ability-studio/vocabulary/evaluate/conditions";
 import { Gender } from "#data/gender";
 import { TerrainType } from "#data/terrain";
-import { adaptCondition, recomposeAttr, readDeclParams } from "#data/elite-redux/ability-studio/build-attr";
-import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
-import { getBinding } from "#data/elite-redux/ability-studio/bindings";
-import { compileCondition } from "#data/elite-redux/ability-studio/vocabulary/evaluate/conditions";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
 import { WeatherType } from "#enums/weather-type";
 import type { Move } from "#moves/move";
+import { type BindingCase, bindingCases } from "#test/tests/elite-redux/decomp/harness/differential";
 import { startWorld } from "#test/tests/elite-redux/decomp/harness/game";
-import { bindingCases, type BindingCase } from "#test/tests/elite-redux/decomp/harness/differential";
 import { allAttrSites } from "#test/tests/elite-redux/decomp/harness/sites";
-import { applyGridState, buildStateGrid, GRID_MOVES, type GridState, type World } from "#test/tests/elite-redux/decomp/harness/world";
+import {
+  applyGridState,
+  buildStateGrid,
+  GRID_MOVES,
+  type GridState,
+  type World,
+} from "#test/tests/elite-redux/decomp/harness/world";
 import { NumberHolder } from "#utils/common";
 import Phaser from "phaser";
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -69,17 +75,47 @@ function wideMoves(): Move[] {
   }
   const all = allMoves.filter((move): move is Move => move !== undefined && move.id !== MoveId.NONE);
   for (const flag of [1, 4, 32, 64, 128, 256, 512, 134217728, 536870912]) {
-    all.filter(move => move.hasFlag(flag)).slice(0, 4).forEach(add);
-    all.filter(move => !move.hasFlag(flag)).slice(0, 2).forEach(add);
+    all
+      .filter(move => move.hasFlag(flag))
+      .slice(0, 4)
+      .forEach(add);
+    all
+      .filter(move => !move.hasFlag(flag))
+      .slice(0, 2)
+      .forEach(add);
   }
-  all.filter(move => move.hasAttr("VariablePowerAttr")).slice(0, 4).forEach(add);
-  all.filter(move => move.power > 0 && move.power <= 60 && !move.hasAttr("VariablePowerAttr")).slice(0, 4).forEach(add);
-  all.filter(move => move.power > 60).slice(0, 3).forEach(add);
-  all.filter(move => move.chance >= 1).slice(0, 4).forEach(add);
-  all.filter(move => move.chance === 0).slice(0, 2).forEach(add);
-  all.filter(move => move.priority > 0).slice(0, 3).forEach(add);
-  all.filter(move => move.priority < 0).slice(0, 2).forEach(add);
-  all.filter(move => move.category === 2).slice(0, 4).forEach(add);
+  all
+    .filter(move => move.hasAttr("VariablePowerAttr"))
+    .slice(0, 4)
+    .forEach(add);
+  all
+    .filter(move => move.power > 0 && move.power <= 60 && !move.hasAttr("VariablePowerAttr"))
+    .slice(0, 4)
+    .forEach(add);
+  all
+    .filter(move => move.power > 60)
+    .slice(0, 3)
+    .forEach(add);
+  all
+    .filter(move => move.chance >= 1)
+    .slice(0, 4)
+    .forEach(add);
+  all
+    .filter(move => move.chance === 0)
+    .slice(0, 2)
+    .forEach(add);
+  all
+    .filter(move => move.priority > 0)
+    .slice(0, 3)
+    .forEach(add);
+  all
+    .filter(move => move.priority < 0)
+    .slice(0, 2)
+    .forEach(add);
+  all
+    .filter(move => move.category === 2)
+    .slice(0, 4)
+    .forEach(add);
   return [...picked.values()];
 }
 
@@ -98,7 +134,13 @@ function wideStates(): GridState[] {
   }
   extra.push({ ...base, name: "grassy terrain, full hp", terrain: TerrainType.GRASSY });
   extra.push({ ...base, name: "fog, foe Fire", weather: WeatherType.FOG, foeTypes: [9] });
-  extra.push({ ...base, name: "female holder, female foe in sun", weather: WeatherType.SUNNY, holderGender: Gender.FEMALE, foeGender: Gender.FEMALE });
+  extra.push({
+    ...base,
+    name: "female holder, female foe in sun",
+    weather: WeatherType.SUNNY,
+    holderGender: Gender.FEMALE,
+    foeGender: Gender.FEMALE,
+  });
   return [...grid, ...extra];
 }
 
@@ -113,7 +155,9 @@ function compare(world: World, cases: readonly BindingCase[], moves: readonly Mo
         const library = (testCase.library as unknown as (...a: unknown[]) => boolean)(world.holder, world.foe, move);
         evaluations++;
         if (original !== library) {
-          mismatches.push(`${testCase.site.abilityName} attr ${testCase.site.attrIndex} ${testCase.slot} | ${state.name} | ${move.name}: original ${original}, library ${library}`);
+          mismatches.push(
+            `${testCase.site.abilityName} attr ${testCase.site.attrIndex} ${testCase.slot} | ${state.name} | ${move.name}: original ${original}, library ${library}`,
+          );
         }
       }
     }
@@ -137,7 +181,9 @@ describe("B02 chunk 3: power and damage boosts", () => {
     const moves = wideMoves();
     expect(moves.length).toBeGreaterThan(60);
     const { mismatches, evaluations } = compare(world, cases, moves, wideStates());
-    console.log(`B02_C3 wide differential: ${cases.length} bindings, ${moves.length} moves, ${evaluations} evaluations`);
+    console.log(
+      `B02_C3 wide differential: ${cases.length} bindings, ${moves.length} moves, ${evaluations} evaluations`,
+    );
     expect(mismatches.slice(0, 10)).toEqual([]);
   }, 600000);
 
@@ -152,12 +198,21 @@ describe("B02 chunk 3: power and damage boosts", () => {
       ctx: "attack" as const,
       spec: { block: "move.flag", params: { flag: "PUNCHING_MOVE" } },
       original: original as never,
-      library: adaptCondition("attack", compileCondition({ block: "move.flag", params: { flag: "PUNCHING_MOVE" } })) as never,
+      library: adaptCondition(
+        "attack",
+        compileCondition({ block: "move.flag", params: { flag: "PUNCHING_MOVE" } }),
+      ) as never,
     } satisfies BindingCase;
     const { mismatches } = compare(world, [wrong], wideMoves(), buildStateGrid().slice(0, 3));
     expect(mismatches.length).toBeGreaterThan(0);
     // and the right one passes
-    const right = { ...wrong, library: adaptCondition("attack", compileCondition(getBinding(site.abilityId, site.attrIndex, "ctor:0")!.spec!)) as never };
+    const right = {
+      ...wrong,
+      library: adaptCondition(
+        "attack",
+        compileCondition(getBinding(site.abilityId, site.attrIndex, "ctor:0")!.spec!),
+      ) as never,
+    };
     expect(compare(world, [right], wideMoves(), buildStateGrid().slice(0, 3)).mismatches).toEqual([]);
   });
 
@@ -177,12 +232,28 @@ describe("B02 chunk 3: power and damage boosts", () => {
 
   it("the settings read back from the live attrs are the ones of the abilities", () => {
     const read = (className: string, abilityName: string, index?: number) => {
-      const site = sitesOf(className).find(s => s.abilityName === abilityName && (index === undefined || s.attrIndex === index))!;
+      const site = sitesOf(className).find(
+        s => s.abilityName === abilityName && (index === undefined || s.attrIndex === index),
+      )!;
       expect(site, `${abilityName} ${className}`).toBeDefined();
       return readDeclParams(declRegistry.get(className)!, site.attr);
     };
-    expect(read("MoveTypePowerBoostAbAttr", "Transistor")).toEqual({ type: "ELECTRIC", multiplier: 1.5 });
-    expect(read("MoveTypePowerBoostAbAttr", "Water Bubble")).toEqual({ type: "WATER", multiplier: 2 });
+    expect(read("MoveTypePowerBoostAbAttr", "Transistor")).toEqual({
+      type: "ELECTRIC",
+      multiplier: 1.5,
+      skipDuringMovesetGen: false,
+    });
+    // vanilla Sand Force passes true, but Elite Redux replaces that ability: every live user reads back false
+    expect(
+      sitesOf("MoveTypePowerBoostAbAttr").every(
+        s => (s.attr as unknown as { skipDuringMovesetGen: boolean }).skipDuringMovesetGen === false,
+      ),
+    ).toBe(true);
+    expect(read("MoveTypePowerBoostAbAttr", "Water Bubble")).toEqual({
+      type: "WATER",
+      multiplier: 2,
+      skipDuringMovesetGen: false,
+    });
     expect(read("LowHpMoveTypePowerBoostAbAttr", "Blaze")).toEqual({ type: "FIRE", multiplier: 1.5 });
     expect(read("LowHpMoveTypePowerBoostAbAttr", "Overgrow")).toEqual({ type: "GRASS", multiplier: 1.5 });
     expect(read("LowHpMoveTypePowerBoostAbAttr", "Torrent")).toEqual({ type: "WATER", multiplier: 1.5 });
@@ -190,10 +261,10 @@ describe("B02 chunk 3: power and damage boosts", () => {
     expect(read("FieldMoveTypePowerBoostAbAttr", "Dark Aura")).toMatchObject({ type: "DARK" });
     expect(read("FieldMoveTypePowerBoostAbAttr", "Fairy Aura")).toMatchObject({ type: "FAIRY" });
     expect(read("UserFieldMoveTypePowerBoostAbAttr", "Steely Spirit")).toEqual({ type: "STEEL", multiplier: 1.3 });
-    expect(read("AllyMoveCategoryPowerBoostAbAttr", "Battery")).toEqual({ categories: "SPECIAL", multiplier: 1.3 });
+    expect(read("AllyMoveCategoryPowerBoostAbAttr", "Battery")).toEqual({ categories: "special", multiplier: 1.3 });
     expect(read("MoveDamageBoostAbAttr", "Parental Bond")).toEqual({ multiplier: 0.25 });
-    expect(read("AddMoveFlagAbAttr", "Brawling Wyvern")).toEqual({ flags: "PUNCHING_MOVE" });
-    expect(read("AddMoveFlagAbAttr", "Mixed Martial Arts")).toEqual({ flags: "PUNCHING_MOVE,KICKING_MOVE" });
+    expect(read("AddMoveFlagAbAttr", "Brawling Wyvern")).toEqual({ flags: "punching" });
+    expect(read("AddMoveFlagAbAttr", "Mixed Martial Arts")).toEqual({ flags: "punching,kicking" });
     // every attr of every class yields every declared setting
     for (const className of MY_CLASSES) {
       const module = declRegistry.get(className)!;
@@ -247,7 +318,12 @@ describe("B02 chunk 3: power and damage boosts", () => {
     ]) {
       const module = declRegistry.get(className)!;
       for (const site of sitesOf(className)) {
-        const rebuilt = recomposeAttr(module, site.attr, site.abilityId, site.attrIndex) as unknown as FieldMoveTypePowerBoostAbAttr;
+        const rebuilt = recomposeAttr(
+          module,
+          site.attr,
+          site.abilityId,
+          site.attrIndex,
+        ) as unknown as FieldMoveTypePowerBoostAbAttr;
         const original = site.attr as unknown as FieldMoveTypePowerBoostAbAttr;
         for (const move of moves) {
           const run = (attr: FieldMoveTypePowerBoostAbAttr) => {
@@ -277,7 +353,8 @@ describe("B02 chunk 3: power and damage boosts", () => {
       const rebuilt = recomposeAttr(module, site.attr, site.abilityId, site.attrIndex);
       expect(readDeclParams(module, rebuilt)).toEqual(readDeclParams(module, site.attr));
       for (const category of [0, 1, 2]) {
-        const accepts = (attr: unknown) => (attr as { condition: (...a: unknown[]) => boolean }).condition(undefined, undefined, { category });
+        const accepts = (attr: unknown) =>
+          (attr as { condition: (...a: unknown[]) => boolean }).condition(undefined, undefined, { category });
         expect(accepts(rebuilt)).toBe(accepts(site.attr));
       }
     }
@@ -310,7 +387,13 @@ describe("B02 chunk 3: power and damage boosts", () => {
         }
       }
       lines.push(`${site.abilityName}: exact ties at 33.5% seen ${atBoundary}`);
-      const params = { pokemon: world.holder, opponent: world.foe, move: allMoves[MoveId.TACKLE], power: new NumberHolder(40), simulated: true };
+      const params = {
+        pokemon: world.holder,
+        opponent: world.foe,
+        move: allMoves[MoveId.TACKLE],
+        power: new NumberHolder(40),
+        simulated: true,
+      };
       expect(rebuilt.canApply(params)).toBe(original.canApply(params));
     }
     console.log(`B02_C3 low hp: ${lines.join("; ")}`);
