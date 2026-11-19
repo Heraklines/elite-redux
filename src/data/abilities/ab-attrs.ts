@@ -2341,13 +2341,32 @@ export class PostAttackApplyBattlerTagAbAttr extends PostAttackAbAttr {
     this.effects = effects;
   }
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1): `guards` (two safety rules), then `gate` (damaging move, contact when
+   * required, then the chance roll), no residual. The original clause order was damaging move, Shield Dust style
+   * block, not-self, contact, roll; the guards now run first, which only moves pure checks ahead of each other. The
+   * roll is still the LAST clause, so it is drawn exactly when it was drawn before (even for a chance of 0 or 100).
+   */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /**
+   * Safety rules. Battler tags inflicted by abilities post attacking are also considered additional effects, so a
+   * target whose ability ignores move effects is never affected, and the attacker never targets itself.
+   */
+  public guards({ pokemon, opponent }: PostMoveInteractionAbAttrParams): boolean {
+    return !opponent.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr") && pokemon !== opponent;
+  }
+
+  /** The replaceable condition: a damaging move, contact when required, and the chance roll (the only random draw). */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
     const { pokemon, move, opponent } = params;
-    // Battler tags inflicted by abilities post attacking are also considered additional effects.
     return (
       super.canApply(params)
-      && !opponent.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr")
-      && pokemon !== opponent
       && (!this.contactRequired
         || move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: pokemon, target: opponent }))
       && pokemon.randBattleSeedInt(100) < this.chance(pokemon, opponent, move)
@@ -2381,15 +2400,31 @@ export class PostAttackAbilityGiveAbAttr extends PostAttackAbAttr {
     this.ability = ability;
   }
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1): `guards` (never the attacker itself), `gate` (damaging move and contact)
+   * and `residual` (the target's ability can be replaced and is not already this giver). No random draws, so moving
+   * the pure not-self check ahead of the move checks changes nothing.
+   */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  public guards({ pokemon, opponent: target }: PostMoveInteractionAbAttrParams): boolean {
+    return pokemon !== target;
+  }
+
+  /** The replaceable condition: a damaging move that makes contact. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
     const { pokemon, opponent: target, move } = params;
-    return (
-      super.canApply(params)
-      && pokemon !== target
-      && move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: pokemon, target })
-      && target.getAbility().suppressable
-      && !target.getAbility().hasAttr("PostAttackAbilityGiveAbAttr")
-    );
+    return super.canApply(params) && move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: pokemon, target });
+  }
+
+  /** Feasibility that stays in the class: the target's ability can be replaced and is not already this giver. */
+  public residual({ opponent: target }: PostMoveInteractionAbAttrParams): boolean {
+    return target.getAbility().suppressable && !target.getAbility().hasAttr("PostAttackAbilityGiveAbAttr");
   }
 
   override apply({ simulated, opponent: target }: PostMoveInteractionAbAttrParams): void {
@@ -2527,7 +2562,24 @@ export class SynchronizeStatusAbAttr extends PostSetStatusAbAttr {
    * - {@linkcode StatusEffect.POISON | Poison}
    * - {@linkcode StatusEffect.TOXIC | Toxic}
    */
-  override canApply({ sourcePokemon, effect }: PostSetStatusAbAttrParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostSetStatusAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1): `guards` (a Pokemon must have set the status) then `gate` (the status is
+   * one of the synchronizable ones). There is no residual and no random draw.
+   */
+  override canApply(params: PostSetStatusAbAttrParams): boolean {
+    return gatedCanApply<PostSetStatusAbAttrParams>(this, params);
+  }
+
+  /** Safety rule: a status that no Pokemon set (weather, entry hazards) has nobody to be passed back to. */
+  public guards({ sourcePokemon }: PostSetStatusAbAttrParams): boolean {
+    return Boolean(sourcePokemon);
+  }
+
+  /** The replaceable condition: the status that was set is one of the synchronizable statuses. */
+  public gate({ effect }: PostSetStatusAbAttrParams): boolean {
     /** Synchronizable statuses */
     const syncStatuses = new Set<StatusEffect>([
       StatusEffect.BURN,
@@ -2537,7 +2589,7 @@ export class SynchronizeStatusAbAttr extends PostSetStatusAbAttr {
     ]);
 
     // synchronize does not need to check canSetStatus because the ability shows even if it fails to set the status
-    return (sourcePokemon ?? false) && syncStatuses.has(effect);
+    return syncStatuses.has(effect);
   }
 
   /**
@@ -2650,8 +2702,25 @@ export class PostKnockOutStatStageChangeAbAttr extends PostKnockOutAbAttr {
 }
 
 export class CopyFaintedAllyAbilityAbAttr extends PostKnockOutAbAttr {
-  override canApply({ pokemon, victim }: PostKnockOutAbAttrParams): boolean {
-    return pokemon.isPlayer() === victim.isPlayer() && victim.getAbility().copiable;
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostKnockOutAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1): `gate` (the fainted Pokemon is on my side) and `residual` (its ability can
+   * be copied). No guards, no random draws; the clause order is the original one.
+   */
+  override canApply(params: PostKnockOutAbAttrParams): boolean {
+    return gatedCanApply<PostKnockOutAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the fainted Pokemon is on the same side as the holder. */
+  public gate({ pokemon, victim }: PostKnockOutAbAttrParams): boolean {
+    return pokemon.isPlayer() === victim.isPlayer();
+  }
+
+  /** Feasibility that stays in the class: the fainted Pokemon's ability can be copied. */
+  public residual({ victim }: PostKnockOutAbAttrParams): boolean {
+    return victim.getAbility().copiable;
   }
 
   override apply({ pokemon, simulated, victim }: PostKnockOutAbAttrParams): void {
