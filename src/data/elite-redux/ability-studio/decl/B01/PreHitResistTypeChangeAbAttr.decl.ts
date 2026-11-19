@@ -29,7 +29,7 @@ export default defineDecl(PreHitResistTypeChangeAbAttr, {
   when: "event.before-hit-lands",
   label: "Turn into the type that resists the incoming move best",
   summary: () =>
-    "Just before a damaging move hits me, I change into the one type that takes the least damage from it. Example: a Water move makes me Grass, like Color Change in Elite Redux.",
+    "Just before a damaging move hits me, I change into the type that takes the least damage from it. Example: an Electric move makes me Ground type, like Color Change.",
   synonyms: [
     "color change",
     "prismatic fur",

@@ -21,8 +21,6 @@
 // R-B01-21). The rest of the gate maps to move.damaging and tag.has.
 import { PostDefendHpGatedStatStageChangeAbAttr } from "#abilities/ab-attrs";
 import { defineDecl, type ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
-import { enumListCodec } from "#data/elite-redux/ability-studio/param-codecs";
-import { STAT_OPTIONS } from "#data/elite-redux/ability-studio/vocabulary/enums";
 import { Stat } from "#enums/stat";
 
 /** "None" reads as no guard battle effect (the constructor argument is left out). */
@@ -31,13 +29,52 @@ const guardTagCodec: ParamCodec = {
   fromInstance: raw => (raw === undefined ? "NONE" : typeof raw === "string" ? raw : undefined),
 };
 
+/** Player names of the stats, in the order shown. The box shows and accepts these (the enum constants still work). */
+const STAT_PLAYER_NAMES: ReadonlyArray<readonly [string, Stat]> = [
+  ["Attack", Stat.ATK],
+  ["Defense", Stat.DEF],
+  ["Sp. Atk", Stat.SPATK],
+  ["Sp. Def", Stat.SPDEF],
+  ["Speed", Stat.SPD],
+  ["Accuracy", Stat.ACC],
+  ["Evasion", Stat.EVA],
+];
+
+const squash = (text: string): string => text.toLowerCase().replace(/[^a-z]/g, "");
+
+/** "Attack, Sp. Atk" <-> [Stat.ATK, Stat.SPATK]. Case, dots and spaces do not matter; "ATK" and "SPATK" are accepted too. */
+const statListCodec: ParamCodec = {
+  toCtor: value =>
+    String(value)
+      .split(",")
+      .map(part => part.trim())
+      .filter(part => part.length > 0)
+      .map(part => {
+        const key = squash(part);
+        const found = STAT_PLAYER_NAMES.find(([name, stat]) => squash(name) === key || squash(Stat[stat]) === key);
+        if (found === undefined) {
+          throw new Error(
+            `"${part}" is not a known stat (use Attack, Defense, Sp. Atk, Sp. Def, Speed, Accuracy, Evasion)`,
+          );
+        }
+        return found[1];
+      }),
+  fromInstance: raw => {
+    if (!Array.isArray(raw)) {
+      return;
+    }
+    const names = raw.map(item => STAT_PLAYER_NAMES.find(([, stat]) => stat === item)?.[0]);
+    return names.every((name): name is string => name !== undefined) ? names.join(", ") : undefined;
+  },
+};
+
 export default defineDecl(PostDefendHpGatedStatStageChangeAbAttr, {
   tier: "B",
   kind: "event-effect",
   when: "event.after-hit",
   label: "Change several stats when a hit drops me to an HP line",
   summary: params =>
-    `The hit that takes my HP to ${Math.round(Number(params.hpGate) * 100)}% or lower changes ${params.stats} by ${params.stages} stages. Example: +1 Attack, Sp. Atk and Speed at half HP, like Anger Shell.`,
+    `The hit that takes my HP to ${Math.round(Number(params.hpGate) * 100)}% or lower changes ${params.stats} by ${params.stages} ${Math.abs(Number(params.stages)) === 1 ? "stage" : "stages"}. Example: +1 Attack, Sp. Atk and Speed at half HP, like Anger Shell.`,
   synonyms: [
     "anger shell",
     "no turning back",
@@ -68,12 +105,12 @@ export default defineDecl(PostDefendHpGatedStatStageChangeAbAttr, {
       ctorIndex: 1,
       path: "stats",
       control: "text",
-      label: "Stats that change (comma separated, for example Attack, Sp. Atk)",
+      label: "Stats that change (comma separated: Attack, Defense, Sp. Atk, Sp. Def, Speed, Accuracy, Evasion)",
       editable: true,
       gateIndependent: true,
-      default: "ATK",
-      options: STAT_OPTIONS,
-      codec: enumListCodec(Stat, "stat"),
+      default: "Attack",
+      options: STAT_PLAYER_NAMES.map(([name]) => name),
+      codec: statListCodec,
     },
     {
       id: "stages",

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "19b4a3aed16a8d",
-  "hash": "0a198f7d1d8151",
+  "hash": "18d14ff91e50b5",
   "blocks": [
     {
       "id": "block.allied-field-damage-reduction",
@@ -1107,7 +1107,7 @@
       "id": "block.post-defend-hp-gated-stat-stage-change",
       "className": "PostDefendHpGatedStatStageChangeAbAttr",
       "label": "Change several stats when a hit drops me to an HP line",
-      "summary": "The hit that takes my HP to 50% or lower changes Attack by 1 stages. Example: +1 Attack, Sp. Atk and Speed at half HP, like Anger Shell.",
+      "summary": "The hit that takes my HP to 50% or lower changes Attack by 1 stage. Example: +1 Attack, Sp. Atk and Speed at half HP, like Anger Shell.",
       "tier": "B",
       "kind": "event-effect",
       "status": "decomposed",
@@ -1138,18 +1138,18 @@
         },
         {
           "id": "stats",
-          "label": "Stats that change (comma separated, for example Attack, Sp. Atk)",
+          "label": "Stats that change (comma separated: Attack, Defense, Sp. Atk, Sp. Def, Speed, Accuracy, Evasion)",
           "control": "text",
-          "default": "ATK",
+          "default": "Attack",
           "editable": true,
           "options": [
-            "ATK",
-            "DEF",
-            "SPATK",
-            "SPDEF",
-            "SPD",
-            "ACC",
-            "EVA"
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Sp. Def",
+            "Speed",
+            "Accuracy",
+            "Evasion"
           ],
           "gateIndependent": true
         },
@@ -1548,7 +1548,7 @@
       "id": "block.pre-hit-resist-type-change",
       "className": "PreHitResistTypeChangeAbAttr",
       "label": "Turn into the type that resists the incoming move best",
-      "summary": "Just before a damaging move hits me, I change into the one type that takes the least damage from it. Example: a Water move makes me Grass, like Color Change in Elite Redux.",
+      "summary": "Just before a damaging move hits me, I change into the type that takes the least damage from it. Example: an Electric move makes me Ground type, like Color Change.",
       "tier": "B",
       "kind": "package",
       "status": "decomposed",
