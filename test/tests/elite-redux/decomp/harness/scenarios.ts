@@ -553,7 +553,9 @@ export async function runScenario(
     for (const action of spec.turns) {
       turn++;
       if ("move" in action) {
-        game.move.select(action.move);
+        // A holder that transformed (Imposter) only has the copied moves: fall back to its first move.
+        const known = holder.getMoveset().some(m => m.moveId === action.move);
+        game.move.select(known ? action.move : (holder.getMoveset()[0]?.moveId ?? action.move));
         action.afterSelect?.(ctx);
         if (action.until === "BerryPhase") {
           await game.phaseInterceptor.to("BerryPhase");
@@ -567,7 +569,11 @@ export async function runScenario(
         await game.toNextTurn();
       } else if ("faintHolder" in action) {
         holder.hp = 1;
-        game.move.select(MoveId.CELEBRATE);
+        game.move.select(
+          holder.getMoveset().some(m => m.moveId === MoveId.CELEBRATE)
+            ? MoveId.CELEBRATE
+            : (holder.getMoveset()[0]?.moveId ?? MoveId.CELEBRATE),
+        );
         await game.phaseInterceptor.to("FaintPhase");
       } else {
         await game.killPokemon(action.kill === "holder" ? holder : foe);
