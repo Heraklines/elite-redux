@@ -20,7 +20,16 @@ import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 import { enumListCodec } from "#data/elite-redux/ability-studio/param-codecs";
 import { StatusEffect } from "#enums/status-effect";
 
-const STATUS_NAMES = ["POISON", "TOXIC", "PARALYSIS", "SLEEP", "FREEZE", "BURN"];
+// Player words for the status problems (spec 8.3: never enum constants). Typing is case-insensitive.
+const STATUS_PLAYER_NAMES: Record<string, string> = {
+  POISON: "Poison",
+  TOXIC: "Bad poison",
+  PARALYSIS: "Paralysis",
+  SLEEP: "Sleep",
+  FREEZE: "Freeze",
+  BURN: "Burn",
+};
+const STATUS_NAMES = Object.values(STATUS_PLAYER_NAMES);
 
 export default defineDecl(PostSummonUserFieldRemoveStatusEffectAbAttr, {
   tier: "A",
@@ -40,7 +49,7 @@ export default defineDecl(PostSummonUserFieldRemoveStatusEffectAbAttr, {
   ],
   examples: [
     "Wake up my whole side from sleep when I enter, like Sweet Veil",
-    "Cure poison and bad poison on my side when I enter, like Pastel Veil",
+    "Cure poison and bad poison on my whole side when I enter",
   ],
   params: [
     {
@@ -48,11 +57,15 @@ export default defineDecl(PostSummonUserFieldRemoveStatusEffectAbAttr, {
       ctorIndex: 0,
       path: "statusEffect",
       control: "text",
-      label: "Status problems to cure (comma separated: Poison, Toxic, Paralysis, Sleep, Freeze, Burn)",
+      label: "Status problems to cure (comma separated: Poison, Bad poison, Paralysis, Sleep, Freeze, Burn)",
       editable: true,
-      default: "SLEEP",
+      default: "Sleep",
       options: STATUS_NAMES,
-      codec: enumListCodec(StatusEffect as unknown as Readonly<Record<string, number>>, "status problem"),
+      codec: enumListCodec(
+        StatusEffect as unknown as Readonly<Record<string, number>>,
+        "status problem",
+        STATUS_PLAYER_NAMES,
+      ),
       spread: true,
     },
   ],

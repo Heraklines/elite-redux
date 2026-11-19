@@ -27,7 +27,7 @@ export default defineDecl(PostSummonFormChangeAbAttr, {
   tier: "A",
   kind: "event-effect",
   when: "event.on-entry",
-  label: "Change to my right form when I enter",
+  label: "Change form to match my HP or level when I enter",
   summary: () =>
     "When I enter the battle, if I am not in the form I should have, I change form. Example: a Pokemon at 50% HP or less enters in its low-HP form.",
   synonyms: [

@@ -34,11 +34,35 @@ export function enumCodec(table: EnumTable, what: string): ParamCodec {
   };
 }
 
+/** Lower case and drop spaces, hyphens and underscores, so "Bad poison", "bad-poison" and "BAD_POISON" are one word. */
+function looseKey(text: string): string {
+  return text.toLowerCase().replace(/[\s_-]+/g, "");
+}
+
 /**
  * A list of enum values shown as comma separated names ("POISON,PARALYSIS"), for constructors that take
  * the list as rest arguments (pair it with `spread: true`) or as an array.
+ *
+ * With `playerNames` (member name -> words players use, for example `{ TOXIC: "Bad poison" }`) the list is shown
+ * in player words ("Poison, Bad poison") and typing is case-insensitive: the player word, the member name and a
+ * spelling without spaces are all accepted. Members missing from `playerNames` keep their member name.
  */
-export function enumListCodec(table: EnumTable, what: string): ParamCodec {
+export function enumListCodec(
+  table: EnumTable,
+  what: string,
+  playerNames?: Readonly<Record<string, string>>,
+): ParamCodec {
+  const shown = (member: string): string => playerNames?.[member] ?? member;
+  const byLooseKey = new Map<string, number>();
+  if (playerNames) {
+    for (const member of Object.keys(table)) {
+      const value = table[member];
+      if (typeof value === "number" && Number.isNaN(Number(member))) {
+        byLooseKey.set(looseKey(member), value);
+        byLooseKey.set(looseKey(shown(member)), value);
+      }
+    }
+  }
   return {
     toCtor: value =>
       String(value)
@@ -46,7 +70,7 @@ export function enumListCodec(table: EnumTable, what: string): ParamCodec {
         .map(part => part.trim())
         .filter(part => part.length > 0)
         .map(part => {
-          const resolved = table[part];
+          const resolved = playerNames ? byLooseKey.get(looseKey(part)) : table[part];
           if (typeof resolved !== "number") {
             throw new Error(`"${part}" is not a known ${what}`);
           }
@@ -57,7 +81,10 @@ export function enumListCodec(table: EnumTable, what: string): ParamCodec {
         return;
       }
       const names = raw.map(item => nameOf(table, item));
-      return names.every((name): name is string => name !== undefined) ? names.join(",") : undefined;
+      if (!names.every((name): name is string => name !== undefined)) {
+        return;
+      }
+      return playerNames ? names.map(shown).join(", ") : names.join(",");
     },
   };
 }

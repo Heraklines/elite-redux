@@ -23,7 +23,16 @@ import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 import { enumListCodec } from "#data/elite-redux/ability-studio/param-codecs";
 import { StatusEffect } from "#enums/status-effect";
 
-const STATUS_NAMES = ["POISON", "TOXIC", "PARALYSIS", "SLEEP", "FREEZE", "BURN"];
+// Player words for the status problems (spec 8.3: never enum constants). Typing is case-insensitive.
+const STATUS_PLAYER_NAMES: Record<string, string> = {
+  POISON: "Poison",
+  TOXIC: "Bad poison",
+  PARALYSIS: "Paralysis",
+  SLEEP: "Sleep",
+  FREEZE: "Freeze",
+  BURN: "Burn",
+};
+const STATUS_NAMES = Object.values(STATUS_PLAYER_NAMES);
 
 export default defineDecl(PostSummonHealStatusAbAttr, {
   tier: "B",
@@ -53,11 +62,16 @@ export default defineDecl(PostSummonHealStatusAbAttr, {
       ctorIndex: 0,
       path: "immuneEffects",
       control: "text",
-      label: "Status problems that make it cure me (comma separated; empty = any status)",
+      label:
+        "Status problems that cure me (Poison, Bad poison, Paralysis, Sleep, Freeze, Burn; empty = any)",
       editable: false,
-      default: "PARALYSIS",
+      default: "Paralysis",
       options: STATUS_NAMES,
-      codec: enumListCodec(StatusEffect as unknown as Readonly<Record<string, number>>, "status problem"),
+      codec: enumListCodec(
+        StatusEffect as unknown as Readonly<Record<string, number>>,
+        "status problem",
+        STATUS_PLAYER_NAMES,
+      ),
       spread: true,
     },
   ],

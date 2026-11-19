@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "011ee3842de16a",
+  "hash": "0865d2b7781e6b",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -1660,7 +1660,7 @@
     {
       "id": "block.post-summon-form-change",
       "className": "PostSummonFormChangeAbAttr",
-      "label": "Change to my right form when I enter",
+      "label": "Change form to match my HP or level when I enter",
       "summary": "When I enter the battle, if I am not in the form I should have, I change form. Example: a Pokemon at 50% HP or less enters in its low-HP form.",
       "tier": "A",
       "kind": "event-effect",
@@ -1735,17 +1735,17 @@
       "params": [
         {
           "id": "statuses",
-          "label": "Status problems that make it cure me (comma separated; empty = any status)",
+          "label": "Status problems that cure me (Poison, Bad poison, Paralysis, Sleep, Freeze, Burn; empty = any)",
           "control": "text",
-          "default": "PARALYSIS",
+          "default": "Paralysis",
           "editable": false,
           "options": [
-            "POISON",
-            "TOXIC",
-            "PARALYSIS",
-            "SLEEP",
-            "FREEZE",
-            "BURN"
+            "Poison",
+            "Bad poison",
+            "Paralysis",
+            "Sleep",
+            "Freeze",
+            "Burn"
           ]
         }
       ],
@@ -2397,22 +2397,22 @@
       ],
       "examples": [
         "Wake up my whole side from sleep when I enter, like Sweet Veil",
-        "Cure poison and bad poison on my side when I enter, like Pastel Veil"
+        "Cure poison and bad poison on my whole side when I enter"
       ],
       "params": [
         {
           "id": "statuses",
-          "label": "Status problems to cure (comma separated: Poison, Toxic, Paralysis, Sleep, Freeze, Burn)",
+          "label": "Status problems to cure (comma separated: Poison, Bad poison, Paralysis, Sleep, Freeze, Burn)",
           "control": "text",
-          "default": "SLEEP",
+          "default": "Sleep",
           "editable": true,
           "options": [
-            "POISON",
-            "TOXIC",
-            "PARALYSIS",
-            "SLEEP",
-            "FREEZE",
-            "BURN"
+            "Poison",
+            "Bad poison",
+            "Paralysis",
+            "Sleep",
+            "Freeze",
+            "Burn"
           ]
         }
       ],

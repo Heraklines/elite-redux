@@ -141,7 +141,7 @@ describe("B03 chunk 4: every user of the four classes", () => {
     const [site] = sitesOf("PostSummonUserFieldRemoveStatusEffectAbAttr") as [AttrSite];
     const original = site.attr as PostSummonUserFieldRemoveStatusEffectAbAttr;
     const copy = rebuild(site) as PostSummonUserFieldRemoveStatusEffectAbAttr;
-    expect(readDeclParams(declRegistry.get(site.className)!, copy)).toEqual({ statuses: "SLEEP" });
+    expect(readDeclParams(declRegistry.get(site.className)!, copy)).toEqual({ statuses: "Sleep" });
     const queued: string[] = [];
     const cureLog: unknown[][] = [];
     vi.spyOn(globalScene.phaseManager, "queueMessage").mockImplementation(((text: string) => {
