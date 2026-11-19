@@ -963,6 +963,12 @@ export class PostDefendHpGatedStatStageChangeAbAttr extends PostDefendAbAttr {
   private readonly guardTag: BattlerTagType | undefined;
 
   /**
+   * Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. Declared with
+   * `declare` so it is not an own field of ordinary instances (the runtime configuration snapshot ignores it).
+   */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /**
    * @param guardTag - optional battler tag that, when already present on the
    *   holder, suppresses the boost. Used by Elite Redux's No Turning Back so the
    *   one-time all-stats boost shares the same guard as its NO_RETREAT self-trap
@@ -979,10 +985,19 @@ export class PostDefendHpGatedStatStageChangeAbAttr extends PostDefendAbAttr {
     this.guardTag = guardTag;
   }
 
+  /**
+   * Tier B split (ability studio spec 3.1): the whole old `canApply` is the replaceable `gate` (every clause is a rule
+   * staff may change: damaging move, not locked out by the guard tag, HP line just crossed). There is no guard and no
+   * residual, so the clause order is exactly the old one.
+   */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
   // TODO: This should trigger after the final hit of multi-strike moves, which requires an aggregated damage total
   // across all strikes (similar to Wimp Out).
   // The structure used for the former can likely be re-used for the latter.
-  override canApply({ pokemon, move, damage }: PostMoveInteractionAbAttrParams): boolean {
+  public gate({ pokemon, move, damage }: PostMoveInteractionAbAttrParams): boolean {
     if (move.category === MoveCategory.STATUS) {
       return false;
     }
@@ -1136,13 +1151,28 @@ export class PreHitResistTypeChangeAbAttr extends AbAttr {
     return bestType;
   }
 
-  override canApply({ pokemon, opponent, move }: AugmentMoveInteractionAbAttrParams): boolean {
-    if (
-      pokemon === opponent
-      || pokemon.isTerastallized
-      || move.category === MoveCategory.STATUS
-      || move.hasAttr("TypelessAttr")
-    ) {
+  /**
+   * Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. Declared with
+   * `declare` so it is not an own field of ordinary instances (the runtime configuration snapshot ignores it).
+   */
+  public declare gateOverride: ((params: AugmentMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1): `gate`, then `residual`. The old clauses were pure reads (no random draw,
+   * no side effect), so moving the Terastallized and typeless checks into the residual cannot change any outcome.
+   */
+  override canApply(params: AugmentMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<AugmentMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The replaceable conditions: the hit is not my own move, and it is a damaging move (clauses 1 and 3 of the old `canApply`). */
+  public gate({ pokemon, opponent, move }: AugmentMoveInteractionAbAttrParams): boolean {
+    return pokemon !== opponent && move.category !== MoveCategory.STATUS;
+  }
+
+  /** The feasibility that stays in the class: not Terastallized, the move has a type, a better resisting type exists. */
+  public residual({ pokemon, opponent, move }: AugmentMoveInteractionAbAttrParams): boolean {
+    if (pokemon.isTerastallized || move.hasAttr("TypelessAttr")) {
       return false;
     }
     const moveType = opponent.getMoveType(move);
@@ -1171,8 +1201,25 @@ export class PostDefendTerrainChangeAbAttr extends PostDefendAbAttr {
     this.terrainType = terrainType;
   }
 
-  override canApply({ hitResult }: PostMoveInteractionAbAttrParams): boolean {
-    return hitResult < HitResult.NO_EFFECT && globalScene.arena.canSetTerrain(this.terrainType);
+  /**
+   * Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. Declared with
+   * `declare` so it is not an own field of ordinary instances (the runtime configuration snapshot ignores it).
+   */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): `gate`, then `residual`, in the original clause order. */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: "the move really hurt me" (not blocked, not immune), clause 1 of the old `canApply`. */
+  public gate({ hitResult }: PostMoveInteractionAbAttrParams): boolean {
+    return hitResult < HitResult.NO_EFFECT;
+  }
+
+  /** The feasibility that stays in the class (clause 2): the terrain can be set right now. */
+  public residual(_params: PostMoveInteractionAbAttrParams): boolean {
+    return globalScene.arena.canSetTerrain(this.terrainType);
   }
 
   override apply({ simulated, pokemon }: PostMoveInteractionAbAttrParams): void {

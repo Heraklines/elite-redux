@@ -104,16 +104,10 @@ bindLegacyClosure(20019, 2, `Radiant Jewel: ${PRIORITY_GATE}`, "gate");
 // (c) `pokemon !== attacker && move.doesFlagEffectApply({ flag: SOUND_BASED, user: attacker })`, exact: the attacker is not
 // me, and the move has the sound property by the same engine predicate the atom move.flag calls.
 bindCondition(43, 0, {
-  all: [
-    { not: { id: "side.is", kind: "self" } },
-    { id: "move.flag", flag: "SOUND_BASED" },
-  ],
+  all: [{ not: { id: "side.is", kind: "self" } }, { id: "move.flag", flag: "SOUND_BASED" }],
 });
 bindCondition(5272, 1, {
-  all: [
-    { not: { id: "side.is", kind: "self" } },
-    { id: "move.flag", flag: "SOUND_BASED" },
-  ],
+  all: [{ not: { id: "side.is", kind: "self" } }, { id: "move.flag", flag: "SOUND_BASED" }],
 });
 
 // (a) `pokemon !== attacker && move.hasFlag(POWDER_MOVE)`: the plain flag, not doesFlagEffectApply (which also counts a flag
@@ -143,4 +137,88 @@ bindLegacyClosure(
   283,
   0,
   "Good as Gold: closure is `pokemon !== attacker && move.category === STATUS && ![BOTH_SIDES, ENEMY_SIDE, USER_SIDE].includes(move.moveTarget)`. The not-self and status-category parts have atoms (side.is, move.category) but 'targets a whole side' has none exact (move.target-kind groups other targets as well). Needs `move.targets-whole-side` (R-B01-11).",
+);
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Chunk 3 (the after-hit and before-hit family). Every line below was read from the live attr (closure source printed
+// from the running game; the ER rebalance patcher rewrites several vanilla closures after construction).
+//
+// MoveImmunityStatStageChangeAbAttr, PostDefendStatStageChangeAbAttr, PostDefendApplyArenaTrapTagAbAttr and
+// PostDefendApplyBattlerTagAbAttr have a constructor closure (slot ctor:0, `(target, user, move)`; the holder of the frame
+// is the target and `other` / the move user is the attacker). The Tier B classes PostDefendHpGatedStatStageChangeAbAttr,
+// PreHitResistTypeChangeAbAttr and PostDefendTerrainChangeAbAttr have a gate. ReverseDrainAbAttr has neither.
+//
+// The plain contact flag `move.hasFlag(MAKES_CONTACT)` and `move.hasFlag(WIND_MOVE)` are NOT the library flag atom (that
+// one asks doesFlagEffectApply, which also counts flags an ability injects, Long Reach, Punching Glove and substitutes), so
+// those closures are legacy-closures until the librarian adds move.has-built-in-flag (R-B01-10).
+
+const CONTACT = { id: "move.flag", flag: "MAKES_CONTACT" };
+const DAMAGING = { id: "move.damaging" };
+const OF_TYPE = (type: string): unknown => ({ id: "move.type", type });
+const PLAIN_CONTACT =
+  "the closure is `(_target, _user, move) => move.hasFlag(MAKES_CONTACT)` (the plain flag, no doesFlagEffectApply); the library flag atom is not the same predicate (R-B01-10)";
+
+// PostDefendStatStageChangeAbAttr, slot ctor:0.
+// `move.doesFlagEffectApply({ flag: MAKES_CONTACT, user, target })` -> move.flag (same call).
+bindCondition(133, 0, CONTACT); // Weak Armor, Defense -1
+bindCondition(133, 1, CONTACT); // Weak Armor, Speed +2
+bindCondition(221, 0, CONTACT); // Tangling Hair
+bindCondition(5602, 0, CONTACT); // Moustache, Speed -1
+bindCondition(5647, 0, CONTACT); // Massive Pelt
+// `move.category !== STATUS` -> move.damaging.
+bindCondition(192, 0, DAMAGING); // Stamina
+bindCondition(6002, 0, DAMAGING); // Stamina (second id)
+bindCondition(238, 0, DAMAGING); // Cotton Down
+bindCondition(5257, 2, DAMAGING); // Crowned Shield
+bindCondition(5602, 2, DAMAGING); // Moustache, Defense +1
+// `user.getMoveType(move) === T && move.category !== STATUS` (type first, then the category), move.type is effective.
+bindCondition(195, 0, { all: [OF_TYPE("WATER"), DAMAGING] }); // Water Compaction
+bindCondition(270, 0, { all: [OF_TYPE("FIRE"), DAMAGING] }); // Thermal Exchange
+bindCondition(5711, 0, { all: [OF_TYPE("FIRE"), DAMAGING] }); // Thermal Entropy
+// `move.category !== STATUS && (moveType === T1 || moveType === T2 ...)` (the category first).
+bindCondition(155, 0, { all: [DAMAGING, { any: [OF_TYPE("DARK"), OF_TYPE("BUG"), OF_TYPE("GHOST")] }] }); // Rattled
+bindCondition(243, 0, { all: [DAMAGING, { any: [OF_TYPE("FIRE"), OF_TYPE("WATER")] }] }); // Steam Engine
+bindLegacyClosure(183, 0, `Gooey: ${PLAIN_CONTACT}.`);
+bindLegacyClosure(5685, 0, `Mucus Membrane: ${PLAIN_CONTACT}.`);
+bindLegacyClosure(5734, 1, `Slime Mold: ${PLAIN_CONTACT}.`);
+
+// MoveImmunityStatStageChangeAbAttr, slot ctor:0: `pokemon !== attacker && move.hasFlag(WIND_MOVE) && move.category !== STATUS`.
+bindLegacyClosure(
+  274,
+  0,
+  "Wind Rider: the closure is `pokemon !== attacker && move.hasFlag(WIND_MOVE) && move.category !== STATUS`. It maps to all[ not side.is{self}, move.has-built-in-flag{WIND_MOVE}, move.damaging ], but the plain-flag atom does not exist yet and the library flag atom asks doesFlagEffectApply (R-B01-10).",
+);
+
+// PostDefendApplyArenaTrapTagAbAttr, slot ctor:0.
+bindLegacyClosure(295, 0, `Toxic Debris: ${PLAIN_CONTACT}.`);
+
+// PostDefendApplyBattlerTagAbAttr, slot ctor:0. `() => true` is the always-true group.
+bindCondition(280, 0, { all: [] }); // Electromorphosis
+bindCondition(5152, 0, { all: [] }); // Atomic Burst
+bindLegacyClosure(
+  277,
+  0,
+  "Wind Power: the closure is `(_target, _user, move) => move.hasFlag(WIND_MOVE)` (the plain flag, no doesFlagEffectApply); the library flag atom is not the same predicate (R-B01-10).",
+);
+
+// PostDefendHpGatedStatStageChangeAbAttr (Tier B). Slot "gate" is the WHOLE old canApply (damaging move, optional guard
+// battle effect, HP line crossed with toDmgValue), see R-B01-21 for why the HP part cannot be bound yet.
+const HP_LINE =
+  "the gate is [move.damaging, (not tag.has guardTag), the HP line just crossed with `t = toDmgValue(maxHp * hpGate)`: hp <= t && hp + damage > t]; toDmgValue never goes below 1, which hp.crossed-below floor-half does, so a 1 max HP Pokemon differs (R-B01-21)";
+bindLegacyClosure(271, 0, `Anger Shell (attr 0, +2 Attack, Sp. Atk, Speed): ${HP_LINE}.`, "gate");
+bindLegacyClosure(271, 1, `Anger Shell (attr 1, -1 Defense, Sp. Def): ${HP_LINE}.`, "gate");
+bindLegacyClosure(5372, 0, `No Turning Back (guard battle effect NO_RETREAT): ${HP_LINE}.`, "gate");
+
+// PreHitResistTypeChangeAbAttr (Tier B). Slot "gate": `pokemon !== opponent && move.category !== STATUS`; the Terastallized,
+// typeless and best-type clauses stay in the class as `residual`.
+const NOT_MY_OWN_DAMAGING = { all: [{ not: { id: "side.is", kind: "self" } }, DAMAGING] };
+bindCondition(16, 0, NOT_MY_OWN_DAMAGING, "gate"); // Color Change
+bindCondition(5176, 0, NOT_MY_OWN_DAMAGING, "gate"); // Prismatic Fur
+
+// PostDefendTerrainChangeAbAttr (Tier B). Slot "gate": `hitResult < HitResult.NO_EFFECT`.
+bindLegacyClosure(
+  269,
+  0,
+  "Seed Sower gate: `hitResult < HitResult.NO_EFFECT` (the hit dealt damage). The frame carries the hitResult slot but no atom reads it (R-B01-23).",
+  "gate",
 );

@@ -338,6 +338,13 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     hitResult: HitResult.EFFECTIVE,
     simulated: false,
   }),
+  // The moment just before a hit lands (move-effect-phase.ts:612): the engine passes the defender, the attacker and the move.
+  "event.before-hit-lands": ({ holder, foe, move }) => ({
+    pokemon: holder,
+    opponent: foe,
+    move,
+    simulated: false,
+  }),
   "event.after-my-hit": ({ holder, foe, move, damage }) => ({
     pokemon: holder,
     opponent: foe,

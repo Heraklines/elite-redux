@@ -9,7 +9,12 @@
 import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
 import { BattleTrace, diffTraces, type TraceData } from "#test/tests/elite-redux/decomp/harness/battle-trace";
 import { freshGame } from "#test/tests/elite-redux/decomp/harness/game";
-import { rebuildAbility, registerShadow, unregisterShadows } from "#test/tests/elite-redux/decomp/harness/rebuild";
+import {
+  type AttrOverride,
+  rebuildAbility,
+  registerShadow,
+  unregisterShadows,
+} from "#test/tests/elite-redux/decomp/harness/rebuild";
 import type { Axes, ScenarioSpec } from "#test/tests/elite-redux/decomp/harness/scenarios";
 import { runScenario } from "#test/tests/elite-redux/decomp/harness/scenarios";
 import {
@@ -28,6 +33,8 @@ export interface TwinRun {
   /** Drop these attr indices from the rebuild (mutation check: the twin must then DIFFER). */
   readonly drop?: readonly number[];
   readonly axes?: Axes;
+  /** Per attr index overrides of the rebuild (for example the original closure of an attr whose binding is still legacy). */
+  readonly overrides?: Readonly<Record<number, AttrOverride>>;
   /**
    * Start the battle at this wave. The opening wild battle (wave 1) is always single, so a doubles scenario needs a
    * later wave (battle-scene.ts checkIsDouble); the shared harness has no wave setting (requests/B01.md, R-B01-8).
@@ -54,6 +61,7 @@ export async function twinRebuild(
   const rebuilt = rebuildAbility(original, shadowId, {
     registry: declRegistry,
     ...(run.drop === undefined ? {} : { drop: run.drop }),
+    ...(run.overrides === undefined ? {} : { overrides: run.overrides }),
   });
   registerShadow(shadowId, rebuilt.ability);
   try {
