@@ -32,7 +32,7 @@ export default defineDecl(PreserveBaseStatAbilitiesAbAttr, {
   tier: "C",
   kind: "while-active",
   when: "while.active",
-  label: "Keep the foe's stat-changing abilities when I ignore abilities",
+  label: "Keep the foe's stat abilities while I ignore abilities",
   summary: () =>
     "While I have this and I ignore the foe's ability, the foe's stat-changing abilities (Grass Pelt, Fur Coat...) still work. Their other abilities are still ignored.",
   synonyms: [
