@@ -851,8 +851,19 @@ export function validateCustomAbilitiesDelta(
     if (!isPlainObject(value)) {
       return { ok: false, error: `${key}: ability must be an object or null` };
     }
-    if (value.version !== 1) {
-      return { ok: false, error: `${key}.version: must be 1` };
+    // Version 2 is the block (WHEN / IF / DO) form and must carry a non-empty `composition` array.
+    // The game validates the blocks themselves when it compiles the ability.
+    if (value.version !== 1 && value.version !== 2) {
+      return { ok: false, error: `${key}.version: must be 1 or 2` };
+    }
+    if (value.composition !== undefined && (!Array.isArray(value.composition) || value.composition.length > 24)) {
+      return { ok: false, error: `${key}.composition: must be an array of at most 24 rules` };
+    }
+    if (value.version === 2 && (!Array.isArray(value.composition) || value.composition.length === 0)) {
+      return { ok: false, error: `${key}.composition: version 2 needs at least one block rule` };
+    }
+    if (value.version === 1 && value.composition !== undefined) {
+      return { ok: false, error: `${key}.composition: needs version 2` };
     }
     if (!Number.isInteger(value.id) || (value.id as number) < 20000 || (value.id as number) > 29999) {
       return { ok: false, error: `${key}.id: must be 20000-29999` };
@@ -950,6 +961,7 @@ export function validateCustomAbilitiesDelta(
         + (Array.isArray(value.componentRules) ? value.componentRules.length : 0)
         + value.rules.length
         + value.modifiers.length
+        + (Array.isArray(value.composition) ? value.composition.length : 0)
       === 0
     ) {
       return { ok: false, error: `${key}: add an include, component rule, mechanic, rule, or modifier` };

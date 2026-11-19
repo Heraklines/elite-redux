@@ -52,6 +52,18 @@ describe("custom ability Worker validation", () => {
     };
   }
 
+  it("accepts version 2 only with a non-empty composition, and V1 only without one", () => {
+    const base = componentAbility({ kind: "holder-hp", maxPercent: 35 });
+    const rule = { key: "rule-1", when: { block: "event.after-taking-damage" }, if: [], do: [] };
+    const v2 = { ...base, componentRules: [], composition: [rule], version: 2 };
+    expect(validateCustomAbilitiesDelta({ "block-one": v2 })).toEqual({ ok: true });
+    expect(validateCustomAbilitiesDelta({ "block-one": { ...v2, composition: [] } })).toMatchObject({ ok: false });
+    expect(validateCustomAbilitiesDelta({ "block-one": { ...base, composition: [rule] } })).toMatchObject({
+      ok: false,
+    });
+    expect(validateCustomAbilitiesDelta({ "block-one": { ...base, version: 3 } })).toMatchObject({ ok: false });
+  });
+
   it("accepts primitive conditions inside component rules", () => {
     expect(
       validateCustomAbilitiesDelta({ "threshold-exit": componentAbility({ kind: "holder-hp", maxPercent: 35 }) }),

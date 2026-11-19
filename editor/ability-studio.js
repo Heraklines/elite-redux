@@ -3073,12 +3073,28 @@
     return true;
   }
 
+  /**
+   * The form that is saved. An ability without block rules is a plain V1 ability: version 1 and no
+   * `composition` key. Only a non-empty composition is saved as version 2. The in-editor entry keeps
+   * its empty `composition`, so the block builder stays open while the author works.
+   */
+  function savedForm(value) {
+    if (!value || typeof value !== "object" || !Array.isArray(value.composition)) {
+      return value;
+    }
+    if (value.composition.length > 0) {
+      return value.version === 2 ? value : { ...value, version: 2 };
+    }
+    const { composition: _empty, ...rest } = value;
+    return { ...rest, version: 1 };
+  }
+
   function buildDelta() {
     const errors = allValidationErrors();
     const delta = {};
     const keys = new Set([...Object.keys(state), ...Object.keys(baseline)]);
     for (const key of keys) {
-      const value = state[key];
+      const value = savedForm(state[key]);
       if (value === null) {
         if (baseline[key] !== undefined) {
           delta[key] = null;

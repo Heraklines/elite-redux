@@ -4,14 +4,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// The Ability Studio block builder (editor/composition-builder.js plus its hooks in ability-studio.js).
-//
-//  - the generated editor data is fresh (vocabulary hash) and the unpackable gates are real
-//  - the editor's validation is a faithful port of the game's validateComposition (parity over a matrix)
-//  - slot-compatibility filtering of the picker equals what the validator accepts
-//  - search over label / synonyms / examples, sentence preview, locked safety rules, "Works as one piece"
-//  - V1 abilities open and save byte-identically; "Upgrade to blocks" changes nothing that compiles
-//  - "Unpack" turns a legacy event gate into explicit blocks that validate and compile
 import { allAbilities } from "#data/data-lists";
 import { validateAbilityStudioBlueprints } from "#data/elite-redux/ability-studio/ability-blueprint";
 import { compileAbilityStudioBlueprint } from "#data/elite-redux/ability-studio/compile-ability-blueprint";
@@ -22,6 +14,15 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { JSDOM } from "jsdom";
 import { beforeEach, describe, expect, it } from "vitest";
+// The Ability Studio block builder (editor/composition-builder.js plus its hooks in ability-studio.js).
+//
+//  - the generated editor data is fresh (vocabulary hash) and the unpackable gates are real
+//  - the editor's validation is a faithful port of the game's validateComposition (parity over a matrix)
+//  - slot-compatibility filtering of the picker equals what the validator accepts
+//  - search over label / synonyms / examples, sentence preview, locked safety rules, "Works as one piece"
+//  - V1 abilities open and save byte-identically; "Upgrade to blocks" changes nothing that compiles
+//  - "Unpack" turns a legacy event gate into explicit blocks that validate and compile
+import { validateCustomAbilitiesDelta } from "../../../../workers/er-editor-api/src/index";
 
 type Json = Record<string, unknown>;
 
@@ -754,6 +755,27 @@ describe("V1 abilities and the upgrade", () => {
     expect(studio.buildDelta().delta).toEqual({});
   });
 
+  it("saves an untouched New ability, an Upgrade and an emptied Unpack as plain V1 that the worker accepts", () => {
+    initStudio({});
+    click("[data-as-action='new-ability']");
+    const fresh = Object.values(studio.buildDelta().delta)[0] as Json;
+    expect(fresh.version).toBe(1);
+    expect("composition" in fresh).toBe(false);
+    expect(validateCustomAbilitiesDelta({ fresh: { ...fresh, includes: [1] } })).toEqual({ ok: true });
+    // the builder itself stays open for the author
+    expect(root.querySelector(".cb-add-rule")).not.toBeNull();
+    // adding a rule turns the saved form into V2 and the worker accepts it
+    click("[data-cb-action='add-rule']");
+    typeInto("[data-cb-search]", "taking damage");
+    pickOption("event.after-taking-damage");
+    typeInto("[data-cb-search]", "switch out");
+    pickOption("effect.force-switch-out");
+    const used = Object.values(studio.buildDelta().delta)[0] as Json;
+    expect(used.version).toBe(2);
+    expect((used.composition as unknown[]).length).toBe(1);
+    expect(validateCustomAbilitiesDelta({ used: { ...used, includes: [1] } })).toEqual({ ok: true });
+  });
+
   it("shows an Upgrade button instead of the block builder, and 'Upgrade to blocks' only adds composition", () => {
     const key = "new-ability-13";
     initStudio({ [key]: structuredClone(savedAbilities[key]) });
@@ -764,9 +786,17 @@ describe("V1 abilities and the upgrade", () => {
     click("[data-cb-action='upgrade']");
     const { delta, errors } = studio.buildDelta();
     expect(errors).toEqual(errorsBefore);
-    const upgraded = delta[key] as Json;
+    // an upgraded ability with no block rule yet saves as plain V1: nothing to save at all
+    expect(delta[key]).toBeUndefined();
+    expect(root.querySelector(".cb-add-rule")).not.toBeNull();
+    click("[data-cb-action='add-rule']");
+    typeInto("[data-cb-search]", "taking damage");
+    pickOption("event.after-taking-damage");
+    typeInto("[data-cb-search]", "switch out");
+    pickOption("effect.force-switch-out");
+    const upgraded = studio.buildDelta().delta[key] as Json;
     expect(upgraded.version).toBe(2);
-    expect(upgraded.composition).toEqual([]);
+    expect((upgraded.composition as unknown[]).length).toBe(1);
     const { version: _v1, ...before } = savedAbilities[key];
     const { version: _v2, composition: _c, ...after } = upgraded;
     expect(after).toEqual(before);
