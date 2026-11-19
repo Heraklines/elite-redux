@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "096ef32b703c2f",
+  "hash": "1477232ba9a78c",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -124,6 +124,63 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.confusion-on-status-effect",
+      "className": "ConfusionOnStatusEffectAbAttr",
+      "label": "Confuse the foe after I give it a chosen status",
+      "summary": "After I give a foe Poison, Toxic, that foe also becomes confused for 2 to 5 turns, if it can be confused.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-inflicting-status",
+      "whenLabel": "After I inflict a status",
+      "synonyms": [
+        "poison puppeteer",
+        "confuse after poisoning",
+        "poison and confuse",
+        "status and confusion",
+        "bonus confusion",
+        "dazed by status"
+      ],
+      "examples": [
+        "Foes I poison are also confused, like Poison Puppeteer"
+      ],
+      "params": [
+        {
+          "id": "statuses",
+          "label": "Statuses that also cause confusion (comma separated, for example Poison, Toxic)",
+          "control": "text",
+          "default": "POISON,TOXIC",
+          "editable": true,
+          "options": [
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The foe must still be standing",
+        "The foe must be able to become confused (it is not already confused and nothing protects it)"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": [
+          "statuses"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.float",
@@ -463,6 +520,44 @@
       "uses": 9
     },
     {
+      "id": "block.post-summon-clear-weather",
+      "className": "PostSummonClearWeatherAbAttr",
+      "label": "Clear the weather when I enter",
+      "summary": "When I enter the battle, any weather ends, even Heavy rain, Extremely harsh sunlight and Strong winds. Nothing happens if the sky is already clear.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "cloud nine",
+        "remove weather",
+        "end the weather",
+        "clear sky",
+        "stop the rain",
+        "no weather"
+      ],
+      "examples": [
+        "End the rain or sun the moment I enter, even a primal weather"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "There must be an active weather to clear"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
       "id": "block.post-summon-copy-ability",
       "className": "PostSummonCopyAbilityAbAttr",
       "label": "Copy a foe's ability when I enter",
@@ -499,6 +594,44 @@
       },
       "packageReason": "Package, justified: the attr keeps `target` and `targetAbilityName` between canApply, apply and getTriggerMessage, and its apply replaces the holder's ability (setTempAbility) and suppresses the source for two turns. Splitting would re-implement the class. Users: Trace only. Honest bucket: package-only.",
       "uses": 1
+    },
+    {
+      "id": "block.post-summon-form-change-by-weather",
+      "className": "PostSummonFormChangeByWeatherAbAttr",
+      "label": "Take the form that fits the weather when I enter",
+      "summary": "When I enter the battle, I change to the form that matches the current weather (Castform in rain, Cherrim in sun), if my species has one.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "forecast",
+        "flower gift",
+        "castform",
+        "cherrim",
+        "weather form",
+        "change form with the weather"
+      ],
+      "examples": [
+        "Switch to my rain form when I enter during rain, like Castform"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "My species must have a weather-based form change that is allowed right now"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.post-summon-weather-change",
@@ -565,6 +698,326 @@
       "uses": 7
     },
     {
+      "id": "block.post-summon-weather-suppressed-form-change",
+      "className": "PostSummonWeatherSuppressedFormChangeAbAttr",
+      "label": "Return weather-based forms to normal when I enter",
+      "summary": "When I enter the battle, every Pokemon on the field that changes form with the weather (Castform, Cherrim) goes back to its normal form. Nothing happens if there is none.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "air lock",
+        "cloud nine",
+        "undo weather form",
+        "castform normal form",
+        "cherrim normal form",
+        "end weather forms"
+      ],
+      "examples": [
+        "Turn Castform and Cherrim back to normal when I enter, like Air Lock"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one Pokemon on the field (either side) must be a Castform with Forecast or a Cherrim with Flower Gift"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.pre-leave-field-clear-weather",
+      "className": "PreLeaveFieldClearWeatherAbAttr",
+      "label": "End a lasting weather when I leave the field",
+      "summary": "When I leave the field and the weather is heavy rain, it ends, unless another Pokemon on the field keeps the same weather going.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.leave-field",
+      "whenLabel": "When I leave the field",
+      "synonyms": [
+        "primal weather ends",
+        "desolate land leaves",
+        "primordial sea leaves",
+        "delta stream leaves",
+        "weather ends when I leave",
+        "clear weather on switch out"
+      ],
+      "examples": [
+        "Heavy rain ends when I leave the field, like Primordial Sea"
+      ],
+      "params": [
+        {
+          "id": "weather",
+          "label": "Weather that ends when I leave",
+          "control": "select",
+          "default": "HEAVY_RAIN",
+          "editable": true,
+          "options": [
+            "SUNNY",
+            "RAIN",
+            "SANDSTORM",
+            "HAIL",
+            "SNOW",
+            "FOG",
+            "HEAVY_RAIN",
+            "HARSH_SUN",
+            "STRONG_WINDS",
+            "TEMPEST_STORM",
+            "SNOWY_WRATH",
+            "EERIE_FOG"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The weather on the field must be the one I keep alive",
+        "No other Pokemon on the field may hold an ability that keeps the same weather alive"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "weather"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 6
+    },
+    {
+      "id": "block.pre-leave-field-remove-suppress-abilities-source",
+      "className": "PreLeaveFieldRemoveSuppressAbilitiesSourceAbAttr",
+      "label": "End the ability-blocking gas when I leave the field",
+      "summary": "When I leave the field, the gas that switches off other Pokemon's abilities loses one source and ends once no source is left. Nothing happens if no gas is active.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.leave-field",
+      "whenLabel": "When I leave the field",
+      "synonyms": [
+        "neutralizing gas ends",
+        "abilities work again",
+        "end ability suppression",
+        "gas cloud ends",
+        "stop blocking abilities",
+        "ability suppression leaves with me"
+      ],
+      "examples": [
+        "Everyone's abilities work again after I leave the field, like Neutralizing Gas"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "An ability-blocking gas must currently be active on the field (otherwise nothing happens)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.pre-switch-out-form-change",
+      "className": "PreSwitchOutFormChangeAbAttr",
+      "label": "Change form when I switch out",
+      "summary": "When I switch out, I change form (Palafin turns into its Hero form). Nothing happens if I fainted or already have that form.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.switch-out",
+      "whenLabel": "When I switch out",
+      "synonyms": [
+        "zero to hero",
+        "palafin",
+        "hero form",
+        "change form when retreating",
+        "form change on switch"
+      ],
+      "examples": [
+        "Turn into my hero form when I switch out, like Zero to Hero"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": false,
+          "editable": false,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "My species must have a registered form change for this ability that is allowed right now"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.pre-switch-out-heal",
+      "className": "PreSwitchOutHealAbAttr",
+      "label": "Heal a third of my max HP when I switch out",
+      "summary": "When I switch out while hurt, I heal 33% of my max HP (rounded down, at least 1). Example: 200 max HP heals 66. Nothing happens at full HP.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.switch-out",
+      "whenLabel": "When I switch out",
+      "synonyms": [
+        "regenerator",
+        "heal on switch",
+        "recover when retreating",
+        "switch out heal",
+        "eternal blessing",
+        "natural recovery"
+      ],
+      "examples": [
+        "Heal about a third of my HP when I switch out, like Regenerator"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "My HP must not already be full"
+      ],
+      "effect": {
+        "id": "effect.heal-percent",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.pre-switch-out-reset-status",
+      "className": "PreSwitchOutResetStatusAbAttr",
+      "label": "Cure my status when I switch out",
+      "summary": "When I switch out, I recover from any status condition (burn, poison, sleep, paralysis, freeze, Bleed, Frostbite, Fear). Nothing happens if I have none.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.switch-out",
+      "whenLabel": "When I switch out",
+      "synonyms": [
+        "natural cure",
+        "heal status on switch",
+        "cleanse when retreating",
+        "status reset",
+        "self repair",
+        "natural recovery"
+      ],
+      "examples": [
+        "Cure my burn or poison when I switch out, like Natural Cure"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "I must have a status condition (a normal one, or Bleed, Frostbite or Fear) to cure"
+      ],
+      "effect": {
+        "id": "effect.cure-status",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.protect-stat",
+      "className": "ProtectStatAbAttr",
+      "label": "Stop other Pokemon from lowering my stats",
+      "summary": "Other Pokemon (and Sticky Web) cannot lower any of my stats. Drops from my own moves still land.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.stat-protect",
+      "whenLabel": "While the game checks if my stat is protected",
+      "synonyms": [
+        "clear body",
+        "hyper cutter",
+        "keen eye",
+        "stat drop immunity",
+        "block intimidate",
+        "stat protection",
+        "cannot be lowered"
+      ],
+      "examples": [
+        "Attack cannot be lowered by foes, like Hyper Cutter",
+        "No stat can be lowered by foes, like Clear Body"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat is protected (or all stats)",
+          "control": "select",
+          "default": "ALL",
+          "editable": true,
+          "options": [
+            "ALL",
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only stat drops that other Pokemon or field effects cause are checked (a drop from my own move is not)",
+        "A drop that another ability or effect already blocked is left alone"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": [
+          "stat"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 10
+    },
+    {
       "id": "block.received-move-damage-multiplier",
       "className": "ReceivedMoveDamageMultiplierAbAttr",
       "label": "Take less (or more) damage",
@@ -628,6 +1081,284 @@
         "do": true
       },
       "uses": 64
+    },
+    {
+      "id": "block.reflect-stat-stage-change",
+      "className": "ReflectStatStageChangeAbAttr",
+      "label": "Bounce stat drops back at the Pokemon that caused them",
+      "summary": "When another Pokemon tries to lower one of my stats, the drop is blocked and the same drop lands on that Pokemon instead, even through its own stat protection.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.stat-reflect",
+      "whenLabel": "While the game checks if a stat drop is reflected",
+      "synonyms": [
+        "mirror armor",
+        "reflect stat drops",
+        "bounce back intimidate",
+        "send stat drops back",
+        "reverse stat drop",
+        "stat drop reflection"
+      ],
+      "examples": [
+        "Send Intimidate and Growl back at the foe, like Mirror Armor"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A foe must be behind the drop (my own drops, Octolock and drops that were already bounced are never reflected)",
+        "A drop that another ability or effect already blocked is left alone"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.self-stat-drop-immunity",
+      "className": "SelfStatDropImmunityAbAttr",
+      "label": "Stop my own moves from lowering my stats",
+      "summary": "My own moves and effects cannot lower any of my stats. Example: Close Combat no longer lowers Defense. Other Pokemon can still lower my stats.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.stat-protect",
+      "whenLabel": "While the game checks if my stat is protected",
+      "synonyms": [
+        "limber",
+        "lucky halo",
+        "no self stat drops",
+        "overheat no drop",
+        "close combat no drop",
+        "ignore recoil stat drops",
+        "self drop immunity"
+      ],
+      "examples": [
+        "Moves like Close Combat and Overheat never lower my stats, like Lucky Halo"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat is protected (or all stats)",
+          "control": "select",
+          "default": "ALL",
+          "editable": true,
+          "options": [
+            "ALL",
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only stat drops are blocked (a boost I give myself always lands)",
+        "Only drops I cause myself are checked here (a drop from another Pokemon is the job of the other stat-protection block)",
+        "A drop that another ability or effect already blocked is left alone"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": [
+          "stat"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 9
+    },
+    {
+      "id": "block.status-effect-immunity",
+      "className": "StatusEffectImmunityAbAttr",
+      "label": "Be immune to chosen status conditions",
+      "summary": "I cannot get Burn. Example: choose Burn and burns never land on me.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.status-immunity",
+      "whenLabel": "While the game checks my status immunity",
+      "synonyms": [
+        "immune to burn",
+        "immune to poison",
+        "immune to sleep",
+        "immune to paralysis",
+        "limber",
+        "insomnia",
+        "status immunity",
+        "cannot be statused"
+      ],
+      "examples": [
+        "Immune to paralysis, like Limber",
+        "Immune to every status condition, like Comatose"
+      ],
+      "params": [
+        {
+          "id": "statuses",
+          "label": "Status conditions I am immune to (comma separated; leave empty for every status)",
+          "control": "text",
+          "default": "BURN",
+          "editable": true,
+          "options": [
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A status that another ability or effect already blocked is left alone",
+        "Leaving the list empty blocks every status condition except fainting"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": [
+          "statuses"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 21
+    },
+    {
+      "id": "block.user-field-self-stat-drop-immunity",
+      "className": "UserFieldSelfStatDropImmunityAbAttr",
+      "label": "Protect me and my partner from their own stat drops",
+      "summary": "Neither I nor my partner lose any stat from our own moves, like Overheat. Foes can still lower stats.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.stat-protect",
+      "whenLabel": "While the game checks if my stat is protected",
+      "synonyms": [
+        "evaporate",
+        "protect partner from self drops",
+        "ally no recoil stat drops",
+        "team self drop immunity",
+        "doubles partner overheat",
+        "shield ally stat drops"
+      ],
+      "examples": [
+        "My partner's Overheat and Close Combat stop lowering its stats, like Evaporate under Mist"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat is protected (or all stats)",
+          "control": "select",
+          "default": "ALL",
+          "editable": true,
+          "options": [
+            "ALL",
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only stat drops are blocked (a boost always lands)",
+        "Only drops that the Pokemon causes itself are checked (a drop from a foe is the job of the other stat-protection block)",
+        "In a double battle the same block also covers my partner's own drops",
+        "A drop that another ability or effect already blocked is left alone"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": [
+          "stat"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.user-field-status-effect-immunity",
+      "className": "UserFieldStatusEffectImmunityAbAttr",
+      "label": "Protect my partner from chosen status conditions",
+      "summary": "My partner (not me) cannot get Sleep while I am on the field. Example: choose Sleep and my partner never falls asleep.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.status-immunity-field",
+      "whenLabel": "While the game checks my side's status immunity",
+      "synonyms": [
+        "sweet veil",
+        "pastel veil",
+        "ally status immunity",
+        "partner cannot sleep",
+        "team status protection",
+        "protect ally from status"
+      ],
+      "examples": [
+        "My ally cannot fall asleep, like Sweet Veil"
+      ],
+      "params": [
+        {
+          "id": "statuses",
+          "label": "Status conditions my partner is immune to (comma separated; leave empty for every status)",
+          "control": "text",
+          "default": "SLEEP",
+          "editable": true,
+          "options": [
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only my partner is protected, never myself (my own immunity is a separate block)",
+        "Leaving the list empty protects against every status condition except fainting"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": [
+          "statuses"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     }
   ]
 }
