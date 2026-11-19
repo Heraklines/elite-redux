@@ -110,7 +110,12 @@ describe("L2 battle twin (live registry)", () => {
             const key = `${scenario.template.id}|${JSON.stringify(scenario.axes)}|${scenario.when}`;
             const entry = scenarios.get(key) ?? { scenario, attrs: [] };
             // A presence flag (while-active, engine-query) is never dispatched, so no trace can show it evaluated.
-            if (getWhen(declRegistry.get(attr.constructor.name)!.decl.when)?.dispatchKey != null) {
+            // A declaration with a written l2StaticReason says no template can steer into its trigger; its hand-written
+            // twin test carries the proof, so the shared twin only compares whole-battle traces for it.
+            if (
+              scenario.staticReason === undefined
+              && getWhen(declRegistry.get(attr.constructor.name)!.decl.when)?.dispatchKey != null
+            ) {
               entry.attrs.push({ attrIndex: index, className: attr.constructor.name });
             }
             scenarios.set(key, entry);

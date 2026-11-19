@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "1477232ba9a78c",
+  "hash": "07cb9344de8e45",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -170,10 +170,8 @@
         "The foe must be able to become confused (it is not already confused and nothing protects it)"
       ],
       "effect": {
-        "id": "effect.apply-tag",
-        "params": [
-          "statuses"
-        ]
+        "id": "effect.package",
+        "params": []
       },
       "reusableAlone": {
         "when": true,

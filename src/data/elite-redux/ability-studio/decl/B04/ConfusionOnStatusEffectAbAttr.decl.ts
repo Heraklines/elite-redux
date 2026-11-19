@@ -66,8 +66,14 @@ export default defineDecl(ConfusionOnStatusEffectAbAttr, {
     "The foe must still be standing",
     "The foe must be able to become confused (it is not already confused and nothing protects it)",
   ],
-  effect: { id: "effect.apply-tag", params: ["statuses"] },
+  // The statuses setting is the TRIGGER filter (which status just landed), not an effect setting. The effect (confuse the foe
+  // for 2 to 5 turns, one draw from the holder, tag source = the foe itself) has no editable setting yet: the class hard-codes
+  // the tag and the range. effect.apply-tag (target, tag) cannot express the range or the source, so the effect stays a
+  // package until requests/B04.md section 7 (turns range + source choice on effect.apply-tag) is built.
+  effect: { id: "effect.package", params: [] },
   reusableAlone: { when: true, if: true, do: true },
+  l2StaticReason:
+    "No L2 template makes the holder inflict a status on a foe, so the shared twin never evaluates this attr. The proof is the real Toxic battle in b04-chunk2.test.ts (holder poisons a foe, original against rebuilt shadow, same 2-to-5 draw).",
   flags: {
     rng: "apply",
     rngOrder: ["apply: how many turns the confusion lasts (2 to 5), only when not simulated, after the status landed"],
