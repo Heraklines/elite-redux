@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "0c8f05ea51c377",
+  "hash": "01f4130a832567",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -261,7 +261,7 @@
     {
       "id": "block.bonus-crit",
       "className": "BonusCritAbAttr",
-      "label": "Raise my critical hit chance by one level",
+      "label": "Raise my critical hit level",
       "summary": "Every move I use is one level more likely to be a critical hit. Example: a normal 1 in 24 chance becomes 1 in 8, and a 1 in 8 chance becomes 1 in 2.",
       "tier": "C",
       "kind": "calc-modifier",
