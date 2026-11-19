@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "18cff0c8171d7a",
+  "hash": "0f70ce7e79cdd5",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -83,6 +83,77 @@
       "uses": 21
     },
     {
+      "id": "block.battler-tag-immunity",
+      "className": "BattlerTagImmunityAbAttr",
+      "label": "Be immune to chosen effects such as confusion or flinching",
+      "summary": "Nothing can give me Confusion. Example: choose Confusion and confusion never lands on me.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.battle-effect-immunity",
+      "whenLabel": "While the game checks my battle-effect immunity",
+      "synonyms": [
+        "own tempo",
+        "inner focus",
+        "oblivious",
+        "insomnia",
+        "immune to confusion",
+        "immune to flinching",
+        "flinch immunity",
+        "immune to infatuation",
+        "yawn immunity"
+      ],
+      "examples": [
+        "Immune to confusion, like Own Tempo",
+        "Immune to flinching, like Inner Focus"
+      ],
+      "params": [
+        {
+          "id": "effects",
+          "label": "Battle effects I am immune to (comma separated, for example Confusion, Flinch)",
+          "control": "text",
+          "default": "Confusion",
+          "editable": true,
+          "options": [
+            "Flinch",
+            "Confusion",
+            "Infatuation",
+            "Drowsiness",
+            "Taunt",
+            "Disable",
+            "Encore",
+            "Torment",
+            "Heal Block",
+            "Leech Seed",
+            "Nightmare",
+            "Curse",
+            "Salt Cure",
+            "Bleed",
+            "Frostbite",
+            "Fear"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "An effect that another ability or effect already blocked is left alone",
+        "The game also asks this block when it only checks whether an effect could land, without applying it"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": [
+          "effects"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 18
+    },
+    {
       "id": "block.berserk-on-threshold",
       "className": "BerserkOnThresholdAbAttr",
       "label": "Raise my best attack once when a hit drops me to half HP",
@@ -124,6 +195,234 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.block-crit",
+      "className": "BlockCritAbAttr",
+      "label": "Be immune to critical hits",
+      "summary": "Attacks against me can never be critical hits. Example: a hit that would have been critical does normal damage instead.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.crit",
+      "whenLabel": "While the game checks if I can be critically hit",
+      "synonyms": [
+        "battle armor",
+        "shell armor",
+        "no crits",
+        "cannot be critically hit",
+        "crit immunity",
+        "block critical hits",
+        "lucky chant"
+      ],
+      "examples": [
+        "Critical hits never land on me, like Battle Armor"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 16
+    },
+    {
+      "id": "block.conditional-user-field-battler-tag-immunity",
+      "className": "ConditionalUserFieldBattlerTagImmunityAbAttr",
+      "label": "Protect a qualifying partner from effects like drowsiness",
+      "summary": "My partner cannot get Drowsiness while it passes the check (Flower Veil: it is a Grass type). Example: choose Drowsiness and a Grass partner never gets drowsy.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.battle-effect-immunity-field",
+      "whenLabel": "While the game checks my side's battle-effect immunity",
+      "synonyms": [
+        "flower veil",
+        "jungle's guard",
+        "protect grass partner from yawn",
+        "grass partner cannot be confused",
+        "ally effect shield",
+        "partner effect immunity",
+        "team yawn protection"
+      ],
+      "examples": [
+        "My Grass-type partner cannot become drowsy, like Flower Veil"
+      ],
+      "params": [
+        {
+          "id": "effects",
+          "label": "Battle effects my partner is immune to (comma separated, for example Drowsiness, Confusion)",
+          "control": "text",
+          "default": "Drowsiness",
+          "editable": true,
+          "options": [
+            "Flinch",
+            "Confusion",
+            "Infatuation",
+            "Drowsiness",
+            "Taunt",
+            "Disable",
+            "Encore",
+            "Torment",
+            "Heal Block",
+            "Leech Seed",
+            "Nightmare",
+            "Curse",
+            "Salt Cure",
+            "Bleed",
+            "Frostbite",
+            "Fear"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": false,
+          "editable": false,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only my partner is protected, never myself (my own immunity is a separate block)",
+        "An effect that another ability or effect already blocked is left alone",
+        "The game also asks this block when it only checks whether an effect could land, without applying it"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": [
+          "effects"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.conditional-user-field-protect-stat",
+      "className": "ConditionalUserFieldProtectStatAbAttr",
+      "label": "Protect me and a qualifying partner from stat drops",
+      "summary": "Other Pokemon cannot lower any stat of me or of my partner while that Pokemon passes the check (Flower Veil: it is a Grass type). Drops from its own moves still land.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.stat-protect-field",
+      "whenLabel": "While the game checks if my side's stat is protected",
+      "synonyms": [
+        "flower veil",
+        "jungle's guard",
+        "protect grass partner from stat drops",
+        "team stat protection",
+        "ally stat drop immunity",
+        "side stat protection",
+        "block intimidate for allies"
+      ],
+      "examples": [
+        "Grass-type Pokemon on my side cannot have their stats lowered by foes, like Flower Veil"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": false,
+          "editable": false,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only stat drops that other Pokemon or field effects cause are checked (a drop from my own move is not)",
+        "A drop that another ability or effect already blocked is left alone",
+        "Every stat is protected; the block cannot be limited to one stat"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.conditional-user-field-status-effect-immunity",
+      "className": "ConditionalUserFieldStatusEffectImmunityAbAttr",
+      "label": "Protect a qualifying partner from status conditions",
+      "summary": "My partner cannot get Sleep from another Pokemon while it passes the check (Flower Veil: it is a Grass type).",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.status-immunity-field",
+      "whenLabel": "While the game checks my side's status immunity",
+      "synonyms": [
+        "flower veil",
+        "jungle's guard",
+        "protect grass partner from status",
+        "partner status immunity",
+        "grass partner cannot be burned",
+        "ally status shield",
+        "team status protection"
+      ],
+      "examples": [
+        "My Grass-type partner cannot be burned, poisoned or put to sleep, like Flower Veil"
+      ],
+      "params": [
+        {
+          "id": "statuses",
+          "label": "Status conditions my partner is immune to (comma separated; leave empty for every status)",
+          "control": "text",
+          "default": "Sleep",
+          "editable": true,
+          "options": [
+            "Poison",
+            "Bad poison",
+            "Paralysis",
+            "Sleep",
+            "Freeze",
+            "Burn"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": false,
+          "editable": false,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only my partner is protected, never myself (my own immunity is a separate block)",
+        "Only a status that another Pokemon causes is blocked (not one the target gives itself, and not one with no Pokemon behind it)",
+        "A status that another ability or effect already blocked is left alone",
+        "Leaving the list empty blocks every status condition except fainting"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": [
+          "statuses"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.confusion-on-status-effect",
@@ -169,8 +468,7 @@
           "default": "Confusion",
           "editable": true,
           "options": [
-            "Confusion",
-            "Heal Block"
+            "Confusion"
           ]
         },
         {
@@ -186,7 +484,7 @@
         },
         {
           "id": "turnsMax",
-          "label": "Longest time it lasts (turns)",
+          "label": "Longest time it lasts (turns, not shorter than the shortest)",
           "control": "number",
           "default": 5,
           "editable": true,
@@ -216,6 +514,100 @@
         "do": true
       },
       "uses": 1
+    },
+    {
+      "id": "block.defensive-stat-substitute",
+      "className": "DefensiveStatSubstituteAbAttr",
+      "label": "Defend with another stat instead of Defense and Sp. Def",
+      "summary": "When I am hit, the damage formula uses my Speed instead of my Defense or Sp. Def. Example: choose Speed and a fast Pokemon takes less damage.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.defensive-stat-substitute",
+      "whenLabel": "While the game picks my defensive stat",
+      "synonyms": [
+        "tangled feet",
+        "speed as defense",
+        "use speed for defense",
+        "swap defensive stat",
+        "defend with speed",
+        "defense from another stat"
+      ],
+      "examples": [
+        "Take hits with my Speed instead of my Defense, like Tangled Feet while confused"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Stat used in place of Defense and Sp. Def",
+          "control": "select",
+          "default": "Speed",
+          "editable": true,
+          "options": [
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Sp. Def",
+            "Speed"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when the attacker ignores my ability (Mold Breaker style)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "stat"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.enemy-min-damage-roll",
+      "className": "EnemyMinDamageRollAbAttr",
+      "label": "Make foes always roll the lowest damage against me",
+      "summary": "Attacks against me always use the lowest damage roll (85% of the top value) instead of a random 85 to 100%. Example: a hit that could do 85 to 100 damage does 85.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.damage-roll",
+      "whenLabel": "While the game rolls the random damage spread",
+      "synonyms": [
+        "bad luck",
+        "bad omen",
+        "scarecrow",
+        "lowest damage roll",
+        "minimum damage roll",
+        "foes roll low",
+        "always minimum damage"
+      ],
+      "examples": [
+        "Foes always deal their minimum damage to me, like Bad Luck"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Damage previews (calculations that only look ahead) never use the damage roll, so this block does nothing there"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
     },
     {
       "id": "block.float",
@@ -1276,6 +1668,75 @@
         "do": true
       },
       "uses": 21
+    },
+    {
+      "id": "block.user-field-battler-tag-immunity",
+      "className": "UserFieldBattlerTagImmunityAbAttr",
+      "label": "Protect my partner from effects like taunt or infatuation",
+      "summary": "My partner (not me) cannot get Taunt. Example: choose Taunt and my partner can never be taunted.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.battle-effect-immunity-field",
+      "whenLabel": "While the game checks my side's battle-effect immunity",
+      "synonyms": [
+        "aroma veil",
+        "sweet veil",
+        "protect partner from taunt",
+        "ally effect immunity",
+        "partner cannot be confused",
+        "team effect protection",
+        "protect ally from infatuation"
+      ],
+      "examples": [
+        "My partner cannot be taunted, tormented or infatuated, like Aroma Veil"
+      ],
+      "params": [
+        {
+          "id": "effects",
+          "label": "Battle effects my partner is immune to (comma separated, for example Taunt, Encore)",
+          "control": "text",
+          "default": "Taunt",
+          "editable": true,
+          "options": [
+            "Flinch",
+            "Confusion",
+            "Infatuation",
+            "Drowsiness",
+            "Taunt",
+            "Disable",
+            "Encore",
+            "Torment",
+            "Heal Block",
+            "Leech Seed",
+            "Nightmare",
+            "Curse",
+            "Salt Cure",
+            "Bleed",
+            "Frostbite",
+            "Fear"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only my partner is protected, never myself (my own immunity is a separate block)",
+        "An effect that another ability or effect already blocked is left alone",
+        "The game also asks this block when it only checks whether an effect could land, without applying it"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": [
+          "effects"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.user-field-self-stat-drop-immunity",

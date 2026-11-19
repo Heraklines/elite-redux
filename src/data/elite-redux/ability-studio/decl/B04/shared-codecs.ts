@@ -46,19 +46,59 @@ const STATUS_NAMES: ReadonlyArray<readonly [string, StatusEffect]> = [
 export const STATUS_CHOICES: readonly string[] = STATUS_NAMES.map(([name]) => name);
 
 /** Player name of each battle effect the confusion-after-status class can apply for a chosen number of turns. */
-const TAG_NAMES: ReadonlyArray<readonly [string, BattlerTagType]> = [
-  ["Confusion", BattlerTagType.CONFUSED],
-];
+const TAG_NAMES: ReadonlyArray<readonly [string, BattlerTagType]> = [["Confusion", BattlerTagType.CONFUSED]];
 
 /** The battle effect choices staff see. */
 export const TAG_CHOICES: readonly string[] = TAG_NAMES.map(([name]) => name);
+
+/**
+ * Player name of each battle effect (volatile condition) a "be immune to chosen effects" block can list. Every name is a
+ * real battle effect of the game; the list is what staff are offered, the live abilities use only some of them.
+ */
+const BLOCKABLE_EFFECT_NAMES: ReadonlyArray<readonly [string, BattlerTagType]> = [
+  ["Flinch", BattlerTagType.FLINCHED],
+  ["Confusion", BattlerTagType.CONFUSED],
+  ["Infatuation", BattlerTagType.INFATUATED],
+  ["Drowsiness", BattlerTagType.DROWSY],
+  ["Taunt", BattlerTagType.TAUNT],
+  ["Disable", BattlerTagType.DISABLED],
+  ["Encore", BattlerTagType.ENCORE],
+  ["Torment", BattlerTagType.TORMENT],
+  ["Heal Block", BattlerTagType.HEAL_BLOCK],
+  ["Leech Seed", BattlerTagType.SEEDED],
+  ["Nightmare", BattlerTagType.NIGHTMARE],
+  ["Curse", BattlerTagType.CURSED],
+  ["Salt Cure", BattlerTagType.SALT_CURED],
+  ["Bleed", BattlerTagType.ER_BLEED],
+  ["Frostbite", BattlerTagType.ER_FROSTBITE],
+  ["Fear", BattlerTagType.ER_FEAR],
+];
+
+/** The battle effect choices of the immunity blocks. */
+export const BLOCKABLE_EFFECT_CHOICES: readonly string[] = BLOCKABLE_EFFECT_NAMES.map(([name]) => name);
+
+/** Player name of each stat the damage formula can read in place of Defense or Sp. Def. */
+const DEFENSIVE_SUBSTITUTE_NAMES: ReadonlyArray<readonly [string, Stat]> = [
+  ["Attack", Stat.ATK],
+  ["Defense", Stat.DEF],
+  ["Sp. Atk", Stat.SPATK],
+  ["Sp. Def", Stat.SPDEF],
+  ["Speed", Stat.SPD],
+];
+
+/** The stat choices of the "use another stat as my defense" block. */
+export const DEFENSIVE_SUBSTITUTE_CHOICES: readonly string[] = DEFENSIVE_SUBSTITUTE_NAMES.map(([name]) => name);
 
 /** Loose comparison key: lower case, letters and digits only ("Sp. Atk" and "SPATK" both become "spatk"). */
 function key(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function lookup<T>(table: ReadonlyArray<readonly [string, T]>, enumNames: Readonly<Record<string, T>>, text: string): T | undefined {
+function lookup<T>(
+  table: ReadonlyArray<readonly [string, T]>,
+  enumNames: Readonly<Record<string, T>>,
+  text: string,
+): T | undefined {
   const wanted = key(text);
   const player = table.find(([name]) => key(name) === wanted);
   if (player !== undefined) {
@@ -81,7 +121,7 @@ export const oneStatOrEveryCodec: ParamCodec = {
   toCtor: value => {
     const text = String(value);
     if (key(text) === key(EVERY_STAT) || key(text) === "all") {
-      return undefined;
+      return;
     }
     const stat = lookup(STAT_NAMES, STAT_ENUM, text);
     if (stat === undefined) {
@@ -145,4 +185,55 @@ export function statWords(value: unknown): string {
 export function statusWords(value: unknown): string {
   const text = String(value).trim();
   return text.length === 0 ? "every status condition" : text;
+}
+
+function battleEffectNames(raw: unknown): string | undefined {
+  const list = Array.isArray(raw) ? raw : typeof raw === "string" ? [raw] : undefined;
+  if (list === undefined) {
+    return;
+  }
+  const names = list.map(item => nameFor(BLOCKABLE_EFFECT_NAMES, item));
+  return names.every((name): name is string => name !== undefined) ? names.join(", ") : undefined;
+}
+
+/**
+ * A comma separated list of battle effect names ("Confusion, Flinch"). The constructor takes a list; an empty text is not
+ * allowed (a block that is immune to nothing would do nothing).
+ */
+export const battleEffectListCodec: ParamCodec = {
+  toCtor: value => {
+    const parts = String(value)
+      .split(",")
+      .map(part => part.trim())
+      .filter(part => part.length > 0);
+    if (parts.length === 0) {
+      throw new Error("name at least one battle effect (for example Confusion)");
+    }
+    return parts.map(part => {
+      const tag = lookup(BLOCKABLE_EFFECT_NAMES, TAG_ENUM, part);
+      if (tag === undefined) {
+        throw new Error(`"${part}" is not a known battle effect`);
+      }
+      return tag;
+    });
+  },
+  fromInstance: battleEffectNames,
+};
+
+/** One stat that can stand in for Defense and Sp. Def, by its player name. */
+export const defensiveSubstituteCodec: ParamCodec = {
+  toCtor: value => {
+    const stat = lookup(DEFENSIVE_SUBSTITUTE_NAMES, STAT_ENUM, String(value));
+    if (stat === undefined) {
+      throw new Error(`"${String(value)}" is not a stat the damage formula can use`);
+    }
+    return stat;
+  },
+  fromInstance: raw => nameFor(DEFENSIVE_SUBSTITUTE_NAMES, raw),
+};
+
+/** "Confusion, Flinch" for a summary. */
+export function effectWords(value: unknown): string {
+  const text = String(value).trim();
+  return text.length === 0 ? "no battle effects" : text;
 }
