@@ -1242,13 +1242,27 @@ export class PostDefendPartyStatusHealAbAttr extends PostDefendAbAttr {
     return pokemon.isPlayer() ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
   }
 
-  override canApply({ pokemon, hitResult }: PostMoveInteractionAbAttrParams): boolean {
-    // Direct-hit gate (same as PostDefendTerrainChangeAbAttr): a genuinely
-    // connecting damaging hit. Only fire when a party member actually has a
-    // status to clear (avoid a no-op trigger message).
-    if (hitResult >= HitResult.NO_EFFECT) {
-      return false;
-    }
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): `gate`, then `residual`, in the original clause order. */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /**
+   * The replaceable condition, clause 1 of the old `canApply`. Direct-hit gate (same as PostDefendTerrainChangeAbAttr):
+   * a genuinely connecting damaging hit. Written as `!(>=)` so it is the old early return exactly.
+   */
+  public gate({ hitResult }: PostMoveInteractionAbAttrParams): boolean {
+    return !(hitResult >= HitResult.NO_EFFECT);
+  }
+
+  /**
+   * The feasibility that stays in the class (clause 2): only fire when a party member actually has a status to clear
+   * (avoid a no-op trigger message).
+   */
+  public residual({ pokemon }: PostMoveInteractionAbAttrParams): boolean {
     return this.getParty(pokemon).some(p => p.status != null);
   }
 
@@ -1357,12 +1371,28 @@ export class PostDefendContactApplyTagChanceAbAttr extends PostDefendAbAttr {
     this.turnCount = turnCount;
   }
 
-  override canApply({ move, pokemon, opponent }: PostMoveInteractionAbAttrParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): `gate`, then `residual`, in the original clause order. */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /**
+   * The replaceable condition, clauses 1 and 2 of the old `canApply`: the move makes contact, then the chance roll
+   * (the random draw only happens for a contact move, because `&&` short-circuits).
+   */
+  public gate({ move, pokemon, opponent }: PostMoveInteractionAbAttrParams): boolean {
     return (
       move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: opponent, target: pokemon })
       && pokemon.randBattleSeedInt(100) < this.chance
-      && opponent.canAddTag(this.tagType)
     );
+  }
+
+  /** The feasibility that stays in the class (clause 3): the attacker can receive the battle effect. */
+  public residual({ opponent }: PostMoveInteractionAbAttrParams): boolean {
+    return opponent.canAddTag(this.tagType);
   }
 
   override apply({ pokemon, simulated, opponent, move }: PostMoveInteractionAbAttrParams): void {

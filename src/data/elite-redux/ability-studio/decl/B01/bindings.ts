@@ -222,3 +222,57 @@ bindLegacyClosure(
   "Seed Sower gate: `hitResult < HitResult.NO_EFFECT` (the hit dealt damage). The frame carries the hitResult slot but no atom reads it (R-B01-23).",
   "gate",
 );
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Chunk 4 (the after-hit status and battle-effect family). Every line below was read from the live attr (fields printed
+// from the running game: chance, tag type, turn count, extra condition), not from the source text.
+//
+// None of the three classes has a constructor closure (no `condition` field), so the only binding of each is its Tier B gate.
+
+// PostDefendPartyStatusHealAbAttr (Tier B). Slot "gate": clause 1 of the old canApply, `!(hitResult >= HitResult.NO_EFFECT)`
+// (the hit dealt damage). The frame carries the hitResult slot but no atom reads it (R-B01-23, the same clause as Seed Sower's
+// terrain half). The residual (a team member has a status) stays in the class.
+bindLegacyClosure(
+  269,
+  1,
+  "Seed Sower party heal gate: `!(hitResult >= HitResult.NO_EFFECT)` (the hit dealt damage). The frame carries the hitResult slot but no atom reads it (R-B01-23).",
+  "gate",
+);
+
+// EffectSporeAbAttr (Tier B, inherited gate). Slot "gate", in the ORIGINAL clause order of the parent:
+//   move.doesFlagEffectApply(MAKES_CONTACT) && !attacker.status && randBattleSeedInt(100) < 10
+// The chance atom stays LAST so a non-contact hit or a statused attacker draws no random number. The powder immunity clause
+// and the status check (canSetStatus) stay in the class.
+bindCondition(
+  27,
+  0,
+  {
+    all: [
+      { id: "move.flag", flag: "MAKES_CONTACT" },
+      { id: "status.has", who: "other", status: "NONE" },
+      { id: "rng.chance", pct: 10 },
+    ],
+  },
+  "gate",
+);
+
+// PostDefendContactApplyTagChanceAbAttr (Tier B). Slot "gate", in the ORIGINAL clause order:
+//   move.doesFlagEffectApply(MAKES_CONTACT) && randBattleSeedInt(100) < chance
+// `attacker.canAddTag(tagType)` stays in the class as `residual`. The chance is the live field of each attr (Cute Charm was
+// rewritten from 30 to 50 by the ER patcher), and `gateParams` moves it with the slider.
+const contactChanceGate = (pct: number): unknown => ({
+  all: [
+    { id: "move.flag", flag: "MAKES_CONTACT" },
+    { id: "rng.chance", pct },
+  ],
+});
+bindCondition(56, 0, contactChanceGate(50), "gate"); // Cute Charm, Infatuated
+bindCondition(115, 2, contactChanceGate(10), "gate"); // Ice Body, Frostbite
+bindCondition(221, 1, contactChanceGate(50), "gate"); // Tangling Hair, Trapped
+bindCondition(5216, 1, contactChanceGate(50), "gate"); // Prim and Proper, Infatuated
+bindCondition(5238, 0, contactChanceGate(50), "gate"); // Pure Love, Infatuated
+bindCondition(5527, 0, contactChanceGate(50), "gate"); // Tender Affection, Infatuated
+bindCondition(5602, 1, contactChanceGate(50), "gate"); // Moustache, Trapped
+bindCondition(5632, 5, contactChanceGate(10), "gate"); // Sundae, Frostbite
+bindCondition(5647, 1, contactChanceGate(50), "gate"); // Massive Pelt, Trapped
+bindCondition(5953, 2, contactChanceGate(10), "gate"); // Ice Body (second id), Frostbite

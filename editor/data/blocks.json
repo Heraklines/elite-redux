@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "19b4a3aed16a8d",
-  "hash": "15a9b937031eba",
+  "hash": "092596ec8a5680",
   "blocks": [
     {
       "id": "block.allied-field-damage-reduction",
@@ -292,6 +292,52 @@
         "do": true
       },
       "uses": 4
+    },
+    {
+      "id": "block.effect-spore",
+      "className": "EffectSporeAbAttr",
+      "label": "Sometimes poison, paralyze or sleep a contact attacker",
+      "summary": "When a move that makes contact hits me, there is a 10% chance the attacker is poisoned, paralyzed or put to sleep (one at random). Grass types and powder-proof Pokemon are spared. Like Effect Spore.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "effect spore",
+        "spore on contact",
+        "random status on contact",
+        "poison paralyze or sleep the attacker",
+        "touch me and get a random status",
+        "powder on touch"
+      ],
+      "examples": [
+        "10% chance to poison, paralyze or sleep attackers that touch me, like Effect Spore"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The attacker must not be a Grass type or have a powder-proof ability (Overcoat)",
+        "The attacker must be able to receive the status (it is not immune and nothing blocks it)"
+      ],
+      "effect": {
+        "id": "effect.inflict-status",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.field-priority-move-immunity",
@@ -1104,6 +1150,104 @@
       "uses": 9
     },
     {
+      "id": "block.post-defend-contact-apply-tag-chance",
+      "className": "PostDefendContactApplyTagChanceAbAttr",
+      "label": "Chance to put a battle effect on attackers that touch me",
+      "summary": "When a move that makes contact hits me, there is a 50% chance the attacker gets the infatuated effect. Example: 50% Infatuated, like Cute Charm.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "cute charm",
+        "infatuate on contact",
+        "attract on touch",
+        "trap on contact",
+        "tangling hair",
+        "frostbite on contact",
+        "ice body",
+        "contact effect chance",
+        "charm the attacker"
+      ],
+      "examples": [
+        "50% chance to infatuate an attacker that touches me, like Cute Charm",
+        "50% chance to trap an attacker that touches me, like Tangling Hair",
+        "10% chance to give frostbite to an attacker that touches me"
+      ],
+      "params": [
+        {
+          "id": "chance",
+          "label": "Chance (%)",
+          "control": "slider",
+          "default": 50,
+          "editable": true,
+          "min": 1,
+          "max": 99,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "effect",
+          "label": "Battle effect the attacker gets (Infatuated: may not attack; Trapped: cannot switch out; Frostbite: hurt each turn)",
+          "control": "select",
+          "default": "Infatuated",
+          "editable": true,
+          "options": [
+            "Infatuated",
+            "Trapped",
+            "Frostbite"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "turns",
+          "label": "How long it lasts (turns, 0 = the effect's normal length)",
+          "control": "number",
+          "default": 0,
+          "editable": true,
+          "min": 0,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The attacker must be able to get that battle effect right now (for example Ice types cannot get Frostbite)",
+        "Nothing is added when the game only previews the move"
+      ],
+      "gateParams": [
+        {
+          "param": "chance",
+          "block": "rng.chance",
+          "field": "pct"
+        }
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": [
+          "effect",
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 10
+    },
+    {
       "id": "block.post-defend-hp-gated-stat-stage-change",
       "className": "PostDefendHpGatedStatStageChangeAbAttr",
       "label": "Change several stats when a hit drops me to an HP line",
@@ -1220,6 +1364,54 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.post-defend-party-status-heal",
+      "className": "PostDefendPartyStatusHealAbAttr",
+      "label": "Cure my whole team after a damaging hit on me",
+      "summary": "After a move deals damage to me, every Pokemon on my team with a status condition, bench included, is cured. Example: burned and poisoned teammates both recover, like Seed Sower.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "seed sower",
+        "heal party status",
+        "cure the team",
+        "cleanse everyone",
+        "cure bench status",
+        "aromatherapy when hit",
+        "team status cure",
+        "heal bell when hit"
+      ],
+      "examples": [
+        "Cure the status of my whole team when a move damages me, like Seed Sower"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "At least one Pokemon on my team must have a status condition, otherwise nothing happens and nothing is shown",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.cure-status",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.post-defend-stat-stage-change",
