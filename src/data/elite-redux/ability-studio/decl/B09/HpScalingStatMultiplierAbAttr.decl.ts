@@ -50,7 +50,7 @@ export default defineDecl(HpScalingStatMultiplierAbAttr, {
       ctorOption: "stat",
       path: "stat",
       control: "select",
-      label: "Which stat grows (Attack, Defense, Sp. Atk, Sp. Def or Speed)",
+      label: "Which stat grows (Attack, Defense, Sp. Atk, Sp. Def, Speed, Accuracy or Evasion)",
       editable: true,
       default: "DEF",
       options: STAT_OPTIONS,

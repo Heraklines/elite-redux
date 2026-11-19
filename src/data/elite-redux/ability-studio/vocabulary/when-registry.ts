@@ -977,6 +977,7 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
       "DoubleSelfInflictedDamageAbAttr",
       "DrenchImmunityAbAttr",
       "FloatAbAttr",
+      "GroundEntryHazardImmunityAbAttr",
       "IgnoreContactAbAttr",
       "IgnoreGenderInfatuationAbAttr",
       "IgnoreProtectByFlagAbAttr",
