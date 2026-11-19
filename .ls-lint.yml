@@ -23,6 +23,11 @@ ls:
    src/system/version-migration/versions:
       .ts: snake_case
       <<: *cfg
+   # Ability studio declarations are named after the AbAttr class they describe (decl/<batch>/<ClassName>.decl.ts).
+   src/data/elite-redux/ability-studio/decl:
+      <<: *src
+      .ts: pascalcase | kebab-case
+      .*.ts: pascalcase | kebab-case
    test: *src
 ignore:
    - .pnpm-store

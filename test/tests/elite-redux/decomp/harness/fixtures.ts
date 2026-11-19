@@ -49,6 +49,16 @@ export function bindMultiscale(spec: unknown = { id: "hp.full", who: "holder" })
   bindCondition(MULTISCALE_ID, 0, spec);
 }
 
+/**
+ * Empties the process-wide bindings for a test that registers its own, remembering the real ones for
+ * `restoreBindings`. Vitest shares workers between files, so a test that cleared them for good would break the
+ * live-registry suites that run after it.
+ */
+export function stashBindings(): void {
+  saved ??= allBindings();
+  clearBindingsForTests();
+}
+
 export function restoreBindings(): void {
   if (saved === undefined) {
     return;

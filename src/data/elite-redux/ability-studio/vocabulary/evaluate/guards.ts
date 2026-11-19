@@ -26,6 +26,8 @@ const FORBIDDEN_ATTACKING_MOVES: readonly MoveId[] = [
 const FORBIDDEN_DEFENDING_MOVES: readonly MoveId[] = [MoveId.DRAGON_TAIL, MoveId.CIRCLE_THROW];
 
 export const GUARD_EVALUATORS: Readonly<Record<string, GuardPredicate>> = {
+  // A fainted holder never changes form (HpThresholdFormChangeAbAttr).
+  "not-fainted": frame => !frame.holder.isFainted(),
   // Will not activate when the Pokemon's HP is lowered by cutting its own HP.
   "not-own-hp-cost-move": frame => {
     const lastMoveUsed = frame.holder.getLastXMoves()[0];

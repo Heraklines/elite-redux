@@ -18,7 +18,6 @@ import {
   bindCondition,
   bindingsFor,
   bindLegacyClosure,
-  clearBindingsForTests,
   getBinding,
   normalizeBindingSpec,
 } from "#data/elite-redux/ability-studio/bindings";
@@ -29,10 +28,11 @@ import { type ClassDecl, constructorArity, defineDecl } from "#data/elite-redux/
 import { type GatedAttr, gatedCanApply, setGateOverride } from "#data/elite-redux/ability-studio/gate-residual";
 import { AbilityId } from "#enums/ability-id";
 import { multiscaleLike, multiscaleLikeDecl } from "#test/tests/elite-redux/decomp/decl-machinery";
+import { restoreBindings, stashBindings } from "#test/tests/elite-redux/decomp/harness/fixtures";
 import { toDmgValue } from "#utils/common";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 function fake(hp: number, max: number) {
   return { hp, getMaxHp: () => max, isFullHp: () => hp >= max, getAlly: () => undefined } as never;
@@ -244,7 +244,8 @@ describe("fresh-instance factory (ctorIndex)", () => {
 });
 
 describe("bindings API", () => {
-  afterEach(() => clearBindingsForTests());
+  beforeEach(stashBindings);
+  afterEach(restoreBindings);
 
   it("normalizes the short form and keys bindings by ability id + attr index + slot", () => {
     expect(normalizeBindingSpec({ id: "hp.full", who: "holder" })).toEqual({

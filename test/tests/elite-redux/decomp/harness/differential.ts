@@ -32,7 +32,7 @@ import { compileCondition } from "#data/elite-redux/ability-studio/vocabulary/ev
 import type { ParamValues } from "#data/elite-redux/ability-studio/vocabulary/params";
 import type { GameManager } from "#test/framework/game-manager";
 import { abilityFingerprint, attrFingerprint } from "#test/tests/elite-redux/decomp/fingerprint";
-import { NumberHolder } from "#utils/common";
+import { BooleanHolder, NumberHolder } from "#utils/common";
 import { type MockInstance, vi } from "vitest";
 import { seededGenerator } from "./battle-trace";
 import type { AttrSite } from "./sites";
@@ -115,6 +115,8 @@ export class RngProbe {
   }
 
   reset(): void {
+    // The spy records every call's arguments; over millions of evaluations that is gigabytes, and nobody reads it.
+    this.spy.mockClear();
     this.count = 0;
     this.next = seededGenerator("l1");
   }
@@ -171,7 +173,7 @@ export function bindingCases(
         });
         continue;
       }
-      if (slot.ctx === "none") {
+      if (slot.ctx === "none" || slot.ctx === "params") {
         continue;
       }
       cases.push({
@@ -272,10 +274,10 @@ export interface AttrMismatch {
   readonly message: string;
 }
 
-function numberHolderValues(params: Record<string, unknown>): Record<string, number> {
-  const out: Record<string, number> = {};
+function numberHolderValues(params: Record<string, unknown>): Record<string, number | boolean> {
+  const out: Record<string, number | boolean> = {};
   for (const [key, value] of Object.entries(params)) {
-    if (value instanceof NumberHolder) {
+    if (value instanceof NumberHolder || value instanceof BooleanHolder) {
       out[key] = value.value;
     }
   }

@@ -69,6 +69,17 @@ export const GUARD_REGISTRY: readonly GuardDef[] = [
     },
     synonyms: ["multi hit", "last strike", "final hit"],
   },
+  {
+    id: "not-fainted",
+    label: "Does not trigger once I have fainted",
+    why: "A fainted Pokemon cannot change form or act; triggering would be a bug, not a design choice.",
+    requires: [],
+    formula: {
+      expr: "!holder.isFainted()",
+      source: "src/data/elite-redux/archetypes/hp-threshold-form-change.ts HpThresholdFormChangeAbAttr.canApply",
+    },
+    synonyms: ["fainted", "knocked out", "alive"],
+  },
 ];
 
 const BY_ID: ReadonlyMap<string, GuardDef> = new Map(GUARD_REGISTRY.map(def => [def.id, def]));

@@ -138,7 +138,7 @@ describe("vocabulary: registry invariants", () => {
       }
     }
     for (const guard of GUARD_REGISTRY) {
-      expect(guard.formula.source).toContain("ab-attrs.ts");
+      expect(guard.formula.source).toContain(".ts");
       expect(guard.synonyms.length).toBeGreaterThanOrEqual(1);
     }
   });

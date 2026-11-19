@@ -25,7 +25,7 @@ import {
 import { startWorld } from "#test/tests/elite-redux/decomp/harness/game";
 import { rebuildAbility } from "#test/tests/elite-redux/decomp/harness/rebuild";
 import { allAttrSites, batchSites, liveAbilities } from "#test/tests/elite-redux/decomp/harness/sites";
-import { buildStateGrid, extraHpValues } from "#test/tests/elite-redux/decomp/harness/world";
+import { buildStateGrid, extraHpValues, GRID_MOVES } from "#test/tests/elite-redux/decomp/harness/world";
 import Phaser from "phaser";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
@@ -70,30 +70,34 @@ describe("L1 predicate and attr differential over the state grid (live registry)
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
   });
 
-  it("every binding equals its original closure, and every rebuilt attr agrees with its original", async () => {
-    const started = Date.now();
-    const sites = batchSites().filter(site => declRegistry.has(site.className));
-    const { cases, problems } = bindingCases(sites, declRegistry);
-    const probeAxes = declRegistry.all().flatMap(module => (module.decl.probes ?? []).map(probe => probe.axes));
-    const states = buildStateGrid(extraHpValues(probeAxes));
-    const world = await startWorld(phaserGame);
-    const predicate = runPredicateDifferential(world, cases, states);
-    const attr = runAttrDifferential(world, sites, declRegistry, states);
-    console.log(
-      `DECOMP_L1 differential bindings=${cases.length} states=${states.length} predicateEvals=${predicate.evaluations} attrEvals=${attr.evaluations} noParamBuilder=${attr.noBuilder.length} ${Date.now() - started}ms`,
-    );
-    expect(problems.map(p => p.message)).toEqual([]);
-    expect(predicate.mismatches.map(m => m.message)).toEqual([]);
-    expect(attr.mismatches.map(m => m.message)).toEqual([]);
-    // A Tier B class (gate in canApply) can only be proven through canApply, which needs a builder.
-    const tierBWithoutBuilder = attr.noBuilder.filter(site => declRegistry.get(site.className)?.decl.tier === "B");
-    expect(
-      tierBWithoutBuilder.map(
-        site =>
-          `${site.abilityName} (${site.className}): add an engine-parameter builder for its trigger to harness/world.ts`,
-      ),
-    ).toEqual([]);
-  });
+  it(
+    "every binding equals its original closure, and every rebuilt attr agrees with its original",
+    async () => {
+      const started = Date.now();
+      const sites = batchSites().filter(site => declRegistry.has(site.className));
+      const { cases, problems } = bindingCases(sites, declRegistry);
+      const probeAxes = declRegistry.all().flatMap(module => (module.decl.probes ?? []).map(probe => probe.axes));
+      const states = buildStateGrid(extraHpValues(probeAxes));
+      const world = await startWorld(phaserGame);
+      const predicate = runPredicateDifferential(world, cases, states);
+      const attr = runAttrDifferential(world, sites, declRegistry, states);
+      console.log(
+        `DECOMP_L1 differential bindings=${cases.length} states=${states.length} predicateEvals=${predicate.evaluations} attrEvals=${attr.evaluations} noParamBuilder=${attr.noBuilder.length} ${Date.now() - started}ms`,
+      );
+      expect(problems.map(p => p.message)).toEqual([]);
+      expect(predicate.mismatches.map(m => m.message)).toEqual([]);
+      expect(attr.mismatches.map(m => m.message)).toEqual([]);
+      // A Tier B class (gate in canApply) can only be proven through canApply, which needs a builder.
+      const tierBWithoutBuilder = attr.noBuilder.filter(site => declRegistry.get(site.className)?.decl.tier === "B");
+      expect(
+        tierBWithoutBuilder.map(
+          site =>
+            `${site.abilityName} (${site.className}): add an engine-parameter builder for its trigger to harness/world.ts`,
+        ),
+      ).toEqual([]);
+    },
+    10 * 60 * 1000,
+  );
 });
 
 describe("L1 faithful rebuild of the worked example (control for the drift self-tests)", () => {
@@ -114,10 +118,10 @@ describe("L1 faithful rebuild of the worked example (control for the drift self-
     expect(cases).toHaveLength(1);
     const predicate = runPredicateDifferential(world, cases, states);
     expect(predicate.mismatches).toEqual([]);
-    expect(predicate.evaluations).toBe(states.length * 16);
+    expect(predicate.evaluations).toBe(states.length * GRID_MOVES.length);
     const attr = runAttrDifferential(world, [site], registry, states);
     expect(attr.mismatches).toEqual([]);
     expect(attr.noBuilder).toEqual([]);
-    expect(attr.evaluations).toBe(states.length * 16 * 2);
+    expect(attr.evaluations).toBe(states.length * GRID_MOVES.length * 2);
   });
 });

@@ -14,9 +14,13 @@
 // world is mutated once per state and every binding is evaluated inside that state.
 
 import { allMoves } from "#data/data-lists";
+import { Gender } from "#data/gender";
 import { Status } from "#data/status-effect";
 import { Terrain, TerrainType } from "#data/terrain";
 import { Weather } from "#data/weather";
+import { ArenaTagSide } from "#enums/arena-tag-side";
+import { ArenaTagType } from "#enums/arena-tag-type";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
@@ -26,7 +30,7 @@ import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
 import type { GameManager } from "#test/framework/game-manager";
-import { NumberHolder } from "#utils/common";
+import { BooleanHolder, NumberHolder } from "#utils/common";
 
 export type AxisValue = string | number | boolean;
 export type Axes = Readonly<Record<string, AxisValue>>;
@@ -85,6 +89,17 @@ export interface GridState {
   readonly defStage: number;
   readonly holderTypes: readonly PokemonType[] | undefined;
   readonly foeTypes: readonly PokemonType[] | undefined;
+  /** Gravity is up (arena tag). */
+  readonly gravity: boolean;
+  /** The holder carries the grounding tag (Smack Down, BattlerTagType.IGNORE_FLYING). */
+  readonly groundedTag: boolean;
+  /** The holder has already moved this turn (PokemonTurnData.acted). */
+  readonly acted: boolean;
+  /** Genders; undefined keeps the Pokemon's own. */
+  readonly holderGender: Gender | undefined;
+  readonly foeGender: Gender | undefined;
+  /** Forces the holder's max HP (an even and an odd value reach different roundings); undefined keeps its own. */
+  readonly maxHp: number | undefined;
 }
 
 const HP_BOUNDARIES: readonly AxisValue[] = [
@@ -114,6 +129,12 @@ const BASE: GridState = {
   defStage: 0,
   holderTypes: undefined,
   foeTypes: undefined,
+  gravity: false,
+  groundedTag: false,
+  acted: false,
+  holderGender: undefined,
+  foeGender: undefined,
+  maxHp: undefined,
 };
 
 /** Probe axes of the declarations under test, merged: `hp` values become extra HP boundary states. */
@@ -138,6 +159,12 @@ export function buildStateGrid(extraHp: readonly AxisValue[] = []): GridState[] 
     states.push({ ...BASE, ...patch, name });
   };
   const hps = [...HP_BOUNDARIES];
+  // Even and odd max HP: floor(max / 2) and max / 2 only differ for an even max, so both must be probed.
+  for (const maxHp of [100, 101]) {
+    for (const hp of ["max", "50%+1", "50%", "50%-1", "35%", 1]) {
+      add(`max hp ${maxHp}, holder hp ${String(hp)}`, { maxHp, hp });
+    }
+  }
   for (const value of extraHp) {
     if (!hps.some(existing => String(existing) === String(value))) {
       hps.push(value);
@@ -174,6 +201,16 @@ export function buildStateGrid(extraHp: readonly AxisValue[] = []): GridState[] 
   add("foe is Fire", { foeTypes: [PokemonType.FIRE] });
   add("foe is Grass/Poison", { foeTypes: [PokemonType.GRASS, PokemonType.POISON] });
   add("foe is Ground", { foeTypes: [PokemonType.GROUND] });
+  add("foe is Dragon", { foeTypes: [PokemonType.DRAGON] });
+  add("foe is Dark/Steel", { foeTypes: [PokemonType.DARK, PokemonType.STEEL] });
+  add("gravity", { gravity: true });
+  add("grounded by a tag", { groundedTag: true });
+  add("gravity and grounded by a tag", { gravity: true, groundedTag: true });
+  add("holder has already moved", { acted: true });
+  add("male holder, female foe", { holderGender: Gender.MALE, foeGender: Gender.FEMALE });
+  add("female holder, female foe", { holderGender: Gender.FEMALE, foeGender: Gender.FEMALE });
+  add("genderless holder, female foe", { holderGender: Gender.GENDERLESS, foeGender: Gender.FEMALE });
+  add("male holder, genderless foe", { holderGender: Gender.MALE, foeGender: Gender.GENDERLESS });
   add("foe hp 50%", { foeHp: "50%" });
   add("foe hp 1", { foeHp: 1 });
   add("rain + burn + half hp", { weather: WeatherType.RAIN, status: StatusEffect.BURN, hp: "50%" });
@@ -195,6 +232,10 @@ export interface World {
 /** Sets the world to `state`. The holder's base types are kept in `baseTypes` so a state can restore them. */
 export function applyGridState(world: World, state: GridState): void {
   const { game, holder, foe } = world;
+  if (!naturalMaxHp.has(holder)) {
+    naturalMaxHp.set(holder, holder.stats[Stat.HP]);
+  }
+  holder.stats[Stat.HP] = state.maxHp ?? (naturalMaxHp.get(holder) as number);
   holder.hp = resolveHp(state.hp, holder.getMaxHp());
   foe.hp = resolveHp(state.foeHp, foe.getMaxHp());
   setStatusOf(holder, state.status);
@@ -204,7 +245,33 @@ export function applyGridState(world: World, state: GridState): void {
   holder.setStatStage(Stat.DEF, state.defStage);
   setTypesOf(holder, state.holderTypes);
   setTypesOf(foe, state.foeTypes);
+  const arena = game.scene.arena;
+  const gravityUp = arena.getTag(ArenaTagType.GRAVITY) !== undefined;
+  if (state.gravity && !gravityUp) {
+    arena.addTag(ArenaTagType.GRAVITY, 5, undefined, holder.id, ArenaTagSide.BOTH, true);
+  } else if (!state.gravity && gravityUp) {
+    arena.removeTag(ArenaTagType.GRAVITY);
+  }
+  const grounded = holder.getTag(BattlerTagType.IGNORE_FLYING) !== undefined;
+  if (state.groundedTag && !grounded) {
+    holder.addTag(BattlerTagType.IGNORE_FLYING, 1, MoveId.SMACK_DOWN, foe.id);
+  } else if (!state.groundedTag && grounded) {
+    holder.removeTag(BattlerTagType.IGNORE_FLYING);
+  }
+  holder.turnData.acted = state.acted;
+  for (const [mon, gender] of [
+    [holder, state.holderGender],
+    [foe, state.foeGender],
+  ] as const) {
+    if (!naturalGender.has(mon)) {
+      naturalGender.set(mon, mon.gender);
+    }
+    mon.gender = gender ?? (naturalGender.get(mon) as Gender);
+  }
 }
+
+const naturalGender = new WeakMap<Pokemon, Gender>();
+const naturalMaxHp = new WeakMap<Pokemon, number>();
 
 /** The moves every closure is evaluated with: type, category, contact, priority, multi-hit, status, chance. */
 export const GRID_MOVES: readonly MoveId[] = [
@@ -224,6 +291,11 @@ export const GRID_MOVES: readonly MoveId[] = [
   MoveId.EXPLOSION,
   MoveId.HYPER_BEAM,
   MoveId.SEISMIC_TOSS,
+  // Ghost, Dark, Psychic and sound-based moves (Heavy Metal, Astral Project and the sound-flag users).
+  MoveId.SHADOW_BALL,
+  MoveId.BITE,
+  MoveId.PSYCHIC,
+  MoveId.HYPER_VOICE,
 ];
 
 export function gridMoves(): Move[] {
@@ -284,6 +356,14 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     opponent: ctx.foe,
     move: ctx.move,
     damage: holderDamage(ctx),
+    simulated: false,
+  }),
+  "calc.move-immunity": ctx => ({
+    pokemon: ctx.holder,
+    opponent: ctx.foe,
+    move: ctx.move,
+    typeMultiplier: new NumberHolder(1),
+    cancelled: new BooleanHolder(false),
     simulated: false,
   }),
   "calc.move-power": ctx => ({

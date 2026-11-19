@@ -10,6 +10,7 @@
 
 import { hpCrossedBelow } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { Gender } from "#data/gender";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import { SpeciesFormChangeManualTrigger } from "#data/pokemon-forms/form-change-triggers";
 import { TerrainType } from "#data/terrain";
@@ -242,7 +243,7 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
     const tag = enumValue(ArenaTagType, String(p.tag), "field effect") as ArenaTagType;
     return frame => globalScene.arena.getTagOnSide(tag, sideOf(frame.holder, String(p.side))) !== undefined;
   },
-  "field.gravity": () => () => globalScene.arena.getTag(ArenaTagType.GRAVITY) !== undefined,
+  "field.gravity": () => () => globalScene.arena.hasActiveGravity(),
   "field.trick-room": () => () => globalScene.arena.getTag(ArenaTagType.TRICK_ROOM) !== undefined,
 
   // Status and tags
@@ -310,6 +311,20 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
   },
   "time.once-per": p => {
     const scope = String(p.scope);
+    // The wave scope is the per-wave memory the ER archetypes already use (pokemon.waveData.entryEffectsFired, a
+    // plain Set of keys that is reset every wave), so a class that keeps its own once-per-wave flag there and its
+    // library form read and write the same memory. Every other scope lives in the (battleData, key) WeakMap.
+    if (scope === "wave") {
+      const waveKey = String(p.key);
+      return frame => {
+        const fired = frame.holder.waveData.entryEffectsFired;
+        if (fired.has(waveKey)) {
+          return false;
+        }
+        deferMemoryWrite(frame, () => fired.add(waveKey));
+        return true;
+      };
+    }
     const key = `once:${scope}:${String(p.key)}`;
     return frame => {
       const memory = memoryOf(frame.holder);
@@ -321,6 +336,7 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
       return true;
     };
   },
+  "time.acted": p => frame => holderLikeOf(frame, String(p.who))?.turnData?.acted ?? false,
   "time.nth-use": p => {
     const key = `nth:${String(p.key)}`;
     return frame => {
@@ -379,6 +395,15 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
   "mon.has-type": p => {
     const type = enumValue(PokemonType, String(p.type), "type") as PokemonType;
     return frame => holderLikeOf(frame, String(p.who))?.isOfType(type) ?? false;
+  },
+  "mon.opposite-gender": () => frame => {
+    const { holder, other } = frame;
+    return (
+      other !== undefined
+      && holder.gender !== Gender.GENDERLESS
+      && other.gender !== Gender.GENDERLESS
+      && holder.gender !== other.gender
+    );
   },
   "mon.grounded": p => frame => holderLikeOf(frame, String(p.who))?.isGrounded() ?? false,
   "mon.has-ability": p => {

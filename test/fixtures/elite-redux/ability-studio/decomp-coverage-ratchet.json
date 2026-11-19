@@ -1,7 +1,18 @@
 {
-  "attrsFull": 0,
-  "attrsPartlyOrBetter": 0,
-  "abilitiesFull": 0,
-  "attrsNotStartedMax": 2875,
-  "verifiedClasses": []
+  "attrsFull": 64,
+  "attrsPartlyOrBetter": 115,
+  "abilitiesFull": 10,
+  "attrsNotStartedMax": 2760,
+  "verifiedClasses": [
+    "AttackTypeImmunityAbAttr",
+    "BerserkOnThresholdAbAttr",
+    "FloatAbAttr",
+    "HpThresholdFormChangeAbAttr",
+    "IgnoreContactAbAttr",
+    "PostDamageForceSwitchAbAttr",
+    "PostDefendContactApplyStatusEffectAbAttr",
+    "PostSummonCopyAbilityAbAttr",
+    "PostSummonWeatherChangeAbAttr",
+    "ReceivedMoveDamageMultiplierAbAttr"
+  ]
 }

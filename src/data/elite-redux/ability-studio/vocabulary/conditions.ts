@@ -374,7 +374,10 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     requires: [],
     params: [],
     pure: true,
-    formula: { expr: "arena.getTag(GRAVITY) !== undefined", source: `${ARENA} getTag` },
+    formula: {
+      expr: "arena.hasActiveGravity()",
+      source: `${ARENA}:241 (hasActiveGravity: the tag is set and not suppressed)`,
+    },
     synonyms: ["gravity", "grounded field"],
     examples: ["Only while Gravity is up"],
   },
@@ -509,6 +512,21 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     examples: ["Boost after using the same move twice"],
   },
   {
+    id: "time.acted",
+    group: "Time",
+    label: "{who} has already moved this turn",
+    requires: [],
+    whoParam: "who",
+    params: [WHO()],
+    pure: true,
+    formula: {
+      expr: "pokemon.turnData?.acted ?? false",
+      source: "src/data/pokemon/pokemon-data.ts PokemonTurnData.acted (Stall, Breakwater, Haste Makes Waste)",
+    },
+    synonyms: ["already moved", "moved this turn", "acted", "went first"],
+    examples: ["Take less damage until I have moved this turn"],
+  },
+  {
     id: "time.once-per",
     group: "Time",
     label: "Only once per {scope}",
@@ -516,8 +534,9 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     params: [selectParam("scope", "Scope", ONCE_PER_SCOPES, "battle"), textParam("key", "Memory key", "once")],
     pure: true,
     formula: {
-      expr: "WeakMap<battleData|summonData|...>.has(key) ? false : (mark, true)  (marks only when not simulated)",
-      source: "state keyed by (pokemon.battleData, key), never static fields",
+      expr: "wave: holder.waveData.entryEffectsFired.has(key) ? false : (add(key), true) ; other scopes: WeakMap<battleData>(key) === scope marker ? false : (mark, true) ; marks only when not simulated and only when the rule applies",
+      source:
+        "the wave scope IS the per-wave memory the ER archetypes use (berserk-on-threshold, self-switch-on-stat-lower, entry-effect); other scopes are keyed by (pokemon.battleData, key), never static fields",
     },
     synonyms: ["once", "one time", "once per battle", "once per turn", "single use"],
     examples: ["Only the first time per battle"],
@@ -693,6 +712,20 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     formula: { expr: "pokemon.isOfType(PokemonType[type])", source: `${ENGINE}:2875 (isOfType)` },
     synonyms: ["is fire type", "type check", "dual type"],
     examples: ["Only against Ghost types"],
+  },
+  {
+    id: "mon.opposite-gender",
+    group: "Pokemon",
+    label: "The other Pokemon is of the opposite gender",
+    requires: ["other"],
+    params: [],
+    pure: true,
+    formula: {
+      expr: "holder.gender !== GENDERLESS && other.gender !== GENDERLESS && holder.gender !== other.gender",
+      source: "src/enums/gender.ts (Rivalry, Empress)",
+    },
+    synonyms: ["opposite sex", "different gender", "male versus female"],
+    examples: ["Take less damage from the opposite gender"],
   },
   {
     id: "mon.grounded",

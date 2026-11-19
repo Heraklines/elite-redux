@@ -110,6 +110,36 @@ export const TEMPLATES: Readonly<Record<string, ScenarioSpec>> = {
     foeMoves: [MoveId.CELEBRATE],
     turns: [celebrate(), celebrate()],
   },
+  /** The enemy hits the holder while a teammate is ready; a forced-switch prompt (Wimp Out, Emergency Exit) is answered. */
+  "hit-with-reserve": {
+    ...BASE,
+    id: "hit-with-reserve",
+    label: "The enemy hits the holder while a teammate is ready to come in",
+    party: [SpeciesId.MAGIKARP],
+    turns: [
+      {
+        move: MoveId.CELEBRATE,
+        until: "TurnEndPhase",
+        afterSelect: ({ game }) => {
+          game.doSelectPartyPokemon(1);
+        },
+      },
+    ],
+  },
+  /**
+   * Flags nobody dispatches (while-active, engine-query): the holder attacks a Rough Skin foe (contact matters) while
+   * the foe uses Earthquake and Spikes (grounding matters). Both runs must end identically.
+   */
+  "while-active-flags": {
+    ...BASE,
+    id: "while-active-flags",
+    label: "The holder attacks a Rough Skin foe that uses Earthquake and Spikes",
+    foe: SpeciesId.SNORLAX,
+    foeLevel: 100,
+    foeAbility: AbilityId.ROUGH_SKIN,
+    foeMoves: [MoveId.EARTHQUAKE, MoveId.SPIKES],
+    turns: [use(MoveId.TACKLE), use(MoveId.TACKLE), celebrate()],
+  },
   /** The enemy hits the holder twice. */
   "foe-hits-holder": {
     ...BASE,
@@ -292,6 +322,8 @@ const t = {
   boom: "foe-explodes",
   low: "holder-low-hp-turns",
   doubles: "doubles-ally",
+  reserve: "hit-with-reserve",
+  flags: "while-active-flags",
 } as const;
 
 /** WHEN id to the template that reaches it. Reviewed by hand; `reach.test.ts` proves it with a probe attr. */
@@ -315,7 +347,7 @@ const WHEN_TEMPLATE: Readonly<Record<string, string>> = {
   "event.after-any-move": t.hit,
   "event.after-inflicting-status": t.attack,
   "event.after-hit": t.hit,
-  "event.after-taking-damage": t.hit,
+  "event.after-taking-damage": t.reserve,
   "event.after-crit-taken": t.crit,
   "event.before-hit-lands": t.hit,
   "event.got-status": t.inflicted,
@@ -391,6 +423,7 @@ const WHEN_TEMPLATE: Readonly<Record<string, string>> = {
   "cancel.infiltrate": t.hit,
   "calc.incoming-move": t.hit,
   "calc.outgoing-move": t.attack,
+  "while.active": t.flags,
 };
 
 /** The template that reaches `whenId`, or undefined for a static (flag) WHEN or an unknown id. */

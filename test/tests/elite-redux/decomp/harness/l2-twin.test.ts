@@ -16,6 +16,8 @@
 // Nothing is declared in this worktree yet, so the live run is empty here; the machinery is proven by
 // selftest-drift.test.ts, which runs the same functions on the worked example.
 import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
+import { getWhen } from "#data/elite-redux/ability-studio/vocabulary/when-registry";
+import { checkIdentity } from "#test/tests/elite-redux/decomp/harness/differential";
 import { rebuildAbility, registerShadow, unregisterShadows } from "#test/tests/elite-redux/decomp/harness/rebuild";
 import { type AttrSite, allAttrSites, batchSites } from "#test/tests/elite-redux/decomp/harness/sites";
 import {
@@ -47,8 +49,12 @@ function shardSlice<T>(items: readonly T[]): T[] {
 /** Abilities to twin: declared sites of the batch, one per signature (or all), as ability ids. */
 function abilitiesToTwin(): number[] {
   const declared = batchSites().filter(site => {
-    const status = declRegistry.get(site.className)?.decl.status;
-    return status === "decomposed" || status === "verified";
+    const module = declRegistry.get(site.className);
+    if (module === undefined || (module.decl.status !== "decomposed" && module.decl.status !== "verified")) {
+      return false;
+    }
+    // An attr with a legacy-closure (or missing) binding cannot be rebuilt, so there is nothing to twin.
+    return checkIdentity(site, module).outcome !== "not-rebuilt";
   });
   if (MODE === "all") {
     return [...new Set(declared.map(site => site.abilityId))].sort((a, b) => a - b);
@@ -103,7 +109,10 @@ describe("L2 battle twin (live registry)", () => {
           for (const scenario of scenariosFor(declRegistry.get(attr.constructor.name)!)) {
             const key = `${scenario.template.id}|${JSON.stringify(scenario.axes)}|${scenario.when}`;
             const entry = scenarios.get(key) ?? { scenario, attrs: [] };
-            entry.attrs.push({ attrIndex: index, className: attr.constructor.name });
+            // A presence flag (while-active, engine-query) is never dispatched, so no trace can show it evaluated.
+            if (getWhen(declRegistry.get(attr.constructor.name)!.decl.when)?.dispatchKey != null) {
+              entry.attrs.push({ attrIndex: index, className: attr.constructor.name });
+            }
             scenarios.set(key, entry);
           }
         }
@@ -116,7 +125,9 @@ describe("L2 battle twin (live registry)", () => {
           scenarioCount++;
           battles += 2;
           // The original must show every rebuilt attr of this scenario being evaluated, else L2 is vacuous.
-          const outcome = await twinById(phaserGame, id, shadowId, scenario, { reach: { attrs } });
+          const outcome = await twinById(phaserGame, id, shadowId, scenario, {
+            reach: { attrs, presenceOnly: attrs.length === 0 },
+          });
           if (outcome.differences.length > 0) {
             failures.push(describeTwinFailure(original.name, outcome));
           }

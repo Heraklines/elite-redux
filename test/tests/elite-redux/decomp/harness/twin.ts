@@ -49,6 +49,11 @@ export interface TwinScenario {
 /** What the original's run must show: each of these attrs evaluated at least once. */
 export interface ReachExpectation {
   readonly attrs: readonly { readonly attrIndex: number; readonly className: string }[];
+  /**
+   * Every rebuilt attr is a presence flag (while-active, engine-query): the engine reads it with hasAbilityWithAttr and
+   * nothing is dispatched, so no trace event can show it being evaluated. The twin then compares the whole battle.
+   */
+  readonly presenceOnly?: boolean;
 }
 
 const REACH_FILE = resolve(process.cwd(), "test/fixtures/elite-redux/ability-studio/decomp-l2-reach.json");
@@ -82,6 +87,9 @@ export function reachProblems(
     }
   }
   const events = original.attrEvents.filter(event => event.startsWith(`${abilityId}#`));
+  if (reach?.presenceOnly === true) {
+    return problems;
+  }
   if (reach === undefined || reach.attrs.length === 0) {
     if (events.length === 0) {
       problems.push({

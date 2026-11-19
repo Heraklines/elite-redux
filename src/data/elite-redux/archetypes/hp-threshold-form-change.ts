@@ -27,6 +27,7 @@
 
 import { PostDefendAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { SpeciesFormChangeManualTrigger } from "#data/pokemon-forms/form-change-triggers";
 import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 
@@ -82,7 +83,10 @@ export interface HpThresholdFormChangeOptions {
  * and the change is a no-op — now logged once via a console.warn so the missing
  * wiring is VISIBLE rather than silently swallowed.
  */
-export class HpThresholdFormChangeAbAttr extends PostDefendAbAttr {
+export class HpThresholdFormChangeAbAttr
+  extends PostDefendAbAttr
+  implements GatedAttr<PostMoveInteractionAbAttrParams>
+{
   private readonly hpThreshold: number;
   private readonly targetFormKey: string;
   private readonly cureStatus: boolean;
@@ -113,11 +117,24 @@ export class HpThresholdFormChangeAbAttr extends PostDefendAbAttr {
     return pokemon.species.forms[pokemon.formIndex]?.formKey === this.targetFormKey;
   }
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B (ability studio spec 3.1): the safety rule, then the replaceable HP-and-form test. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { pokemon } = params;
-    if (pokemon.isFainted()) {
-      return false;
-    }
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Safety rule (guard id `not-fainted`): a fainted holder never changes form. */
+  public guards({ pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    return !pokemon.isFainted();
+  }
+
+  /**
+   * The replaceable condition. Exactly one edge is open at a time: enter the target form (HP says "be in it" and
+   * the holder is not) or leave it (HP says "not in it" and the holder is).
+   */
+  public gate({ pokemon }: PostMoveInteractionAbAttrParams): boolean {
     const belowThreshold = pokemon.hp / pokemon.getMaxHp() <= this.hpThreshold;
     const inTargetForm = this.isInTargetForm(pokemon);
     // Whether the holder SHOULD currently be in the target form given its HP:

@@ -1120,6 +1120,15 @@ export class PostDefendPartyStatusHealAbAttr extends PostDefendAbAttr {
   }
 }
 
+/**
+ * The parameters of {@linkcode PostDefendContactApplyStatusEffectAbAttr.canApply} after the `prepare` step: the
+ * engine's own object plus the status effect that step picked.
+ */
+export interface PostDefendContactStatusParams extends PostMoveInteractionAbAttrParams {
+  /** The effect `canSetStatus` is asked about (picked by the first of the class's random draws). */
+  pickedEffect?: StatusEffect;
+}
+
 export class PostDefendContactApplyStatusEffectAbAttr extends PostDefendAbAttr {
   private readonly chance: number;
   private readonly effects: readonly StatusEffect[];
@@ -1131,15 +1140,38 @@ export class PostDefendContactApplyStatusEffectAbAttr extends PostDefendAbAttr {
     this.effects = effects;
   }
 
-  override canApply({ pokemon, move, opponent: attacker }: PostMoveInteractionAbAttrParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostDefendContactStatusParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `prepare` (random draw 1, only with several
+   * effects), then `gate` (contact, attacker has no status, random draw 2 for the chance), then `residual`.
+   * `apply` draws again to pick its own effect, so with several effects the status that lands can differ from the
+   * one `canApply` checked (an existing quirk, preserved).
+   */
+  public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostDefendContactStatusParams>(this, params);
+  }
+
+  /** Random draw 1 (before any other clause, even when the move makes no contact): which effect canSetStatus checks. */
+  public prepare(params: PostDefendContactStatusParams): PostDefendContactStatusParams {
     const effect =
-      this.effects.length === 1 ? this.effects[0] : this.effects[pokemon.randBattleSeedInt(this.effects.length)];
+      this.effects.length === 1 ? this.effects[0] : this.effects[params.pokemon.randBattleSeedInt(this.effects.length)];
+    return { ...params, pickedEffect: effect };
+  }
+
+  /** The replaceable condition: contact, the attacker has no status yet, and the chance roll (random draw 2). */
+  public gate({ pokemon, move, opponent: attacker }: PostDefendContactStatusParams): boolean {
     return (
       move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
       && !attacker.status
       && (this.chance === -1 || pokemon.randBattleSeedInt(100) < this.chance)
-      && attacker.canSetStatus(effect, true, false, pokemon)
     );
+  }
+
+  /** Feasibility that stays in the class: the attacker must be able to receive the status. */
+  public residual({ pokemon, opponent: attacker, pickedEffect }: PostDefendContactStatusParams): boolean {
+    return attacker.canSetStatus(pickedEffect as StatusEffect, true, false, pokemon);
   }
 
   override apply({ opponent: attacker, pokemon }: PostMoveInteractionAbAttrParams): void {

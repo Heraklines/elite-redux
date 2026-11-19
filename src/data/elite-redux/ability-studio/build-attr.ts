@@ -9,6 +9,7 @@
 // arrays and `oncePerBattleKey` hazards of `cloneAttr` cannot leak between abilities.
 
 import type { AbAttr } from "#abilities/ab-attrs";
+import type { AbAttrCondition } from "#types/ability-types";
 import { getBinding } from "./bindings";
 import { type DeclCondition, type DeclModule, type DeclParam, isAbsentOptional } from "./define-decl";
 import { type GatedAttr, setGateOverride } from "./gate-residual";
@@ -185,5 +186,16 @@ export function recomposeAttr(
     }
     conds[slot.slot] = binding.spec;
   }
-  return buildAttr(module, { ...readDeclParams(module, attr), ...overrides.params }, { ...conds, ...overrides.conds });
+  const rebuilt = buildAttr(
+    module,
+    { ...readDeclParams(module, attr), ...overrides.params },
+    { ...conds, ...overrides.conds },
+  );
+  // The attr-level condition (AbAttr.addCondition: ability composition, upgrades) is not a constructor argument
+  // and not part of the class's own rule, so it is carried over as it is.
+  const attrLevel = (attr as unknown as { extraCondition?: AbAttrCondition }).extraCondition;
+  if (attrLevel !== undefined) {
+    rebuilt.addCondition(attrLevel);
+  }
+  return rebuilt;
 }
