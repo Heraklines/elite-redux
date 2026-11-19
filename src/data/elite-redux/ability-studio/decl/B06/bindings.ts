@@ -153,3 +153,73 @@ bindLegacyClosure(
 // =============================================================================================
 bindCondition(216, 0, { id: "move.flag", flag: "DANCE_MOVE" }, "gate"); // Dancer
 bindCondition(5469, 1, { id: "move.flag", flag: "DANCE_MOVE" }, "gate"); // Samba
+
+// =============================================================================================
+// B06 chunk 3
+//
+// ArenaTrapAbAttr, slot ctor:0: `(user, target) => boolean`, which foes are trapped (user = the holder, target = the foe that wants to
+// leave, read as "other"). Each closure was read by calling the LIVE closure with stand-in foes over every Ghost, Steel, grounded and
+// "has Shadow Tag" state (the three vanilla ones are wrapped by ER: `isOfType(GHOST) ? false : original`), not from the source text.
+// The class itself still adds `not Ghost (true, true)` and `no Run Away` after the closure, so those two are not bound.
+//   Arena Trap (71):   not a Ghost type and grounded      (ER wrapper, then `target.isGrounded()`)
+//   Salt Circle (5273): every foe                          (`() => true`, no wrapper)
+//   Magnet Pull (42):  not a Ghost type and a Steel type   -> legacy: the original calls isOfType(STEEL, true, true)
+//   Shadow Tag (23), Frenzied Phantom (5491, identical answers): not a Ghost type and the foe lacks Shadow Tag -> legacy
+//
+// Not bound here (no constructor closure and no gate): PreventItemUseAbAttr, HealFromBerryUseAbAttr (a number, not a closure),
+// RunSuccessAbAttr, MaxMultiHitAbAttr, PostBattleLootAbAttr, PostFaintUnsuppressedWeatherFormChangeAbAttr.
+// =============================================================================================
+bindCondition(
+  71,
+  0,
+  {
+    all: [{ not: { id: "mon.has-type", who: "other", type: "GHOST" } }, { id: "mon.grounded", who: "other" }],
+  },
+  "ctor:0",
+); // Arena Trap
+bindCondition(5273, 0, { all: [] }, "ctor:0"); // Salt Circle
+bindLegacyClosure(
+  42,
+  0,
+  "Magnet Pull: not a Ghost and a Steel type, but the original asks isOfType(STEEL, true, true) (original types under Stellar Terastallization) and the type atom asks isOfType(type) (R-B06-17)",
+  "ctor:0",
+);
+const SHADOW_TAG_REASON =
+  "not a Ghost and the foe does not have Shadow Tag, asked as abilityQuery(target, SHADOW_TAG_TRAP_IMMUNITY), which also counts role carriers; the ability atom calls plain hasAbility (R-B06-17)";
+bindLegacyClosure(23, 0, `Shadow Tag: ${SHADOW_TAG_REASON}`, "ctor:0");
+bindLegacyClosure(5491, 2, `Frenzied Phantom (same answers as Shadow Tag): ${SHADOW_TAG_REASON}`, "ctor:0");
+
+// =============================================================================================
+// PostFaintFormChangeAbAttr, slot ctor:0: `formFunc(pokemon)`, a form NUMBER, not a yes/no condition (R-B06-8). The attr-level conditions of
+// Battle Bond ('Greninja and not a fusion') and Power Construct ('form 4 or 5') are not constructor arguments; the rebuild copies them.
+// =============================================================================================
+bindLegacyClosure(
+  209,
+  4,
+  "Disguise: form number function (always form 0, the base form); needs a number-valued form picker (R-B06-8)",
+  "ctor:0",
+);
+bindLegacyClosure(
+  210,
+  2,
+  "Battle Bond: form number function (always form 1) behind an attr-level condition (Greninja, not a fusion); needs a number-valued form picker (R-B06-8)",
+  "ctor:0",
+);
+bindLegacyClosure(
+  211,
+  3,
+  "Power Construct: form number function (formIndex - 2) behind an attr-level condition (form 4 or 5); needs form index atoms (R-B06-8)",
+  "ctor:0",
+);
+bindLegacyClosure(
+  5396,
+  4,
+  "Patchwork: form number function (always form 0, the base form); needs a number-valued form picker (R-B06-8)",
+  "ctor:0",
+);
+bindLegacyClosure(
+  5586,
+  3,
+  "Revelation: form number function (the Revelation form while HP ratio > the revert ratio, otherwise a base form); needs HP and form index atoms (R-B06-8)",
+  "ctor:0",
+);

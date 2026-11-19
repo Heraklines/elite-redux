@@ -1,8 +1,56 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1d50feb8353e55",
-  "hash": "0db006ff4d2ab2",
+  "hash": "131be96c072cdb",
   "blocks": [
+    {
+      "id": "block.arena-trap",
+      "className": "ArenaTrapAbAttr",
+      "label": "Trap foes so they cannot switch out or run away",
+      "summary": "While I am on the field, foes that pass my test cannot switch out or run away. Ghost types and foes with Run Away are never trapped. Example: Arena Trap traps grounded foes.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.trap-check",
+      "whenLabel": "While the game checks if a foe can escape",
+      "synonyms": [
+        "arena trap",
+        "shadow tag",
+        "magnet pull",
+        "trap",
+        "cannot switch",
+        "cannot flee",
+        "salt circle"
+      ],
+      "examples": [
+        "Trap grounded foes, like Arena Trap",
+        "Trap Steel types, like Magnet Pull"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Ghost types are never trapped",
+        "A foe with Run Away or a similar escape ability is never trapped"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 5
+    },
     {
       "id": "block.attack-type-immunity",
       "className": "AttackTypeImmunityAbAttr",
@@ -360,6 +408,57 @@
       "uses": 5
     },
     {
+      "id": "block.heal-from-berry-use",
+      "className": "HealFromBerryUseAbAttr",
+      "label": "Heal some HP after I eat a berry",
+      "summary": "After I eat a berry, I heal 33% of my max HP. Example: 0.33 heals a third of max HP, 1 heals all of it.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.berry-eaten",
+      "whenLabel": "After I eat a berry",
+      "synonyms": [
+        "cheek pouch",
+        "gluttony",
+        "voracity",
+        "berry heal",
+        "heal after eating",
+        "recover hp from berries"
+      ],
+      "examples": [
+        "Heal a third of max HP after eating a berry, like Gluttony"
+      ],
+      "params": [
+        {
+          "id": "healShare",
+          "label": "Share of my max HP to heal (0.33 = a third, 1 = all)",
+          "control": "slider",
+          "default": 0.3333333333333333,
+          "editable": true,
+          "min": 0,
+          "max": 1,
+          "step": 0.01
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Heals the share of max HP rounded down, at least 1 HP",
+        "Does nothing in a simulated preview",
+        "A holder that eats several berries in one round heals once"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
       "id": "block.hp-threshold-form-change",
       "className": "HpThresholdFormChangeAbAttr",
       "label": "Change form depending on my HP",
@@ -509,6 +608,45 @@
       "uses": 1
     },
     {
+      "id": "block.max-multi-hit",
+      "className": "MaxMultiHitAbAttr",
+      "label": "Always roll the most hits on a 2 to 5 hit move",
+      "summary": "Moves that hit 2 to 5 times always hit 5 times, and moves that check accuracy on every strike, like Triple Axel, check it only once. Example: Skill Link.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.max-multi-hit",
+      "whenLabel": "While the game rolls how many hits a multi-hit move gets",
+      "synonyms": [
+        "skill link",
+        "always five hits",
+        "max hits",
+        "best multi hit roll",
+        "multi hit boost",
+        "ninja"
+      ],
+      "examples": [
+        "Moves like Bullet Seed always hit five times, like Skill Link"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only moves that roll 2 to 5 hits are changed; fixed hit counts stay as they are",
+        "Does nothing for moves that ignore the user's ability"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
       "id": "block.moody",
       "className": "MoodyAbAttr",
       "label": "Raise one random stat and lower another each turn",
@@ -567,6 +705,48 @@
         "if": true,
         "do": true
       },
+      "uses": 1
+    },
+    {
+      "id": "block.post-battle-loot",
+      "className": "PostBattleLootAbAttr",
+      "label": "Take a random item the foes dropped after a win",
+      "summary": "After I win a battle, I take one random item that the defeated wild Pokemon were holding, if I can carry it. Example: Pickup.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-battle",
+      "whenLabel": "After the battle ends",
+      "synonyms": [
+        "pickup",
+        "loot",
+        "take foe items",
+        "find items after battle",
+        "scavenge",
+        "item drop"
+      ],
+      "examples": [
+        "Pick up one of the defeated foes' items after winning, like Pickup"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only after the battle was won",
+        "Only when the defeated foes left at least one item that can be carried",
+        "The item must be one I can take (a theft block, or already holding the most of that item, stops it)",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified: the attr keeps the drawn item between canApply and apply (`randItem`), the draw sits in canApply after three gate clauses, and apply moves the item and edits the shared loot list, so splitting it would re-implement the class. The won-battle test has no library atom (request R-B06-19: an atom 'I won the battle' reading the victory flag, and a gate/residual split of canApply, which is a foundation decision). Users (1 attr, no closure): Pickup (53, attr 0; the ability is unsuppressable). The class is asked for every Pokemon allowed in battle, so each Pickup holder draws separately in party order and the loot list shrinks as items are taken.",
       "uses": 1
     },
     {
@@ -895,6 +1075,92 @@
         "do": true
       },
       "uses": 9
+    },
+    {
+      "id": "block.post-faint-form-change",
+      "className": "PostFaintFormChangeAbAttr",
+      "label": "Change form when I faint if my ability asks for it",
+      "summary": "When I faint, if my form is not the one my ability asks for, I change form. Example: Disguise puts Mimikyu back in its disguised form after it faints.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.faint",
+      "whenLabel": "When I faint",
+      "synonyms": [
+        "disguise",
+        "battle bond",
+        "power construct",
+        "revert form on faint",
+        "form change on faint",
+        "patchwork"
+      ],
+      "examples": [
+        "Go back to my first form when I faint, like Disguise"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": false,
+          "editable": false,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The form my ability asks for must differ from my current form",
+        "My species must have a form change registered for its ability (otherwise nothing happens)",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 5
+    },
+    {
+      "id": "block.post-faint-unsuppressed-weather-form-change",
+      "className": "PostFaintUnsuppressedWeatherFormChangeAbAttr",
+      "label": "Update weather forms (Castform, Cherrim) when I faint",
+      "summary": "When I faint, Pokemon whose form follows the weather, like Castform and Cherrim, check the weather again and change form. Example: Castform turns Sunny once Cloud Nine faints.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.faint",
+      "whenLabel": "When I faint",
+      "synonyms": [
+        "cloud nine",
+        "air lock",
+        "weather forms return",
+        "castform",
+        "cherrim",
+        "weather form refresh"
+      ],
+      "examples": [
+        "When I faint, Castform changes form with the weather again, like Cloud Nine"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only matters when a Castform with Forecast or a Cherrim with Flower Gift is on the field",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 3
     },
     {
       "id": "block.post-summon-copy-ability",
@@ -1262,6 +1528,42 @@
       "uses": 9
     },
     {
+      "id": "block.prevent-item-use",
+      "className": "PreventItemUseAbAttr",
+      "label": "Stop my foes from using their held items",
+      "summary": "While I am on the field, opposing Pokemon cannot use their single-use held items, such as gems, Red Card, Eject Button and Eject Pack. Example: a foe's Fire Gem does not boost its Fire move.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "cancel.interaction",
+      "whenLabel": "While the game checks if an interaction is blocked",
+      "synonyms": [
+        "as one",
+        "unnerve",
+        "klutz",
+        "crowned king",
+        "item lock",
+        "no items for foes",
+        "block held items"
+      ],
+      "examples": [
+        "Foes cannot use their gems or Eject Button while I am out, like As One"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only the opposing side is stopped, never my own items",
+        "Berries are stopped by the separate berry block that the same abilities carry"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 10
+    },
+    {
       "id": "block.received-move-damage-multiplier",
       "className": "ReceivedMoveDamageMultiplierAbAttr",
       "label": "Take less (or more) damage",
@@ -1325,6 +1627,45 @@
         "do": true
       },
       "uses": 64
+    },
+    {
+      "id": "block.run-success",
+      "className": "RunSuccessAbAttr",
+      "label": "Always escape when I run from a wild battle",
+      "summary": "When my side tries to run from a wild battle the escape always works, and foes' trapping abilities cannot hold me. Example: Run Away always gets out.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.run-chance",
+      "whenLabel": "While the game rolls my chance to run away",
+      "synonyms": [
+        "run away",
+        "escape",
+        "flee",
+        "guaranteed escape",
+        "dust cloud",
+        "always run"
+      ],
+      "examples": [
+        "Always escape from wild battles, like Run Away"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only runs from wild battles can be attempted at all; trainer battles never ask",
+        "Arena Trap style trapping abilities never trap a Pokemon with this (a rule the trapping class applies)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 7
     },
     {
       "id": "block.speed-boost",
