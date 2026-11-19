@@ -536,3 +536,86 @@ legacyEach(
   "Closure `move.type === GRASS && arena.terrain?.terrainType === GRASSY`: reads the terrain object directly, while field.terrain asks arena.terrainType, which a Clueless-style field suppression sets to None; an atom for the raw terrain is request B02-36 in requests/B02.md",
   [[5310, 0, "Flourish"]],
 );
+
+// =============================================================================================
+// B02 chunk 4.
+// StatMultiplierAbAttr (Tier A). Slot ctor:2, an optional PokemonAttackCondition `(user, target, move)`; only 7 of the 62 attrs
+// have one. The frame's holder and move user are the user. Every closure was read from the live attr (init-abilities.ts,
+// init-elite-redux-vanilla-rebalance.ts:1373, archetype-dispatcher.ts:4943, :6427, :6442, ability-upgrades).
+// =============================================================================================
+// Hustle `(_user, _target, move) => move.category !== MoveCategory.STATUS` (accuracy x0.9, rebalance `attacksOnly`).
+bindCondition(55, 1, { id: "move.damaging" }, "ctor:2");
+// Plasma Lamp `(_user, _target, move) => move.type === FIRE || move.type === ELECTRIC`: the PRINTED move type, so `effective: false`.
+bindCondition(
+  5197,
+  2,
+  {
+    any: [
+      { id: "move.type", type: "FIRE", effective: false },
+      { id: "move.type", type: "ELECTRIC", effective: false },
+    ],
+  },
+  "ctor:2",
+);
+// Determination `p => (p.status != null && p.status.effect !== NONE) || !!p.getTag(ER_FROSTBITE)`. A status object always has an
+// effect (the game never keeps one with NONE), so the first part is `status.has ANY` on the user.
+bindCondition(
+  5236,
+  0,
+  {
+    any: [
+      { id: "status.has", who: "holder", status: "ANY" },
+      { id: "tag.has", who: "holder", tag: "ER_FROSTBITE" },
+    ],
+  },
+  "ctor:2",
+);
+// Rage Point `pokemon => pokemon.status !== null && pokemon.status?.effect !== NONE` (ATK and SPATK attrs).
+bindCondition(5406, 0, { id: "status.has", who: "holder", status: "ANY" }, "ctor:2");
+bindCondition(5406, 1, { id: "status.has", who: "holder", status: "ANY" }, "ctor:2");
+// Propeller Tail `getWeatherCondition(RAIN, HEAVY_RAIN)`: `!arena.weather?.isEffectSuppressed() && weatherType in [RAIN, HEAVY_RAIN]`
+// (its Sun and Grassy branch cannot be reached with a rain list). field.weather ignores suppression.
+bindLegacyClosure(
+  239,
+  1,
+  "Closure `getWeatherCondition(RAIN, HEAVY_RAIN)` reads the weather object and its suppression (`weather.isEffectSuppressed()`); field.weather ignores suppression, so it is not the same test (request B02-35 in requests/B02.md)",
+  "ctor:2",
+);
+// Jungle Fever `globalSceneTerrainIs(GRASSY)` = `arena.terrain?.terrainType === GRASSY` (the raw terrain object).
+bindLegacyClosure(
+  5728,
+  0,
+  "Closure `arena.terrain?.terrainType === GRASSY` reads the terrain object directly, while field.terrain asks arena.terrainType, which a Clueless-style field suppression sets to None; an atom for the raw terrain is request B02-36 in requests/B02.md",
+  "ctor:2",
+);
+
+// ---- PostAttackApplyStatusEffectAbAttr (Tier B). Slot "gate": [the move deals damage, chance]. The class default attack
+// condition is `move.category !== STATUS` (= move.damaging). The Shield Dust and "not myself" tests are guards in the class, the
+// status pick and `canSetStatus` are the residual. contactRequired is false for both users, so no contact atom.
+for (const [abilityId, attrIndex] of [
+  [302, 0], // Toxic Chain (TOXIC)
+  [5552, 3], // Komodo (POISON)
+] as const) {
+  bindCondition(abilityId, attrIndex, { all: [{ id: "move.damaging" }, { id: "rng.chance", pct: 30 }] }, "gate");
+}
+
+// ---- PostAttackContactApplyStatusEffectAbAttr (Tier B). Slot "gate": [damaging, contact, chance], contactRequired is true. ----
+for (const [abilityId, attrIndex] of [
+  [9, 2], // Static
+  [38, 1], // Poison Point
+  [49, 2], // Flame Body
+  [143, 0], // Poison Touch
+  [5358, 2], // White Noise
+  [5479, 1], // Venom Crown
+  [5480, 2], // Blight Scale
+  [5541, 2], // Poison Quills
+  [5667, 3], // Toxic Shell
+  [5733, 4], // Smoldering Wood
+] as const) {
+  bindCondition(
+    abilityId,
+    attrIndex,
+    { all: [{ id: "move.damaging" }, { id: "move.flag", flag: "MAKES_CONTACT" }, { id: "rng.chance", pct: 30 }] },
+    "gate",
+  );
+}

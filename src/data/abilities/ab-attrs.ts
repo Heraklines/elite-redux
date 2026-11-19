@@ -2444,23 +2444,45 @@ export class PostAttackApplyStatusEffectAbAttr extends PostAttackAbAttr {
     this.effects = effects;
   }
 
-  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1): `guards`, then `gate` (the damaging-move test, contact when required, and
+   * the chance roll = random draw 1), then `residual` (the random draw that picks the status, only with several
+   * statuses, then `canSetStatus`). `apply` draws once more to pick its own status, so with several statuses the one
+   * that lands can differ from the one `canApply` checked (an existing quirk, preserved).
+   */
+  public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /**
+   * Safety rules that need no random draw: the foe is not protected against extra effects (Shield Dust style) and I
+   * did not hit myself. Both were skipped for a simulated call, which stays true. They now run before the
+   * damaging-move test; every one of these checks is free of side effects and draws nothing, so the outcome is the same.
+   */
+  public guards({ simulated, pokemon, opponent }: PostMoveInteractionAbAttrParams): boolean {
+    return simulated || (!opponent.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr") && pokemon !== opponent);
+  }
+
+  /** The replaceable condition: the move is a damaging move, it makes contact when required, and the chance roll. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
     const { simulated, pokemon, move, opponent } = params;
-    if (
+    return (
       super.canApply(params)
       && (simulated
-        || (!opponent.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr")
-          && pokemon !== opponent
-          && (!this.contactRequired
-            || move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: pokemon, target: opponent }))
+        || ((!this.contactRequired
+          || move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: pokemon, target: opponent }))
           && pokemon.randBattleSeedInt(100) < this.chance))
-    ) {
-      const effect =
-        this.effects.length === 1 ? this.effects[0] : this.effects[pokemon.randBattleSeedInt(this.effects.length)];
-      return simulated || opponent.canSetStatus(effect, true, false, pokemon);
-    }
+    );
+  }
 
-    return false;
+  /** Feasibility that stays in the class: the foe must be able to receive the (randomly picked) status. */
+  public residual({ simulated, pokemon, opponent }: PostMoveInteractionAbAttrParams): boolean {
+    const effect =
+      this.effects.length === 1 ? this.effects[0] : this.effects[pokemon.randBattleSeedInt(this.effects.length)];
+    return simulated || opponent.canSetStatus(effect, true, false, pokemon);
   }
 
   apply({ pokemon, opponent }: PostMoveInteractionAbAttrParams): void {
