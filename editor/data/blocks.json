@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "0ea6aa28e2e5a8",
+  "hash": "120253dedee3b0",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -168,6 +168,47 @@
         "if": true,
         "do": true
       },
+      "uses": 1
+    },
+    {
+      "id": "block.download",
+      "className": "DownloadAbAttr",
+      "label": "Raise Attack or Sp. Atk to match the foes' weaker defense",
+      "summary": "When I enter the battle, my Attack rises by 1 stage if the foes' Defense is not higher than their Sp. Def, otherwise my Sp. Atk rises by 1 stage.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "download",
+        "adapt to foe",
+        "read the foe's defenses",
+        "raise attack or special attack",
+        "scan the opponent",
+        "exploit weaker defense"
+      ],
+      "examples": [
+        "Raise Attack or Sp. Atk by one stage depending on the foes' weaker defense, the way the download ability does"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one foe next to me must exist, and the foes' average Defense and average Sp. Def must both be above 0 (they include stat stages), otherwise nothing happens and the ability does not show",
+        "The comparison uses the foes' Defense and Sp. Def after boosts and drops, rounded to a whole number per stat",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package, 1 user: Download (88 attr 0). Reason it cannot be split further today: the stat choice (the foes' average Defense against their average Sp. Def) is computed in canApply and stored on the shared instance, then read by apply; a library IF 'foes' average Defense is not higher than Sp. Def' and a two-branch form (raise Attack / raise Sp. Atk) do not exist (requests/B03.md: `foe.average-defense-not-higher`, plus an effect that raises a stat by a fixed amount for the holder that both branches can use; `effect.stat-stage` already exists for that). Trigger is separate (on entry), feasibility is written out, and extra IFs can only be ANDed on top. Quirks recorded, not fixed: the average is rounded per stat before the compare (round half up), so two foes at 100/101 Defense compare as 101; `canApply` mutates `enemyDef`, `enemySpDef`, `enemyCountTally` on the shared instance, and `apply` writes `stats` even for a simulated call, so a simulated check followed by a real one reuses the numbers of the last canApply (they are recomputed every canApply, so it is harmless); `getAdjacentOpponents` skips an empty slot, the null guard comes from a daily-run crash fix.",
       "uses": 1
     },
     {
@@ -1387,6 +1428,138 @@
       "uses": 10
     },
     {
+      "id": "block.post-summon-ally-heal",
+      "className": "PostSummonAllyHealAbAttr",
+      "label": "Heal my ally when I enter",
+      "summary": "When I enter the battle, each active ally next to me is healed by 1/4 of my max HP. Example: 4 heals a quarter of my max HP.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "hospitality",
+        "heal partner on entry",
+        "restore ally hp",
+        "ally recovery",
+        "heal teammate",
+        "butter up",
+        "food lovers"
+      ],
+      "examples": [
+        "Heal my ally by a quarter of my max HP when I enter, like Hospitality"
+      ],
+      "params": [
+        {
+          "id": "healRatio",
+          "label": "Heal share of my max HP (4 = a quarter, 2 = half)",
+          "control": "number",
+          "default": 4,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "showAnim",
+          "label": "Play the healing animation",
+          "control": "boolean",
+          "default": false,
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one active ally standing next to me must exist, otherwise nothing happens and the ability does not show",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.heal-percent",
+        "params": [
+          "healRatio"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.post-summon-clear-ally-stat-stages",
+      "className": "PostSummonClearAllyStatStagesAbAttr",
+      "label": "Reset my ally's stat boosts and drops when I enter",
+      "summary": "When I enter the battle, every active ally's stat stages go back to 0, both boosts and drops. Example: an ally at +2 Attack and -1 Speed ends at 0 in everything.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "curious medicine",
+        "reset ally stats",
+        "clear ally boosts",
+        "haze on ally",
+        "cleanse stat changes",
+        "remove ally stat changes"
+      ],
+      "examples": [
+        "Reset my ally's stat changes when I enter, like Curious Medicine"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one active ally must exist (in a triple battle any of them, not only the one next to me), otherwise nothing happens and the ability does not show",
+        "It does nothing in a preview"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": false
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.post-summon-clear-opponent-positive-stat-stages",
+      "className": "PostSummonClearOpponentPositiveStatStagesAbAttr",
+      "label": "Remove the foes' stat boosts when I enter",
+      "summary": "When I enter the battle, every active foe loses its stat boosts. Their stat drops and my own stages stay. Example: a foe at +2 Attack and -1 Speed ends at 0 Attack and -1 Speed.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "petrify",
+        "clear foe boosts",
+        "remove enemy buffs",
+        "haze on entry",
+        "stat reset foes",
+        "remove stat raises",
+        "negate boosts"
+      ],
+      "examples": [
+        "Remove the foes' stat boosts when I enter, but keep their stat drops"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one active foe must have a raised stat, otherwise nothing happens and the ability does not show",
+        "It does nothing in a preview"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": false
+      },
+      "uses": 1
+    },
+    {
       "id": "block.post-summon-copy-ability",
       "className": "PostSummonCopyAbilityAbAttr",
       "label": "Copy a foe's ability when I enter",
@@ -1423,6 +1596,72 @@
       },
       "packageReason": "Package, justified: the attr keeps `target` and `targetAbilityName` between canApply, apply and getTriggerMessage, and its apply replaces the holder's ability (setTempAbility) and suppresses the source for two turns. Splitting would re-implement the class. Users: Trace only. Honest bucket: package-only.",
       "uses": 1
+    },
+    {
+      "id": "block.post-summon-heal-status",
+      "className": "PostSummonHealStatusAbAttr",
+      "label": "Cure my status problem when I enter",
+      "summary": "When I enter the battle (or gain this ability) while I have one of these status problems (Paralysis), it is cured. Example: Limber cures paralysis.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "limber",
+        "insomnia",
+        "immunity",
+        "water veil",
+        "cure burn",
+        "cure paralysis",
+        "cure poison",
+        "cure sleep",
+        "cleanse status"
+      ],
+      "examples": [
+        "Cure my paralysis when I enter or gain this ability",
+        "Cure poison and bad poison when I enter the battle"
+      ],
+      "params": [
+        {
+          "id": "statuses",
+          "label": "Status problems that make it cure me (comma separated; empty = any status)",
+          "control": "text",
+          "default": "PARALYSIS",
+          "editable": false,
+          "options": [
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "I must have a status problem, otherwise nothing happens and the ability does not show",
+        "It also works right after a move hits me, not only on entry (the game checks it again at the end of every move)"
+      ],
+      "effect": {
+        "id": "effect.cure-status",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 15
     },
     {
       "id": "block.post-summon-message",
@@ -1590,6 +1829,354 @@
         "do": false
       },
       "uses": 3
+    },
+    {
+      "id": "block.post-summon-remove-battler-tag",
+      "className": "PostSummonRemoveBattlerTagAbAttr",
+      "label": "Shake off battle effects when I enter",
+      "summary": "When I enter the battle (or gain this ability), I lose these battle effects if I have them: Confused. Example: Own Tempo removes Confusion.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "own tempo",
+        "oblivious",
+        "cure confusion",
+        "remove taunt",
+        "cure infatuation",
+        "cleanse volatile",
+        "shake off"
+      ],
+      "examples": [
+        "Remove Confusion from me when I enter or gain this ability",
+        "Cure Infatuation and Taunt when I enter the battle"
+      ],
+      "params": [
+        {
+          "id": "tags",
+          "label": "Battle effects to remove (comma separated names)",
+          "control": "text",
+          "default": "CONFUSED",
+          "editable": false,
+          "options": [
+            "RECHARGING",
+            "FLINCHED",
+            "INTERRUPTED",
+            "SKY_DROP",
+            "CONFUSED",
+            "INFATUATED",
+            "SEEDED",
+            "NIGHTMARE",
+            "FRENZY",
+            "CHARGING",
+            "ENCORE",
+            "HELPING_HAND",
+            "INGRAIN",
+            "OCTOLOCK",
+            "AQUA_RING",
+            "DROWSY",
+            "TRAPPED",
+            "BIND",
+            "WRAP",
+            "FIRE_SPIN",
+            "WHIRLPOOL",
+            "CLAMP",
+            "SAND_TOMB",
+            "MAGMA_STORM",
+            "SNAP_TRAP",
+            "THUNDER_CAGE",
+            "INFESTATION",
+            "PROTECTED",
+            "SPIKY_SHIELD",
+            "KINGS_SHIELD",
+            "OBSTRUCT",
+            "SILK_TRAP",
+            "MIND_READER",
+            "BANEFUL_BUNKER",
+            "BURNING_BULWARK",
+            "ER_PARALYZING_SHIELD",
+            "ER_TANGLING_HUSK",
+            "ENDURING",
+            "STURDY",
+            "PERISH_SONG",
+            "TRUANT",
+            "SLOW_START",
+            "PROTOSYNTHESIS",
+            "QUARK_DRIVE",
+            "FLYING",
+            "UNDERGROUND",
+            "UNDERWATER",
+            "HIDDEN",
+            "FIRE_BOOST",
+            "CRIT_BOOST",
+            "ALWAYS_CRIT",
+            "IGNORE_ACCURACY",
+            "IGNORE_FLYING",
+            "SALT_CURED",
+            "CURSED",
+            "ER_SLAB_CURSE",
+            "CHARGED",
+            "ROOSTED",
+            "FLOATING",
+            "MINIMIZED",
+            "DESTINY_BOND",
+            "CENTER_OF_ATTENTION",
+            "STOCKPILING",
+            "RECEIVE_DOUBLE_DAMAGE",
+            "ALWAYS_GET_HIT",
+            "DISABLED",
+            "SUBSTITUTE",
+            "IGNORE_GHOST",
+            "IGNORE_DARK",
+            "GULP_MISSILE_ARROKUDA",
+            "GULP_MISSILE_PIKACHU",
+            "BEAK_BLAST_CHARGING",
+            "SHELL_TRAP",
+            "DRAGON_CHEER",
+            "NO_RETREAT",
+            "GORILLA_TACTICS",
+            "UNBURDEN",
+            "THROAT_CHOPPED",
+            "TAR_SHOT",
+            "BURNED_UP",
+            "DOUBLE_SHOCKED",
+            "AUTOTOMIZED",
+            "MYSTERY_ENCOUNTER_POST_SUMMON",
+            "POWER_TRICK",
+            "HEAL_BLOCK",
+            "TORMENT",
+            "TAUNT",
+            "IMPRISON",
+            "SYRUP_BOMB",
+            "ELECTRIFIED",
+            "TELEKINESIS",
+            "COMMANDED",
+            "GRUDGE",
+            "PSYCHO_SHIFT",
+            "ENDURE_TOKEN",
+            "POWDER",
+            "MAGIC_COAT",
+            "SUPREME_OVERLORD",
+            "BYPASS_SPEED",
+            "SNATCH",
+            "ME_FIRST",
+            "ER_BLEED",
+            "ER_FROSTBITE",
+            "ER_FEAR",
+            "ER_ITEM_DISABLED",
+            "ER_SILKEN_DECREE",
+            "ER_ICE_STATUE",
+            "ER_PARASITIC_SPORES",
+            "ER_DESPAIR",
+            "ER_DRENCHED",
+            "ER_ENRAGE",
+            "ER_QUASHED",
+            "ER_EMPOWERED_SWITCH_IN",
+            "ER_COMMANDED",
+            "ER_SAFE_PASSAGE",
+            "ER_SAGE_POWER_LOCK",
+            "ER_BLIND_JUSTICE",
+            "ER_CONFECTED",
+            "ER_IRRADIATED_TOXIC",
+            "ER_IRRADIATED_LOCK",
+            "ER_BREACHED",
+            "ER_EMBEDDED",
+            "ER_DECAY_POISON"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "It acts only when I am affected by at least one of the listed battle effects (this is the condition above)",
+        "It also works right after a move hits me, not only on entry (the game checks it again at the end of every move)"
+      ],
+      "effect": {
+        "id": "effect.remove-tag",
+        "params": [
+          "tags"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.post-summon-stat-stage-change",
+      "className": "PostSummonStatStageChangeAbAttr",
+      "label": "Raise or lower stats when I enter",
+      "summary": "When I enter the battle, Foes get Attack changed by -1 stage(s). Example: Intimidate lowers the foes' Attack by 1; Intrepid Sword raises my own Attack by 1.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "intimidate",
+        "intrepid sword",
+        "dauntless shield",
+        "scare",
+        "boost on entry",
+        "lower foe stats on entry",
+        "stat drop on entry",
+        "embody aspect"
+      ],
+      "examples": [
+        "Lower the foes' Attack by 1 stage when I enter, like Intimidate",
+        "Raise my own Speed by 2 stages when I enter",
+        "Lower the foes' Sp. Atk by 2 stages when I enter and give them a 10% chance of Fear"
+      ],
+      "params": [
+        {
+          "id": "stats",
+          "label": "Stats to change (comma separated names)",
+          "control": "text",
+          "default": "ATK",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ]
+        },
+        {
+          "id": "stages",
+          "label": "Stages to change (+1 raises one stage, -1 lowers one stage)",
+          "control": "number",
+          "default": -1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "target",
+          "label": "Whose stats change",
+          "control": "select",
+          "default": "FOES",
+          "editable": true,
+          "options": [
+            "ME",
+            "FOES"
+          ]
+        },
+        {
+          "id": "intimidate",
+          "label": "Use the Intimidate rules (immune abilities and Substitute block it, reactions like Rattled trigger)",
+          "control": "boolean",
+          "default": false,
+          "editable": true
+        },
+        {
+          "id": "afterDrop",
+          "label": "Extra effect on each foe whose stat really dropped",
+          "control": "select",
+          "default": "NONE",
+          "editable": true,
+          "options": [
+            "NONE",
+            "FEAR_10_PERCENT_2_TURNS"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "In a triple battle only the foes standing next to me are affected",
+        "With the Intimidate rules, a foe with an immune ability (like Inner Focus) or a Substitute is left alone",
+        "A stat that is already at its limit only shows the 'cannot go any higher' message",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stats",
+          "stages",
+          "target"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 23
+    },
+    {
+      "id": "block.post-summon-terrain-change",
+      "className": "PostSummonTerrainChangeAbAttr",
+      "label": "Set the terrain when I enter",
+      "summary": "When I enter the battle, the terrain becomes Electric. Example: Electric Surge sets Electric Terrain; choosing None clears the terrain.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "electric surge",
+        "grassy surge",
+        "misty surge",
+        "psychic surge",
+        "summon terrain",
+        "terrain setter",
+        "clear terrain"
+      ],
+      "examples": [
+        "Set Electric Terrain when I enter the battle",
+        "Clear any terrain when I enter the battle"
+      ],
+      "params": [
+        {
+          "id": "terrain",
+          "label": "Terrain (None clears the current terrain)",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NONE",
+            "MISTY",
+            "ELECTRIC",
+            "GRASSY",
+            "PSYCHIC",
+            "TOXIC"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The terrain must be settable: it is not already the same terrain",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.set-terrain",
+        "params": [
+          "terrain"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 4
     },
     {
       "id": "block.post-summon-unnamed-message",

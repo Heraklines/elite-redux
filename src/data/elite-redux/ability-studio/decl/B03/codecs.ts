@@ -14,6 +14,8 @@
 //    translation call the ability file writes inline (the closures live in init-abilities.ts and cannot be imported).
 import { getPokemonNameWithAffix } from "#app/messages";
 import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
+import { onSuccessfulStatDrop } from "#data/elite-redux/ability-upgrades/attrs/stat-control";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { getStatKey, Stat } from "#enums/stat";
 import type { Pokemon } from "#field/pokemon";
 import i18next from "i18next";
@@ -144,3 +146,49 @@ export const ANNOUNCEMENTS: Readonly<
 
 /** The one announcement that cannot be rebuilt: it also writes a per-battle memory only init-abilities.ts can reach. */
 export const ZERO_TO_HERO = "ZERO_TO_HERO_TRANSFORMATION";
+
+// ---------------------------------------------------------------------------------------------------------------
+// Chunk 3: the entry stat change (PostSummonStatStageChangeAbAttr)
+//
+//  - `targetSideCodec`: the constructor flag `selfTarget` (true = me) shown as the words ME / FOES.
+//  - `dropFollowUpCodec`: the constructor takes ONE ready callback for "after a foe's stat really dropped". The only
+//    callback any shipped ability passes is the 10% Fear one (init-elite-redux-ability-upgrades.ts and
+//    archetype-dispatcher.ts write the identical closure three times), so the choice is NONE (no callback) or the Fear
+//    callback built from the same `onSuccessfulStatDrop` helper. A live instance only tells us whether a callback is
+//    there, which is why the second choice reads back for ANY function.
+
+export const TARGET_SIDES = ["ME", "FOES"] as const;
+
+export const targetSideCodec: ParamCodec = {
+  toCtor: value => {
+    if (value === "ME") {
+      return true;
+    }
+    if (value === "FOES") {
+      return false;
+    }
+    throw new Error(`"${String(value)}" is not a target (me or the foes)`);
+  },
+  fromInstance: raw => (typeof raw === "boolean" ? (raw ? "ME" : "FOES") : undefined),
+};
+
+export const FEAR_AFTER_DROP = "FEAR_10_PERCENT_2_TURNS";
+export const DROP_FOLLOW_UPS = ["NONE", FEAR_AFTER_DROP] as const;
+
+export const dropFollowUpCodec: ParamCodec = {
+  toCtor: value => {
+    if (value === "NONE") {
+      return null;
+    }
+    if (value === FEAR_AFTER_DROP) {
+      return onSuccessfulStatDrop(target => {
+        if (target.randBattleSeedInt(100) < 10) {
+          target.addTag(BattlerTagType.ER_FEAR, 2);
+        }
+      });
+    }
+    throw new Error(`"${String(value)}" is not a follow-up effect (none or fear)`);
+  },
+  fromInstance: raw =>
+    raw === null || raw === undefined ? "NONE" : typeof raw === "function" ? FEAR_AFTER_DROP : undefined,
+};

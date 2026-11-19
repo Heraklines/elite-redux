@@ -206,3 +206,60 @@ bindLegacyClosure(
   `Venoblaze Pincers (Defense and Sp. Def ignored while the foe is trapped): ${TRAPPED_FOE_REASON}`,
   "ctor:1",
 );
+
+// =============================================================================================
+// Chunk 3. PostSummonRemoveBattlerTagAbAttr (Tier B). Slot "gate": `immuneTags.some(t => !!pokemon.getTag(t))`, spelled as
+// an `any` over `tag.has` (`pokemon.getTag(BattlerTagType[tag]) !== undefined`, the same test). The list of effects is
+// the constructor argument of each user, read from the live attr.
+// =============================================================================================
+const tagHas = (tag: string): unknown => ({ id: "tag.has", who: "holder", tag });
+// Oblivious: Infatuation and Taunt
+bindEach({ any: [tagHas("INFATUATED"), tagHas("TAUNT")] }, [[12, 1, "Oblivious"]], "gate");
+// Own Tempo: Confusion
+bindEach({ any: [tagHas("CONFUSED")] }, [[20, 1, "Own Tempo"]], "gate");
+
+// =============================================================================================
+// PostSummonHealStatusAbAttr (Tier B). Slot "gate": the status I have is one of the listed ones (the list of every user is
+// non-empty, so the 'empty list = any status' branch of the class is not used by anyone). `status.has` reads
+// `pokemon.status?.effect === StatusEffect[status]`; the class's own residual 'I have a status at all' stays in the class.
+// =============================================================================================
+const statusHas = (status: string): unknown => ({ id: "status.has", who: "holder", status });
+const anyOf = (...statuses: string[]): unknown => ({ any: statuses.map(statusHas) });
+// paralysis: Limber, Steadfast, Superheavy
+bindEach(
+  anyOf("PARALYSIS"),
+  [
+    [7, 1, "Limber"],
+    [80, 2, "Steadfast"],
+    [5549, 2, "Superheavy"],
+  ],
+  "gate",
+);
+// sleep: Insomnia, Vital Spirit, Brainpower
+bindEach(
+  anyOf("SLEEP"),
+  [
+    [15, 1, "Insomnia"],
+    [72, 1, "Vital Spirit"],
+    [5940, 4, "Brainpower"],
+  ],
+  "gate",
+);
+// poison and bad poison: Immunity
+bindEach(anyOf("POISON", "TOXIC"), [[17, 1, "Immunity"]], "gate");
+// freeze: Magma Armor
+bindEach(anyOf("FREEZE"), [[40, 1, "Magma Armor"]], "gate");
+// burn: Water Veil (two ids), Water Bubble, Thermal Exchange, Purifying Waters, Flame Bubble, Thermal Entropy
+bindEach(
+  anyOf("BURN"),
+  [
+    [41, 1, "Water Veil"],
+    [5947, 1, "Water Veil (second id)"],
+    [199, 3, "Water Bubble"],
+    [270, 2, "Thermal Exchange"],
+    [5231, 2, "Purifying Waters"],
+    [5368, 3, "Flame Bubble"],
+    [5711, 2, "Thermal Entropy"],
+  ],
+  "gate",
+);

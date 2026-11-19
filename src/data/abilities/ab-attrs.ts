@@ -3008,7 +3008,19 @@ export class PostSummonRemoveBattlerTagAbAttr extends PostSummonRemoveEffectAbAt
     this.immuneTags = immuneTags;
   }
 
-  public override canApply({ pokemon }: AbAttrBaseParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1): the whole rule is one `gate` ("I am affected by one of the listed battle
+   * effects"). No guards, no residual, no random draws.
+   */
+  public override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The replaceable condition: I am affected by at least one of the listed battle effects. */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     return this.immuneTags.some(tagType => !!pokemon.getTag(tagType));
   }
 
@@ -3321,10 +3333,28 @@ export class PostSummonHealStatusAbAttr extends PostSummonRemoveEffectAbAttr {
     this.immuneEffects = immuneEffects;
   }
 
-  public override canApply({ pokemon }: AbAttrBaseParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1): `gate` (my status is one of the listed ones, or any status when the list is
+   * empty) then `residual` (I have a status at all). The two clauses are pure, so running the list test first and the
+   * "has a status" test second gives the same answer as the original `status != null && (...)`. No guards, no random draws.
+   */
+  public override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The replaceable condition: my status is one of the listed statuses (any status when the list is empty). */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     const status = pokemon.status?.effect;
     const immuneEffects = this.immuneEffects;
-    return status != null && (immuneEffects.length === 0 || immuneEffects.includes(status));
+    return immuneEffects.length === 0 || (status != null && immuneEffects.includes(status));
+  }
+
+  /** Feasibility that stays in the class: there is a status to heal. */
+  public residual({ pokemon }: AbAttrBaseParams): boolean {
+    return pokemon.status?.effect != null;
   }
 
   public override apply({ pokemon }: AbAttrBaseParams): void {
