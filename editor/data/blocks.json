@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "19b4a3aed16a8d",
-  "hash": "18d14ff91e50b5",
+  "hash": "15a9b937031eba",
   "blocks": [
     {
       "id": "block.allied-field-damage-reduction",
@@ -1107,7 +1107,7 @@
       "id": "block.post-defend-hp-gated-stat-stage-change",
       "className": "PostDefendHpGatedStatStageChangeAbAttr",
       "label": "Change several stats when a hit drops me to an HP line",
-      "summary": "The hit that takes my HP to 50% or lower changes Attack by 1 stage. Example: +1 Attack, Sp. Atk and Speed at half HP, like Anger Shell.",
+      "summary": "The hit that takes my HP to 50% or lower changes Attack by 1 stage. Example: +2 Attack, Sp. Atk and Speed at half HP, like Anger Shell.",
       "tier": "B",
       "kind": "event-effect",
       "status": "decomposed",

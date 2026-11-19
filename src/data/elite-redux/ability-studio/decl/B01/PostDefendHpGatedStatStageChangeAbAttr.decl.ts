@@ -74,7 +74,7 @@ export default defineDecl(PostDefendHpGatedStatStageChangeAbAttr, {
   when: "event.after-hit",
   label: "Change several stats when a hit drops me to an HP line",
   summary: params =>
-    `The hit that takes my HP to ${Math.round(Number(params.hpGate) * 100)}% or lower changes ${params.stats} by ${params.stages} ${Math.abs(Number(params.stages)) === 1 ? "stage" : "stages"}. Example: +1 Attack, Sp. Atk and Speed at half HP, like Anger Shell.`,
+    `The hit that takes my HP to ${Math.round(Number(params.hpGate) * 100)}% or lower changes ${params.stats} by ${params.stages} ${Math.abs(Number(params.stages)) === 1 ? "stage" : "stages"}. Example: +2 Attack, Sp. Atk and Speed at half HP, like Anger Shell.`,
   synonyms: [
     "anger shell",
     "no turning back",
