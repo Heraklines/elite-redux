@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// B08 chunk 1, BoneMoveTypeChartAbAttr (declaration PARKED until the WHEN calc.my-attack-matchup exists, R-B08-8).
+// B08 chunk 1, BoneMoveTypeChartAbAttr (live declaration, trigger calc.my-attack-matchup).
 // The class is read by a by-name scan in the type effectiveness calculation, so the shared L1 and L2 tests cannot see
-// it. Both live users (Bone Zone, Cranisphere) are rebuilt from the parked declaration and compared with the original
+// it. Both live users (Bone Zone, Cranisphere) are rebuilt from the live declaration and compared with the original
 // on `fire(move, multiplier)` for bone and non-bone moves and the multipliers 0, 0.25, 0.5, 1, 2 and 4.
 import { allMoves } from "#data/data-lists";
 import { buildAttr } from "#data/elite-redux/ability-studio/build-attr";
-import pending from "#data/elite-redux/ability-studio/decl/B08/pending/BoneMoveTypeChartAbAttr.decl.pending";
+import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
 import type { DeclModule } from "#data/elite-redux/ability-studio/define-decl";
 import type { BoneMoveTypeChartAbAttr } from "#data/elite-redux/archetypes/bone-move-type-chart";
 import { MoveFlags } from "#enums/move-flags";
@@ -22,9 +22,9 @@ import { NumberHolder } from "#utils/common";
 import Phaser from "phaser";
 import { beforeAll, describe, expect, it } from "vitest";
 
-const module = pending as DeclModule;
+const module = declRegistry.get("BoneMoveTypeChartAbAttr") as DeclModule;
 
-describe("B08: bone moves and the type chart (BoneMoveTypeChartAbAttr, parked declaration)", () => {
+describe("B08: bone moves and the type chart (BoneMoveTypeChartAbAttr)", () => {
   let phaserGame: Phaser.Game;
   beforeAll(() => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });

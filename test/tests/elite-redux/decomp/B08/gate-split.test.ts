@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// B08 chunk 1: proof that the three Tier B refactors are a pure move of code, and that every bound gate equals the
+// B08 chunk 1: proof that the four Tier B refactors are a pure move of code, and that every bound gate equals the
 // class's own gate in states the shared L1 grid and the L2 twin cannot reach (the foe's status, every hit result, a
 // Terastallized attacker, Shield Dust on the target, the holder carrying the type, a roll that passes and one that fails).
 //
-//   1. ORACLE: the original `canApply` of AddTypeToAttackerOnContactAbAttr, AteConditionalStatusAbAttr and
+//   1. ORACLE: the original `canApply` of AbsorbantAbAttr, AddTypeToAttackerOnContactAbAttr, AteConditionalStatusAbAttr and
 //      ChanceStatusOnHitAbAttr is copied below VERBATIM from the commit before the split (git show ce5d9815f). The
 //      refactored class must give the same answer AND draw the same random ranges, in the same order, for every
 //      live user and every state.
@@ -18,6 +18,7 @@ import { PostAttackAbAttr, type PostMoveInteractionAbAttrParams } from "#abiliti
 import { allMoves } from "#data/data-lists";
 import { recomposeAttr } from "#data/elite-redux/ability-studio/build-attr";
 import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
@@ -34,6 +35,14 @@ type Fields = Record<string, any>;
 
 // ---------------------------------------------------------------------------------------------
 // The original canApply bodies (frozen copies)
+
+function legacyAbsorbant(attr: Fields, params: Params): boolean {
+  return (
+    PostAttackAbAttr.prototype.canApply.call(attr, params)
+    && !params.opponent.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr")
+    && params.opponent.canAddTag(BattlerTagType.SEEDED)
+  );
+}
 
 function legacyAddType(attr: Fields, params: Params): boolean {
   const { pokemon, move, opponent: attacker } = params;
@@ -121,6 +130,7 @@ function legacyChanceStatus(attr: Fields, params: Params): boolean {
 }
 
 const LEGACY: Readonly<Record<string, (attr: Fields, params: Params) => boolean>> = {
+  AbsorbantAbAttr: legacyAbsorbant,
   AddTypeToAttackerOnContactAbAttr: legacyAddType,
   AteConditionalStatusAbAttr: legacyAte,
   ChanceStatusOnHitAbAttr: legacyChanceStatus,
@@ -131,6 +141,8 @@ const LEGACY: Readonly<Record<string, (attr: Fields, params: Params) => boolean>
 
 const MOVES: readonly MoveId[] = [
   MoveId.TACKLE,
+  MoveId.DRAIN_PUNCH,
+  MoveId.GIGA_DRAIN,
   MoveId.EMBER,
   MoveId.FLAME_WHEEL,
   MoveId.WATER_GUN,
@@ -257,6 +269,11 @@ function observe(world: World, state: State, run: (params: Params) => boolean): 
   }
 }
 
+/** The target types the state space tries: Absorbant also needs a Grass target (it cannot be seeded). */
+function foeTypesFor(className: string): readonly (readonly PokemonType[] | undefined)[] {
+  return className === "AbsorbantAbAttr" ? [undefined, [PokemonType.GRASS]] : [undefined];
+}
+
 function sitesOf(className: string): AttrSite[] {
   // A studio carrier has its own canApply and is not a use of the class.
   return allAttrSites().filter(site => site.className === className && !Object.hasOwn(site.attr, "canApply"));
@@ -288,7 +305,7 @@ describe("B08 Tier B: the split is a pure move of code and every bound gate equa
         const attr = site.attr as unknown as Fields;
         const own = [attr.addedType, attr.newType].filter(t => t !== undefined) as PokemonType[];
         let siteTrue = 0;
-        for (const state of statesFor(own)) {
+        for (const state of statesFor(own, foeTypesFor(className))) {
           const before = observe(world, state, params => legacy(attr, params));
           const after = observe(world, state, params => site.attr.canApply(params as never));
           evaluations++;
@@ -334,7 +351,7 @@ describe("B08 Tier B: the split is a pure move of code and every bound gate equa
         const attr = site.attr as unknown as Fields;
         const own = [attr.addedType, attr.newType].filter(t => t !== undefined) as PokemonType[];
         let siteTrue = 0;
-        for (const state of statesFor(own)) {
+        for (const state of statesFor(own, foeTypesFor(className))) {
           const original = observe(world, state, params => site.attr.canApply(params as never));
           const library = observe(world, state, params => rebuilt.canApply(params as never));
           compared++;

@@ -423,6 +423,8 @@ const WHEN_TEMPLATE: Readonly<Record<string, string>> = {
   "cancel.infiltrate": t.hit,
   "calc.incoming-move": t.hit,
   "calc.outgoing-move": t.attack,
+  "calc.attack-stat": t.attack,
+  "calc.my-attack-matchup": t.attack,
   "while.active": t.flags,
 };
 

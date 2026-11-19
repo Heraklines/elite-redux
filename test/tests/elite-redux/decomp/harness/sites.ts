@@ -85,10 +85,21 @@ export function batchClassFilter(): ReadonlySet<string> | undefined {
   );
 }
 
-/** Sites whose class is in the batch (all sites when no batch is set). */
+/**
+ * A studio rule carrier: an attr whose canApply/apply/getCondition were replaced on the instance by the rule
+ * runtime (runtime-components.ts). Its behaviour is the composed rule, not the class's own rule, so a plain
+ * declaration rebuild of it would drop that rule. Identity and differential checks skip it; the twin run
+ * carries it over unchanged (rebuild.ts).
+ */
+export function isRuleCarrier(attr: AbAttr): boolean {
+  return Object.hasOwn(attr, "canApply");
+}
+
+/** Sites whose class is in the batch (all sites when no batch is set), without studio rule carriers. */
 export function batchSites(sites: readonly AttrSite[] = allAttrSites()): AttrSite[] {
   const filter = batchClassFilter();
-  return filter === undefined ? [...sites] : sites.filter(site => filter.has(site.className));
+  const inBatch = filter === undefined ? [...sites] : sites.filter(site => filter.has(site.className));
+  return inBatch.filter(site => !isRuleCarrier(site.attr));
 }
 
 /** Distinct ability ids that use at least one class of the batch, ascending. */

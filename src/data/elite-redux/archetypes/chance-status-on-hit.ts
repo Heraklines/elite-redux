@@ -78,7 +78,7 @@ import type { Move } from "#types/move-types";
  * holder "before any attack was made" (user-reported as Flame Body burning at
  * the start of battle / on switch-in).
  */
-const DAMAGING_HIT_RESULTS: ReadonlySet<HitResult> = new Set([
+export const DAMAGING_HIT_RESULTS: ReadonlySet<HitResult> = new Set([
   HitResult.EFFECTIVE,
   HitResult.SUPER_EFFECTIVE,
   HitResult.NOT_VERY_EFFECTIVE,

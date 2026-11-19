@@ -4,19 +4,14 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// B08 / calc-modifier (Tier C). PARKED: status legacy-closure-pending-request.
+// B08 / calc-modifier (Tier C).
 //
-// This file is written and complete, but it is deliberately NOT named `*.decl.ts`, so the registry glob does not pick
-// it up yet. Reason: the class extends only AbAttr and is never dispatched through applyAbAttrs. The engine finds it BY
-// CLASS NAME inside Pokemon.getAttackTypeEffectiveness (pokemon.ts, around line 4391):
-//   if (move && attr?.constructor?.name === "BoneMoveTypeChartAbAttr") attr.fire(move, multi)
-// next to the other registration-free type-chart scanners (OffensiveTypeChartOverrideAbAttr, WeatherGroundAirborneAbAttr,
-// MiracleBladeTypeChartAbAttr). No WHEN of WHEN_REGISTRY has this class or an ancestor as its dispatch key (the chain is
-// BoneMoveTypeChartAbAttr, AbAttr), so the L0 rule "the WHEN's dispatch key is the class or an ancestor" cannot be met,
-// and a batch may not edit the library (spec 6, step 3). The request is requests/B08.md R-B08-8.
-//
-// To finish: once the librarian has added the WHEN `calc.my-attack-matchup` (dispatch key BoneMoveTypeChartAbAttr, plus the
-// sibling scanners), rename this file to BoneMoveTypeChartAbAttr.decl.ts, make sure the id below matches, and run L0 / L1.
+// The class extends only AbAttr and is never dispatched through applyAbAttrs: the engine finds it BY CLASS NAME inside
+// Pokemon.getAttackTypeEffectiveness (field/pokemon.ts, around line 4391): `attr?.constructor?.name === "BoneMoveTypeChartAbAttr"` then
+// `attr.fire(move, multi)`, next to the other registration-free type-chart scanners.
+// The library trigger `calc.my-attack-matchup` carries the class's own name as its dispatch key (vocabulary/when-registry.ts), so the L0 rule
+// "the WHEN's dispatch key is the class or an ancestor" holds. L2 cannot reach it with a battle template (it is listed as
+// unreached in decomp-l2-reach.json), so the declaration carries an `l2StaticReason` and its own B08 test drives the engine-side call.
 //
 // What the class is (read from the source): no constructor argument (it calls super(false)), no closure, no random draw.
 // `canApply` is a constant true and `apply` is empty: the whole effect is `fire(move, multi)`, the type effectiveness
@@ -64,5 +59,5 @@ export default defineDecl(BoneMoveTypeChartAbAttr, {
     "The class is read by a by-name scan in the type-effectiveness calculation, not dispatched, so no trace event shows it evaluated. The B08 test (test/tests/elite-redux/decomp/B08/bone-move-type-chart.test.ts) calls fire() on the original and the rebuild for bone and non-bone moves and the multipliers 0, 0.25, 0.5, 1 and 2.",
   status: "decomposed",
   notes:
-    "Tier C, parked until the WHEN `calc.my-attack-matchup` exists (R-B08-8). Users (2): Bone Zone (5091 attr 0) and Cranisphere (6096 attr 0). Nothing to bind. showAbility is false. The engine passes `move` only when it is known, so a call without a move never reaches fire().",
+    "Tier C. WHEN `calc.my-attack-matchup` added to the library (R-B08-8 done). Users (2): Bone Zone (5091 attr 0) and Cranisphere (6096 attr 0). Nothing to bind. showAbility is false. The engine passes `move` only when it is known, so a call without a move never reaches fire().",
 });

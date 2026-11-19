@@ -11,15 +11,28 @@
 // settings of each user). The L1 differential evaluates the class's own gate and the compiled library gate over the
 // state grid and fails on any difference.
 //
-// Classes without a binding here: AbsorbantAbAttr, AllyAttackPowerBoostAbAttr and ChanceDodgeAbAttr (Tier C, no
-// constructor closure), AttackStatSubstituteAbAttr and BoneMoveTypeChartAbAttr (parked, no WHEN yet).
-import { bindCondition, bindLegacyClosure } from "#data/elite-redux/ability-studio/bindings";
+// Classes without a binding here: AllyAttackPowerBoostAbAttr and ChanceDodgeAbAttr (Tier C, no constructor closure),
+// AttackStatSubstituteAbAttr and BoneMoveTypeChartAbAttr (Tier C, nothing to bind).
+import { bindCondition } from "#data/elite-redux/ability-studio/bindings";
 
 // =============================================================================================
 // AddTypeToAttackerOnContactAbAttr (Tier B). Slot "gate": doesFlagEffectApply(MAKES_CONTACT, user: attacker, target: holder).
 // The residual (not Terastallized, does not have the type) stays in the class.
 // =============================================================================================
 bindCondition(5508, 1, { id: "move.flag", flag: "MAKES_CONTACT" }, "gate"); // Woodland Curse (adds Grass)
+
+// =============================================================================================
+// AbsorbantAbAttr (Tier B). Slot "gate", in the ORIGINAL clause order: the move drains (HitHealAttr), then the target is not
+// protected from added effects (Shield Dust). The residual (the target can receive Leech Seed) stays in the class.
+// =============================================================================================
+bindCondition(
+  5161,
+  0,
+  {
+    all: [{ id: "move.drains" }, { not: { id: "mon.protected-from-effects", who: "other" } }],
+  },
+  "gate",
+); // Absorbant
 
 // =============================================================================================
 // ChanceStatusOnHitAbAttr (Tier B). Slot "gate", in the ORIGINAL clause order:
@@ -54,16 +67,21 @@ bindCondition(
   "gate",
 );
 
-// The non-contact tier (contactExcluded): the move must INHERENTLY lack the contact flag (move.hasFlag, which ignores
-// the attacker's Long Reach) AND the hit result must be a damaging one (EFFECTIVE, SUPER_EFFECTIVE, NOT_VERY_EFFECTIVE,
-// ONE_HIT_KO). move.flag calls doesFlagEffectApply (user-aware), and no atom reads the hit result, so these four gates
-// stay legacy until requests/B08.md R-B08-1 and R-B08-2 exist.
-const NON_CONTACT_REASON =
-  "non-contact tier: needs an atom for the move's own contact flag that ignores the attacker's Long Reach (move.hasFlag) and an atom for 'the hit was a damaging one' (hit result in EFFECTIVE, SUPER_EFFECTIVE, NOT_VERY_EFFECTIVE, ONE_HIT_KO); requests/B08.md R-B08-1 and R-B08-2";
-bindLegacyClosure(9, 1, NON_CONTACT_REASON, "gate"); // Static: 10% paralysis on non-contact
-bindLegacyClosure(49, 1, NON_CONTACT_REASON, "gate"); // Flame Body: 20% burn on non-contact
-bindLegacyClosure(5358, 1, NON_CONTACT_REASON, "gate"); // White Noise: 10% paralysis on non-contact
-bindLegacyClosure(5733, 3, NON_CONTACT_REASON, "gate"); // Smoldering Wood: 20% burn on non-contact
+// The non-contact tier (contactExcluded), in the ORIGINAL clause order: the move must INHERENTLY lack the contact flag
+// (move.hasFlag, which ignores the attacker's Long Reach), the hit must be a damaging one (EFFECTIVE, SUPER_EFFECTIVE,
+// NOT_VERY_EFFECTIVE, ONE_HIT_KO, so a Growl never procs it), the attacker has no status, then the chance roll LAST.
+const nonContactStatusGate = (pct: number): unknown => ({
+  all: [
+    { not: { id: "move.inherent-flag", flag: "MAKES_CONTACT" } },
+    { id: "hit.landed-damage" },
+    { id: "status.has", who: "other", status: "NONE" },
+    { id: "rng.chance", pct },
+  ],
+});
+bindCondition(9, 1, nonContactStatusGate(10), "gate"); // Static: 10% paralysis on non-contact
+bindCondition(49, 1, nonContactStatusGate(20), "gate"); // Flame Body: 20% burn on non-contact
+bindCondition(5358, 1, nonContactStatusGate(10), "gate"); // White Noise: 10% paralysis on non-contact
+bindCondition(5733, 3, nonContactStatusGate(20), "gate"); // Smoldering Wood: 20% burn on non-contact
 
 // =============================================================================================
 // AteConditionalStatusAbAttr (Tier B). Slot "gate": holder.isOfType(T) && holder.getMoveType(move) === T, then (status and

@@ -19,7 +19,7 @@ import type { DeclRegistry } from "#data/elite-redux/ability-studio/decl-registr
 import { isAbsentOptional } from "#data/elite-redux/ability-studio/define-decl";
 import { WHEN_REGISTRY } from "#data/elite-redux/ability-studio/vocabulary/when-registry";
 import { mappedWhenIds, STATIC_WHEN_REASONS, TEMPLATES, templateForWhen } from "./scenarios";
-import type { AttrSite } from "./sites";
+import { type AttrSite, isRuleCarrier } from "./sites";
 import { probeProblems } from "./twin";
 
 /** lintDecl plus the harness-specific rules for every declaration. */
@@ -78,7 +78,13 @@ export function bindingProblems(sites: readonly AttrSite[], registry: DeclRegist
   const bound = new Set(allBindings().map(binding => `${binding.abilityId}:${binding.attrIndex}:${binding.slot}`));
   for (const site of sites) {
     const module = registry.get(site.className);
-    if (module === undefined || module.decl.status === "todo" || module.decl.kind === "package") {
+    // A studio rule carrier runs the composed rule, not the gate of the class: there is nothing of the class to bind there.
+    if (
+      module === undefined
+      || module.decl.status === "todo"
+      || module.decl.kind === "package"
+      || isRuleCarrier(site.attr)
+    ) {
       continue;
     }
     for (const slot of module.decl.conditions) {

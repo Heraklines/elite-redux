@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// B08 chunk 1, AttackStatSubstituteAbAttr (declaration PARKED until the WHEN calc.attack-stat exists, R-B08-7).
+// B08 chunk 1, AttackStatSubstituteAbAttr (live declaration, trigger calc.attack-stat).
 // The class is read by a duck-typed scan in the damage formula, so the shared L1 and L2 tests cannot see it. Here
-// every one of its 15 live users is rebuilt from the parked declaration (`buildAttr` with the params read back from
+// every one of its 15 live users is rebuilt from the live declaration (`buildAttr` with the params read back from
 // the live instance) and compared with the original: the read-back values, the structural fingerprint and the answer
 // of `resolveStat` for physical and special moves, with Attack above, equal to and below Sp. Atk.
 import { allMoves } from "#data/data-lists";
 import { buildAttr, readDeclParams } from "#data/elite-redux/ability-studio/build-attr";
-import pending from "#data/elite-redux/ability-studio/decl/B08/pending/AttackStatSubstituteAbAttr.decl.pending";
+import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
 import type { DeclModule } from "#data/elite-redux/ability-studio/define-decl";
 import type { AttackStatSubstituteAbAttr } from "#data/elite-redux/archetypes/attack-stat-substitute";
 import { MoveId } from "#enums/move-id";
@@ -22,9 +22,9 @@ import { allAttrSites } from "#test/tests/elite-redux/decomp/harness/sites";
 import Phaser from "phaser";
 import { beforeAll, describe, expect, it } from "vitest";
 
-const module = pending as DeclModule;
+const module = declRegistry.get("AttackStatSubstituteAbAttr") as DeclModule;
 
-describe("B08: attack stat substitution (AttackStatSubstituteAbAttr, parked declaration)", () => {
+describe("B08: attack stat substitution (AttackStatSubstituteAbAttr)", () => {
   let phaserGame: Phaser.Game;
   beforeAll(() => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });

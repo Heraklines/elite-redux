@@ -10,6 +10,7 @@
 
 import { hpCrossedBelow } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { DAMAGING_HIT_RESULTS } from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { Gender } from "#data/gender";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import { SpeciesFormChangeManualTrigger } from "#data/pokemon-forms/form-change-triggers";
@@ -224,6 +225,12 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
       && compare(defender.getMoveEffectiveness(frame.moveUser, frame.move), p.cmp as CompareOp, Number(p.n))
     );
   },
+  "move.inherent-flag": p => {
+    const flag = enumValue(MoveFlags, String(p.flag), "move property") as MoveFlags;
+    return frame => frame.move?.hasFlag(flag) ?? false;
+  },
+  "move.drains": () => frame => frame.move?.hasAttr("HitHealAttr") ?? false,
+  "hit.landed-damage": () => frame => frame.hitResult !== undefined && DAMAGING_HIT_RESULTS.has(frame.hitResult),
   "move.has-effect-chance": () => frame => frame.move !== undefined && frame.move.chance >= 0,
   "move.is-move": p => {
     const id = enumValue(MoveId, String(p.moveId), "move");
@@ -410,6 +417,8 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
     const ability = enumValue(AbilityId, String(p.ability), "ability") as AbilityId;
     return frame => holderLikeOf(frame, String(p.who))?.hasAbility(ability) ?? false;
   },
+  "mon.protected-from-effects": p => frame =>
+    holderLikeOf(frame, String(p.who))?.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr") ?? false,
   "mon.ability-ignorable": () => frame => frame.holder.getAbility().ignorable,
   "mon.in-form": p => frame => holderLikeOf(frame, String(p.who))?.getFormKey() === String(p.key),
   "mon.can-change-form": p => frame => {

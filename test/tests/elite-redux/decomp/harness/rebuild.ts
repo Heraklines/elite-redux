@@ -23,6 +23,7 @@ import { recomposeAttr } from "#data/elite-redux/ability-studio/build-attr";
 import type { DeclRegistry } from "#data/elite-redux/ability-studio/decl-registry";
 import type { ParamValues } from "#data/elite-redux/ability-studio/vocabulary/params";
 import { AbilityId } from "#enums/ability-id";
+import { isRuleCarrier } from "#test/tests/elite-redux/decomp/harness/sites";
 
 export const SHADOW_ID_BASE = 29000;
 
@@ -71,6 +72,15 @@ export function rebuildAbility(original: Ability, shadowId: number, options: Reb
       return;
     }
     const module = options.registry.get(attr.constructor.name);
+    if (isRuleCarrier(attr)) {
+      carried.push({
+        attrIndex,
+        className: attr.constructor.name,
+        reason: "studio rule carrier: its behaviour is the composed rule, not the class's own rule",
+      });
+      builder.attrs.push(attr);
+      return;
+    }
     if (module === undefined) {
       carried.push({ attrIndex, className: attr.constructor.name, reason: "the class has no declaration" });
       builder.attrs.push(attr);

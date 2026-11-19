@@ -4,18 +4,14 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// B08 / calc-modifier (Tier C). PARKED: status legacy-closure-pending-request.
+// B08 / calc-modifier (Tier C).
 //
-// This file is written and complete, but it is deliberately NOT named `*.decl.ts`, so the registry glob does not pick
-// it up yet. Reason: the class extends only AbAttr and is never dispatched through applyAbAttrs. The engine finds it BY
-// NAME-LESS DUCK TYPING inside Pokemon.getBaseDamage (pokemon.ts, around line 5612): it scans the attacker's
-// `getAllActiveAbilityAttrs()` for any attr that has a `resolveStat` function and calls
-// `attr.resolveStat(move, isPhysical, source)`. No WHEN of WHEN_REGISTRY has the class or an ancestor as its dispatch key
-// (the chain is AttackStatSubstituteAbAttr, AbAttr), so the L0 rule "the WHEN's dispatch key is the class or an ancestor"
-// cannot be met, and a batch may not edit the library (spec 6, step 3). The request is requests/B08.md R-B08-7.
-//
-// To finish: once the librarian has added the WHEN `calc.attack-stat` (dispatch key AttackStatSubstituteAbAttr), rename this
-// file to AttackStatSubstituteAbAttr.decl.ts, make sure the id below matches, and run L0 / L1 for the class.
+// The class extends only AbAttr and is never dispatched through applyAbAttrs: Pokemon.getBaseDamage (field/pokemon.ts, around line 5612) scans
+// the attacker's `getAllActiveAbilityAttrs()` for any attr that has a `resolveStat` function and calls
+// `attr.resolveStat(move, isPhysical, source)`.
+// The library trigger `calc.attack-stat` carries the class's own name as its dispatch key (vocabulary/when-registry.ts), so the L0 rule
+// "the WHEN's dispatch key is the class or an ancestor" holds. L2 cannot reach it with a battle template (it is listed as
+// unreached in decomp-l2-reach.json), so the declaration carries an `l2StaticReason` and its own B08 test drives the engine-side call.
 //
 // What the class is (read from the source and from the 15 live users): one options object, no closure, no random draw.
 //   resolveStat(move, isPhysical, source), in order:
@@ -190,5 +186,5 @@ export default defineDecl(AttackStatSubstituteAbAttr, {
     "The class is read by a duck-typed scan inside the damage formula (Pokemon.getBaseDamage), not dispatched, so no trace event shows it evaluated. The B08 test (test/tests/elite-redux/decomp/B08/attack-stat-substitute.test.ts) compares resolveStat of the original and the rebuild over every grid move, both categories and several Attack / Sp. Atk orders.",
   status: "decomposed",
   notes:
-    "Tier C, the whole decision lives in resolveStat. Parked until the WHEN `calc.attack-stat` exists (R-B08-7). 15 users: Ancient Idol (Def / Sp. Def), Momentum (Speed on contact), Equinox, Magistrate, Formless Fist (punch flag), Mimicry (terrain moves, higher), Subversion (lower), Mind Crunch, Megabite, Gnashing Cannon (biting, Sp. Atk), Magical Fists (punching), Mythical Arrows, Kagutsuchi (arrow), Energy Horns (horn), Magic Touch (Sp. Atk on contact for both kinds of move). Nothing to bind. showAbility is false for every user (the class passes false to AbAttr). Related by-name classes RelativityAbAttr and the subversion category half are separate classes.",
+    "Tier C, the whole decision lives in resolveStat. WHEN `calc.attack-stat` added to the library (R-B08-7 done). 15 users: Ancient Idol (Def / Sp. Def), Momentum (Speed on contact), Equinox, Magistrate, Formless Fist (punch flag), Mimicry (terrain moves, higher), Subversion (lower), Mind Crunch, Megabite, Gnashing Cannon (biting, Sp. Atk), Magical Fists (punching), Mythical Arrows, Kagutsuchi (arrow), Energy Horns (horn), Magic Touch (Sp. Atk on contact for both kinds of move). Nothing to bind. showAbility is false for every user (the class passes false to AbAttr). Related by-name classes RelativityAbAttr and the subversion category half are separate classes.",
 });

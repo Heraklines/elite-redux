@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// B08 / calc-modifier, Tier C. Read from the source (archetypes/chance-dodge.ts):
+// B08 / calc-modifier, Tier C, status exempt (the engine never dispatches the class, see notes). Read from the source (archetypes/chance-dodge.ts):
 //
 //   canApply, in order:
 //     1. attacker === holder, or the move is not an AttackMove  -> false          (feasibility: never dodge my own move or a status move)
@@ -77,9 +77,7 @@ export default defineDecl(ChanceDodgeAbAttr, {
       axes: { foeMove: ["TACKLE", "SURF", "GROWL"] },
     },
   ],
-  l2StaticReason:
-    "calc.incoming-move (the PreDefendAbAttr base class) has no dispatch call site: the engine never asks for this class (see notes), so no battle can evaluate the attr. The B08 test (test/tests/elite-redux/decomp/B08/chance-dodge.test.ts) drives canApply and apply on the original and the rebuild with the random draws recorded, and proves with a spy that a real battle never calls the attr.",
-  status: "decomposed",
+  status: "exempt",
   notes:
-    "SUSPECTED GAME BUG, NOT FIXED: nothing ever dispatches this class. PreDefendAbAttr is excluded from the callable attr strings (@types/ability-types.ts) and no engine site scans for ChanceDodgeAbAttr by name, so Ole! (5304) has no effect in battle; the dispatcher comment says the primitive 'does the correct thing', which holds only if it were called. A spy in the B08 test confirms zero canApply calls over a real battle. Tier C because the chance roll must stay with the dodge it gates. `simulated`: canApply rolls even for a simulated call and apply ignores it. User: Ole! (5304, attr 0), nothing to bind.",
+    "EXEMPT UNTIL THE OWNER DECIDES (request R-B08-10, dispatch): the declaration below is faithful to the class, but L2 cannot evaluate the attr in a battle because nothing dispatches it, so it is NOT claimed as decomposed and verified. The B08 test (test/tests/elite-redux/decomp/B08/chance-dodge.test.ts) drives canApply and apply on the original and the rebuild draw for draw, and proves with a spy that a real battle never calls the attr. Once the engine dispatches PreDefendAbAttr (or scans for the class), set the status back to decomposed and run L2. SUSPECTED GAME BUG, NOT FIXED: nothing ever dispatches this class. PreDefendAbAttr is excluded from the callable attr strings (@types/ability-types.ts) and no engine site scans for ChanceDodgeAbAttr by name, so Ole! (5304) has no effect in battle; the dispatcher comment says the primitive 'does the correct thing', which holds only if it were called. A spy in the B08 test confirms zero canApply calls over a real battle. Tier C because the chance roll must stay with the dodge it gates. `simulated`: canApply rolls even for a simulated call and apply ignores it. User: Ole! (5304, attr 0), nothing to bind.",
 });
