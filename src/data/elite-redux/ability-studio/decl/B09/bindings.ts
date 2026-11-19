@@ -81,3 +81,114 @@ bindLegacyClosure(5288, 0, `${NO_MOVE_YET} (Rapid Response, Speed 1.5)`, "gate")
 bindLegacyClosure(5288, 1, `${NO_MOVE_YET} (Rapid Response, Sp. Atk 1.2)`, "gate");
 bindLegacyClosure(5467, 1, `${NO_MOVE_YET} (Champion's Entrance, Speed 1.5)`, "gate");
 bindLegacyClosure(5467, 2, `${NO_MOVE_YET} (Champion's Entrance, Attack 1.2)`, "gate");
+
+// =============================================================================================
+// B09 chunk 3. The Tier B gates of HealStatusOnMoveTypeAbAttr, HitMultiplierAbAttr and HitMultiplierPowerAbAttr.
+// Every line was written by hand after reading archetypes/heal-status-on-move-type.ts and archetypes/hit-multiplier.ts and the live
+// attrs of all users (a throwaway dump of allAttrSites(): filter, extraStrikes, multiplier, extraStrikesOnly, extraCondition).
+// The other five classes of the chunk have no condition slot, so they have nothing to bind.
+// =============================================================================================
+
+// ---------------------------------------------------------------------------------------------
+// HealStatusOnMoveTypeAbAttr. Slot gate: `super.canApply` (the move is not a status move) AND `getMoveType(move) === moveType`.
+// ---------------------------------------------------------------------------------------------
+// move.damaging is matchesAbilityStudioMoveFilter(user, move, { damaging: true }): `move.category !== STATUS`, the parent's default test.
+// move.type with effective on is `moveUser.getMoveType(move) === PokemonType[type]`, the same call. The residual (a curable status) stays in the class.
+bindCondition(
+  72,
+  3,
+  { all: [{ id: "move.damaging" }, { id: "move.type", type: "FIGHTING", effective: true }] },
+  "gate",
+); // Vital Spirit
+
+// ---------------------------------------------------------------------------------------------
+// HitMultiplierAbAttr (calc.hit-count) and HitMultiplierPowerAbAttr (calc.damage-dealt). Slot gate: `matchesFilter(filter, pokemon, move)`.
+//   - type set:    `pokemon.getMoveType(move) === type`                          -> move.type with effective on (same call)
+//   - flag set:    `move.doesFlagEffectApply({ flag, user: pokemon })`           -> move.flag (same call; the atom also passes the foe as
+//                  the target, which doesFlagEffectApply reads only for contact and ignore-abilities, never filtered on here)
+//   - flagsAny:    some of the flags, each through doesFlagEffectApply           -> any of move.flag
+//   - empty:       always true                                                   -> { all: [] }
+// The strike test of HitMultiplierPowerAbAttr (extraStrikesOnly) is the class's residual, not part of any binding.
+// ---------------------------------------------------------------------------------------------
+const MASK_FILTER =
+  "the filter is ONE combined flag mask (Pulse | Slicing) tested with a single doesFlagEffectApply call, and flag injectors compare the flag by equality (Rapier turns horn into slicing), so two move.flag atoms in an any would differ when such an injector is on the holder; no library atom tests a combined mask; request R-B09-12";
+
+// --- HitMultiplierAbAttr gates
+bindCondition(5057, 0, { id: "move.flag", flag: "PUNCHING_MOVE" }, "gate"); // Raging Boxer
+bindCondition(5096, 0, { all: [] }, "gate"); // Hyper Aggressive, every move
+bindCondition(5096, 2, { all: [] }, "gate"); // Hyper Aggressive, second instance (carries the 'enraged' attr condition)
+bindCondition(5156, 0, { id: "move.flag", flag: "BITING_MOVE" }, "gate"); // Primal Maw
+bindLegacyClosure(5169, 0, `${MASK_FILTER} (Dual Wield, Pulse or Slicing)`, "gate");
+bindCondition(5184, 0, { id: "move.type", type: "FIRE", effective: true }, "gate"); // Raging Moth
+bindCondition(5249, 1, { id: "move.flag", flag: "BITING_MOVE" }, "gate"); // Devourer
+bindCondition(5346, 0, { id: "move.flag", flag: "HAMMER_BASED" }, "gate"); // Jackhammer
+bindCondition(5348, 0, { id: "move.type", type: "ICE", effective: true }, "gate"); // Ice Cold Hunter (weather condition is the attr's own)
+bindCondition(5404, 0, { id: "move.flag", flag: "PUNCHING_MOVE" }, "gate"); // Steel Beetle
+bindCondition(5424, 1, { all: [] }, "gate"); // Raging Goddess
+bindCondition(5424, 3, { all: [] }, "gate"); // Raging Goddess, enraged instance
+bindCondition(5456, 1, { all: [] }, "gate"); // Balloon Blitz
+bindCondition(5456, 3, { all: [] }, "gate"); // Balloon Blitz, enraged instance
+bindCondition(5491, 0, { all: [] }, "gate"); // Frenzied Phantom
+bindCondition(5491, 3, { all: [] }, "gate"); // Frenzied Phantom, enraged instance
+bindCondition(5493, 1, { id: "move.flag", flag: "BITING_MOVE" }, "gate"); // Metallic Jaws
+bindCondition(5547, 2, { id: "move.flag", flag: "SLICING_MOVE" }, "gate"); // Magus Blades
+bindCondition(5661, 0, { all: [] }, "gate"); // Witch Broom
+bindCondition(5661, 5, { all: [] }, "gate"); // Witch Broom, enraged instance
+bindCondition(5700, 0, { all: [] }, "gate"); // Ghost Frenzy
+bindCondition(5700, 3, { all: [] }, "gate"); // Ghost Frenzy, enraged instance
+bindCondition(5959, 2, { id: "move.flag", flag: "HORN_BASED" }, "gate"); // Grievous Spear
+bindCondition(5963, 0, { id: "move.flag", flag: "HORN_BASED" }, "gate"); // Savage Spear
+bindCondition(5966, 0, { id: "move.flag", flag: "PUNCHING_MOVE" }, "gate"); // Formless Fist
+bindLegacyClosure(5996, 2, `${MASK_FILTER} (Minigun, Pulse or Slicing)`, "gate");
+bindCondition(6039, 0, { id: "move.flag", flag: "BITING_MOVE" }, "gate"); // Dogged Jaw
+bindLegacyClosure(6086, 0, `${MASK_FILTER} (Two-Chambered, Pulse or Slicing)`, "gate");
+bindCondition(
+  6091,
+  0,
+  {
+    any: [
+      { id: "move.flag", flag: "KICKING_MOVE" },
+      { id: "move.flag", flag: "ARROW_BASED" },
+    ],
+  },
+  "gate",
+); // Flurry
+bindCondition(6094, 0, { id: "move.flag", flag: "PUNCHING_MOVE" }, "gate"); // Twin Lion Fists
+bindCondition(6103, 1, { id: "move.flag", flag: "BITING_MOVE" }, "gate"); // World-Eater
+
+// --- HitMultiplierPowerAbAttr gates (same filters as the partner attr of the same ability)
+bindCondition(5057, 1, { id: "move.flag", flag: "PUNCHING_MOVE" }, "gate"); // Raging Boxer
+bindCondition(5096, 1, { all: [] }, "gate"); // Hyper Aggressive
+bindCondition(5156, 1, { id: "move.flag", flag: "BITING_MOVE" }, "gate"); // Primal Maw
+bindLegacyClosure(5169, 1, `${MASK_FILTER} (Dual Wield, Pulse or Slicing)`, "gate");
+bindCondition(5184, 1, { id: "move.type", type: "FIRE", effective: true }, "gate"); // Raging Moth
+bindCondition(5249, 2, { id: "move.flag", flag: "BITING_MOVE" }, "gate"); // Devourer
+bindCondition(5346, 1, { id: "move.flag", flag: "HAMMER_BASED" }, "gate"); // Jackhammer
+bindCondition(5404, 1, { id: "move.flag", flag: "PUNCHING_MOVE" }, "gate"); // Steel Beetle
+bindCondition(5424, 2, { all: [] }, "gate"); // Raging Goddess
+bindCondition(5456, 2, { all: [] }, "gate"); // Balloon Blitz
+bindCondition(5491, 1, { all: [] }, "gate"); // Frenzied Phantom
+bindCondition(5493, 2, { id: "move.flag", flag: "BITING_MOVE" }, "gate"); // Metallic Jaws
+bindCondition(5547, 3, { id: "move.flag", flag: "SLICING_MOVE" }, "gate"); // Magus Blades
+bindCondition(5661, 1, { all: [] }, "gate"); // Witch Broom
+bindCondition(5700, 1, { all: [] }, "gate"); // Ghost Frenzy
+bindCondition(5959, 3, { id: "move.flag", flag: "HORN_BASED" }, "gate"); // Grievous Spear
+bindCondition(5963, 1, { id: "move.flag", flag: "HORN_BASED" }, "gate"); // Savage Spear
+bindCondition(5966, 1, { id: "move.flag", flag: "PUNCHING_MOVE" }, "gate"); // Formless Fist
+bindLegacyClosure(5996, 3, `${MASK_FILTER} (Minigun, Pulse or Slicing)`, "gate");
+bindCondition(6039, 1, { id: "move.flag", flag: "BITING_MOVE" }, "gate"); // Dogged Jaw
+bindCondition(6050, 1, { all: [] }, "gate"); // Contaminated (its partner ContaminatedHitMultiplierAbAttr is B16)
+bindLegacyClosure(6086, 1, `${MASK_FILTER} (Two-Chambered, Pulse or Slicing)`, "gate");
+bindCondition(
+  6091,
+  1,
+  {
+    any: [
+      { id: "move.flag", flag: "KICKING_MOVE" },
+      { id: "move.flag", flag: "ARROW_BASED" },
+    ],
+  },
+  "gate",
+); // Flurry
+bindCondition(6094, 1, { id: "move.flag", flag: "PUNCHING_MOVE" }, "gate"); // Twin Lion Fists
+bindCondition(6103, 2, { id: "move.flag", flag: "BITING_MOVE" }, "gate"); // World-Eater

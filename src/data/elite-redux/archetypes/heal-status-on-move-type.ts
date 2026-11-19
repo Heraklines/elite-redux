@@ -22,6 +22,7 @@
 import { PostAttackAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { getStatusEffectHealText } from "#data/status-effect";
 import type { PokemonType } from "#enums/pokemon-type";
 import { StatusEffect } from "#enums/status-effect";
@@ -34,18 +35,34 @@ export class HealStatusOnMoveTypeAbAttr extends PostAttackAbAttr {
     super();
   }
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1): `gate`, then `residual`, in the original clause order (the move test first,
+   * the curable-status test second). There is no `guards` and no `prepare`.
+   */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /**
+   * The replaceable condition: the parent's own test (a damaging move) and the move's effective type is the configured
+   * one. The effective type respects the holder's type-changing abilities, e.g. -ate abilities. Moved verbatim from
+   * `canApply`.
+   */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
     if (!super.canApply(params)) {
       return false;
     }
     const { pokemon, move } = params;
-    // Resolve the move's effective type (respects the holder's type-changing
-    // abilities, e.g. -ate abilities) and require a curable primary status.
+    return pokemon.getMoveType(move) === this.moveType;
+  }
+
+  /** Feasibility that stays in the class: there is a curable primary status to remove. Moved verbatim from `canApply`. */
+  public residual({ pokemon }: PostMoveInteractionAbAttrParams): boolean {
     return (
-      pokemon.getMoveType(move) === this.moveType
-      && !!pokemon.status
-      && pokemon.status.effect !== StatusEffect.NONE
-      && pokemon.status.effect !== StatusEffect.FAINT
+      !!pokemon.status && pokemon.status.effect !== StatusEffect.NONE && pokemon.status.effect !== StatusEffect.FAINT
     );
   }
 

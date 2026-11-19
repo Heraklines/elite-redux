@@ -69,7 +69,13 @@
 //     (1st hit 100%, 2nd hit 25%)
 // =============================================================================
 
-import { AddSecondStrikeAbAttr, type AddSecondStrikeAbAttrParams, MoveDamageBoostAbAttr } from "#abilities/ab-attrs";
+import {
+  AddSecondStrikeAbAttr,
+  type AddSecondStrikeAbAttrParams,
+  MoveDamageBoostAbAttr,
+  type PreAttackModifyDamageAbAttrParams,
+} from "#abilities/ab-attrs";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { MoveFlags } from "#enums/move-flags";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { Pokemon } from "#field/pokemon";
@@ -155,15 +161,25 @@ export class HitMultiplierAbAttr extends AddSecondStrikeAbAttr {
     return this.filter;
   }
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AddSecondStrikeAbAttrParams) => boolean) | undefined;
+
   /**
-   * canApply: the parent's `canBeMultiStrikeEnhanced` predicate AND our
-   * configured filter. Both must pass for the extra strike(s) to fire.
+   * Tier B split (ability studio spec 3.1): `guards` (the parent's `canBeMultiStrikeEnhanced` predicate), then `gate`
+   * (our configured filter), in the original clause order. Both must pass for the extra strike(s) to fire.
    */
   public override canApply(params: AddSecondStrikeAbAttrParams): boolean {
-    if (!super.canApply(params)) {
-      return false;
-    }
-    return HitMultiplierAbAttr.matchesFilter(this.filter, params.pokemon, params.move);
+    return gatedCanApply<AddSecondStrikeAbAttrParams>(this, params);
+  }
+
+  /** The move can be enhanced by a multi-strike ability at all (the parent's own test). Moved verbatim from `canApply`. */
+  public guards(params: AddSecondStrikeAbAttrParams): boolean {
+    return super.canApply(params);
+  }
+
+  /** The replaceable condition: the move matches the configured filter. Moved verbatim from `canApply`. */
+  public gate({ pokemon, move }: AddSecondStrikeAbAttrParams): boolean {
+    return HitMultiplierAbAttr.matchesFilter(this.filter, pokemon, move);
   }
 
   /**
@@ -248,6 +264,9 @@ export interface HitMultiplierPowerOptions {
  * uniformly (Raging Moth's "both Fire hits at 70%"). The strike index is read
  * from `pokemon.turnData.{hitCount,hitsLeft}` per dispatch.
  */
+/** The 0-based number of the strike being dealt right now (0 = the first strike). Shared by the closure and `residual`. */
+const strikeIndexOf = (pokemon: Pokemon): number => pokemon.turnData.hitCount - pokemon.turnData.hitsLeft;
+
 export class HitMultiplierPowerAbAttr extends MoveDamageBoostAbAttr {
   private readonly powerMultiplier: number;
   private readonly powerFilter: HitMultiplierFilter;
@@ -279,14 +298,35 @@ export class HitMultiplierPowerAbAttr extends MoveDamageBoostAbAttr {
         return false;
       }
       if (extraStrikesOnly) {
-        const strikeIndex = pokemon.turnData.hitCount - pokemon.turnData.hitsLeft; // 0-based
-        return strikeIndex > 0;
+        return strikeIndexOf(pokemon) > 0;
       }
       return true;
     });
     this.powerMultiplier = opts.multiplier;
     this.powerFilter = filter;
     this.extraStrikesOnly = extraStrikesOnly;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreAttackModifyDamageAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1): `gate` (the move matches the filter), then `residual` (when `extraStrikesOnly`,
+   * it is the 2nd or a later strike), in the order of the constructor closure the parent used to call. There is no
+   * `guards` and no `prepare`. The closure given to `super` above is kept as it was and is no longer called.
+   */
+  public override canApply(params: PreAttackModifyDamageAbAttrParams): boolean {
+    return gatedCanApply<PreAttackModifyDamageAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the move matches the configured filter. Moved verbatim from the closure. */
+  public gate({ pokemon, move }: PreAttackModifyDamageAbAttrParams): boolean {
+    return HitMultiplierAbAttr.matchesFilter(this.powerFilter, pokemon, move);
+  }
+
+  /** The "only the extra strikes" test; the setting `extraStrikesOnly` switches it off. Moved verbatim from the closure. */
+  public residual({ pokemon }: PreAttackModifyDamageAbAttrParams): boolean {
+    return !this.extraStrikesOnly || strikeIndexOf(pokemon) > 0;
   }
 
   /** Whether this multiplier applies only to the extra (2nd+) strikes. */

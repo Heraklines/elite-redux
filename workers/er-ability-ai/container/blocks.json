@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "06a0e987b264fc",
+  "hash": "1f9bc9c3c37acc",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -619,6 +619,48 @@
       "uses": 1
     },
     {
+      "id": "block.flare-boost-self-burn-on-weather-change",
+      "className": "FlareBoostSelfBurnOnWeatherChangeAbAttr",
+      "label": "Burn myself when the weather turns to fog",
+      "summary": "When the weather changes to fog (Eerie Fog or normal fog) while I am out, I get burned, unless I already have a status or my type cannot be burned.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.weather-changed",
+      "whenLabel": "When the weather changes",
+      "synonyms": [
+        "flare boost",
+        "self burn",
+        "ignite in fog",
+        "burn when fog starts",
+        "burn myself",
+        "fog burns me"
+      ],
+      "examples": [
+        "Burn myself the moment fog rolls in, like Flare Boost"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The new weather must be fog (Eerie Fog or normal fog)",
+        "Fog must still be the weather when the burn is dealt",
+        "I must not have fainted or already have a status",
+        "My type must be able to be burned (a Fire type is not)",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.inflict-status",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.float",
       "className": "FloatAbAttr",
       "label": "I float above the ground",
@@ -651,6 +693,498 @@
         "do": true
       },
       "uses": 5
+    },
+    {
+      "id": "block.foe-strongest-stat-self-boost",
+      "className": "FoeStrongestStatSelfBoostAbAttr",
+      "label": "Raise a defense that matches the foe's stronger attack",
+      "summary": "When I enter the battle, I raise my Defense by 2 stages if the foes' Attack is at least as high as their Sp. Atk, otherwise my Sp. Def.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "spyware",
+        "counter the foe's best attack",
+        "read the foe",
+        "adapt defense",
+        "raise defense by the foe's attack type",
+        "scout the foe"
+      ],
+      "examples": [
+        "Sharply raise Defense if the foes hit physically, or Sp. Def if they hit specially, like Spyware"
+      ],
+      "params": [
+        {
+          "id": "stages",
+          "label": "Number of stages (1-6)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 6,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "physicalCounter",
+          "label": "Stat I raise when the foes' Attack is the higher one",
+          "control": "select",
+          "default": "DEF",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ]
+        },
+        {
+          "id": "specialCounter",
+          "label": "Stat I raise when the foes' Sp. Atk is the higher one",
+          "control": "select",
+          "default": "SPDEF",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one foe must still be standing",
+        "The foes' highest Attack and highest Sp. Atk are compared; a tie counts as Attack",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "stages",
+          "physicalCounter",
+          "specialCounter"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package, justified: the stat that gets raised is picked inside apply from the highest Attack and highest Sp. Atk among the standing foes, so there is no plain condition to pull out and no fixed stat for the stat-stage effect. 1 attr: Spyware (5597 attr 0: stages 2, Defense, Sp. Def). The three settings sit together in the private `opts` object, so each param reads it through `path: opts` with its own codec. Behaviour kept as it is: showAbility is always true, so the popup shows on entry even when no foe stands (canApply is false then, so it does not); the comparison uses the highest value of each stat ACROSS foes, which can mix two different foes; a tie goes to the physical answer. Oddity, not fixed: the stats are read with getStat(stat, false), i.e. without stat stages. The raise goes through a normal StatStageChangePhase on the holder itself.",
+      "uses": 1
+    },
+    {
+      "id": "block.force-foe-out-on-inactivity",
+      "className": "ForceFoeOutOnInactivityAbAttr",
+      "label": "Send a foe out if it has not attacked for several turns",
+      "summary": "At the end of each turn I count the turns a foe goes without using a damaging move. After 3 turns in a row, that foe is forced out and its count starts again.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "strikeout",
+        "punish passive play",
+        "force a foe to switch",
+        "stall breaker",
+        "kick out idle foe",
+        "no attack no stay"
+      ],
+      "examples": [
+        "Force a foe out after 3 turns without an attack, like Strikeout"
+      ],
+      "params": [
+        {
+          "id": "turns",
+          "label": "Turns without a damaging move before the foe is sent out (1-10)",
+          "control": "number",
+          "default": 3,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one foe must still be standing",
+        "Only damaging moves count as an attack; a status move or doing nothing counts as idle",
+        "The foe must be able to be switched out (the same checks as a forced switch)",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package, justified: the class keeps one idle counter and one history mark PER FOE (Symbols on the foe object), advances them on every end of turn and then forces the switch, which is memory plus effect. 1 attr: Strikeout (5614 attr 0, turns 3). The `idleTurns(foe)` helper exists only for tests. Oddities, not fixed: (a) the counters live on the foe's object and are never cleared when that foe leaves the field on its own, so a foe that switches out and back in resumes its old count although the comment says a fresh foe starts clean; (b) the two Symbols are shared by every holder of this class, so two holders in one battle would both advance the same counter each turn (the second sees no new history, counts the turn as idle and adds one more); (c) the attack test looks at move-history entries, so a foe that is asleep or flinched adds no entry and counts as idle. Simulated calls do nothing.",
+      "uses": 1
+    },
+    {
+      "id": "block.ground-entry-hazard-immunity",
+      "className": "GroundEntryHazardImmunityAbAttr",
+      "label": "Ignore Stealth Rock and Spikes while I am a Ground type",
+      "summary": "While I have this and I am a Ground type, I take no damage from Stealth Rock or Spikes when I enter. Other hazards still work.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "tectonize",
+        "rock and spikes immunity",
+        "hazard immunity",
+        "stealth rock immune",
+        "spikes immune",
+        "ground hazard guard"
+      ],
+      "examples": [
+        "A Ground type that switches in without taking Stealth Rock or Spikes damage, like Tectonize"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "I must be a Ground type at the moment the hazard triggers; the hazard itself checks this",
+        "Only Spikes and Stealth Rock are ignored, not Toxic Spikes, Sticky Web or other hazards"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.heal-status-on-move-type",
+      "className": "HealStatusOnMoveTypeAbAttr",
+      "label": "Cure my status after I use a move of one type",
+      "summary": "After I use a damaging Fighting-type move, any status condition I have is cured right away. Example: Fighting moves cure my burn, poison or paralysis.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "vital spirit",
+        "cure status on attack",
+        "heal status after move",
+        "cleanse by attacking",
+        "remove burn when i attack",
+        "status wipe"
+      ],
+      "examples": [
+        "Cure my status after I use a Fighting move, like Vital Spirit in Elite Redux"
+      ],
+      "params": [
+        {
+          "id": "moveType",
+          "label": "Type of move that cures me",
+          "control": "select",
+          "default": "FIGHTING",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "I must have a status condition to cure (not fainted)",
+        "Does nothing in a simulated preview"
+      ],
+      "gateParams": [
+        {
+          "param": "moveType",
+          "block": "move.type",
+          "field": "type"
+        }
+      ],
+      "effect": {
+        "id": "effect.cure-status",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.hit-multiplier",
+      "className": "HitMultiplierAbAttr",
+      "label": "Make some of my moves hit extra times",
+      "summary": "My matching damaging moves hit 1 extra time(s); 1 means twice in total, like Parental Bond. Charging, status and multi-hit moves are left alone.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.hit-count",
+      "whenLabel": "While the game decides how many times a move hits",
+      "synonyms": [
+        "parental bond",
+        "hit twice",
+        "double hit",
+        "extra strike",
+        "multi hit",
+        "second hit",
+        "raging boxer",
+        "dual wield",
+        "hit again"
+      ],
+      "examples": [
+        "Punching moves hit twice, like Raging Boxer",
+        "Fire moves hit twice, like Raging Moth",
+        "Every damaging move hits twice, like Hyper Aggressive"
+      ],
+      "params": [
+        {
+          "id": "extraStrikes",
+          "label": "Extra hits (1 = the move hits twice in total)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 4,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "filter",
+          "label": "Which moves get the extra hits (set by the move condition)",
+          "control": "text",
+          "default": "any move",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must be one a multi-hit ability can add hits to: not a status move, a charging move (unless I skip the charge), a move aimed at several foes, a move that already hits many times, or Fling, Uproar, Rollout, Ice Ball and Endeavor"
+      ],
+      "effect": {
+        "id": "effect.hit-n-times",
+        "params": [
+          "extraStrikes"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 31
+    },
+    {
+      "id": "block.hit-multiplier-power",
+      "className": "HitMultiplierPowerAbAttr",
+      "label": "Make my extra hits deal less damage",
+      "summary": "The damage of my matching hits is multiplied by 0.4 (0.4 = 40% of normal). Only the second and later hits are weaker; the first hit stays at full damage.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.damage-dealt",
+      "whenLabel": "While the game calculates damage I deal",
+      "synonyms": [
+        "weaker second hit",
+        "reduced extra hit",
+        "raging boxer",
+        "hyper aggressive",
+        "extra hit damage",
+        "second hit power",
+        "scale down multi hit"
+      ],
+      "examples": [
+        "The second hit of my punching moves deals 40% damage, like Raging Boxer",
+        "Both hits of my Fire moves deal 70% damage, like Raging Moth"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Damage multiplier of the weaker hits (0.4 = 40% of normal, at most 1)",
+          "control": "slider",
+          "default": 0.4,
+          "editable": true,
+          "min": 0.05,
+          "max": 1,
+          "step": 0.05,
+          "gateIndependent": true
+        },
+        {
+          "id": "extraStrikesOnly",
+          "label": "Only the 2nd and later hits are weaker (off = every hit is weaker)",
+          "control": "boolean",
+          "default": true,
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "filter",
+          "label": "Which moves get weaker hits (set by the move condition)",
+          "control": "text",
+          "default": "any move",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "When only the extra hits are weaker, the hit being dealt must be the 2nd or a later one of the move",
+        "The multiplier cannot be above 1: this block only makes hits weaker"
+      ],
+      "effect": {
+        "id": "effect.multiply-damage-dealt",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 25
+    },
+    {
+      "id": "block.hp-scaling-stat-multiplier",
+      "className": "HpScalingStatMultiplierAbAttr",
+      "label": "Raise a stat as my HP gets lower",
+      "summary": "My Defense is multiplied by 1 at full HP and grows smoothly to 1.6 at 0 HP. Example: 1 to 1.6 gives x1.3 at half HP.",
+      "tier": "A",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "last stand",
+        "stat grows with missing hp",
+        "low hp boost",
+        "pinch boost",
+        "desperation",
+        "scaling defense",
+        "gradual boost"
+      ],
+      "examples": [
+        "Defense rises smoothly from x1 at full HP to x1.6 at 0 HP, like Last Stand"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat grows (Attack, Defense, Sp. Atk, Sp. Def or Speed)",
+          "control": "select",
+          "default": "DEF",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ]
+        },
+        {
+          "id": "minMultiplier",
+          "label": "Multiplier at full HP (1 = no change)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 0.05,
+          "max": 4,
+          "step": 0.05
+        },
+        {
+          "id": "maxMultiplier",
+          "label": "Multiplier at 0 HP (1.6 = 60% higher)",
+          "control": "number",
+          "default": 1.6,
+          "editable": true,
+          "min": 0.05,
+          "max": 4,
+          "step": 0.05
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only the chosen stat is changed; accuracy and evasion count as stats here too"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "stat",
+          "minMultiplier",
+          "maxMultiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package, justified: the multiplier is a continuous formula of the holder's missing HP, so it is neither a fixed stat multiplier nor an HP threshold; the formula is the class's multiplierAt. Tier A because there is no closure or gate to bind (the parent gets no condition). 2 attrs: Last Stand (5338 attr 0 Defense, attr 1 Sp. Def, both 1.0 to 1.6). The same formula is repeated by hand in abilities/pressure-vessel.ts (its own class, outside this batch). Oddities, not fixed: (a) the HP fraction is hp / maxHp clamped to 0..1 with plain float math, so the values at 50% and 25% are exactly the dex points only for even max HP; (b) the parent's `multiplier` stays 1, so code that reads it (the studio's runtime reflection) sees 1, not the formula; (c) the multiplier is applied on every stat query, including AI previews. The L1 grid covers HP at every boundary; B09/chunk3.test.ts also checks multiplierAt over a range of HP values for the rebuilt attr.",
+      "uses": 2
     },
     {
       "id": "block.hp-threshold-form-change",
