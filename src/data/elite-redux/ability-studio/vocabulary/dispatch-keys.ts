@@ -22,8 +22,6 @@ export const UNEXPOSED_DISPATCH_KEYS: Readonly<Record<string, string>> = {
     "Only consulted while the enemy AI generates movesets (move.ts getMovegen stats). It is not a battle moment staff can react to.",
   CommanderAbAttr:
     "Doubles-only Commander (Tatsugiri) bookkeeping, re-checked at summon and when held items are counted. A one-ability engine hook; it stays a package.",
-  CudChewConsumeBerryAbAttr:
-    "Cud Chew's second berry meal is driven by the berry phase after turn end. A bespoke one-ability mechanic, shown as a package.",
   DoubleBattleChanceAbAttr: "Wild encounter generation (chance of a double battle). Not a moment inside a battle.",
   IllusionBreakAbAttr:
     "Internal Illusion bookkeeping, called by applySingleAbAttrs when a Pokemon leaves the field or is hit. Not a staff-facing moment.",

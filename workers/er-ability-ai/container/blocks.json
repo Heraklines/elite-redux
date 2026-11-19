@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "0ba1cdc9c70110",
+  "vocabularyHash": "11f58b4e1ee697",
+  "hash": "1f814d2757ab4e",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -124,6 +124,51 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.cud-chew-consume-berry",
+      "className": "CudChewConsumeBerryAbAttr",
+      "label": "Eat last turn's berries again",
+      "summary": "When the berries of a turn have been eaten, I eat again every berry I ate the turn before, for free. Example: Cud Chew.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.berry-phase-end",
+      "whenLabel": "When the berries of the turn have been eaten",
+      "synonyms": [
+        "cud chew",
+        "eat berry twice",
+        "replay berry",
+        "second berry meal",
+        "berry encore",
+        "chew again"
+      ],
+      "examples": [
+        "Eat the same berry again one turn later without using it up, like Cud Chew"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Needs the block that remembers the berries I ate (its pair), otherwise the memory stays empty"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.cud-chew-record-berry",
@@ -366,7 +411,28 @@
       "examples": [
         "Each turn one random stat rises by 2 and another falls by 1, like a moody Pokemon"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "raise",
+          "label": "Stages the raised stat goes up by",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 6,
+          "step": 1
+        },
+        {
+          "id": "lower",
+          "label": "Stages the lowered stat goes down by",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 6,
+          "step": 1
+        }
+      ],
       "conditions": [],
       "guards": [],
       "feasibility": [
@@ -738,7 +804,7 @@
       "guards": [],
       "feasibility": [
         "There must be someone to cure: me, or an ally next to me that has a status or an ailment",
-        "A fainted ally is never picked",
+        "A fainted ally is never picked (as long as it has no Elite Redux ailment tag: the pick is a status other than fainted, or such a tag)",
         "Does nothing in a simulated preview"
       ],
       "effect": {
@@ -757,7 +823,7 @@
     {
       "id": "block.post-turn-restore-berry",
       "className": "PostTurnRestoreBerryAbAttr",
-      "label": "Sometimes get back a berry I ate (like Harvest)",
+      "label": "Get back a berry I ate, with a chance (like Harvest)",
       "summary": "At the end of every turn, there is a chance to get back one berry I ate in this battle. Example: Harvest is 50%, or 100% in harsh sun.",
       "tier": "A",
       "kind": "event-effect",
@@ -829,14 +895,12 @@
           "default": "POISON,TOXIC",
           "editable": true,
           "options": [
-            "NONE",
             "POISON",
             "TOXIC",
             "PARALYSIS",
             "SLEEP",
             "FREEZE",
-            "BURN",
-            "FAINT"
+            "BURN"
           ],
           "gateIndependent": true
         }
@@ -934,8 +998,8 @@
     {
       "id": "block.speed-boost",
       "className": "SpeedBoostAbAttr",
-      "label": "Raise Speed by 1 stage every turn",
-      "summary": "At the end of every turn, my Speed goes up by 1 stage. Example: Speed Boost. It does not trigger on the turn I switched in or after I failed to run away.",
+      "label": "Raise a stat every turn (Speed by default)",
+      "summary": "At the end of every turn, my Speed goes up by 1 stages. Example: Speed Boost. It does not trigger on the turn I switched in or after I failed to run away.",
       "tier": "B",
       "kind": "event-effect",
       "status": "decomposed",
@@ -952,7 +1016,34 @@
       "examples": [
         "Raise Speed by 1 stage at the end of every turn, like Speed Boost"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Stat that goes up",
+          "control": "select",
+          "default": "SPD",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "stages",
+          "label": "Stages it goes up by",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 6,
+          "step": 1,
+          "gateIndependent": true
+        }
+      ],
       "conditions": [
         {
           "slot": "gate",

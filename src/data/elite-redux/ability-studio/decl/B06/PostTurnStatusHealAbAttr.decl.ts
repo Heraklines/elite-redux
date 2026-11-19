@@ -47,7 +47,7 @@ export default defineDecl(PostTurnStatusHealAbAttr, {
       gateIndependent: true,
       default: "POISON,TOXIC",
       // The class takes them as rest arguments.
-      options: enumOptions(StatusEffect),
+      options: enumOptions(StatusEffect).filter(name => name !== "NONE" && name !== "FAINT"),
       codec: enumListCodec(StatusEffect, "status"),
       spread: true,
     },

@@ -235,6 +235,21 @@
       "legacyHookId": "FlinchEffectAbAttr"
     },
     {
+      "id": "event.berry-phase-end",
+      "kind": "event",
+      "dispatchKey": "CudChewConsumeBerryAbAttr",
+      "provides": [
+        "holder"
+      ],
+      "label": "When the berries of the turn have been eaten",
+      "group": "Turn",
+      "synonyms": [
+        "after berry phase",
+        "berry meal ends",
+        "cud chew moment"
+      ]
+    },
+    {
       "id": "event.berry-eaten",
       "kind": "event",
       "dispatchKey": "HealFromBerryUseAbAttr",
@@ -5022,5 +5037,5 @@
       ]
     }
   ],
-  "hash": "1264fa83dbcdc7"
+  "hash": "11f58b4e1ee697"
 }

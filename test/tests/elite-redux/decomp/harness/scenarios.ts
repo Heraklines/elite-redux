@@ -337,6 +337,8 @@ const WHEN_TEMPLATE: Readonly<Record<string, string>> = {
   "event.faint": t.faint,
   "event.end-of-turn": t.quiet,
   "event.wake-up": t.quiet,
+  // BerryPhase runs on every turn, so the quiet turns reach the Cud Chew moment (B06 chunk 1).
+  "event.berry-phase-end": t.quiet,
   "event.flinched": t.hit,
   "event.berry-eaten": t.low,
   "event.before-i-use-move": t.attack,

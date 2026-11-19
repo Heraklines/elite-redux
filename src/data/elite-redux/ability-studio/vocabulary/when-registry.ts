@@ -129,6 +129,16 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
   event("event.flinched", "FlinchEffectAbAttr", [H, SIM], "When I flinch", "Turn", {
     legacyHookId: "FlinchEffectAbAttr",
   }),
+  event(
+    "event.berry-phase-end",
+    "CudChewConsumeBerryAbAttr",
+    [H],
+    "When the berries of the turn have been eaten",
+    "Turn",
+    {
+      synonyms: ["after berry phase", "berry meal ends", "cud chew moment"],
+    },
+  ),
   event("event.berry-eaten", "HealFromBerryUseAbAttr", [H], "After I eat a berry", "Turn", {
     synonyms: ["berry consumed", "nom"],
   }),

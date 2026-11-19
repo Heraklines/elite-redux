@@ -4,10 +4,8 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// B06, Tier B event-effect. PARKED: the finished declaration waits here because its WHEN does not exist yet. The registry only
-// collects `*.decl.ts`, so this file is not loaded; rename it to `CudChewConsumeBerryAbAttr.decl.ts` once the librarian has
-// added the WHEN `event.berry-phase-end` (requests/B06.md, R-B06-9) and moved the dispatch key out of UNEXPOSED_DISPATCH_KEYS.
-// Status of the class meanwhile: legacy-closure-pending-request (the missing WHEN, and the missing IF atom for the gate).
+// B06, Tier B event-effect. The WHEN `event.berry-phase-end` (dispatch key CudChewConsumeBerryAbAttr) was added to the library
+// (when-registry.ts) with this declaration; request R-B06-9 stays open only for the gate atom.
 //
 // "When the berry phase of a turn ends, if I ate a berry the turn before, eat those berries again" (Cud Chew). The class does not
 // extend PostTurnAbAttr: BerryPhase calls `applyAbAttrs("CudChewConsumeBerryAbAttr", { pokemon })` itself for every Pokemon
@@ -18,8 +16,7 @@
 //                  (`getBerryEffectFunc(berry)(pokemon)`) and fires a BerryUsedEvent for the message. No item is consumed and it
 //                  does not count as eating (so Unnerve, Stuff Cheeks and Unburden do not see it). `simulated` is ignored (a TODO
 //                  in the class).
-// Binding to add together with the rename (bindings.ts), in plain words:
-//   bindLegacyClosure(291, 0, "no atom for 'I ate a berry last turn' (summonData.berriesEatenLast.length > 0), R-B06-9", "gate");
+// The gate is bound in bindings.ts as a legacy-closure (no atom for I ate a berry last turn, R-B06-9).
 import { CudChewConsumeBerryAbAttr } from "#abilities/ab-attrs";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 
@@ -43,7 +40,7 @@ export default defineDecl(CudChewConsumeBerryAbAttr, {
   flags: { rng: "none", state: "battle", simulated: "ignores" },
   probes: [{ name: "berry phase after eating nothing", axes: {} }],
   l2StaticReason:
-    "No battle scenario template reaches the berry-phase moment (it is not in the WHEN registry yet), so the class is checked by test/tests/elite-redux/decomp/B06/b06-classes.test.ts, which drives canApply and apply directly.",
+    "No battle scenario template reaches the berry-phase moment (the berry phase is not a scenario template), so the class is checked by test/tests/elite-redux/decomp/B06/b06-chunk1.test.ts, which drives canApply and apply directly.",
   status: "decomposed",
   notes:
     "PACKAGE for the effect only: replaying 'whatever berries I remembered' needs the per-berry effect table (getBerryEffectFunc) and a free animation; effect.use-item eats the HELD item and consumes it, which is not what happens here (request R-B06-6 asks for effect.eat-remembered-berries). The trigger and the gate are separate blocks. Only user: Cud Chew (291, attr 0; attr 1 is CudChewRecordBerryAbAttr). The class comment says it must only be used by Cud Chew. The code has a commented-out line to let Cheek Pouch heal on the replay (HealFromBerryUseAbAttr); it is not active, so Cheek Pouch does not trigger on a Cud Chew replay (design note, not changed).",

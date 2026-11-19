@@ -12,8 +12,7 @@
 // to the atom that calls the SAME engine predicate, or marked legacy with the reason. The L1 differential then evaluates the
 // original and the library form over the state grid; a binding is only a claim until that test passes.
 //
-// Not bound here (no constructor closure and no gate): MoodyAbAttr, CudChewRecordBerryAbAttr. CudChewConsumeBerryAbAttr is parked
-// (decl/B06/pending/CudChewConsumeBerryAbAttr.decl.pending.ts) together with its one legacy gate binding.
+// Not bound here (no constructor closure and no gate): MoodyAbAttr, CudChewRecordBerryAbAttr.
 import { bindCondition, bindLegacyClosure } from "#data/elite-redux/ability-studio/bindings";
 
 // =============================================================================================
@@ -127,4 +126,14 @@ bindLegacyClosure(
   5586,
   2,
   "Revelation: form number function (Revelation form while HP ratio > 0.25, otherwise a base form); needs HP and form index atoms (R-B06-8)",
+);
+
+// =============================================================================================
+// CudChewConsumeBerryAbAttr, slot gate: `pokemon.summonData.berriesEatenLast.length > 0` ("I ate a berry last turn"). No atom (R-B06-9).
+// =============================================================================================
+bindLegacyClosure(
+  291,
+  0,
+  "Cud Chew: no atom for I ate a berry last turn (summonData.berriesEatenLast.length > 0) (R-B06-9)",
+  "gate",
 );

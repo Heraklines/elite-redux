@@ -5584,7 +5584,14 @@ export class CudChewRecordBerryAbAttr extends PostTurnAbAttr {
  * @see {@link https://bulbapedia.bulbagarden.net/wiki/Moody_(Ability) | Moody (Bulbapedia)}
  */
 export class MoodyAbAttr extends PostTurnAbAttr {
-  constructor() {
+  /**
+   * @param raise - Stages the randomly chosen stat goes up by. Defaults to 2, the value of the base game.
+   * @param lower - Stages the second, different, randomly chosen stat goes down by. Defaults to 1.
+   */
+  constructor(
+    private readonly raise = 2,
+    private readonly lower = 1,
+  ) {
     super(true);
   }
   /**
@@ -5604,11 +5611,11 @@ export class MoodyAbAttr extends PostTurnAbAttr {
       if (canRaise.length > 0) {
         const raisedStat = canRaise[pokemon.randBattleSeedInt(canRaise.length)];
         canLower = canLower.filter(s => s !== raisedStat);
-        globalScene.phaseManager.unshiftNew("StatStageChangePhase", pokemon.getBattlerIndex(), true, [raisedStat], 2);
+        globalScene.phaseManager.unshiftNew("StatStageChangePhase", pokemon.getBattlerIndex(), true, [raisedStat], this.raise);
       }
       if (canLower.length > 0) {
         const loweredStat = canLower[pokemon.randBattleSeedInt(canLower.length)];
-        globalScene.phaseManager.unshiftNew("StatStageChangePhase", pokemon.getBattlerIndex(), true, [loweredStat], -1);
+        globalScene.phaseManager.unshiftNew("StatStageChangePhase", pokemon.getBattlerIndex(), true, [loweredStat], -this.lower);
       }
     }
   }
@@ -5616,7 +5623,14 @@ export class MoodyAbAttr extends PostTurnAbAttr {
 
 /** @sealed */
 export class SpeedBoostAbAttr extends PostTurnAbAttr {
-  constructor() {
+  /**
+   * @param stat - The stat that goes up. Defaults to Speed, the value of the base game.
+   * @param stages - How many stages it goes up by. Defaults to 1.
+   */
+  constructor(
+    private readonly stat: BattleStat = Stat.SPD,
+    private readonly stages = 1,
+  ) {
     super(true);
   }
 
@@ -5635,7 +5649,7 @@ export class SpeedBoostAbAttr extends PostTurnAbAttr {
   }
 
   override apply({ pokemon }: AbAttrBaseParams): void {
-    globalScene.phaseManager.unshiftNew("StatStageChangePhase", pokemon.getBattlerIndex(), true, [Stat.SPD], 1);
+    globalScene.phaseManager.unshiftNew("StatStageChangePhase", pokemon.getBattlerIndex(), true, [this.stat], this.stages);
   }
 }
 

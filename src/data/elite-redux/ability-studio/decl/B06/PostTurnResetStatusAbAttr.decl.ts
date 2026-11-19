@@ -71,7 +71,7 @@ export default defineDecl(PostTurnResetStatusAbAttr, {
   guards: [],
   feasibility: [
     "There must be someone to cure: me, or an ally next to me that has a status or an ailment",
-    "A fainted ally is never picked",
+    "A fainted ally is never picked (as long as it has no Elite Redux ailment tag: the pick is a status other than fainted, or such a tag)",
     "Does nothing in a simulated preview",
   ],
   effect: { id: "effect.cure-status", params: ["target"] },
