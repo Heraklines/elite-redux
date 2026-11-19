@@ -186,3 +186,324 @@ for (const [abilityId, attrIndex] of [
 // count starts at 1 and is only raised). The canBeMultiStrikeEnhanced eligibility test is the residual.
 // =============================================================================================
 bindEach({ not: { id: "move.multi-hit" } }, [[5695, 0, "Unrelenting"]], "gate");
+
+// =============================================================================================
+// B02 chunk 3.
+// Every closure below was read from the live attr (a throwaway dump of `String(closure)` for every site of the
+// eight classes) and from the source line named in its comment. A binding is only claimed when the library atom calls
+// the SAME engine predicate; the rest are legacy-closure with the missing atom named (requests B02-18 to B02-27).
+// `attack` closures are `(user, target, move)`: the frame's holder and move user are the user, `other` is the target.
+// =============================================================================================
+
+function legacyEach(reason: string, sites: readonly Site[], slot = "ctor:0"): void {
+  for (const [abilityId, attrIndex] of sites) {
+    bindLegacyClosure(abilityId, attrIndex, reason, slot);
+  }
+}
+
+// ---- MoveDamageBoostAbAttr (Tier A). Slot ctor:1, a PokemonAttackCondition. ----------------------------------------
+// `(user, target, move) => (target?.getMoveEffectiveness(user, move) ?? 1) <= .5` (Tinted Lens, Sepia Lens, Drake Of Rage).
+// A missing target answers 1 in the closure (not <= 0.5, so false) and false in the atom (no defender).
+bindEach(
+  { id: "move.effectiveness", cmp: "lte", n: 0.5 },
+  [
+    [110, 0, "Tinted Lens"],
+    [5506, 0, "Sepia Lens"],
+    [5512, 0, "Drake Of Rage"],
+  ],
+  "ctor:1",
+);
+// Parental Bond: `user.turnData.hitCount > 1 && user.turnData.hitsLeft === 1 && move.canBeMultiStrikeEnhanced(user, true, target)`.
+bindLegacyClosure(
+  185,
+  1,
+  "Closure: the move is on its extra strike (turnData.hitCount > 1 and hitsLeft === 1) AND the move can take extra strikes (canBeMultiStrikeEnhanced). The attack frame has no hit counters and no atom reads turnData.hitCount / hitsLeft or the strike-eligibility rule (request B02-18 in requests/B02.md)",
+  "ctor:1",
+);
+
+// ---- AddMoveFlagAbAttr (Tier A). Slot ctor:1, a PokemonAttackCondition built from the options filter (user, move). ----
+// `user.getMoveType(move) === DRAGON / NORMAL`: the move type after ability changes, the move.type atom with effective true.
+bindEach({ id: "move.type", type: "DRAGON", effective: true }, [[5307, 2, "Brawling Wyvern"]], "ctor:1");
+bindEach(
+  { id: "move.type", type: "NORMAL", effective: true },
+  [
+    [5513, 0, "Reverberate"],
+    [5514, 0, "Mixed Martial Arts"],
+    [6089, 2, "Kyokushin"],
+  ],
+  "ctor:1",
+);
+// Junshi Sanda: `move.hasFlag(PUNCHING)` and `move.hasFlag(KICKING)`. move.flag asks doesFlagEffectApply, which only differs from
+// hasFlag for contact, ignore-abilities, ignore-protect and the two injected flags (dance, sound); punching and kicking are none of them.
+bindEach({ id: "move.flag", flag: "PUNCHING_MOVE" }, [[5470, 0, "JunshiSanda (punching moves also kick)"]], "ctor:1");
+bindEach({ id: "move.flag", flag: "KICKING_MOVE" }, [[5470, 1, "JunshiSanda (kicking moves also punch)"]], "ctor:1");
+// Gunman: `move.category === STATUS`.
+bindEach({ id: "move.category", category: "STATUS" }, [[5481, 1, "Gunman (status moves count as pulse)"]], "ctor:1");
+
+// ---- LowHpMoveTypePowerBoostAbAttr (Tier A). Slot ctor:2, an AbAttrCondition (pokemon). ------------------------------
+// `pokemon.getHpRatio() <= 0.33`; getHpRatio() rounds hp / maxHp to two decimals, so hp.at-most (hp * 100 <= maxHp * pct) is a
+// different test (33.4% is low here, not there). No atom has that rounding yet.
+legacyEach(
+  "Closure `pokemon.getHpRatio() <= 0.33`: getHpRatio() rounds the ratio to two decimals (Math.round(hp / maxHp * 100) / 100), which the library HP atoms do not do (hp.at-most uses hp * 100 <= maxHp * pct); an HP atom with that rounding is request B02-21 in requests/B02.md",
+  [
+    [65, 0, "Overgrow"],
+    [66, 0, "Blaze"],
+    [67, 0, "Torrent"],
+    [68, 0, "Swarm"],
+    [5672, 0, "Lepidopteran"],
+  ],
+  "ctor:2",
+);
+
+// ---- MovePowerBoostAbAttr (Tier A). Slot ctor:0, a PokemonAttackCondition. ------------------------------------------
+// `() => true`: no condition (Blood Price, Dreamscape, Subversion). An empty ALL group is always true.
+bindEach({ all: [] }, [
+  [5264, 0, "Blood Price"],
+  [5560, 3, "Dreamscape"],
+  [6081, 2, "Subversion"],
+]);
+// `move.category !== STATUS` (Hustle).
+bindEach({ id: "move.damaging" }, [[55, 0, "Hustle"]]);
+// `move.category === PHYSICAL`.
+bindEach({ id: "move.category", category: "PHYSICAL" }, [
+  [203, 1, "Long Reach"],
+  [5354, 0, "Venoblaze Pincers"],
+]);
+// Toxic Boost `move.category === PHYSICAL && (user.status?.effect === POISON || user.status?.effect === TOXIC)`.
+bindEach(
+  {
+    all: [
+      { id: "move.category", category: "PHYSICAL" },
+      { any: [{ id: "status.has", who: "holder", status: "POISON" }, { id: "status.has", who: "holder", status: "TOXIC" }] },
+    ],
+  },
+  [[137, 0, "Toxic Boost"]],
+);
+// Flare Boost `move.category === SPECIAL && user.status?.effect === BURN`.
+bindEach(
+  { all: [{ id: "move.category", category: "SPECIAL" }, { id: "status.has", who: "holder", status: "BURN" }] },
+  [[138, 0, "Flare Boost"]],
+);
+// Normalize `move?.type === NORMAL`: the raw printed type (effective: false), like the MoveTypeChange bindings above.
+bindEach({ id: "move.type", type: "NORMAL", effective: false }, [[96, 1, "Normalize (1.1x)"]]);
+// Two-Faced: `fullBelly(user) && move.type === NORMAL` (fullBelly = `user.getFormKey() !== "hangry"`).
+bindEach(
+  { all: [{ not: { id: "mon.in-form", who: "holder", key: "hangry" } }, { id: "move.type", type: "NORMAL", effective: false }] },
+  [[5486, 9, "Two-Faced"]],
+);
+// Sound moves: `move.doesFlagEffectApply({ flag: SOUND_BASED, user })`, the very call the atom makes (the target only matters for contact).
+bindEach({ id: "move.flag", flag: "SOUND_BASED" }, [
+  [204, 1, "Liquid Voice"],
+  [244, 0, "Punk Rock"],
+  [5253, 2, "Bass Boosted"],
+  [5428, 3, "Sludgy Mix"],
+  [20015, 2, "Siren's Song"],
+]);
+// Printed move flags read with `move.hasFlag(F)`. For F other than contact, ignore-abilities, ignore-protect, dance and sound,
+// doesFlagEffectApply(F) is `hasFlag(F)` (the only flag injectors in the game inject dance and sound), so the atom is the same test.
+bindEach({ id: "move.flag", flag: "RECKLESS_MOVE" }, [
+  [120, 0, "Reckless"],
+  [5459, 1, "Brute Force"],
+  [5708, 0, "Current Crash (reckless part)"],
+]);
+bindEach({ id: "move.flag", flag: "BITING_MOVE" }, [
+  [173, 0, "Strong Jaw"],
+  [5249, 0, "Devourer"],
+  [5319, 0, "Flaming Maw"],
+  [5409, 0, "Shocking Maw"],
+  [5562, 0, "Hungry Maws"],
+  [5677, 0, "Crushing Jaw"],
+  [6103, 0, "World-Eater"],
+]);
+bindEach({ id: "move.flag", flag: "PULSE_MOVE" }, [
+  [178, 0, "Mega Launcher"],
+  [5132, 0, "Iron Barrage"],
+  [5387, 0, "Master Hand"],
+  [5478, 0, "Super Scope"],
+  [5481, 0, "Gunman (pulse part)"],
+  [5555, 0, "Gnashing Cannon"],
+  [5679, 3, "Nihil Blaster (pulse part)"],
+]);
+bindEach({ id: "move.flag", flag: "THROW_BASED" }, [
+  [276, 1, "Rocky Payload (throwing part)"],
+  [6027, 1, "Dirty Snowball (throwing part)"],
+]);
+// Higher Rank `(move?.priority ?? 0) > 0`.
+bindEach({ id: "move.priority", cmp: "gt", n: 0 }, [[5366, 0, "Higher Rank"]]);
+// `(target?.getMoveEffectiveness(user, move) ?? 1) >= 2` (Neuroforce, Calculative's second boost).
+bindEach({ id: "move.effectiveness", cmp: "gte", n: 2 }, [
+  [233, 0, "Neuroforce"],
+  [5494, 2, "Calculative (super effective part)"],
+]);
+// Seaweed and Old Mariner `!!target && target.isOfType(FIRE) && user.getMoveType(move) === GRASS` (the holder's own Grass-type
+// test is the attr-level condition `holder.isOfType(GRASS)`, carried by addCondition).
+bindEach(
+  {
+    all: [
+      { id: "mon.has-type", who: "other", type: "FIRE" },
+      { id: "move.type", type: "GRASS", effective: true },
+    ],
+  },
+  [
+    [5080, 0, "Seaweed"],
+    [5324, 0, "Old Mariner"],
+  ],
+);
+// `!!target && target.isOfType(WATER)` (and `target.getTypes().includes(WATER)`: isOfType calls getTypes with the same defaults).
+bindEach({ id: "mon.has-type", who: "other", type: "WATER" }, [
+  [5126, 0, "Thundercall"],
+  [5127, 1, "Marine Apex"],
+  [5708, 1, "Current Crash (water part)"],
+  [20005, 6, "Thunder Gods Vessel (water part)"],
+  [20006, 6, "Malicious Empathy (water part)"],
+]);
+bindEach({ id: "mon.has-type", who: "other", type: "STEEL" }, [[6042, 0, "Power Grinder"]]);
+// A named move: `move.id === TACKLE / POISON_STING / ELECTROWEB / BUG_BITE` (Angel's Wrath, one attr per move).
+bindEach({ id: "move.is-move", moveId: "TACKLE" }, [[5175, 2, "Angel's Wrath (Tackle)"]]);
+bindEach({ id: "move.is-move", moveId: "POISON_STING" }, [[5175, 3, "Angel's Wrath (Poison Sting)"]]);
+bindEach({ id: "move.is-move", moveId: "ELECTROWEB" }, [[5175, 4, "Angel's Wrath (Electroweb)"]]);
+bindEach({ id: "move.is-move", moveId: "BUG_BITE" }, [[5175, 5, "Angel's Wrath (Bug Bite)"]]);
+bindEach(
+  { any: [{ id: "move.is-move", moveId: "HIDDEN_POWER" }, { id: "move.is-move", moveId: "SECRET_POWER" }] },
+  [[5477, 1, "Unown Power"]],
+);
+bindEach({ id: "move.is-move", moveId: "WATER_SHURIKEN" }, [[5659, 0, "Giant Shuriken"]]);
+bindEach({ id: "move.is-move", moveId: "FLYING_PRESS" }, [[5663, 0, "Wrestle Showman"]]);
+// Fog: `isFogWeather(arena.weather?.weatherType)` = FOG or EERIE_FOG, read from the weather object the atom also reads
+// (arena.weatherType is `weather?.weatherType ?? NONE`; neither looks at weather suppression).
+const FOG = { any: [{ id: "field.weather", weather: "FOG" }, { id: "field.weather", weather: "EERIE_FOG" }] };
+bindEach(FOG, [[5646, 0, "Echolocation"]]);
+bindEach({ all: [FOG, { id: "move.type", type: "GHOST", effective: true }] }, [
+  [5523, 0, "Ominous Shroud"],
+  [5961, 1, "Ominous Shroud (second id)"],
+  [5666, 0, "Foggy Eye"],
+]);
+// Relentless `target != null && target.status != null && target.status.effect !== 0` (a status object always has an effect,
+// the game never keeps one with NONE), the atom status.has ANY on the target.
+bindEach({ id: "status.has", who: "other", status: "ANY" }, [[5473, 2, "Relentless"]]);
+
+// ---- MovePowerBoostAbAttr: closures that stay legacy-closure, each with the exact atom that is missing. --------------
+const CONTACT_RAW_REASON =
+  "Closure reads the printed flag with move.hasFlag(MAKES_CONTACT). The atom move.flag asks doesFlagEffectApply, which for contact also says no for Long Reach, Punching Glove, a hit on a substitute and Manifest; an atom for the printed flag is request B02-22 in requests/B02.md";
+legacyEach(CONTACT_RAW_REASON, [
+  [145, 0, "Big Pecks"],
+  [181, 0, "Tough Claws"],
+  [5122, 1, "Nosferatu"],
+  [5399, 0, "Apex Predator"],
+  [5621, 0, "Lead Claws"],
+  [5633, 0, "Ice Picks"],
+  [5704, 0, "Bird of Prey"],
+  [5726, 0, "Reaper's Embarce"],
+]);
+legacyEach(`Physical move that does not make contact: \`category === PHYSICAL && !move.hasFlag(MAKES_CONTACT)\`. ${CONTACT_RAW_REASON}`, [
+  [5550, 0, "World Serpent"],
+  [5933, 2, "First Serpent"],
+]);
+const GRANTED_REASON =
+  "Closure `move.hasFlag(F) || AddMoveFlagAbAttr.userGrantsFlag(user, move, F)`: the move has the property printed OR one of my abilities grants it (Brawling Wyvern, Junshi Sanda, ...). No atom reads the granted properties (request B02-23 in requests/B02.md)";
+legacyEach(GRANTED_REASON, [
+  [89, 0, "Iron Fist"],
+  [292, 0, "Sharpness"],
+  [5200, 0, "Nika (punching part)"],
+  [5385, 0, "Atomic Punch"],
+  [5718, 0, "Icicle Fist"],
+]);
+legacyEach(
+  "Closure `move.power <= 60 && !move.hasAttr(VariablePowerAttr)`: the first part is the atom move.power, but no atom says that the move's power is fixed (does not change with a formula, weight, speed...); request B02-24 in requests/B02.md",
+  [
+    [101, 0, "Technician"],
+    [5191, 0, "Ninja's Blade"],
+    [5702, 2, "Bandit"],
+  ],
+);
+legacyEach(
+  "Closure `move.chance >= 1`: the move has an extra effect with a chance of at least 1% (Sheer Force). The atom move.has-effect-chance tests `move.chance >= 0`, which also accepts a 0 chance; an atom with the 'above 0' test is request B02-25 in requests/B02.md",
+  [[125, 0, "Sheer Force"]],
+);
+legacyEach(
+  "Closure asks whether an ally has the paired ability through abilityQuery(ally, MINUS_PAIRING / PLUS_PAIRING) over user.getAllies(); the atom party.ally-ability tests hasAbility of the one ally, not the engine query over every ally (request B02-26 in requests/B02.md)",
+  [
+    [57, 0, "Plus"],
+    [58, 0, "Minus"],
+  ],
+);
+legacyEach(
+  "Closure `user.gender !== GENDERLESS && target?.gender !== GENDERLESS && user.gender === target?.gender` (same gender); the library only has the opposite-gender atom (mon.opposite-gender); a same-gender atom is request B02-27 in requests/B02.md",
+  [
+    [79, 0, "Rivalry"],
+    [5625, 1, "Empress"],
+  ],
+);
+legacyEach("Closure `!!user && user.summonData.illusion != null`: no atom says that I am disguised by an illusion (request B02-28 in requests/B02.md)", [
+  [149, 3, "Illusion"],
+]);
+legacyEach(
+  "Closure `!phaseManager.hasPhaseOfType(MovePhase, phase => phase.pokemon.id !== user.id)`: nobody else still has a move waiting this turn, i.e. I move last; the atom time.acted tests the turn data of one Pokemon, not the move queue (request B02-29 in requests/B02.md)",
+  [
+    [148, 0, "Analytic"],
+    [5494, 0, "Calculative (moving last part)"],
+    [5515, 1, "Strategic Pause"],
+    [5561, 1, "Haste Makes Waste"],
+  ],
+);
+legacyEach(
+  "Closure `target?.turnData.switchedInThisTurn`: the target came in this turn; no atom reads switchedInThisTurn (request B02-30 in requests/B02.md)",
+  [
+    [198, 0, "Stakeout"],
+    [5429, 0, "Overwatch"],
+  ],
+);
+legacyEach(
+  "Closure `move.id === TERRAIN_PULSE && target !== null && !user.isOfType(resolveRequestedMoveType(user, target, move, user.getMoveType(move)))`: the requested-type resolver and 'the move's type is not one of my types' have no atom (request B02-31 in requests/B02.md)",
+  [[250, 2, "Mimicry"]],
+);
+legacyEach(
+  "Closure reads hasCommandAbilityProvenance(user, 'quick-draw:proc' / 'quick-claw:proc') and, for Quick Draw and Minigun, abilityQuery(target, QUICK_DRAW_TARGET); no atom reads the command-ability provenance (request B02-32 in requests/B02.md)",
+  [
+    [259, 1, "Quick Draw"],
+    [5996, 1, "Minigun"],
+    [5481, 2, "Gunman (quick draw part)"],
+  ],
+);
+legacyEach(
+  "Closure `move.type === F && user.getHpRatio() < 1 / 3`: the printed type (atom move.type, effective false) AND an HP test on getHpRatio(), which rounds to two decimals; the HP atoms do not round that way (request B02-21 in requests/B02.md)",
+  [
+    [5014, 1, "Vengeance"],
+    [5037, 1, "Earthbound"],
+    [5283, 2, "Vengeful Spirit"],
+  ],
+);
+legacyEach(
+  "Closure `move.type === NORMAL && anyTypeMoveConversionCondition(user, target, move)`: the move may have its type changed by an ability; there is no atom for the Terastallized state, Tera Blast and the fixed-type moves (request B02-14 in requests/B02.md)",
+  [
+    [174, 1, "Refrigerate"],
+    [182, 1, "Pixilate"],
+    [184, 1, "Aerilate"],
+    [206, 1, "Galvanize"],
+    [5152, 2, "Atomic Burst"],
+    [5954, 1, "Pixilate (second id)"],
+    [6019, 1, "Fluttering Spirit"],
+    [20005, 3, "Thunder Gods Vessel (convert part)"],
+    [20006, 3, "Malicious Empathy (convert part)"],
+    [20007, 1, "Fae Heart"],
+  ],
+);
+legacyEach(
+  "Closure `user.isOfType(user.getMoveType(move))`: the move's type is one of my own types (same-type bonus); no atom compares the move type with my types (request B02-33 in requests/B02.md)",
+  [[5403, 0, "Color Spectrum"]],
+);
+legacyEach(
+  "Closure reads holderHasUpcycle / holderHasUpcyclePoisonBoost / isErFoodPokemon (upcycle and food-type rules); no atom exists for them (request B02-34 in requests/B02.md)",
+  [
+    [5356, 0, "Sugar Rush (boost)"],
+    [5356, 1, "Sugar Rush (poison boost)"],
+  ],
+);
+legacyEach(
+  "Closure reads the weather object and its suppression (`weather.isEffectSuppressed()`) and tests Sun or Harsh Sun with a Water move; field.weather ignores suppression, so it is not the same test (request B02-35 in requests/B02.md)",
+  [[5200, 1, "Nika (sun and water part)"]],
+);
+legacyEach(
+  "Closure `move.type === GRASS && arena.terrain?.terrainType === GRASSY`: reads the terrain object directly, while field.terrain asks arena.terrainType, which a Clueless-style field suppression sets to None; an atom for the raw terrain is request B02-36 in requests/B02.md",
+  [[5310, 0, "Flourish"]],
+);

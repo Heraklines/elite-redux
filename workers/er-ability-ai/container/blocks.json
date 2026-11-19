@@ -1,8 +1,92 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "0395808edf8e04",
+  "hash": "15c654920886bd",
   "blocks": [
+    {
+      "id": "block.add-move-flag",
+      "className": "AddMoveFlagAbAttr",
+      "label": "Give my moves an extra move property",
+      "summary": "My moves that pass the condition also count as these move properties: Punching move. Abilities that boost that property (such as punching moves) then boost them too.",
+      "tier": "A",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "count as punching",
+        "count as kicking",
+        "make moves punch",
+        "iron fist boost",
+        "extra move property",
+        "move family",
+        "count as sound",
+        "add a flag"
+      ],
+      "examples": [
+        "Make my Dragon moves count as punching moves, like Brawling Wyvern",
+        "Make my Normal moves count as sound moves, like Reverberate"
+      ],
+      "params": [
+        {
+          "id": "flags",
+          "label": "Move properties to add (comma separated list)",
+          "control": "text",
+          "default": "PUNCHING_MOVE",
+          "editable": true,
+          "options": [
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:1",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only works while my ability is active (a suppressed Pokemon grants nothing)",
+        "Only abilities that look for the property notice it; it never changes the move itself"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "flags"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 7
+    },
     {
       "id": "block.add-second-strike",
       "className": "AddSecondStrikeAbAttr",
@@ -196,6 +280,72 @@
       "uses": 1
     },
     {
+      "id": "block.ally-move-category-power-boost",
+      "className": "AllyMoveCategoryPowerBoostAbAttr",
+      "label": "Multiply my ally's physical or special move power",
+      "summary": "The base power of my ally's moves of these kinds (Special) is multiplied by 1.3. Example: Special at 1.3 = 30% stronger special moves for my ally, like Battery.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "battery",
+        "power spot",
+        "ally boost",
+        "partner boost",
+        "boost my ally's special moves",
+        "boost my ally's physical moves",
+        "doubles support"
+      ],
+      "examples": [
+        "Make my ally's special moves 30% stronger, like Battery",
+        "Make my ally's physical and special moves 30% stronger, like Power Spot"
+      ],
+      "params": [
+        {
+          "id": "categories",
+          "label": "Move kinds that are boosted (comma separated: physical, special, status)",
+          "control": "text",
+          "default": "SPECIAL",
+          "editable": true,
+          "options": [
+            "PHYSICAL",
+            "SPECIAL",
+            "STATUS"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.3 = 30% more power)",
+          "control": "number",
+          "default": 1.3,
+          "editable": true,
+          "min": 0.05,
+          "max": 10,
+          "step": 0.05
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only helps an ally that is next to me (a far wing of a triple battle does not count)",
+        "Does nothing while the move user's own ability is being ignored"
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
       "id": "block.attack-type-immunity",
       "className": "AttackTypeImmunityAbAttr",
       "label": "Be immune to one type of attack",
@@ -316,6 +466,89 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.field-move-type-power-boost",
+      "className": "FieldMoveTypePowerBoostAbAttr",
+      "label": "Multiply one move type's power for everyone on the field",
+      "summary": "While I am on the field, Dark-type moves used by any Pokemon (mine, my ally's and the foes') have their base power multiplied by 1.33. Example: Dark at 1.33, like Dark Aura.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "dark aura",
+        "fairy aura",
+        "aura break",
+        "aura",
+        "boost for everyone",
+        "field boost",
+        "weaken a type",
+        "pixie power"
+      ],
+      "examples": [
+        "Make every Dark move on the field 33% stronger, like Dark Aura",
+        "Make every Fairy move on the field weaker, like Aura Break next to a Fairy Aura"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Move type that is boosted",
+          "control": "select",
+          "default": "DARK",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.33 = 33% more power, 0.75 = a quarter less)",
+          "control": "number",
+          "default": 1.33,
+          "editable": true,
+          "min": 0.05,
+          "max": 10,
+          "step": 0.01
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Affects every Pokemon on the field, not only me",
+        "Does nothing while the move user's own ability is being ignored"
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 10
     },
     {
       "id": "block.field-multiply-stat",
@@ -610,6 +843,156 @@
       "uses": 3
     },
     {
+      "id": "block.low-hp-move-type-power-boost",
+      "className": "LowHpMoveTypePowerBoostAbAttr",
+      "label": "Boost my moves of one type while my HP is low",
+      "summary": "While my HP is about a third or less (33% rounded), my Fire-type moves have their base power multiplied by 1.5. Example: Fire at 1.5, like Blaze.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "blaze",
+        "torrent",
+        "overgrow",
+        "swarm",
+        "pinch boost",
+        "low hp boost",
+        "when almost fainted",
+        "desperation boost"
+      ],
+      "examples": [
+        "Make Fire moves 50% stronger while my HP is low, like Blaze",
+        "Make Water moves 50% stronger in a pinch, like Torrent"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Move type that is boosted",
+          "control": "select",
+          "default": "FIRE",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.5 = 50% more power)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0.05,
+          "max": 10,
+          "step": 0.05
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:2",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Moves that deal a fixed amount of damage are not changed"
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 5
+    },
+    {
+      "id": "block.move-damage-boost",
+      "className": "MoveDamageBoostAbAttr",
+      "label": "Multiply the damage my moves deal",
+      "summary": "The final damage of my attack is multiplied by 2 (rounded down, at least 1) whenever the condition is true. Example: 2 = double damage.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.damage-dealt",
+      "whenLabel": "While the game calculates damage I deal",
+      "synonyms": [
+        "tinted lens",
+        "parental bond",
+        "damage boost",
+        "deal more damage",
+        "stronger hits",
+        "final damage",
+        "double damage",
+        "extra damage"
+      ],
+      "examples": [
+        "Double the damage of resisted hits, like Tinted Lens",
+        "Make the second strike of a two-hit move deal a quarter damage, like Parental Bond"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Damage multiplier (2 = double, 0.25 = a quarter)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 0,
+          "max": 10,
+          "step": 0.05
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:1",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The result is rounded down to a whole number and is never below 1"
+      ],
+      "effect": {
+        "id": "effect.multiply-damage-dealt",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 4
+    },
+    {
       "id": "block.move-effect-chance-multiplier",
       "className": "MoveEffectChanceMultiplierAbAttr",
       "label": "Multiply the chance of my moves' extra effects",
@@ -663,6 +1046,72 @@
         "do": true
       },
       "uses": 4
+    },
+    {
+      "id": "block.move-power-boost",
+      "className": "MovePowerBoostAbAttr",
+      "label": "Multiply the power of my moves",
+      "summary": "The base power of my move is multiplied by 1.3 whenever the condition is true. Example: 1.5 = 50% more power, like Technician on weak moves.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "technician",
+        "iron fist",
+        "tough claws",
+        "sheer force",
+        "analytic",
+        "reckless",
+        "strong jaw",
+        "mega launcher",
+        "boost power",
+        "base power",
+        "power up",
+        "stronger moves"
+      ],
+      "examples": [
+        "Boost punching moves by 30%, like Iron Fist",
+        "Boost moves of 60 base power or less by 50%, like Technician",
+        "Boost my physical moves by 50% while I am poisoned, like Toxic Boost"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.5 = 50% more power)",
+          "control": "number",
+          "default": 1.3,
+          "editable": true,
+          "min": 0,
+          "max": 10,
+          "step": 0.05
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Moves that deal a fixed amount of damage are not changed"
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 109
     },
     {
       "id": "block.move-type-change",
@@ -741,6 +1190,89 @@
         "do": true
       },
       "uses": 27
+    },
+    {
+      "id": "block.move-type-power-boost",
+      "className": "MoveTypePowerBoostAbAttr",
+      "label": "Multiply the power of my moves of one type",
+      "summary": "My Electric-type moves have their base power multiplied by 1.5. Example: Electric at 1.5 = 50% stronger Electric moves, like Transistor.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "transistor",
+        "water bubble",
+        "dragon's maw",
+        "rocky payload",
+        "type boost",
+        "boost fire moves",
+        "boost water moves",
+        "elemental boost",
+        "stronger electric moves"
+      ],
+      "examples": [
+        "Make Electric moves 50% stronger, like Transistor",
+        "Make Water moves twice as strong, like Water Bubble"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Move type that is boosted",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.5 = 50% more power)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0.05,
+          "max": 10,
+          "step": 0.05
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Moves that deal a fixed amount of damage are not changed"
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 21
     },
     {
       "id": "block.opposing-mega-stat-suppress",
@@ -1986,6 +2518,87 @@
         "do": true
       },
       "uses": 64
+    },
+    {
+      "id": "block.user-field-move-type-power-boost",
+      "className": "UserFieldMoveTypePowerBoostAbAttr",
+      "label": "Multiply one move type's power for my ally",
+      "summary": "The Steel-type moves of the Pokemon next to me have their base power multiplied by 1.3. Example: Steel at 1.3 = 30% stronger Steel moves for my ally, like Steely Spirit.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "steely spirit",
+        "ally boost",
+        "partner boost",
+        "boost my ally's moves",
+        "team type boost",
+        "doubles support"
+      ],
+      "examples": [
+        "Make my ally's Steel moves 30% stronger, like Steely Spirit",
+        "Make my ally's Flying moves 30% stronger, like Airborne"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Move type that is boosted",
+          "control": "select",
+          "default": "STEEL",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.3 = 30% more power)",
+          "control": "number",
+          "default": 1.3,
+          "editable": true,
+          "min": 0.05,
+          "max": 10,
+          "step": 0.05
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only helps an ally that is next to me (a far wing of a triple battle does not count)",
+        "Does nothing while the move user's own ability is being ignored"
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
     }
   ]
 }

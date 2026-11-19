@@ -1979,10 +1979,23 @@ export abstract class VariableMovePowerAbAttr extends PreAttackAbAttr {
 export class AddMoveFlagAbAttr extends AbAttr {
   private readonly filter: (user: Pokemon, move: Move) => boolean;
   private readonly grantedFlags: MoveFlags[];
+  /** The filter in the `(user, target, move)` shape every other power rule uses; `filter` calls it with no target. */
+  private readonly condition: PokemonAttackCondition;
 
-  constructor(options: { filter: (user: Pokemon, move: Move) => boolean; flags: MoveFlags[] }) {
+  /**
+   * @param options - `flags` are granted to the user's moves that pass the filter. `filter` may be left out when
+   *   `condition` is given (the ability studio rebuilds the class that way).
+   * @param condition - Optional replacement of `options.filter` in the `PokemonAttackCondition` shape (the target is
+   *   always `null`: the rule is asked about a move, not about a target).
+   */
+  constructor(
+    options: { filter?: (user: Pokemon, move: Move) => boolean; flags: MoveFlags[] },
+    condition?: PokemonAttackCondition,
+  ) {
     super(false);
-    this.filter = options.filter;
+    const optionFilter = options.filter;
+    this.condition = condition ?? ((user, _target, move) => optionFilter?.(user, move) ?? false);
+    this.filter = (user, move) => this.condition(user, null, move);
     this.grantedFlags = options.flags;
   }
 
@@ -2096,13 +2109,21 @@ export class MoveTypePowerBoostAbAttr extends MovePowerBoostAbAttr {
 
 export class LowHpMoveTypePowerBoostAbAttr extends MoveTypePowerBoostAbAttr {
   protected override readonly skipDuringMovesetGen = true;
-  // biome-ignore lint/complexity/noUselessConstructor: Changes the constructor params
-  constructor(boostedType: PokemonType) {
-    super(boostedType);
+  /** The "my HP is low" rule: the holder's HP ratio (rounded to two decimals) is at most 0.33 unless replaced. */
+  private readonly lowHpCondition: AbAttrCondition;
+
+  /**
+   * @param boostedType - The move type that is boosted.
+   * @param powerMultiplier - The power multiplier, 1.5 by default.
+   * @param lowHpCondition - The rule that decides when HP counts as low; by default `getHpRatio() <= 0.33`.
+   */
+  constructor(boostedType: PokemonType, powerMultiplier = 1.5, lowHpCondition?: AbAttrCondition) {
+    super(boostedType, powerMultiplier);
+    this.lowHpCondition = lowHpCondition ?? (pokemon => pokemon.getHpRatio() <= 0.33);
   }
 
   getCondition(): AbAttrCondition {
-    return pokemon => pokemon.getHpRatio() <= 0.33;
+    return this.lowHpCondition;
   }
 }
 
