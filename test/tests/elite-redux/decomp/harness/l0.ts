@@ -14,6 +14,7 @@
 
 import { allBindings } from "#data/elite-redux/ability-studio/bindings";
 import { lintDecl } from "#data/elite-redux/ability-studio/decl-lint";
+import { duplicateLabelProblems } from "#data/elite-redux/ability-studio/decl-naming";
 import type { DeclRegistry } from "#data/elite-redux/ability-studio/decl-registry";
 import { isAbsentOptional } from "#data/elite-redux/ability-studio/define-decl";
 import { WHEN_REGISTRY } from "#data/elite-redux/ability-studio/vocabulary/when-registry";
@@ -43,6 +44,11 @@ export function declarationProblems(registry: DeclRegistry): string[] {
       problems.push(`${className}: a verified class needs notes (at least who reviewed it and what was checked)`);
     }
   }
+  problems.push(
+    ...duplicateLabelProblems(
+      registry.all().map(module => ({ className: module.className, label: module.decl.label })),
+    ),
+  );
   return problems;
 }
 

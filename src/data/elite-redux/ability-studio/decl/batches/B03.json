@@ -1,0 +1,328 @@
+{
+  "batch": "B03",
+  "classes": [
+    {
+      "className": "PostAttackApplyBattlerTagAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 2327,
+      "uses": 24,
+      "abilities": [
+        "Balloon Bomb",
+        "Cute Charm",
+        "Deep Cuts",
+        "Deviate",
+        "Frostmaw",
+        "Hollow Ice Zone",
+        "Hydrate",
+        "Icicle Fist",
+        "Mob Boss",
+        "Oblivious",
+        "Prim and Proper",
+        "Puncture",
+        "Pungency",
+        "Pure Love",
+        "Sharp Talons",
+        "Spectralize",
+        "Stench",
+        "Tender Affection",
+        "Two-Faced",
+        "Waterborne",
+        "Wings of Pestilence",
+        "Wrestle Showman"
+      ]
+    },
+    {
+      "className": "PostAttackAbilityGiveAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 2376,
+      "uses": 1,
+      "abilities": ["Blood Stain"]
+    },
+    {
+      "className": "PostDefendStealHeldItemAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 2446,
+      "uses": 1,
+      "abilities": ["Pickpocket"]
+    },
+    {
+      "className": "SynchronizeStatusAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 2522,
+      "uses": 1,
+      "abilities": ["Synchronize"]
+    },
+    {
+      "className": "PostVictoryStatStageChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 2570,
+      "uses": 12,
+      "abilities": [
+        "As One",
+        "Battle Bond",
+        "Beast Boost",
+        "Chilling Neigh",
+        "Crowned King",
+        "Grim Neigh",
+        "Moxie",
+        "Strong-Headed"
+      ]
+    },
+    {
+      "className": "PostVictoryFormChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 2591,
+      "uses": 2,
+      "abilities": ["Battle Bond"]
+    },
+    {
+      "className": "PostKnockOutStatStageChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 2633,
+      "uses": 3,
+      "abilities": ["Fae Heart", "Pure Good", "Soul-Heart"]
+    },
+    {
+      "className": "CopyFaintedAllyAbilityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 2652,
+      "uses": 1,
+      "abilities": ["Receiver"]
+    },
+    {
+      "className": "IgnoreOpponentStatStagesAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 2682,
+      "uses": 10,
+      "abilities": [
+        "Blasé Powder",
+        "Contempt",
+        "Grip Pincer",
+        "In the Clouds",
+        "Lepidopteran",
+        "Mind’s Eye",
+        "Sword of Damnation",
+        "Unaware",
+        "Unintentional Genius",
+        "Venoblaze Pincers"
+      ]
+    },
+    {
+      "className": "IntimidateImmunityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 2709,
+      "uses": 15,
+      "abilities": [
+        "Bird of Prey",
+        "Blind Rage",
+        "Enlightened",
+        "Fighting Spirit",
+        "Heartless Style",
+        "Inner Focus",
+        "Monk",
+        "Oblivious",
+        "Overrule",
+        "Own Tempo",
+        "Qigong",
+        "Scrappy",
+        "Unlocked Potential",
+        "Way of Precision"
+      ]
+    },
+    {
+      "className": "PostIntimidateStatStageChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 2734,
+      "uses": 2,
+      "abilities": ["Guard Dog", "Rattled"]
+    },
+    {
+      "className": "PostSummonRemoveArenaTagAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 2809,
+      "uses": 3,
+      "abilities": ["Demolitionist", "Pickup", "Screen Cleaner"]
+    },
+    {
+      "className": "PostSummonAddArenaTagAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 2846,
+      "uses": 2,
+      "abilities": ["Inverse Room", "Neutralizing Gas"]
+    },
+    {
+      "className": "PostSummonMessageAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 2870,
+      "uses": 23,
+      "abilities": [
+        "Anticipation",
+        "As One",
+        "Aura Break",
+        "Beads of Ruin",
+        "Blind Rage",
+        "Dark Aura",
+        "Dreadful Winds",
+        "Fairy Aura",
+        "Fairy Wings",
+        "Mold Breaker",
+        "Nihil Blaster",
+        "Pressure",
+        "Pure Good",
+        "Sword of Damnation",
+        "Sword of Ruin",
+        "Sword's Nature",
+        "Tablets of Ruin",
+        "Telepathy",
+        "Teravolt",
+        "Turboblaze",
+        "Vessel of Ruin",
+        "Zero to Hero"
+      ]
+    },
+    {
+      "className": "PostSummonUnnamedMessageAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 2887,
+      "uses": 2,
+      "abilities": ["Air Lock", "Malicious Empathy"]
+    },
+    {
+      "className": "PostSummonAddBattlerTagAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 2904,
+      "uses": 10,
+      "abilities": [
+        "Berserk DNA",
+        "Blood Stain",
+        "Energized",
+        "Generator",
+        "Madness Enhancement",
+        "Protosynthesis",
+        "Quark Drive",
+        "Slow Start",
+        "Supreme Overlord",
+        "Truant"
+      ]
+    },
+    {
+      "className": "PostSummonRemoveBattlerTagAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 2931,
+      "uses": 2,
+      "abilities": ["Oblivious", "Own Tempo"]
+    },
+    {
+      "className": "PostSummonStatStageChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 2951,
+      "uses": 23,
+      "abilities": [
+        "Champion's Entrance",
+        "Crowned Shield",
+        "Crowned Sword",
+        "Dauntless Shield",
+        "Embody Aspect",
+        "Fearmonger",
+        "Fire's Wrath",
+        "Furnace",
+        "Gleam Eyes",
+        "Ice Plumes",
+        "Intimidate",
+        "Intrepid Sword",
+        "Mob Boss",
+        "Petrify",
+        "Scare",
+        "Scarecrow",
+        "Spin To Win",
+        "Terrify",
+        "Yuki Onna"
+      ]
+    },
+    {
+      "className": "PostSummonAllyHealAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3041,
+      "uses": 3,
+      "abilities": ["Butter Up", "Food Lovers", "Hospitality"]
+    },
+    {
+      "className": "PostSummonClearAllyStatStagesAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3084,
+      "uses": 2,
+      "abilities": ["Curious Medicine", "CuriusMedicn"]
+    },
+    {
+      "className": "PostSummonClearOpponentPositiveStatStagesAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3120,
+      "uses": 1,
+      "abilities": ["Petrify"]
+    },
+    {
+      "className": "DownloadAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3148,
+      "uses": 1,
+      "abilities": ["Download"]
+    },
+    {
+      "className": "PostSummonTerrainChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3222,
+      "uses": 4,
+      "abilities": ["Electric Surge", "Reap and Sow", "Surges Up", "Teraform Zero"]
+    },
+    {
+      "className": "PostSummonHealStatusAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3243,
+      "uses": 15,
+      "abilities": [
+        "Brainpower",
+        "Flame Bubble",
+        "Immunity",
+        "Insomnia",
+        "Limber",
+        "Magma Armor",
+        "Purifying Waters",
+        "Steadfast",
+        "Superheavy",
+        "Thermal Entropy",
+        "Thermal Exchange",
+        "Vital Spirit",
+        "Water Bubble",
+        "Water Veil"
+      ]
+    },
+    {
+      "className": "PostSummonFormChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3279,
+      "uses": 7,
+      "abilities": ["Ice Face", "Power Construct", "Revelation", "Schooling", "Shields Down", "Tera Shift", "Zen Mode"]
+    },
+    {
+      "className": "PostSummonUserFieldRemoveStatusEffectAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3357,
+      "uses": 1,
+      "abilities": ["Sweet Veil (P)"]
+    },
+    {
+      "className": "PostSummonCopyAllyStatsAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3395,
+      "uses": 1,
+      "abilities": ["Costar"]
+    },
+    {
+      "className": "PostSummonTransformAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3454,
+      "uses": 1,
+      "abilities": ["Imposter"]
+    }
+  ]
+}

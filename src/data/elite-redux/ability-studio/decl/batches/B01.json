@@ -1,0 +1,298 @@
+{
+  "batch": "B01",
+  "classes": [
+    {
+      "className": "BlockRecoilDamageAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 250,
+      "uses": 5,
+      "abilities": ["Brute Force", "Madness Enhancement", "Rock Head", "Steel Barrel", "Thick Skulled"]
+    },
+    {
+      "className": "DoubleBattleChanceAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 267,
+      "uses": 4,
+      "abilities": ["Arena Trap", "Brawling Wyvern", "Commander", "No Guard"]
+    },
+    {
+      "className": "PostBattleInitFormChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 284,
+      "uses": 10,
+      "abilities": [
+        "Battle Bond",
+        "Disguise",
+        "Ice Face",
+        "Patchwork",
+        "Power Construct",
+        "Revelation",
+        "Schooling",
+        "Shields Down",
+        "Zen Mode",
+        "Zero to Hero"
+      ]
+    },
+    {
+      "className": "PreDefendFullHpEndureAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 334,
+      "uses": 2,
+      "abilities": ["Immovable Object", "Sturdy"]
+    },
+    {
+      "className": "BlockItemTheftAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 351,
+      "uses": 3,
+      "abilities": ["Slime Mold", "Sticky Hold", "Supersweet Syrup"]
+    },
+    {
+      "className": "StabBoostAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 365,
+      "uses": 4,
+      "abilities": ["Adaptability", "RKS System", "Waterborne"]
+    },
+    {
+      "className": "AlliedFieldDamageReductionAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 411,
+      "uses": 3,
+      "abilities": ["Caretaker", "Food Lovers", "Friend Guard"]
+    },
+    {
+      "className": "ReceivedTypeDamageMultiplierAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 424,
+      "uses": 42,
+      "abilities": [
+        "Crude Steel",
+        "Droideka",
+        "Dry Skin",
+        "Flame Bubble",
+        "Fluffiest",
+        "Heatproof",
+        "Immunity",
+        "Iron Giant",
+        "Liquified",
+        "Magma Armor",
+        "Moon Spirit",
+        "Nocturnal",
+        "Nucleus",
+        "Old Mariner",
+        "Prankster",
+        "Puffy",
+        "Purifying Salt",
+        "Seaweed",
+        "Solar Panel",
+        "Stainless Steel",
+        "Steelworker",
+        "Sumo Guard",
+        "Thermal Entropy",
+        "Thick Fat",
+        "Thick Skulled",
+        "Tummyache",
+        "Water Bubble",
+        "Water Compaction",
+        "Weighted Scales"
+      ]
+    },
+    {
+      "className": "TypeImmunityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 458,
+      "uses": 1,
+      "abilities": ["Low Tide"]
+    },
+    {
+      "className": "TypeImmunityHealAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 508,
+      "uses": 9,
+      "abilities": [
+        "Desolate Sun",
+        "Dry Skin",
+        "Earth Eater",
+        "Elemental Vortex",
+        "Exo Armor",
+        "Old Ocean Relic",
+        "Reservoir",
+        "Volt Absorb",
+        "Water Absorb"
+      ]
+    },
+    {
+      "className": "TypeImmunityStatStageChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 534,
+      "uses": 4,
+      "abilities": ["Glycolysis", "Justified", "Motor Drive", "Well-Baked Body"]
+    },
+    {
+      "className": "TypeImmunityAddBattlerTagAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 561,
+      "uses": 3,
+      "abilities": ["Elemental Vortex", "Flash Fire"]
+    },
+    {
+      "className": "NonSuperEffectiveImmunityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 582,
+      "uses": 1,
+      "abilities": ["Wonder Guard"]
+    },
+    {
+      "className": "FullHpResistTypeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 608,
+      "uses": 2,
+      "abilities": ["Tera Shell", "Teraform Zero"]
+    },
+    {
+      "className": "FieldPriorityMoveImmunityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 635,
+      "uses": 15,
+      "abilities": [
+        "Armor Tail",
+        "Dazzling",
+        "Duplicity",
+        "Empress",
+        "Jungle's Guard",
+        "Lucha Libre",
+        "Moonarch",
+        "Queenly Majesty",
+        "Radiant Jewel",
+        "Rain Shroud",
+        "Royal Decree",
+        "Sand Fiend",
+        "Sand Guard",
+        "Sepia Lens",
+        "Sun Basking"
+      ]
+    },
+    {
+      "className": "MoveImmunityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 652,
+      "uses": 10,
+      "abilities": [
+        "Bulletproof",
+        "Chestnut Shield",
+        "Good as Gold",
+        "Guardian Coat",
+        "Overcoat",
+        "Parroting",
+        "Powder Burst",
+        "Shield Dust",
+        "Soundproof",
+        "Telepathy"
+      ]
+    },
+    {
+      "className": "MoveImmunityStatStageChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 697,
+      "uses": 1,
+      "abilities": ["Wind Rider"]
+    },
+    {
+      "className": "ReverseDrainAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 757,
+      "uses": 1,
+      "abilities": ["Liquid Ooze"]
+    },
+    {
+      "className": "PostDefendStatStageChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 791,
+      "uses": 18,
+      "abilities": [
+        "Cotton Down",
+        "Crowned Shield",
+        "Gooey",
+        "Massive Pelt",
+        "Moustache",
+        "Mucus Membrane",
+        "Rattled",
+        "Slime Mold",
+        "Stamina",
+        "Steam Engine",
+        "Tangling Hair",
+        "Thermal Entropy",
+        "Thermal Exchange",
+        "Water Compaction",
+        "Weak Armor"
+      ]
+    },
+    {
+      "className": "PostDefendHpGatedStatStageChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 858,
+      "uses": 3,
+      "abilities": ["Anger Shell", "No Turning Back"]
+    },
+    {
+      "className": "PostDefendApplyArenaTrapTagAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 913,
+      "uses": 1,
+      "abilities": ["Toxic Debris"]
+    },
+    {
+      "className": "PostDefendApplyBattlerTagAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 942,
+      "uses": 3,
+      "abilities": ["Atomic Burst", "Electromorphosis", "Wind Power"]
+    },
+    {
+      "className": "PreHitResistTypeChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 1022,
+      "uses": 2,
+      "abilities": ["Color Change", "Prismatic Fur"]
+    },
+    {
+      "className": "PostDefendTerrainChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 1065,
+      "uses": 1,
+      "abilities": ["Seed Sower"]
+    },
+    {
+      "className": "PostDefendPartyStatusHealAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 1093,
+      "uses": 1,
+      "abilities": ["Seed Sower"]
+    },
+    {
+      "className": "EffectSporeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 1186,
+      "uses": 1,
+      "abilities": ["Effect Spore"]
+    },
+    {
+      "className": "PostDefendContactApplyTagChanceAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 1200,
+      "uses": 10,
+      "abilities": [
+        "Cute Charm",
+        "Ice Body",
+        "Massive Pelt",
+        "Moustache",
+        "Prim and Proper",
+        "Pure Love",
+        "Sundae",
+        "Tangling Hair",
+        "Tender Affection"
+      ]
+    }
+  ]
+}

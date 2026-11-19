@@ -1,0 +1,246 @@
+{
+  "batch": "B06",
+  "classes": [
+    {
+      "className": "PostTurnStatusHealAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5306,
+      "uses": 1,
+      "abilities": ["Poison Heal"]
+    },
+    {
+      "className": "PostTurnResetStatusAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5342,
+      "uses": 12,
+      "abilities": [
+        "Big Leaves",
+        "Caretaker",
+        "Healer",
+        "Hydration",
+        "Leaf Guard",
+        "Pattern Change",
+        "Purifying Waters",
+        "Shed Skin",
+        "Sun's Bounty",
+        "Wonder Scale"
+      ]
+    },
+    {
+      "className": "PostTurnRestoreBerryAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5388,
+      "uses": 5,
+      "abilities": ["Big Leaves", "Glycolysis", "Harvest", "Serfdom", "Sun's Bounty"]
+    },
+    {
+      "className": "CudChewConsumeBerryAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5480,
+      "uses": 1,
+      "abilities": ["Cud Chew"]
+    },
+    {
+      "className": "CudChewRecordBerryAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5519,
+      "uses": 1,
+      "abilities": ["Cud Chew"]
+    },
+    {
+      "className": "MoodyAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5538,
+      "uses": 1,
+      "abilities": ["Moody"]
+    },
+    {
+      "className": "SpeedBoostAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5570,
+      "uses": 2,
+      "abilities": ["Max Acceleration", "Speed Boost"]
+    },
+    {
+      "className": "PostTurnFormChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5609,
+      "uses": 9,
+      "abilities": [
+        "Hunger Switch",
+        "Power Construct",
+        "Revelation",
+        "Schooling",
+        "Shields Down",
+        "Two-Faced",
+        "Zen Mode"
+      ]
+    },
+    {
+      "className": "PostBiomeChangeWeatherChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5713,
+      "uses": 6,
+      "abilities": ["Blistering Sun", "Delta Stream", "Desolate Land", "Desolate Sun", "Fire Aspect", "Primordial Sea"]
+    },
+    {
+      "className": "PostBiomeChangeTerrainChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5735,
+      "uses": 8,
+      "abilities": [
+        "Electric Surge",
+        "Grassy Surge",
+        "Hadron Engine",
+        "Misty Surge",
+        "Psychic Supremacy",
+        "Psychic Surge",
+        "Reap and Sow",
+        "Surges Up"
+      ]
+    },
+    {
+      "className": "PostDancingMoveAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5774,
+      "uses": 2,
+      "abilities": ["Dancer", "Samba"]
+    },
+    {
+      "className": "StatStageChangeMultiplierAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5877,
+      "uses": 2,
+      "abilities": ["Contrary", "Simple"]
+    },
+    {
+      "className": "BypassBurnDamageReductionAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5915,
+      "uses": 8,
+      "abilities": ["Determination", "Droideka", "Guts", "Heatproof", "Iron Giant", "Rage Point", "Thermal Entropy"]
+    },
+    {
+      "className": "FullBurnDamageImmunityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5955,
+      "uses": 5,
+      "abilities": ["Droideka", "Heatproof", "Iron Giant", "Thermal Entropy"]
+    },
+    {
+      "className": "DoubleBerryEffectAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5970,
+      "uses": 2,
+      "abilities": ["Apple Pie", "Ripen"]
+    },
+    {
+      "className": "PreventBerryUseAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5980,
+      "uses": 9,
+      "abilities": ["As One", "Crowned King", "Klutz", "Unnerve", "Voracity"]
+    },
+    {
+      "className": "PreventItemUseAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5989,
+      "uses": 10,
+      "abilities": ["As One", "Crowned King", "Klutz", "Unnerve", "Voracity"]
+    },
+    {
+      "className": "HealFromBerryUseAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5995,
+      "uses": 2,
+      "abilities": ["Gluttony", "Voracity"]
+    },
+    {
+      "className": "RunSuccessAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6031,
+      "uses": 7,
+      "abilities": ["Coward", "Dust Cloud", "Emergency Exit", "Rattled", "Run Away", "Tactical Retreat", "Wimp Out"]
+    },
+    {
+      "className": "ArenaTrapAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6066,
+      "uses": 5,
+      "abilities": ["Arena Trap", "Frenzied Phantom", "Magnet Pull", "Salt Circle", "Shadow Tag"]
+    },
+    {
+      "className": "MaxMultiHitAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6099,
+      "uses": 2,
+      "abilities": ["Ninja's Blade", "Skill Link"]
+    },
+    {
+      "className": "PostBattleLootAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6127,
+      "uses": 1,
+      "abilities": ["Pickup"]
+    },
+    {
+      "className": "PostFaintUnsuppressedWeatherFormChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6182,
+      "uses": 3,
+      "abilities": ["Air Lock", "Cloud Nine", "In the Clouds"]
+    },
+    {
+      "className": "PostFaintFormChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6198,
+      "uses": 5,
+      "abilities": ["Battle Bond", "Disguise", "Patchwork", "Power Construct", "Revelation"]
+    },
+    {
+      "className": "PostFaintHPDamageAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6275,
+      "uses": 1,
+      "abilities": ["Innards Out"]
+    },
+    {
+      "className": "RedirectTypeMoveAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6352,
+      "uses": 9,
+      "abilities": [
+        "Alluring Skull",
+        "Capacitor Bank",
+        "Heat Sink",
+        "Ice Dew",
+        "Lightning Rod",
+        "Low Tide",
+        "Poison Absorb",
+        "Reservoir",
+        "Storm Drain"
+      ]
+    },
+    {
+      "className": "BlockRedirectAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6372,
+      "uses": 3,
+      "abilities": ["Old Ocean Relic", "Propeller Tail", "Stalwart"]
+    },
+    {
+      "className": "ReduceStatusEffectDurationAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6388,
+      "uses": 1,
+      "abilities": ["Early Bird"]
+    },
+    {
+      "className": "FlinchStatStageChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6419,
+      "uses": 3,
+      "abilities": ["Rattled", "Steadfast", "Superheavy"]
+    }
+  ]
+}

@@ -1,0 +1,355 @@
+{
+  "batch": "B14",
+  "classes": [
+    {
+      "className": "AstralProjectStarMarkerAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts",
+      "line": 154,
+      "uses": 1,
+      "abilities": ["Astral Project"]
+    },
+    {
+      "className": "PhotovoltaicTypeAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts",
+      "line": 246,
+      "uses": 1,
+      "abilities": ["Photovoltaic"]
+    },
+    {
+      "className": "PentaPunchMarkerAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts",
+      "line": 371,
+      "uses": 1,
+      "abilities": ["Penta-Punch"]
+    },
+    {
+      "className": "PerpetualMotionProgressAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts",
+      "line": 697,
+      "uses": 1,
+      "abilities": ["Perpetual Motion"]
+    },
+    {
+      "className": "PerpetualMotionPowerAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts",
+      "line": 723,
+      "uses": 1,
+      "abilities": ["Perpetual Motion"]
+    },
+    {
+      "className": "PropheticAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts",
+      "line": 1244,
+      "uses": 1,
+      "abilities": ["Prophetic"]
+    },
+    {
+      "className": "SouthernCrossPunchAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts",
+      "line": 1268,
+      "uses": 1,
+      "abilities": ["Southern Cross Punch"]
+    },
+    {
+      "className": "BitterDrillAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts",
+      "line": 1315,
+      "uses": 1,
+      "abilities": ["Bitter Drill"]
+    },
+    {
+      "className": "BitterDrillDamageAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts",
+      "line": 1333,
+      "uses": 1,
+      "abilities": ["Bitter Drill"]
+    },
+    {
+      "className": "MiracleBladeTypeChartAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts",
+      "line": 1363,
+      "uses": 1,
+      "abilities": ["Miracle Blade"]
+    },
+    {
+      "className": "SpiritualSaberNoContactAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts",
+      "line": 1405,
+      "uses": 1,
+      "abilities": ["Spiritual Saber"]
+    },
+    {
+      "className": "ManifestContactAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts",
+      "line": 1412,
+      "uses": 1,
+      "abilities": ["Manifest"]
+    },
+    {
+      "className": "SlabsCurseAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts",
+      "line": 1423,
+      "uses": 1,
+      "abilities": ["Slab's Curse"]
+    },
+    {
+      "className": "BoobyTrapAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts",
+      "line": 1446,
+      "uses": 1,
+      "abilities": ["Booby Trap"]
+    },
+    {
+      "className": "BoobyTrapItemLostAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts",
+      "line": 1475,
+      "uses": 1,
+      "abilities": ["Booby Trap"]
+    },
+    {
+      "className": "OfudaAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts",
+      "line": 1499,
+      "uses": 1,
+      "abilities": ["Ofuda"]
+    },
+    {
+      "className": "LowTideWaterSurfAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts",
+      "line": 1518,
+      "uses": 1,
+      "abilities": ["Low Tide"]
+    },
+    {
+      "className": "SeaSpecterAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts",
+      "line": 1541,
+      "uses": 1,
+      "abilities": ["Sea Specter"]
+    },
+    {
+      "className": "CelestialJellyAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts",
+      "line": 1559,
+      "uses": 1,
+      "abilities": ["Celestial Jelly"]
+    },
+    {
+      "className": "ReductionRuneAbAttr",
+      "file": "src/data/elite-redux/abilities/bernerd-roster-mechanics.ts",
+      "line": 78,
+      "uses": 1,
+      "abilities": ["Reduction Rune"]
+    },
+    {
+      "className": "FreeAimAbAttr",
+      "file": "src/data/elite-redux/abilities/bernerd-roster-mechanics.ts",
+      "line": 81,
+      "uses": 1,
+      "abilities": ["Free Aim"]
+    },
+    {
+      "className": "AmaterasuMarkerAbAttr",
+      "file": "src/data/elite-redux/abilities/bernerd-roster-mechanics.ts",
+      "line": 84,
+      "uses": 2,
+      "abilities": ["Amaterasu", "Blaze Release"]
+    },
+    {
+      "className": "RagingFistAbAttr",
+      "file": "src/data/elite-redux/abilities/bernerd-roster-mechanics.ts",
+      "line": 87,
+      "uses": 1,
+      "abilities": ["Raging Fist"]
+    },
+    {
+      "className": "MonkFocusPunchAbAttr",
+      "file": "src/data/elite-redux/abilities/bernerd-roster-mechanics.ts",
+      "line": 90,
+      "uses": 1,
+      "abilities": ["Monk"]
+    },
+    {
+      "className": "CranisphereSkullBashAbAttr",
+      "file": "src/data/elite-redux/abilities/bernerd-roster-mechanics.ts",
+      "line": 93,
+      "uses": 1,
+      "abilities": ["Cranisphere"]
+    },
+    {
+      "className": "MudballReactiveAbAttr",
+      "file": "src/data/elite-redux/abilities/bernerd-roster-mechanics.ts",
+      "line": 96,
+      "uses": 1,
+      "abilities": ["Mudball"]
+    },
+    {
+      "className": "LowerOffenseMoveCategoryAbAttr",
+      "file": "src/data/elite-redux/abilities/bernerd-roster-mechanics.ts",
+      "line": 99,
+      "uses": 1,
+      "abilities": ["Subversion"]
+    },
+    {
+      "className": "GritAttackStatAbAttr",
+      "file": "src/data/elite-redux/abilities/bernerd-roster-mechanics.ts",
+      "line": 111,
+      "uses": 1,
+      "abilities": ["Grit"]
+    },
+    {
+      "className": "SharingIsScaringAbAttr",
+      "file": "src/data/elite-redux/abilities/bernerd-roster-mechanics.ts",
+      "line": 249,
+      "uses": 1,
+      "abilities": ["Sharing is Scaring"]
+    },
+    {
+      "className": "RaichuTerrainStatMultiplierAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-raichu.ts",
+      "line": 222,
+      "uses": 4,
+      "abilities": ["Demodulator", "Modulator"]
+    },
+    {
+      "className": "RaichuAllyStatMultiplierAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-raichu.ts",
+      "line": 229,
+      "uses": 4,
+      "abilities": ["Demodulator", "Modulator"]
+    },
+    {
+      "className": "ElectrodynamicsPositionAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-raichu.ts",
+      "line": 251,
+      "uses": 1,
+      "abilities": ["Electrodynamics"]
+    },
+    {
+      "className": "PsionicTerrainPowerAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-raichu.ts",
+      "line": 260,
+      "uses": 1,
+      "abilities": ["Psionic"]
+    },
+    {
+      "className": "ElectrodynamicsTerrainPowerAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-raichu.ts",
+      "line": 267,
+      "uses": 1,
+      "abilities": ["Electrodynamics"]
+    },
+    {
+      "className": "ElectrodynamicsGalvanizeAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-raichu.ts",
+      "line": 278,
+      "uses": 1,
+      "abilities": ["Electrodynamics"]
+    },
+    {
+      "className": "ElectrodynamicsGalvanizePowerAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-raichu.ts",
+      "line": 285,
+      "uses": 1,
+      "abilities": ["Electrodynamics"]
+    },
+    {
+      "className": "RaichuAllTerrainSurgeSurferAbAttr",
+      "file": "src/data/elite-redux/abilities/fakemon-pitch-raichu.ts",
+      "line": 292,
+      "uses": 1,
+      "abilities": ["Surges Up"]
+    },
+    {
+      "className": "SynchronizedCurrentAbAttr",
+      "file": "src/data/elite-redux/abilities/plusle-minun.ts",
+      "line": 151,
+      "uses": 1,
+      "abilities": ["Synchronized Current"]
+    },
+    {
+      "className": "SynchronizedCurrentBothAttackPowerAbAttr",
+      "file": "src/data/elite-redux/abilities/plusle-minun.ts",
+      "line": 207,
+      "uses": 1,
+      "abilities": ["Synchronized Current"]
+    },
+    {
+      "className": "SynchronizedCurrentHealAbAttr",
+      "file": "src/data/elite-redux/abilities/plusle-minun.ts",
+      "line": 244,
+      "uses": 1,
+      "abilities": ["Synchronized Current"]
+    },
+    {
+      "className": "PositiveFeedbackPowerAbAttr",
+      "file": "src/data/elite-redux/abilities/plusle-minun.ts",
+      "line": 274,
+      "uses": 1,
+      "abilities": ["Positive Feedback"]
+    },
+    {
+      "className": "PositiveFeedbackAbAttr",
+      "file": "src/data/elite-redux/abilities/plusle-minun.ts",
+      "line": 285,
+      "uses": 1,
+      "abilities": ["Positive Feedback"]
+    },
+    {
+      "className": "NegativeFeedbackAbAttr",
+      "file": "src/data/elite-redux/abilities/plusle-minun.ts",
+      "line": 310,
+      "uses": 1,
+      "abilities": ["Negative Feedback"]
+    },
+    {
+      "className": "ClosedCircuitAbAttr",
+      "file": "src/data/elite-redux/abilities/plusle-minun.ts",
+      "line": 332,
+      "uses": 1,
+      "abilities": ["Closed Circuit"]
+    },
+    {
+      "className": "CapacitorBankGainAbAttr",
+      "file": "src/data/elite-redux/abilities/electivire.ts",
+      "line": 101,
+      "uses": 1,
+      "abilities": ["Capacitor Bank"]
+    },
+    {
+      "className": "CapacitorBankAbsorbAbAttr",
+      "file": "src/data/elite-redux/abilities/electivire.ts",
+      "line": 155,
+      "uses": 1,
+      "abilities": ["Capacitor Bank"]
+    },
+    {
+      "className": "FaultCurrentAbAttr",
+      "file": "src/data/elite-redux/abilities/electivire.ts",
+      "line": 178,
+      "uses": 1,
+      "abilities": ["Fault Current"]
+    },
+    {
+      "className": "OverloadedPowerAbAttr",
+      "file": "src/data/elite-redux/abilities/electivire.ts",
+      "line": 218,
+      "uses": 1,
+      "abilities": ["Overloaded"]
+    },
+    {
+      "className": "OverloadedPriorityAbAttr",
+      "file": "src/data/elite-redux/abilities/electivire.ts",
+      "line": 229,
+      "uses": 1,
+      "abilities": ["Overloaded"]
+    },
+    {
+      "className": "OverloadedChipAbAttr",
+      "file": "src/data/elite-redux/abilities/electivire.ts",
+      "line": 242,
+      "uses": 1,
+      "abilities": ["Overloaded"]
+    }
+  ]
+}

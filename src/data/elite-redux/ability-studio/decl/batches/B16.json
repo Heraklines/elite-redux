@@ -1,0 +1,202 @@
+{
+  "batch": "B16",
+  "classes": [
+    {
+      "className": "ErBadDreamsAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Bad Dreams"]
+    },
+    {
+      "className": "BallasterResetAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Ballaster"]
+    },
+    {
+      "className": "BallasterAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Ballaster"]
+    },
+    {
+      "className": "StellarizeTypeAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 2,
+      "abilities": ["Bejeweled", "Stellarize"]
+    },
+    {
+      "className": "StellarizePowerAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 2,
+      "abilities": ["Bejeweled", "Stellarize"]
+    },
+    {
+      "className": "BlindJusticeAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Blind Justice"]
+    },
+    {
+      "className": "ConfectiousEntryAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Confectious"]
+    },
+    {
+      "className": "ConfectiousAttackAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Confectious"]
+    },
+    {
+      "className": "ConfectiousDefendAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Confectious"]
+    },
+    {
+      "className": "ContaminatedHitMultiplierAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Contaminated"]
+    },
+    {
+      "className": "CyberkineticAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Cyberkinetic"]
+    },
+    {
+      "className": "DecayEntryAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Decay"]
+    },
+    {
+      "className": "DecayRestoreAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Decay"]
+    },
+    {
+      "className": "ErDefeatistStatMultiplierAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 2,
+      "abilities": ["Defeatist"]
+    },
+    {
+      "className": "ErWeatherSummonAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 10,
+      "abilities": [
+        "Drizzle",
+        "Drought",
+        "Orichalcum Pulse",
+        "Sand Bender",
+        "Sand Stream",
+        "Seaborne",
+        "Snow Warning",
+        "Solar Panel",
+        "Sundae",
+        "Supercell"
+      ]
+    },
+    {
+      "className": "ErBiomeChangeWeatherAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 10,
+      "abilities": [
+        "Drizzle",
+        "Drought",
+        "Orichalcum Pulse",
+        "Sand Bender",
+        "Sand Stream",
+        "Seaborne",
+        "Snow Warning",
+        "Solar Panel",
+        "Sundae",
+        "Supercell"
+      ]
+    },
+    {
+      "className": "ElectromancyEffectChanceAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Electromancy"]
+    },
+    {
+      "className": "EulogyAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Eulogy"]
+    },
+    {
+      "className": "PostSummonWonderRoomAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["False Equivalence"]
+    },
+    {
+      "className": "ErTerrainSummonAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 5,
+      "abilities": ["Grassy Surge", "Hadron Engine", "Misty Surge", "Psychic Supremacy", "Psychic Surge"]
+    },
+    {
+      "className": "HijackAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Hijack"]
+    },
+    {
+      "className": "HydromancyEffectChanceAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Hydromancy"]
+    },
+    {
+      "className": "IrradiatedFistAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Irradiated Fist"]
+    },
+    {
+      "className": "JackpotBattleBuffAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Jackpot"]
+    },
+    {
+      "className": "KnuckleDownAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Knuckle Down"]
+    }
+  ]
+}

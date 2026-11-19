@@ -1,0 +1,291 @@
+{
+  "batch": "B04",
+  "classes": [
+    {
+      "className": "PostSummonWeatherSuppressedFormChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3496,
+      "uses": 3,
+      "abilities": ["Air Lock", "Cloud Nine", "In the Clouds"]
+    },
+    {
+      "className": "PostSummonClearWeatherAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3520,
+      "uses": 2,
+      "abilities": ["Cloud Nine", "In the Clouds"]
+    },
+    {
+      "className": "PostSummonFormChangeByWeatherAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3537,
+      "uses": 2,
+      "abilities": ["Flower Gift", "Forecast"]
+    },
+    {
+      "className": "CommanderAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3567,
+      "uses": 1,
+      "abilities": ["Commander"]
+    },
+    {
+      "className": "PreSwitchOutResetStatusAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3623,
+      "uses": 3,
+      "abilities": ["Natural Cure", "Natural Recovery", "Self Repair"]
+    },
+    {
+      "className": "PreSwitchOutHealAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3643,
+      "uses": 3,
+      "abilities": ["Eternal Blessing", "Natural Recovery", "Regenerator"]
+    },
+    {
+      "className": "PreSwitchOutFormChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3662,
+      "uses": 1,
+      "abilities": ["Zero to Hero"]
+    },
+    {
+      "className": "PreLeaveFieldClearWeatherAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3694,
+      "uses": 6,
+      "abilities": ["Blistering Sun", "Delta Stream", "Desolate Land", "Desolate Sun", "Fire Aspect", "Primordial Sea"]
+    },
+    {
+      "className": "PreLeaveFieldRemoveSuppressAbilitiesSourceAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3730,
+      "uses": 1,
+      "abilities": ["Neutralizing Gas"]
+    },
+    {
+      "className": "ReflectStatStageChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3776,
+      "uses": 3,
+      "abilities": ["Crystalline Armor", "In the Rough", "Mirror Armor"]
+    },
+    {
+      "className": "ProtectStatAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3820,
+      "uses": 10,
+      "abilities": [
+        "Clear Body",
+        "Exosuit",
+        "Free Climb",
+        "Full Metal Body",
+        "Hyper Cutter",
+        "Keen Eye",
+        "Mind’s Eye",
+        "Unburden",
+        "White Smoke"
+      ]
+    },
+    {
+      "className": "SelfStatDropImmunityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3860,
+      "uses": 9,
+      "abilities": [
+        "Clear Body",
+        "Exosuit",
+        "Free Climb",
+        "Full Metal Body",
+        "Limber",
+        "Lucky Halo",
+        "Steadfast",
+        "Superheavy",
+        "Unburden"
+      ]
+    },
+    {
+      "className": "UserFieldSelfStatDropImmunityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3897,
+      "uses": 1,
+      "abilities": ["Evaporate"]
+    },
+    {
+      "className": "ConfusionOnStatusEffectAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3911,
+      "uses": 1,
+      "abilities": ["Poison Puppeteer"]
+    },
+    {
+      "className": "StatusEffectImmunityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 3991,
+      "uses": 21,
+      "abilities": [
+        "Brainpower",
+        "Comatose",
+        "Dreamscape",
+        "Flame Bubble",
+        "Honk Shoo",
+        "Immunity",
+        "Insomnia",
+        "Limber",
+        "Magma Armor",
+        "Phoenix Foliage",
+        "Purifying Salt",
+        "Purifying Waters",
+        "Shields Down",
+        "Steadfast",
+        "Superheavy",
+        "Thermal Entropy",
+        "Thermal Exchange",
+        "Vital Spirit",
+        "Water Bubble",
+        "Water Veil"
+      ]
+    },
+    {
+      "className": "UserFieldStatusEffectImmunityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4007,
+      "uses": 1,
+      "abilities": ["Sweet Veil (P)"]
+    },
+    {
+      "className": "ConditionalUserFieldStatusEffectImmunityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4036,
+      "uses": 2,
+      "abilities": ["Flower Veil", "Jungle's Guard"]
+    },
+    {
+      "className": "ConditionalUserFieldProtectStatAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4077,
+      "uses": 2,
+      "abilities": ["Flower Veil", "Jungle's Guard"]
+    },
+    {
+      "className": "BattlerTagImmunityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4167,
+      "uses": 18,
+      "abilities": [
+        "Blood Bath",
+        "Bloodlust",
+        "Brainpower",
+        "Comatose",
+        "Discipline",
+        "Dreamscape",
+        "Enlightened",
+        "Heartless Style",
+        "Honk Shoo",
+        "Inner Focus",
+        "Insomnia",
+        "Monk",
+        "Oblivious",
+        "Own Tempo",
+        "Shields Down",
+        "Unlocked Potential",
+        "Vital Spirit",
+        "Way of Precision"
+      ]
+    },
+    {
+      "className": "UserFieldBattlerTagImmunityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4175,
+      "uses": 2,
+      "abilities": ["Aroma Veil", "Sweet Veil (P)"]
+    },
+    {
+      "className": "ConditionalUserFieldBattlerTagImmunityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4177,
+      "uses": 2,
+      "abilities": ["Flower Veil", "Jungle's Guard"]
+    },
+    {
+      "className": "BlockCritAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4202,
+      "uses": 16,
+      "abilities": [
+        "Battle Armor",
+        "Droideka",
+        "Exo Armor",
+        "Exosuit",
+        "Faraday Cage",
+        "Fortress",
+        "Malicious Empathy",
+        "Old Ocean Relic",
+        "Shattered Armor",
+        "Shell Armor",
+        "Spin To Win",
+        "Stalwart",
+        "Thunder Gods Vessel",
+        "Toxic Shell",
+        "Voltron"
+      ]
+    },
+    {
+      "className": "EnemyMinDamageRollAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4227,
+      "uses": 3,
+      "abilities": ["Bad Luck", "Bad Omen", "Scarecrow"]
+    },
+    {
+      "className": "DefensiveStatSubstituteAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4250,
+      "uses": 1,
+      "abilities": ["Tangled Feet"]
+    },
+    {
+      "className": "CritUseLowerDefensiveStatAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4278,
+      "uses": 3,
+      "abilities": ["Celestial Bow", "Deadeye", "Hunter's Mark"]
+    },
+    {
+      "className": "BadDreamsImmunityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4332,
+      "uses": 3,
+      "abilities": ["Honk Shoo", "Peaceful Slumber", "Sweet Dreams"]
+    },
+    {
+      "className": "BugPowderImmunityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4346,
+      "uses": 2,
+      "abilities": ["Pollinate", "Steel Beetle"]
+    },
+    {
+      "className": "IgnoreGenderInfatuationAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4360,
+      "uses": 1,
+      "abilities": ["Beautiful Music"]
+    },
+    {
+      "className": "SwitchWhileRampagingAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4379,
+      "uses": 1,
+      "abilities": ["Discipline"]
+    },
+    {
+      "className": "PreserveBaseStatAbilitiesAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4395,
+      "uses": 3,
+      "abilities": ["Blind Rage", "Teravolt", "Turboblaze"]
+    }
+  ]
+}

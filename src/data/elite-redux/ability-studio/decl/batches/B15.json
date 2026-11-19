@@ -1,0 +1,336 @@
+{
+  "batch": "B15",
+  "classes": [
+    {
+      "className": "BadSpliceAbAttr",
+      "file": "src/data/elite-redux/abilities/bad-splice.ts",
+      "line": 132,
+      "uses": 1,
+      "abilities": ["Bad Splice"]
+    },
+    {
+      "className": "SwirlifyAbAttr",
+      "file": "src/data/elite-redux/abilities/barbaracle-mechanics.ts",
+      "line": 70,
+      "uses": 1,
+      "abilities": ["Swirlify"]
+    },
+    {
+      "className": "BrainOverBrawnTypeAbAttr",
+      "file": "src/data/elite-redux/abilities/barbaracle-mechanics.ts",
+      "line": 101,
+      "uses": 2,
+      "abilities": ["Bodhisattva", "Brain Over Brawn"]
+    },
+    {
+      "className": "BrainOverBrawnPowerAbAttr",
+      "file": "src/data/elite-redux/abilities/barbaracle-mechanics.ts",
+      "line": 108,
+      "uses": 2,
+      "abilities": ["Bodhisattva", "Brain Over Brawn"]
+    },
+    {
+      "className": "RapierFlagInjectionAbAttr",
+      "file": "src/data/elite-redux/abilities/barbaracle-mechanics.ts",
+      "line": 149,
+      "uses": 1,
+      "abilities": ["Rapier"]
+    },
+    {
+      "className": "BorrowedTimeSummonAbAttr",
+      "file": "src/data/elite-redux/abilities/borrowed-time.ts",
+      "line": 69,
+      "uses": 1,
+      "abilities": ["Borrowed Time"]
+    },
+    {
+      "className": "BorrowedTimeDecayAbAttr",
+      "file": "src/data/elite-redux/abilities/borrowed-time.ts",
+      "line": 104,
+      "uses": 1,
+      "abilities": ["Borrowed Time"]
+    },
+    {
+      "className": "ChivalryAbAttr",
+      "file": "src/data/elite-redux/abilities/chivalry.ts",
+      "line": 48,
+      "uses": 1,
+      "abilities": ["Chivalry"]
+    },
+    {
+      "className": "CleansingLightAbAttr",
+      "file": "src/data/elite-redux/abilities/cleansing-light.ts",
+      "line": 59,
+      "uses": 1,
+      "abilities": ["Cleansing Light"]
+    },
+    {
+      "className": "CommonRootAbAttr",
+      "file": "src/data/elite-redux/abilities/common-root.ts",
+      "line": 25,
+      "uses": 1,
+      "abilities": ["Common Root"]
+    },
+    {
+      "className": "CrosscutSecondStrikeAbAttr",
+      "file": "src/data/elite-redux/abilities/crosscut.ts",
+      "line": 67,
+      "uses": 1,
+      "abilities": ["Crosscut"]
+    },
+    {
+      "className": "CrosscutPowerAbAttr",
+      "file": "src/data/elite-redux/abilities/crosscut.ts",
+      "line": 99,
+      "uses": 1,
+      "abilities": ["Crosscut"]
+    },
+    {
+      "className": "DandelionBurstAbAttr",
+      "file": "src/data/elite-redux/abilities/dandelion-burst.ts",
+      "line": 41,
+      "uses": 1,
+      "abilities": ["Dandelion Burst"]
+    },
+    {
+      "className": "DraconicVoodooAbAttr",
+      "file": "src/data/elite-redux/abilities/draconic-voodoo.ts",
+      "line": 71,
+      "uses": 1,
+      "abilities": ["Draconic Voodoo"]
+    },
+    {
+      "className": "GenesisSupernovaAbAttr",
+      "file": "src/data/elite-redux/abilities/genesis-supernova.ts",
+      "line": 32,
+      "uses": 1,
+      "abilities": ["Genesis Supernova"]
+    },
+    {
+      "className": "HeartbreakAbAttr",
+      "file": "src/data/elite-redux/abilities/heartbreak.ts",
+      "line": 32,
+      "uses": 1,
+      "abilities": ["Heartbreak"]
+    },
+    {
+      "className": "HydrapexAbAttr",
+      "file": "src/data/elite-redux/abilities/hydrapex.ts",
+      "line": 51,
+      "uses": 1,
+      "abilities": ["Hydrapex"]
+    },
+    {
+      "className": "LastHostAbAttr",
+      "file": "src/data/elite-redux/abilities/last-host.ts",
+      "line": 37,
+      "uses": 1,
+      "abilities": ["Last Host"]
+    },
+    {
+      "className": "LibraryAbAttr",
+      "file": "src/data/elite-redux/abilities/library.ts",
+      "line": 43,
+      "uses": 1,
+      "abilities": ["Library"]
+    },
+    {
+      "className": "LifePreserverAbAttr",
+      "file": "src/data/elite-redux/abilities/life-preserver.ts",
+      "line": 32,
+      "uses": 1,
+      "abilities": ["Life Preserver"]
+    },
+    {
+      "className": "MycelialNetworkAbAttr",
+      "file": "src/data/elite-redux/abilities/mycelial-network.ts",
+      "line": 24,
+      "uses": 1,
+      "abilities": ["Mycelial Network"]
+    },
+    {
+      "className": "OmniformAbAttr",
+      "file": "src/data/elite-redux/abilities/omniform.ts",
+      "line": 81,
+      "uses": 14,
+      "abilities": [
+        "Adaptive Fur",
+        "Blasé Powder",
+        "Flash Fire",
+        "Fluffy",
+        "Ice Body",
+        "Keen Edge",
+        "Magic Bounce",
+        "Omniform",
+        "Pixilate",
+        "Self Sufficient",
+        "Short Circuit",
+        "Stainless Steel",
+        "Stamina",
+        "Water Veil"
+      ]
+    },
+    {
+      "className": "PostTurnHurtNonTypedAbAttr",
+      "file": "src/data/elite-redux/abilities/post-turn-hurt-non-typed.ts",
+      "line": 98,
+      "uses": 7,
+      "abilities": [
+        "Christmas Nightmare",
+        "Decomposer",
+        "Flame Coat",
+        "Funeral Pyre",
+        "Parasitic Spores",
+        "Trash Heap",
+        "Winter Throne"
+      ]
+    },
+    {
+      "className": "PpReductionOnContactAbAttr",
+      "file": "src/data/elite-redux/abilities/pp-reduction-on-contact.ts",
+      "line": 72,
+      "uses": 1,
+      "abilities": ["Spiteful"]
+    },
+    {
+      "className": "PressureVesselAbAttr",
+      "file": "src/data/elite-redux/abilities/pressure-vessel.ts",
+      "line": 68,
+      "uses": 1,
+      "abilities": ["Pressure Vessel"]
+    },
+    {
+      "className": "PuppetStringsAbAttr",
+      "file": "src/data/elite-redux/abilities/puppet-strings.ts",
+      "line": 30,
+      "uses": 1,
+      "abilities": ["Puppet Strings"]
+    },
+    {
+      "className": "QuickeningGraceAbAttr",
+      "file": "src/data/elite-redux/abilities/quickening-grace.ts",
+      "line": 35,
+      "uses": 1,
+      "abilities": ["Quickening Grace"]
+    },
+    {
+      "className": "RainPumpAbAttr",
+      "file": "src/data/elite-redux/abilities/rain-pump.ts",
+      "line": 37,
+      "uses": 1,
+      "abilities": ["Rain Pump"]
+    },
+    {
+      "className": "RelativityAbAttr",
+      "file": "src/data/elite-redux/abilities/relativity.ts",
+      "line": 70,
+      "uses": 1,
+      "abilities": ["Relativity"]
+    },
+    {
+      "className": "RelativityDefenseReductionAbAttr",
+      "file": "src/data/elite-redux/abilities/relativity.ts",
+      "line": 92,
+      "uses": 1,
+      "abilities": ["Relativity"]
+    },
+    {
+      "className": "RendezvousAbAttr",
+      "file": "src/data/elite-redux/abilities/rendezvous.ts",
+      "line": 41,
+      "uses": 1,
+      "abilities": ["Rendezvous"]
+    },
+    {
+      "className": "SetArenaTagOnHitAbAttr",
+      "file": "src/data/elite-redux/abilities/set-arena-effect-on-hit.ts",
+      "line": 93,
+      "uses": 6,
+      "abilities": ["Drop Blocks", "Loose Quills", "Loose Rocks", "Loose Thorns", "Scrapyard", "Shattered Armor"]
+    },
+    {
+      "className": "SetTerrainOnHitAbAttr",
+      "file": "src/data/elite-redux/abilities/set-arena-effect-on-hit.ts",
+      "line": 191,
+      "uses": 2,
+      "abilities": ["Brain Overload", "Power Leak"]
+    },
+    {
+      "className": "ShatteredPsycheAbAttr",
+      "file": "src/data/elite-redux/abilities/shattered-psyche.ts",
+      "line": 51,
+      "uses": 1,
+      "abilities": ["Shattered Psyche"]
+    },
+    {
+      "className": "SilkenDecreeAbAttr",
+      "file": "src/data/elite-redux/abilities/silken-decree.ts",
+      "line": 34,
+      "uses": 1,
+      "abilities": ["Silken Decree"]
+    },
+    {
+      "className": "SoulmateAbAttr",
+      "file": "src/data/elite-redux/abilities/soulmate.ts",
+      "line": 41,
+      "uses": 1,
+      "abilities": ["Soulmate"]
+    },
+    {
+      "className": "StatBoostOnFlagAttackAbAttr",
+      "file": "src/data/elite-redux/abilities/stat-boost-on-flag-attack.ts",
+      "line": 77,
+      "uses": 3,
+      "abilities": ["Daredevil", "Growing Tooth", "Hardened Sheath"]
+    },
+    {
+      "className": "StatChangeOnCategoryAttackAbAttr",
+      "file": "src/data/elite-redux/abilities/stat-change-on-category-attack.ts",
+      "line": 76,
+      "uses": 1,
+      "abilities": ["Whiplash"]
+    },
+    {
+      "className": "StatDebuffOnFlagAttackAbAttr",
+      "file": "src/data/elite-redux/abilities/stat-debuff-on-flag-attack.ts",
+      "line": 91,
+      "uses": 5,
+      "abilities": ["Augur", "Chainsaw", "Crossbow", "Crushing Jaw", "Denting Blows"]
+    },
+    {
+      "className": "TangledSeedAbAttr",
+      "file": "src/data/elite-redux/abilities/tangled-seed.ts",
+      "line": 30,
+      "uses": 1,
+      "abilities": ["Tangled Seed"]
+    },
+    {
+      "className": "WorldInPiecesSummonAbAttr",
+      "file": "src/data/elite-redux/abilities/world-in-pieces.ts",
+      "line": 103,
+      "uses": 1,
+      "abilities": ["World in Pieces"]
+    },
+    {
+      "className": "WorldInPiecesRemoveTypeAbAttr",
+      "file": "src/data/elite-redux/abilities/world-in-pieces.ts",
+      "line": 118,
+      "uses": 1,
+      "abilities": ["World in Pieces"]
+    },
+    {
+      "className": "WorldInPiecesSpeedAbAttr",
+      "file": "src/data/elite-redux/abilities/world-in-pieces.ts",
+      "line": 158,
+      "uses": 1,
+      "abilities": ["World in Pieces"]
+    },
+    {
+      "className": "WorldInPiecesRestoreAbAttr",
+      "file": "src/data/elite-redux/abilities/world-in-pieces.ts",
+      "line": 174,
+      "uses": 1,
+      "abilities": ["World in Pieces"]
+    }
+  ]
+}

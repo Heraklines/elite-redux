@@ -1,0 +1,364 @@
+{
+  "batch": "B10",
+  "classes": [
+    {
+      "className": "NullifyFirstNHitsAbAttr",
+      "file": "src/data/elite-redux/archetypes/nullify-first-n-hits.ts",
+      "line": 32,
+      "uses": 2,
+      "abilities": ["Cheating Death", "Gallantry"]
+    },
+    {
+      "className": "IgnoreResistancesAbAttr",
+      "file": "src/data/elite-redux/archetypes/offensive-type-chart-override.ts",
+      "line": 55,
+      "uses": 1,
+      "abilities": ["Normalize"]
+    },
+    {
+      "className": "OffensiveTypeChartOverrideAbAttr",
+      "file": "src/data/elite-redux/archetypes/offensive-type-chart-override.ts",
+      "line": 91,
+      "uses": 26,
+      "abilities": [
+        "Acidic Slime",
+        "Corrosion",
+        "Corrupted Mind",
+        "Depravity",
+        "Draconic Might",
+        "Draconize",
+        "Dragonfruit",
+        "Extermination Vector",
+        "Ground Shock",
+        "Komodo",
+        "Magma Eater",
+        "Molten Down",
+        "Overcharge",
+        "Overwhelm",
+        "Pyroclastic Flow",
+        "Trash Heap",
+        "Tummyache"
+      ]
+    },
+    {
+      "className": "OnCritStatBoostLowestAbAttr",
+      "file": "src/data/elite-redux/archetypes/on-crit-stat-boost-lowest.ts",
+      "line": 34,
+      "uses": 1,
+      "abilities": ["Home Run"]
+    },
+    {
+      "className": "OnFaintEffectAbAttr",
+      "file": "src/data/elite-redux/archetypes/on-faint-effect.ts",
+      "line": 223,
+      "uses": 5,
+      "abilities": ["Cursed Spirit", "Guilt Trip", "Haunted Spirit", "Ill Will", "Vengeful Spirit"]
+    },
+    {
+      "className": "OnOpponentStatRaiseAbAttr",
+      "file": "src/data/elite-redux/archetypes/on-opponent-stat-raise.ts",
+      "line": 48,
+      "uses": 1,
+      "abilities": ["Egoist"]
+    },
+    {
+      "className": "OnOpponentStatRaiseScriptedMoveAbAttr",
+      "file": "src/data/elite-redux/archetypes/on-opponent-stat-raise.ts",
+      "line": 68,
+      "uses": 1,
+      "abilities": ["Retribution Blow"]
+    },
+    {
+      "className": "OnOpponentSwitchOutAbAttr",
+      "file": "src/data/elite-redux/archetypes/on-opponent-switch-out.ts",
+      "line": 43,
+      "uses": 2,
+      "abilities": ["Super Sniper", "Tag"]
+    },
+    {
+      "className": "OncePerEntryContactDamageReductionAbAttr",
+      "file": "src/data/elite-redux/archetypes/once-per-entry-contact-reduction.ts",
+      "line": 22,
+      "uses": 1,
+      "abilities": ["Chuckster"]
+    },
+    {
+      "className": "OneShotTypeBoostAbAttr",
+      "file": "src/data/elite-redux/archetypes/one-shot-type-boost-then-lose-type.ts",
+      "line": 31,
+      "uses": 1,
+      "abilities": ["Power Outage"]
+    },
+    {
+      "className": "OneShotTypeBoostFollowupAbAttr",
+      "file": "src/data/elite-redux/archetypes/one-shot-type-boost-then-lose-type.ts",
+      "line": 49,
+      "uses": 1,
+      "abilities": ["Power Outage"]
+    },
+    {
+      "className": "OutgoingStatDropMultiplierAbAttr",
+      "file": "src/data/elite-redux/archetypes/outgoing-stat-drop-multiplier.ts",
+      "line": 36,
+      "uses": 1,
+      "abilities": ["Subdue"]
+    },
+    {
+      "className": "PartyCountMultiHitAbAttr",
+      "file": "src/data/elite-redux/archetypes/party-count-multi-hit.ts",
+      "line": 23,
+      "uses": 1,
+      "abilities": ["Minion Control"]
+    },
+    {
+      "className": "PassiveRecoveryAbAttr",
+      "file": "src/data/elite-redux/archetypes/passive-recovery.ts",
+      "line": 125,
+      "uses": 17,
+      "abilities": [
+        "Apple Pie",
+        "Celestial Blessing",
+        "Dune Veil",
+        "Eternal Blessing",
+        "Flourish",
+        "Honk Shoo",
+        "Peaceful Slumber",
+        "Poison Absorb",
+        "Resilience",
+        "Rest in Peace",
+        "Self Repair",
+        "Self Sufficient",
+        "Sweet Dreams",
+        "White Noise",
+        "Winter Throne"
+      ]
+    },
+    {
+      "className": "PersistentFieldAuraAbAttr",
+      "file": "src/data/elite-redux/archetypes/persistent-field-aura.ts",
+      "line": 62,
+      "uses": 3,
+      "abilities": ["Fire Aspect", "Polarity", "Rat King"]
+    },
+    {
+      "className": "PoisonedFoePurgeAbAttr",
+      "file": "src/data/elite-redux/archetypes/poisoned-foe-purge.ts",
+      "line": 27,
+      "uses": 1,
+      "abilities": ["Hemolysis"]
+    },
+    {
+      "className": "PostAttackChangeTargetTypeAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-attack-change-target-type.ts",
+      "line": 48,
+      "uses": 3,
+      "abilities": ["Damp", "Magical Dust", "Paint Shot"]
+    },
+    {
+      "className": "PostAttackContactSuppressTargetAbilityAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-attack-contact-suppress-target-ability.ts",
+      "line": 32,
+      "uses": 1,
+      "abilities": ["Hemotoxin"]
+    },
+    {
+      "className": "PostAttackRemoveTargetTypeAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-attack-remove-target-type.ts",
+      "line": 39,
+      "uses": 6,
+      "abilities": ["Chandelier", "Depth Explorer", "Illuminate", "Refrigerator", "Spectacle"]
+    },
+    {
+      "className": "PostAttackScriptedMoveAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-attack-scripted-move.ts",
+      "line": 73,
+      "uses": 19,
+      "abilities": [
+        "Aftershock",
+        "Backflip",
+        "Blade Dance",
+        "Break it Down",
+        "Chunky Bass Line",
+        "Ebb and Flow",
+        "Frost Burn",
+        "Frost Dragon",
+        "Glacial Rage",
+        "High Tide",
+        "Lunar Wrath",
+        "Monkey Business",
+        "Purple Haze",
+        "Pyro Shells",
+        "Reverberate",
+        "Sludge Spit",
+        "Thunder Clouds",
+        "Two Step",
+        "Volcano Rage"
+      ]
+    },
+    {
+      "className": "PostAttackSetTerrainByMoveTypeAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-attack-set-field-by-type.ts",
+      "line": 37,
+      "uses": 2,
+      "abilities": ["Archmage", "Familiar"]
+    },
+    {
+      "className": "PostAttackSetHazardByMoveTypeAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-attack-set-field-by-type.ts",
+      "line": 77,
+      "uses": 2,
+      "abilities": ["Archmage", "Familiar"]
+    },
+    {
+      "className": "PostDamageForceAttackerOutAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-damage-force-attacker-out.ts",
+      "line": 32,
+      "uses": 2,
+      "abilities": ["Chuckster", "Restraining Order"]
+    },
+    {
+      "className": "PostDefendChangeAttackerTypeAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-defend-change-attacker-type.ts",
+      "line": 49,
+      "uses": 2,
+      "abilities": ["Damp", "Magical Dust"]
+    },
+    {
+      "className": "PostDefendHpGatedSelfTagAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-defend-hp-gated-self-tag.ts",
+      "line": 27,
+      "uses": 1,
+      "abilities": ["No Turning Back"]
+    },
+    {
+      "className": "PostDefendSuppressOpponentDamageBoostAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost.ts",
+      "line": 27,
+      "uses": 7,
+      "abilities": [
+        "Fort Knox",
+        "Mystic Fortification",
+        "Prim and Proper",
+        "Stainless Steel",
+        "Wonder Scale",
+        "Wonder Skin"
+      ]
+    },
+    {
+      "className": "PostFaintDeferredReviveAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-faint-deferred-revive.ts",
+      "line": 62,
+      "uses": 2,
+      "abilities": ["Backup Power", "Shallow Grave"]
+    },
+    {
+      "className": "PostFaintDetonateAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-faint-detonate.ts",
+      "line": 172,
+      "uses": 4,
+      "abilities": ["Aftermath", "Perish Body", "Pungency", "Unstable Core"]
+    },
+    {
+      "className": "PostFaintSpreadDetonateAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-faint-spread-detonate.ts",
+      "line": 88,
+      "uses": 2,
+      "abilities": ["Balloon Bomb", "Victory Bomb"]
+    },
+    {
+      "className": "PostItemLostScriptedMoveAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-item-lost-scripted-move.ts",
+      "line": 30,
+      "uses": 1,
+      "abilities": ["Greedy"]
+    },
+    {
+      "className": "PostSummonApplyTagOnFoesAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-summon-apply-tag-on-foes.ts",
+      "line": 25,
+      "uses": 2,
+      "abilities": ["Mashed Potato", "Permanence"]
+    },
+    {
+      "className": "PostSummonClearTerrainAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-summon-clear-terrain.ts",
+      "line": 43,
+      "uses": 3,
+      "abilities": ["Curse of Famine", "Lawnmower", "Turf War"]
+    },
+    {
+      "className": "PostSummonQuashFoesAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-summon-quash-foes.ts",
+      "line": 25,
+      "uses": 2,
+      "abilities": ["Rejection", "Suppress"]
+    },
+    {
+      "className": "PostSummonScriptedMoveAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-summon-scripted-move.ts",
+      "line": 80,
+      "uses": 40,
+      "abilities": [
+        "Brainpower",
+        "Butter Up",
+        "Change of Heart",
+        "Cheap Tactics",
+        "Chilling Presence",
+        "Curlipede",
+        "Daydreamer",
+        "Dirty Snowball",
+        "Doombringer",
+        "Draco Morale",
+        "Dream Whimsy",
+        "Electro Booster",
+        "Frosty Prescence",
+        "I Am Steve",
+        "Insomnia",
+        "Jackpot",
+        "Jumpscare",
+        "Let's Dance",
+        "Let's Roll",
+        "Low Blow",
+        "Monkey Business",
+        "Monster Mash",
+        "Mudball",
+        "Neutralizing Fog",
+        "Oracle",
+        "Overcast",
+        "Phantom Thief",
+        "Poseidon's Dominion",
+        "Powder Burst",
+        "Sand Pit",
+        "Soothing Aroma",
+        "Suppress",
+        "Tar Toss",
+        "Trickster",
+        "Web Spinner",
+        "Wildfire",
+        "Wind Rage",
+        "Wishmaker"
+      ]
+    },
+    {
+      "className": "PostSummonStackSetEffectsAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-summon-stack-set-effects.ts",
+      "line": 39,
+      "uses": 2,
+      "abilities": ["Gale Bloom", "Harukaze"]
+    },
+    {
+      "className": "PostTurnApplyTagOnFoesAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-turn-apply-tag-on-foes.ts",
+      "line": 29,
+      "uses": 1,
+      "abilities": ["Permanence"]
+    },
+    {
+      "className": "PostTurnDrainAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-turn-drain.ts",
+      "line": 38,
+      "uses": 3,
+      "abilities": ["Life Steal", "Poseidon's Dominion", "Soul Tap"]
+    }
+  ]
+}

@@ -1,0 +1,308 @@
+{
+  "batch": "B07",
+  "classes": [
+    {
+      "className": "IncreasePpAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6443,
+      "uses": 1,
+      "abilities": ["Pressure"]
+    },
+    {
+      "className": "ForceSwitchOutImmunityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6448,
+      "uses": 5,
+      "abilities": ["Glam Rock", "Guard Dog", "Strong Foundation", "Suction Cups", "Superheavy"]
+    },
+    {
+      "className": "ReduceBerryUseThresholdAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6456,
+      "uses": 2,
+      "abilities": ["Gluttony", "Voracity"]
+    },
+    {
+      "className": "WeightMultiplierAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6481,
+      "uses": 6,
+      "abilities": ["Chrome Coat", "Heavy Metal", "Lead Coat", "Light Metal", "Meteor Mass", "Superheavy"]
+    },
+    {
+      "className": "SyncEncounterNatureAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6501,
+      "uses": 1,
+      "abilities": ["Synchronize"]
+    },
+    {
+      "className": "MoveAbilityBypassAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6526,
+      "uses": 6,
+      "abilities": ["Blind Rage", "Mold Breaker", "Mycelium Might", "Stonecutter", "Teravolt", "Turboblaze"]
+    },
+    {
+      "className": "SuperEffectiveMoveAbilityBypassAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6556,
+      "uses": 3,
+      "abilities": ["Deadly Precision", "Flawless Precision", "Mach 3"]
+    },
+    {
+      "className": "IgnoreProtectOnContactAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6567,
+      "uses": 2,
+      "abilities": ["Final Blow", "Unseen Fist"]
+    },
+    {
+      "className": "IgnoreProtectByFlagAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6577,
+      "uses": 2,
+      "abilities": ["Pinnacle Blade", "Puncture"]
+    },
+    {
+      "className": "IgnoreProtectFirstTurnAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6598,
+      "uses": 1,
+      "abilities": ["Demolitionist"]
+    },
+    {
+      "className": "InfiltratorAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6617,
+      "uses": 8,
+      "abilities": [
+        "Current Crash",
+        "Duality",
+        "Infiltrator",
+        "King of the Jungle",
+        "Malicious Empathy",
+        "Marine Apex",
+        "Thunder Gods Vessel",
+        "Thundercall"
+      ]
+    },
+    {
+      "className": "ReflectStatusMoveAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6645,
+      "uses": 4,
+      "abilities": ["Conjurer Of Deceit", "Duplicity", "Magic Bounce"]
+    },
+    {
+      "className": "NoTransformAbilityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6661,
+      "uses": 16,
+      "abilities": [
+        "Disguise",
+        "Embody Aspect",
+        "Gulp Missile",
+        "Hunger Switch",
+        "Ice Face",
+        "Neutralizing Gas",
+        "Patchwork",
+        "Protosynthesis",
+        "Quark Drive",
+        "Shields Down",
+        "Tera Shift",
+        "Two-Faced",
+        "Zero to Hero"
+      ]
+    },
+    {
+      "className": "NoFusionAbilityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6669,
+      "uses": 18,
+      "abilities": [
+        "Disguise",
+        "Flower Gift",
+        "Forecast",
+        "Gulp Missile",
+        "Hunger Switch",
+        "Ice Face",
+        "Illusion",
+        "Multitype",
+        "Patchwork",
+        "Power Construct",
+        "RKS System",
+        "Schooling",
+        "Shields Down",
+        "Stance Change",
+        "Tera Shift",
+        "Two-Faced",
+        "Zen Mode",
+        "Zero to Hero"
+      ]
+    },
+    {
+      "className": "IgnoreTypeImmunityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6686,
+      "uses": 10,
+      "abilities": [
+        "Bird of Prey",
+        "Blind Rage",
+        "Extermination Vector",
+        "Fighting Spirit",
+        "Heartless Style",
+        "Mind’s Eye",
+        "Phantom Pain",
+        "Qigong",
+        "Scrappy",
+        "Soul Devourer"
+      ]
+    },
+    {
+      "className": "IgnoreTypeStatusEffectImmunityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6723,
+      "uses": 9,
+      "abilities": [
+        "Acidic Slime",
+        "Corrosion",
+        "Depravity",
+        "Extermination Vector",
+        "Mycelium Might",
+        "Overcharge",
+        "Pyroclastic Flow",
+        "Trash Heap",
+        "Tummyache"
+      ]
+    },
+    {
+      "className": "MoneyAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6755,
+      "uses": 1,
+      "abilities": ["Honey Gather"]
+    },
+    {
+      "className": "PostSummonStatStageChangeOnArenaAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6773,
+      "uses": 1,
+      "abilities": ["Wind Rider"]
+    },
+    {
+      "className": "FormBlockDamageAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6828,
+      "uses": 2,
+      "abilities": ["Disguise", "Ice Face"]
+    },
+    {
+      "className": "IllusionPreSummonAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6918,
+      "uses": 1,
+      "abilities": ["Illusion"]
+    },
+    {
+      "className": "IllusionBreakAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6966,
+      "uses": 1,
+      "abilities": ["Illusion"]
+    },
+    {
+      "className": "PostDefendIllusionBreakAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6975,
+      "uses": 1,
+      "abilities": ["Illusion"]
+    },
+    {
+      "className": "IllusionPostBattleAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 6993,
+      "uses": 1,
+      "abilities": ["Illusion"]
+    },
+    {
+      "className": "PreventBypassSpeedChanceAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 7058,
+      "uses": 1,
+      "abilities": ["Mycelium Might"]
+    },
+    {
+      "className": "TerrainEventTypeChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 7088,
+      "uses": 1,
+      "abilities": ["Mimicry"]
+    },
+    {
+      "className": "AiMovegenMoveStatsAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 7348,
+      "uses": 43,
+      "abilities": [
+        "Analytic",
+        "Beads of Ruin",
+        "Blistering Sun",
+        "Calculative",
+        "Compound Eyes",
+        "Crowned Shield",
+        "Crowned Sword",
+        "Damp",
+        "Dauntless Shield",
+        "Dazzling",
+        "Desolate Land",
+        "Desolate Sun",
+        "Drizzle",
+        "Drought",
+        "Fire Aspect",
+        "Fourth Degree",
+        "Gorilla Tactics",
+        "Hadron Engine",
+        "Haste Makes Waste",
+        "Huge Power",
+        "Hustle",
+        "Intrepid Sword",
+        "Kagutsuchi",
+        "Lucha Libre",
+        "Misty Surge",
+        "Ninja's Blade",
+        "Orichalcum Pulse",
+        "Parental Bond",
+        "Primordial Sea",
+        "Pure Power",
+        "Radiant Jewel",
+        "Seaborne",
+        "Skill Link",
+        "Sniper",
+        "Snow Warning",
+        "Solar Panel",
+        "Sundae",
+        "Super Sniper",
+        "Supercell",
+        "Sword of Damnation",
+        "Sword of Ruin",
+        "Sword's Nature",
+        "Victory Star"
+      ]
+    },
+    {
+      "className": "AlwaysHitAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 7364,
+      "uses": 5,
+      "abilities": ["Brawling Wyvern", "Iron Barrage", "No Guard", "Qigong", "Sighting System"]
+    },
+    {
+      "className": "SummonTerrainAiMovegenMoveStatsAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 7375,
+      "uses": 4,
+      "abilities": ["Electric Surge", "Grassy Surge", "Psychic Supremacy", "Psychic Surge"]
+    }
+  ]
+}

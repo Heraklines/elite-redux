@@ -26,7 +26,7 @@ export default defineDecl(BerserkOnThresholdAbAttr, {
   tier: "B",
   kind: "event-effect",
   when: "event.after-hit",
-  label: "Raise my stronger attack stat once when a hit drops me to half HP",
+  label: "Raise my best attack once when a hit drops me to half HP",
   summary: () => "Once per wave, the hit that takes me to half HP or less raises my higher attacking stat by one stage",
   synonyms: ["berserk", "anger", "rage at half hp", "once per wave boost", "enrage", "power up when hurt"],
   examples: ["Raise my best attack by one stage the first time I fall to half HP"],

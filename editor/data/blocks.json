@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "0ea56b3af07a2e",
+  "hash": "096ef32b703c2f",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
       "className": "AttackTypeImmunityAbAttr",
       "label": "Be immune to one type of attack",
-      "summary": "Immune to GROUND moves",
+      "summary": "Immune to Ground moves",
       "tier": "A",
       "kind": "calc-modifier",
       "status": "verified",
@@ -85,7 +85,7 @@
     {
       "id": "block.berserk-on-threshold",
       "className": "BerserkOnThresholdAbAttr",
-      "label": "Raise my stronger attack stat once when a hit drops me to half HP",
+      "label": "Raise my best attack once when a hit drops me to half HP",
       "summary": "Once per wave, the hit that takes me to half HP or less raises my higher attacking stat by one stage",
       "tier": "B",
       "kind": "event-effect",
@@ -382,7 +382,7 @@
       "id": "block.post-defend-contact-apply-status-effect",
       "className": "PostDefendContactApplyStatusEffectAbAttr",
       "label": "Sometimes give the attacker a status when it touches me",
-      "summary": "30% chance to give a contact attacker POISON",
+      "summary": "30% chance to give a contact attacker Poison",
       "tier": "B",
       "kind": "event-effect",
       "status": "verified",
@@ -504,7 +504,7 @@
       "id": "block.post-summon-weather-change",
       "className": "PostSummonWeatherChangeAbAttr",
       "label": "Set the weather when I enter",
-      "summary": "When I enter the battle, set the weather to RAIN",
+      "summary": "When I enter the battle, set the weather to Rain",
       "tier": "A",
       "kind": "event-effect",
       "status": "verified",

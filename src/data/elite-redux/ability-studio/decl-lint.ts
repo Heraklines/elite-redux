@@ -7,12 +7,13 @@
 // L0 lint for class declarations (spec section 4): pure functions that return plain-language
 // problems, so the same checks serve the registry test, the coverage gate and the catalog generator.
 
+import { namingProblems } from "./decl-naming";
 import type { DeclRegistry } from "./decl-registry";
-import { constructorArity, type DeclModule } from "./define-decl";
+import { type ClassDecl, constructorArity, type DeclModule } from "./define-decl";
 import { getCondition } from "./vocabulary/conditions";
 import { getEffect } from "./vocabulary/effects";
 import { getGuard } from "./vocabulary/guards";
-import { withParamDefaults } from "./vocabulary/params";
+import { type ParamValues, withParamDefaults } from "./vocabulary/params";
 import { missingSlots, type SlotId } from "./vocabulary/slots";
 import { getWhen, type WhenDef } from "./vocabulary/when-registry";
 
@@ -38,6 +39,28 @@ const KIND_TO_WHEN_KIND: Readonly<Record<string, WhenDef["kind"]>> = {
   "event-effect": "event",
   "while-active": "while-active",
 };
+
+/** The summary with every default, and once more for every choice of every list param (so no choice leaks a constant). */
+function summariesToCheck(decl: ClassDecl): string[] {
+  const baseline = withParamDefaults(
+    decl.params.map(param => ({ id: param.id, label: param.label, control: param.control, default: param.default })),
+    {},
+  );
+  const render = (values: ParamValues): string => {
+    try {
+      return decl.summary(values);
+    } catch (error) {
+      return `(the summary threw: ${String(error)})`;
+    }
+  };
+  const summaries = [render(baseline)];
+  for (const param of decl.params) {
+    for (const option of (param.options ?? []).slice(0, 80)) {
+      summaries.push(render({ ...baseline, [param.id]: option }));
+    }
+  }
+  return summaries;
+}
 
 export function lintDecl(module: DeclModule): string[] {
   const { decl, className, ctor } = module;
@@ -119,6 +142,16 @@ export function lintDecl(module: DeclModule): string[] {
   }
   if (decl.examples.length === 0) {
     say("needs at least 1 example");
+  }
+  for (const problem of namingProblems({
+    label: decl.label,
+    summaries: summariesToCheck(decl),
+    paramLabels: decl.params.map(param => ({ id: param.id, label: param.label })),
+    branchLabels: (decl.branches ?? []).map(branch => branch.label),
+    synonyms: decl.synonyms,
+    examples: decl.examples,
+  })) {
+    say(`naming: ${problem}`);
   }
 
   const defaults = withParamDefaults(

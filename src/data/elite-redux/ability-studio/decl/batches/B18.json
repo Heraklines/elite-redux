@@ -1,0 +1,300 @@
+{
+  "batch": "B18",
+  "classes": [
+    {
+      "className": "ProvenanceBypassSpeedChanceAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/bypass-speed-provenance.ts",
+      "line": 10,
+      "uses": 2,
+      "abilities": ["Minigun", "Quick Draw"]
+    },
+    {
+      "className": "FirstTurnDirectDamageMultiplierAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/first-turn-direct-damage.ts",
+      "line": 11,
+      "uses": 2,
+      "abilities": ["Demolitionist", "Readied Action"]
+    },
+    {
+      "className": "BiomeRevealBonusAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/meta-markers.ts",
+      "line": 18,
+      "uses": 3,
+      "abilities": ["Anticipation", "Telepathy", "Wandering Spirit"]
+    },
+    {
+      "className": "ExperienceGainMultiplierAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/meta-markers.ts",
+      "line": 58,
+      "uses": 2,
+      "abilities": ["Lucky Wings", "Super Luck"]
+    },
+    {
+      "className": "MoneyGainMultiplierAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/meta-markers.ts",
+      "line": 74,
+      "uses": 1,
+      "abilities": ["Good as Gold"]
+    },
+    {
+      "className": "BallRecoveryAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/meta-markers.ts",
+      "line": 90,
+      "uses": 1,
+      "abilities": ["Ball Fetch"]
+    },
+    {
+      "className": "MoveHpCostModifierAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/move-hp-cost.ts",
+      "line": 12,
+      "uses": 1,
+      "abilities": ["Shed Skin"]
+    },
+    {
+      "className": "PostDefendSuppressFirstInnateAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/mummy-family.ts",
+      "line": 23,
+      "uses": 3,
+      "abilities": ["Lingering Aroma", "Lingering Musk", "Mummy"]
+    },
+    {
+      "className": "IgnoreOptionalMoveEffectsAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/optional-secondary-effect.ts",
+      "line": 17,
+      "uses": 1,
+      "abilities": ["Aroma Veil"]
+    },
+    {
+      "className": "UserFieldIgnoreOptionalMoveEffectsAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/optional-secondary-effect.ts",
+      "line": 23,
+      "uses": 1,
+      "abilities": ["Aroma Veil"]
+    },
+    {
+      "className": "FirstEntryPartyHealAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/party-recovery.ts",
+      "line": 44,
+      "uses": 2,
+      "abilities": ["Pastel Veil", "Sweet Veil (P)"]
+    },
+    {
+      "className": "HolderAndAlliesRecoveryAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/party-recovery.ts",
+      "line": 78,
+      "uses": 2,
+      "abilities": ["Butter Up", "Soothing Aroma"]
+    },
+    {
+      "className": "FieldPoisonWeaknessOnEntryAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/requested-combat-riders.ts",
+      "line": 46,
+      "uses": 1,
+      "abilities": ["Toxic Spill"]
+    },
+    {
+      "className": "TelekineticStruggleOnEntryAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/requested-combat-riders.ts",
+      "line": 57,
+      "uses": 1,
+      "abilities": ["Telekinetic"]
+    },
+    {
+      "className": "PreLeaveFieldRemoveLinkedTailwindAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/requested-combat-riders.ts",
+      "line": 84,
+      "uses": 1,
+      "abilities": ["Blistering Sun"]
+    },
+    {
+      "className": "BreakScreensOnAttackAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/requested-combat-riders.ts",
+      "line": 101,
+      "uses": 2,
+      "abilities": ["Juggernaut", "Precise Fist"]
+    },
+    {
+      "className": "AttackerTypeDamageReductionAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/requested-combat-riders.ts",
+      "line": 138,
+      "uses": 2,
+      "abilities": ["King of the Jungle", "Marine Apex"]
+    },
+    {
+      "className": "FullHpMoveTypeDamageReductionAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/requested-combat-riders.ts",
+      "line": 152,
+      "uses": 1,
+      "abilities": ["Drakelp Head"]
+    },
+    {
+      "className": "ReverseNegativeStatChangesAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/requested-combat-riders.ts",
+      "line": 169,
+      "uses": 1,
+      "abilities": ["Change of Heart"]
+    },
+    {
+      "className": "PostDefendAddTagAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/requested-combat-riders.ts",
+      "line": 189,
+      "uses": 1,
+      "abilities": ["Lightning Born"]
+    },
+    {
+      "className": "SameTypeStabOtherwiseBoostAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/requested-combat-riders.ts",
+      "line": 217,
+      "uses": 2,
+      "abilities": ["Fossilized", "Raw Wood"]
+    },
+    {
+      "className": "FaintedAllyStatMultiplierAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/requested-combat-riders.ts",
+      "line": 260,
+      "uses": 2,
+      "abilities": ["Avenger"]
+    },
+    {
+      "className": "HigherStatMultiplierAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/requested-combat-riders.ts",
+      "line": 276,
+      "uses": 2,
+      "abilities": ["Flower Gift"]
+    },
+    {
+      "className": "AllyHigherStatMultiplierAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/requested-combat-riders.ts",
+      "line": 299,
+      "uses": 2,
+      "abilities": ["Flower Gift"]
+    },
+    {
+      "className": "OnceLowHpStatRaiseAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/requested-combat-riders.ts",
+      "line": 325,
+      "uses": 1,
+      "abilities": ["Defeatist"]
+    },
+    {
+      "className": "TypeImmunityHigherDefenseStatRaiseAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/requested-combat-riders.ts",
+      "line": 359,
+      "uses": 1,
+      "abilities": ["Rain Dish"]
+    },
+    {
+      "className": "MoveFlagImmunityAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/requested-combat-riders.ts",
+      "line": 380,
+      "uses": 1,
+      "abilities": ["Ball Fetch"]
+    },
+    {
+      "className": "OnDirectFaintRetaliationAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/requested-combat-riders.ts",
+      "line": 400,
+      "uses": 2,
+      "abilities": ["Ill Will", "Tummyache"]
+    },
+    {
+      "className": "ChancePostAttackStealHeldItemAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/requested-combat-riders.ts",
+      "line": 432,
+      "uses": 3,
+      "abilities": ["Cheap Tactics", "Gluttony", "Low Blow"]
+    },
+    {
+      "className": "PostSummonSnowCloakAuroraVeilAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/snow-cloak-aurora-veil.ts",
+      "line": 17,
+      "uses": 2,
+      "abilities": ["Glacial Ghost", "Snow Cloak"]
+    },
+    {
+      "className": "PreLeaveFieldRemoveSnowCloakAuroraVeilAbAttr",
+      "file": "src/data/elite-redux/ability-upgrades/attrs/snow-cloak-aurora-veil.ts",
+      "line": 38,
+      "uses": 2,
+      "abilities": ["Glacial Ghost", "Snow Cloak"]
+    },
+    {
+      "className": "AbilityStudioRuntimeCapabilityAbAttr",
+      "file": "src/data/elite-redux/ability-studio/runtime-components.ts",
+      "line": 79,
+      "uses": 23,
+      "abilities": [
+        "Accelerate",
+        "Angel's Wrath",
+        "Aurora Borealis",
+        "Big Leaves",
+        "Burn Fatigue",
+        "Chloroplast",
+        "DNA Scramble",
+        "Deadly Sentencing",
+        "Minion Control",
+        "Moon Spirit",
+        "Moonarch",
+        "Reap and Sow",
+        "Relic Stone",
+        "Sleeping In",
+        "Solar Flare",
+        "Spatial Magic",
+        "Symbiosis",
+        "Temporal Rupture",
+        "Titan",
+        "Upcycle"
+      ]
+    },
+    {
+      "className": "AbilityStudioSourceAbilityAbAttr",
+      "file": "src/data/elite-redux/ability-studio/runtime-components.ts",
+      "line": 114,
+      "uses": 42,
+      "abilities": [
+        "Aura Break",
+        "Battle Bond",
+        "Berserk",
+        "Comatose",
+        "Commander",
+        "Dark Aura",
+        "Dreadful Winds",
+        "Fairy Aura",
+        "Fairy Wings",
+        "Flower Gift",
+        "Forecast",
+        "Gulp Missile",
+        "Guts",
+        "Heavy Metal",
+        "Ice Face",
+        "Illuminate",
+        "Klutz",
+        "Levitate",
+        "Mimicry",
+        "Minus",
+        "Multitype",
+        "Overcoat",
+        "Plus",
+        "Poison Heal",
+        "Prankster",
+        "Protosynthesis",
+        "Quark Drive",
+        "Quick Draw",
+        "RKS System",
+        "Sand Force",
+        "Shadow Tag",
+        "Sheer Force",
+        "Snow Warning",
+        "Solar Power",
+        "Stance Change",
+        "Stench",
+        "Truant",
+        "Unburden",
+        "Wandering Spirit",
+        "Wind Power",
+        "Wind Rider",
+        "Wonder Guard"
+      ]
+    }
+  ]
+}

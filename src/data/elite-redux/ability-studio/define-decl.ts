@@ -13,6 +13,7 @@
 // without touching the class.
 
 import type { AbAttr } from "#abilities/ab-attrs";
+import { playerParams } from "./decl-naming";
 import type { ParamControl, ParamValue, ParamValues } from "./vocabulary/params";
 import type { SlotId } from "./vocabulary/slots";
 
@@ -209,7 +210,9 @@ export interface DeclModule {
 }
 
 export function defineDecl(ctor: AbAttrClass, decl: ClassDecl): DeclModule {
-  return Object.freeze({ className: ctor.name, ctor, decl });
+  // Summaries are written against raw param values ("GROUND"); staff always read the player-facing name ("Ground").
+  const readable: ClassDecl = { ...decl, summary: params => decl.summary(playerParams(params)) };
+  return Object.freeze({ className: ctor.name, ctor, decl: readable });
 }
 
 /**

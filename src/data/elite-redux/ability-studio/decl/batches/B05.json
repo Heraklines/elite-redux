@@ -1,0 +1,256 @@
+{
+  "batch": "B05",
+  "classes": [
+    {
+      "className": "DrenchImmunityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4429,
+      "uses": 3,
+      "abilities": ["Amphibious", "Old Mariner", "Poseidon's Dominion"]
+    },
+    {
+      "className": "StealthRockImmunityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4444,
+      "uses": 3,
+      "abilities": ["Free Climb", "Ice Plumes", "Mountaineer"]
+    },
+    {
+      "className": "DoubleSelfInflictedDamageAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4460,
+      "uses": 2,
+      "abilities": ["Cosmic Daze", "Cosmic Dust"]
+    },
+    {
+      "className": "SuppressFieldEffectsAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4476,
+      "uses": 1,
+      "abilities": ["Clueless"]
+    },
+    {
+      "className": "OverruleCritAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4522,
+      "uses": 2,
+      "abilities": ["Magistrate", "Overrule"]
+    },
+    {
+      "className": "SuppressFieldAbilitiesWhenEnragedAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4542,
+      "uses": 1,
+      "abilities": ["Mental Pollution"]
+    },
+    {
+      "className": "SpreadTargetByFlagAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4558,
+      "uses": 8,
+      "abilities": [
+        "Amplifier",
+        "Artillery",
+        "Bass Boosted",
+        "Blademaster",
+        "Siren's Song",
+        "Super Scope",
+        "Sweeping Edge",
+        "Wind Chimes"
+      ]
+    },
+    {
+      "className": "SetMoveAccuracyAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4584,
+      "uses": 3,
+      "abilities": ["Hypnotist", "Lullaby", "Lunar Eclipse"]
+    },
+    {
+      "className": "BonusCritAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4608,
+      "uses": 1,
+      "abilities": ["Super Luck"]
+    },
+    {
+      "className": "MultCritAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4626,
+      "uses": 4,
+      "abilities": ["Fourth Degree", "Kagutsuchi", "Sniper", "Super Sniper"]
+    },
+    {
+      "className": "ConditionalCritAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4656,
+      "uses": 15,
+      "abilities": [
+        "Ambush",
+        "Ape Shift",
+        "Depravity",
+        "Fatal Precision",
+        "Final Blow",
+        "Flawless Precision",
+        "Heartless Style",
+        "Heaven Asunder",
+        "Hunter's Mark",
+        "Merciless",
+        "Relentless",
+        "Showdown Mode",
+        "Ultra Recon Hunter"
+      ]
+    },
+    {
+      "className": "BlockNonDirectDamageAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4674,
+      "uses": 10,
+      "abilities": [
+        "Apple Enlightenment",
+        "Chestnut Shield",
+        "Conjurer Of Deceit",
+        "Cosmic Dust",
+        "Immovable Object",
+        "Impenetrable",
+        "Magic Guard",
+        "Mystic Fortification",
+        "Old Ocean Relic",
+        "Titan"
+      ]
+    },
+    {
+      "className": "BlockStatusDamageAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4680,
+      "uses": 6,
+      "abilities": ["Decay", "Flare Boost", "Marvel Scale", "Poison Heal", "Rainbow Fish", "Toxic Boost"]
+    },
+    {
+      "className": "BlockOneHitKOAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4694,
+      "uses": 2,
+      "abilities": ["Immovable Object", "Sturdy"]
+    },
+    {
+      "className": "ChangeMovePriorityAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4712,
+      "uses": 6,
+      "abilities": ["Gale Wings", "Monk", "Opportunist", "Penta-Punch", "Prankster", "Triage"]
+    },
+    {
+      "className": "ChangeMovePriorityInBracketAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4736,
+      "uses": 1,
+      "abilities": ["Mycelium Might"]
+    },
+    {
+      "className": "BlockWeatherDamageAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4776,
+      "uses": 21,
+      "abilities": [
+        "Christmas Spirit",
+        "Desert Spirit",
+        "Glacial Ghost",
+        "Guardian Coat",
+        "Ice Body",
+        "Ice Cold Hunter",
+        "Ice Picks",
+        "Molten Core",
+        "North Wind",
+        "Overcoat",
+        "Sand Bender",
+        "Sand Fiend",
+        "Sand Force",
+        "Sand Rush",
+        "Sand Veil",
+        "Sepia Lens",
+        "Slush Rush",
+        "Sundae",
+        "Thermal Slide",
+        "Whiteout"
+      ]
+    },
+    {
+      "className": "SuppressWeatherEffectAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4798,
+      "uses": 4,
+      "abilities": ["Air Lock", "Cloud Nine", "Clueless", "In the Clouds"]
+    },
+    {
+      "className": "FriskAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4910,
+      "uses": 2,
+      "abilities": ["Frisk", "Gleam Eyes"]
+    },
+    {
+      "className": "PostWeatherChangeFormChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 4970,
+      "uses": 2,
+      "abilities": ["Flower Gift", "Forecast"]
+    },
+    {
+      "className": "IceFaceFormChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5015,
+      "uses": 1,
+      "abilities": ["Ice Face"]
+    },
+    {
+      "className": "FogRestoreDisguiseFormChangeAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5045,
+      "uses": 3,
+      "abilities": ["Disguise", "Patchwork"]
+    },
+    {
+      "className": "PostSummonFogRestoreDisguiseAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5073,
+      "uses": 3,
+      "abilities": ["Disguise", "Patchwork"]
+    },
+    {
+      "className": "PostWeatherChangeAddBattlerTagAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5105,
+      "uses": 1,
+      "abilities": ["Protosynthesis"]
+    },
+    {
+      "className": "PostWeatherLapseHealAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5151,
+      "uses": 5,
+      "abilities": ["Dry Skin", "Ice Body", "Rain Dish", "Sundae"]
+    },
+    {
+      "className": "PostWeatherLapseDamageAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5182,
+      "uses": 1,
+      "abilities": ["Dry Skin"]
+    },
+    {
+      "className": "PostTerrainChangeAddBattlerTagAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5225,
+      "uses": 1,
+      "abilities": ["Quark Drive"]
+    },
+    {
+      "className": "PostTurnRandomBerryEffectAbAttr",
+      "file": "src/data/abilities/ab-attrs.ts",
+      "line": 5263,
+      "uses": 1,
+      "abilities": ["Craving"]
+    }
+  ]
+}

@@ -1,0 +1,405 @@
+{
+  "batch": "B09",
+  "classes": [
+    {
+      "className": "EntryHazardImmunityAbAttr",
+      "file": "src/data/elite-redux/archetypes/entry-hazard-immunity.ts",
+      "line": 27,
+      "uses": 1,
+      "abilities": ["Shield Dust"]
+    },
+    {
+      "className": "GroundedEntryHazardImmunityAbAttr",
+      "file": "src/data/elite-redux/archetypes/entry-hazard-immunity.ts",
+      "line": 34,
+      "uses": 1,
+      "abilities": ["Electrodynamics"]
+    },
+    {
+      "className": "EntryTailwindClearWeatherAbAttr",
+      "file": "src/data/elite-redux/archetypes/entry-tailwind-clear-weather.ts",
+      "line": 28,
+      "uses": 1,
+      "abilities": ["Air Lock"]
+    },
+    {
+      "className": "EntryTrapOnFoeSideAbAttr",
+      "file": "src/data/elite-redux/archetypes/entry-trap-on-foe-side.ts",
+      "line": 34,
+      "uses": 1,
+      "abilities": ["Spore Bed"]
+    },
+    {
+      "className": "FieldCritBoostAbAttr",
+      "file": "src/data/elite-redux/archetypes/field-crit-boost.ts",
+      "line": 21,
+      "uses": 1,
+      "abilities": ["Battle Aura"]
+    },
+    {
+      "className": "FieldStatShareAbAttr",
+      "file": "src/data/elite-redux/archetypes/field-stat-share.ts",
+      "line": 26,
+      "uses": 1,
+      "abilities": ["Sharing Is Caring"]
+    },
+    {
+      "className": "FireUseFormChangeAbAttr",
+      "file": "src/data/elite-redux/archetypes/fire-interaction-form-change.ts",
+      "line": 63,
+      "uses": 1,
+      "abilities": ["Flammable Coat"]
+    },
+    {
+      "className": "FireHitFormChangeAbAttr",
+      "file": "src/data/elite-redux/archetypes/fire-interaction-form-change.ts",
+      "line": 106,
+      "uses": 1,
+      "abilities": ["Flammable Coat"]
+    },
+    {
+      "className": "FirstFlaggedMovePriorityAbAttr",
+      "file": "src/data/elite-redux/archetypes/first-move-priority.ts",
+      "line": 30,
+      "uses": 9,
+      "abilities": [
+        "Coil Up",
+        "Curlipede",
+        "Cutthroat",
+        "Edgelord",
+        "First Serpent",
+        "Flicker Jab",
+        "Head First",
+        "Quick Charge",
+        "Sidewinder"
+      ]
+    },
+    {
+      "className": "ConsumeFirstFlaggedMovePriorityAbAttr",
+      "file": "src/data/elite-redux/archetypes/first-move-priority.ts",
+      "line": 47,
+      "uses": 7,
+      "abilities": ["Cutthroat", "Edgelord", "First Serpent", "Flicker Jab", "Head First", "Quick Charge", "Sidewinder"]
+    },
+    {
+      "className": "ConsumeFirstFlaggedMoveOnUseAbAttr",
+      "file": "src/data/elite-redux/archetypes/first-move-priority.ts",
+      "line": 87,
+      "uses": 2,
+      "abilities": ["Coil Up", "Curlipede"]
+    },
+    {
+      "className": "RearmFirstFlaggedMoveOnMoveAbAttr",
+      "file": "src/data/elite-redux/archetypes/first-move-priority.ts",
+      "line": 121,
+      "uses": 1,
+      "abilities": ["Cutthroat"]
+    },
+    {
+      "className": "FirstTurnPriorityClampAbAttr",
+      "file": "src/data/elite-redux/archetypes/first-move-priority.ts",
+      "line": 140,
+      "uses": 2,
+      "abilities": ["On the Prowl", "Overwatch"]
+    },
+    {
+      "className": "FirstTurnStatMultiplierAbAttr",
+      "file": "src/data/elite-redux/archetypes/first-turn-stat-multiplier.ts",
+      "line": 33,
+      "uses": 8,
+      "abilities": ["Champion's Entrance", "Rapid Response", "Showdown Mode", "Violent Rush"]
+    },
+    {
+      "className": "FlagDamageBoostAbAttr",
+      "file": "src/data/elite-redux/archetypes/flag-damage-boost.ts",
+      "line": 89,
+      "uses": 59,
+      "abilities": [
+        "Amplifier",
+        "Angelic Wings",
+        "Archer",
+        "Backstreet Boy",
+        "Bass Boosted",
+        "Blade's Essence",
+        "Blademaster",
+        "Celestial Bow",
+        "Chestnut Axe",
+        "Combat Specialist",
+        "Crushing Antlers",
+        "Depth Explorer",
+        "Devious Present",
+        "Energy Horns",
+        "Fairy Wings",
+        "Field Explorer",
+        "Giant Wings",
+        "Gnashing Cannon",
+        "Hammer Fist",
+        "Hunter's Horn",
+        "Impaler",
+        "Imposing Wings",
+        "Kagutsuchi",
+        "Keen Edge",
+        "Lucky Wings",
+        "Magical Fists",
+        "Mega Drill",
+        "Megabite",
+        "Mighty Horn",
+        "Mind Crunch",
+        "Molten Blades",
+        "Mystic Blades",
+        "Mythical Arrows",
+        "Power Edge",
+        "Power Fists",
+        "Reaper's Scythe",
+        "Samba",
+        "Sinister Claws",
+        "Siren's Song",
+        "Soul Crusher",
+        "Spiritual Saber",
+        "Striker",
+        "Super Slammer",
+        "Sword's Nature",
+        "Twinkle Toes",
+        "Unicorn",
+        "Venom Crown",
+        "Warrior's Spear",
+        "Wind Chimes",
+        "Wind Rage"
+      ]
+    },
+    {
+      "className": "FlareBoostSelfBurnOnSummonAbAttr",
+      "file": "src/data/elite-redux/archetypes/flare-boost-fog-self-burn.ts",
+      "line": 56,
+      "uses": 1,
+      "abilities": ["Flare Boost"]
+    },
+    {
+      "className": "FlareBoostSelfBurnOnWeatherChangeAbAttr",
+      "file": "src/data/elite-redux/archetypes/flare-boost-fog-self-burn.ts",
+      "line": 63,
+      "uses": 1,
+      "abilities": ["Flare Boost"]
+    },
+    {
+      "className": "FoeStrongestStatSelfBoostAbAttr",
+      "file": "src/data/elite-redux/archetypes/foe-strongest-stat-self-boost.ts",
+      "line": 34,
+      "uses": 1,
+      "abilities": ["Spyware"]
+    },
+    {
+      "className": "ForceFoeOutOnInactivityAbAttr",
+      "file": "src/data/elite-redux/archetypes/force-foe-out-on-inactivity.ts",
+      "line": 33,
+      "uses": 1,
+      "abilities": ["Strikeout"]
+    },
+    {
+      "className": "GroundEntryHazardImmunityAbAttr",
+      "file": "src/data/elite-redux/archetypes/ground-entry-hazard-immunity.ts",
+      "line": 28,
+      "uses": 1,
+      "abilities": ["Tectonize"]
+    },
+    {
+      "className": "HealStatusOnMoveTypeAbAttr",
+      "file": "src/data/elite-redux/archetypes/heal-status-on-move-type.ts",
+      "line": 29,
+      "uses": 1,
+      "abilities": ["Vital Spirit"]
+    },
+    {
+      "className": "HitMultiplierAbAttr",
+      "file": "src/data/elite-redux/archetypes/hit-multiplier.ts",
+      "line": 129,
+      "uses": 31,
+      "abilities": [
+        "Balloon Blitz",
+        "Devourer",
+        "Dogged Jaw",
+        "Dual Wield",
+        "Flurry",
+        "Formless Fist",
+        "Frenzied Phantom",
+        "Ghost Frenzy",
+        "Grievous Spear",
+        "Hyper Aggressive",
+        "Ice Cold Hunter",
+        "Jackhammer",
+        "Magus Blades",
+        "Metallic Jaws",
+        "Minigun",
+        "Primal Maw",
+        "Raging Boxer",
+        "Raging Goddess",
+        "Raging Moth",
+        "Savage Spear",
+        "Steel Beetle",
+        "Twin Lion Fists",
+        "Two-Chambered",
+        "Witch Broom",
+        "World-Eater"
+      ]
+    },
+    {
+      "className": "HitMultiplierPowerAbAttr",
+      "file": "src/data/elite-redux/archetypes/hit-multiplier.ts",
+      "line": 251,
+      "uses": 25,
+      "abilities": [
+        "Balloon Blitz",
+        "Contaminated",
+        "Devourer",
+        "Dogged Jaw",
+        "Dual Wield",
+        "Flurry",
+        "Formless Fist",
+        "Frenzied Phantom",
+        "Ghost Frenzy",
+        "Grievous Spear",
+        "Hyper Aggressive",
+        "Jackhammer",
+        "Magus Blades",
+        "Metallic Jaws",
+        "Minigun",
+        "Primal Maw",
+        "Raging Boxer",
+        "Raging Goddess",
+        "Raging Moth",
+        "Savage Spear",
+        "Steel Beetle",
+        "Twin Lion Fists",
+        "Two-Chambered",
+        "Witch Broom",
+        "World-Eater"
+      ]
+    },
+    {
+      "className": "HpScalingStatMultiplierAbAttr",
+      "file": "src/data/elite-redux/archetypes/hp-scaling-stat-multiplier.ts",
+      "line": 44,
+      "uses": 2,
+      "abilities": ["Last Stand"]
+    },
+    {
+      "className": "TypeAbsorbHealAbAttr",
+      "file": "src/data/elite-redux/archetypes/immunity-with-absorb.ts",
+      "line": 98,
+      "uses": 2,
+      "abilities": ["Ice Plumes", "Poison Absorb"]
+    },
+    {
+      "className": "TypeAbsorbStatBoostAbAttr",
+      "file": "src/data/elite-redux/archetypes/immunity-with-absorb.ts",
+      "line": 168,
+      "uses": 2,
+      "abilities": ["Aerodynamics", "Fluttering Spirit"]
+    },
+    {
+      "className": "TypeAbsorbHighestAttackStatBoostAbAttr",
+      "file": "src/data/elite-redux/archetypes/immunity-with-absorb.ts",
+      "line": 192,
+      "uses": 3,
+      "abilities": ["Alluring Skull", "Heat Sink", "Ice Dew"]
+    },
+    {
+      "className": "IncomingAccuracyMultiplierAbAttr",
+      "file": "src/data/elite-redux/archetypes/incoming-accuracy-multiplier.ts",
+      "line": 56,
+      "uses": 2,
+      "abilities": ["Bad Luck", "Scarecrow"]
+    },
+    {
+      "className": "LifestealOnHitAbAttr",
+      "file": "src/data/elite-redux/archetypes/lifesteal.ts",
+      "line": 184,
+      "uses": 8,
+      "abilities": [
+        "Energy Horns",
+        "Energy Siphon",
+        "Energy Tap",
+        "Hydro Circuit",
+        "Nosferatu",
+        "Pure Love",
+        "Twin Lion Fists",
+        "Vitality Strike"
+      ]
+    },
+    {
+      "className": "LifestealOnKoAbAttr",
+      "file": "src/data/elite-redux/archetypes/lifesteal.ts",
+      "line": 332,
+      "uses": 18,
+      "abilities": [
+        "Apex Predator",
+        "Bandit",
+        "Bloodlust",
+        "Brain Food",
+        "Crushing Antlers",
+        "Ghost Frenzy",
+        "Gillie Suit",
+        "Hungry Maws",
+        "Hunter's Horn",
+        "Jaws of Carnage",
+        "Looter",
+        "Magma Eater",
+        "Predator",
+        "Reaper's Scythe",
+        "Scavenger",
+        "Soul Devourer",
+        "Soul Eater",
+        "World-Eater"
+      ]
+    },
+    {
+      "className": "ScavengerLootAbAttr",
+      "file": "src/data/elite-redux/archetypes/lifesteal.ts",
+      "line": 425,
+      "uses": 2,
+      "abilities": ["Bandit", "Scavenger"]
+    },
+    {
+      "className": "MoveCategoryOverrideAbAttr",
+      "file": "src/data/elite-redux/archetypes/move-category-override.ts",
+      "line": 37,
+      "uses": 6,
+      "abilities": [
+        "Best Offense",
+        "Blade's Essence",
+        "Magus Blades",
+        "Mystic Blades",
+        "Sinister Claws",
+        "Spiritual Saber"
+      ]
+    },
+    {
+      "className": "MoveFlagInjectionAbAttr",
+      "file": "src/data/elite-redux/archetypes/move-flag-injection.ts",
+      "line": 39,
+      "uses": 5,
+      "abilities": ["Backstreet Boy", "Festivities", "Musical Notes", "Taekkyeon"]
+    },
+    {
+      "className": "MovingFirstTrapFlinchAbAttr",
+      "file": "src/data/elite-redux/archetypes/moving-first-trap-flinch.ts",
+      "line": 28,
+      "uses": 1,
+      "abilities": ["From the Shadows"]
+    },
+    {
+      "className": "ErMultiHeadedAbAttr",
+      "file": "src/data/elite-redux/archetypes/multi-headed.ts",
+      "line": 116,
+      "uses": 6,
+      "abilities": ["3 > 1", "Bodhisattva", "Hand Barnacles", "Hydra", "Multi-Headed", "Strong-Headed"]
+    },
+    {
+      "className": "OverrideMultiHitCountAbAttr",
+      "file": "src/data/elite-redux/archetypes/multi-hit-count-override.ts",
+      "line": 33,
+      "uses": 1,
+      "abilities": ["Giant Shuriken"]
+    }
+  ]
+}

@@ -1,0 +1,180 @@
+{
+  "batch": "B17",
+  "classes": [
+    {
+      "className": "LingeringMuskEndureAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Lingering Musk"]
+    },
+    {
+      "className": "LingeringMuskPostTurnAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Lingering Musk"]
+    },
+    {
+      "className": "ErMagicianStealAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Magician"]
+    },
+    {
+      "className": "MetallosisPoisonAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Metallosis"]
+    },
+    {
+      "className": "MoxibustionAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Moxibustion"]
+    },
+    {
+      "className": "MutualDestructionPostFaintAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Mutual Destruction"]
+    },
+    {
+      "className": "OracleEntryAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Oracle"]
+    },
+    {
+      "className": "OracleGuardTickAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Oracle"]
+    },
+    {
+      "className": "PentaPunchFuryPowerAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Penta-Punch"]
+    },
+    {
+      "className": "PerpetualMotionTriggerAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Perpetual Motion"]
+    },
+    {
+      "className": "PerpetualMotionPostTurnAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Perpetual Motion"]
+    },
+    {
+      "className": "PerpetualMotionResolutionAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Perpetual Motion"]
+    },
+    {
+      "className": "PhoenixFoliageUseFormChangeAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Phoenix Foliage"]
+    },
+    {
+      "className": "PhoenixFoliageHitFormChangeAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Phoenix Foliage"]
+    },
+    {
+      "className": "ErTransmuteOpposingBerriesAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Power of Alchemy"]
+    },
+    {
+      "className": "ClearOpponentStatBuffsOnSummonAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Pressure"]
+    },
+    {
+      "className": "PushKickAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Push Kick"]
+    },
+    {
+      "className": "SleepingInAccuracyAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Sleeping In"]
+    },
+    {
+      "className": "SomniloquyPostTurnAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Somniloquy"]
+    },
+    {
+      "className": "SplashDamageAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 2,
+      "abilities": ["Splash Damage", "Two-Chambered"]
+    },
+    {
+      "className": "PostSummonScreensAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Split Mind"]
+    },
+    {
+      "className": "StarHitMultiplierAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Starcrossed"]
+    },
+    {
+      "className": "StarHitPowerAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Starcrossed"]
+    },
+    {
+      "className": "ThirdEyeAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Third Eye"]
+    },
+    {
+      "className": "VoidPostTurnStealAbAttr",
+      "file": null,
+      "line": null,
+      "uses": 1,
+      "abilities": ["Void"]
+    }
+  ]
+}

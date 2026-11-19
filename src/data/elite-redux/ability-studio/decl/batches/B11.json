@@ -1,0 +1,364 @@
+{
+  "batch": "B11",
+  "classes": [
+    {
+      "className": "PostTurnFoeStatDropAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-turn-foe-stat-drop.ts",
+      "line": 51,
+      "uses": 3,
+      "abilities": ["Sap Trap", "Serpent Bind", "Tentalock"]
+    },
+    {
+      "className": "PostTurnRandomPureTypeAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-turn-random-type.ts",
+      "line": 25,
+      "uses": 1,
+      "abilities": ["Color Spectrum"]
+    },
+    {
+      "className": "PostTurnScriptedMoveAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-turn-scripted-move.ts",
+      "line": 50,
+      "uses": 2,
+      "abilities": ["Cool Exit", "Sumo Wrestler"]
+    },
+    {
+      "className": "PostVictoryClearRechargeAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-victory-clear-recharge.ts",
+      "line": 35,
+      "uses": 7,
+      "abilities": [
+        "Berserker Rage",
+        "Drake Of Rage",
+        "Going Berserk",
+        "Master Hand",
+        "Qigong",
+        "Raging Goddess",
+        "Rampage"
+      ]
+    },
+    {
+      "className": "PostWeatherMoveFollowUpAbAttr",
+      "file": "src/data/elite-redux/archetypes/post-weather-move-follow-up.ts",
+      "line": 31,
+      "uses": 1,
+      "abilities": ["Forecast"]
+    },
+    {
+      "className": "AllyFaintPowerBoostTriggerAbAttr",
+      "file": "src/data/elite-redux/archetypes/power-boost-on-ally-faint.ts",
+      "line": 44,
+      "uses": 2,
+      "abilities": ["Avenger", "Cursed Spirit"]
+    },
+    {
+      "className": "AllyFaintPowerBoostAbAttr",
+      "file": "src/data/elite-redux/archetypes/power-boost-on-ally-faint.ts",
+      "line": 58,
+      "uses": 2,
+      "abilities": ["Avenger", "Cursed Spirit"]
+    },
+    {
+      "className": "AllyFaintPowerBoostExpireAbAttr",
+      "file": "src/data/elite-redux/archetypes/power-boost-on-ally-faint.ts",
+      "line": 64,
+      "uses": 2,
+      "abilities": ["Avenger", "Cursed Spirit"]
+    },
+    {
+      "className": "PreFaintReviveAbAttr",
+      "file": "src/data/elite-redux/archetypes/pre-faint-revive.ts",
+      "line": 128,
+      "uses": 1,
+      "abilities": ["Lucky Halo"]
+    },
+    {
+      "className": "PostSummonRetrieverSnapshotAbAttr",
+      "file": "src/data/elite-redux/archetypes/pre-switch-out-item-restore.ts",
+      "line": 45,
+      "uses": 1,
+      "abilities": ["Retriever"]
+    },
+    {
+      "className": "PreSwitchOutItemRestoreAbAttr",
+      "file": "src/data/elite-redux/archetypes/pre-switch-out-item-restore.ts",
+      "line": 68,
+      "uses": 1,
+      "abilities": ["Retriever"]
+    },
+    {
+      "className": "PreemptivePriorityCounterAbAttr",
+      "file": "src/data/elite-redux/archetypes/preemptive-priority-counter.ts",
+      "line": 17,
+      "uses": 1,
+      "abilities": ["Surprise!"]
+    },
+    {
+      "className": "PriorityModifierAbAttr",
+      "file": "src/data/elite-redux/archetypes/priority-modifier.ts",
+      "line": 136,
+      "uses": 18,
+      "abilities": [
+        "Blitz Boxer",
+        "Early Grave",
+        "Ebb and Flow",
+        "Flame Bubble",
+        "Flaming Soul",
+        "Frozen Soul",
+        "Galeforce Wings",
+        "Iron Barrage",
+        "Perfectionist",
+        "Presto",
+        "Pretty Privilege",
+        "Sighting System",
+        "Siren's Song",
+        "Sky Sovereign ",
+        "Stygian Rush",
+        "Tidal Rush",
+        "Ultra Recon Hunter",
+        "Volt Rush"
+      ]
+    },
+    {
+      "className": "RechargeChargedOnElectricTerrainAbAttr",
+      "file": "src/data/elite-redux/archetypes/recharge-on-electric-terrain.ts",
+      "line": 25,
+      "uses": 2,
+      "abilities": ["Energized", "Generator"]
+    },
+    {
+      "className": "RechargeChargedOnElectricKoAbAttr",
+      "file": "src/data/elite-redux/archetypes/recharge-on-electric-terrain.ts",
+      "line": 43,
+      "uses": 1,
+      "abilities": ["Energized"]
+    },
+    {
+      "className": "RecoilDamageMultiplierAbAttr",
+      "file": "src/data/elite-redux/archetypes/recoil-damage-multiplier.ts",
+      "line": 27,
+      "uses": 4,
+      "abilities": ["Daredevil", "Limber", "Steadfast", "Superheavy"]
+    },
+    {
+      "className": "ReflectDamageOnDefendAbAttr",
+      "file": "src/data/elite-redux/archetypes/reflect-damage-on-defend.ts",
+      "line": 37,
+      "uses": 1,
+      "abilities": ["Soul Linker"]
+    },
+    {
+      "className": "RemoveScreensOnTypedAttackAbAttr",
+      "file": "src/data/elite-redux/archetypes/remove-screens-on-typed-attack.ts",
+      "line": 39,
+      "uses": 1,
+      "abilities": ["Warrior's Spear"]
+    },
+    {
+      "className": "RepeatMovePowerBoostAbAttr",
+      "file": "src/data/elite-redux/archetypes/repeat-move-power-boost.ts",
+      "line": 32,
+      "uses": 1,
+      "abilities": ["Rhythmic"]
+    },
+    {
+      "className": "SandStatusImmunityAbAttr",
+      "file": "src/data/elite-redux/archetypes/sand-cloak.ts",
+      "line": 42,
+      "uses": 2,
+      "abilities": ["Desert Cloak", "Dune Veil"]
+    },
+    {
+      "className": "SandSecondaryEffectImmunityAbAttr",
+      "file": "src/data/elite-redux/archetypes/sand-cloak.ts",
+      "line": 49,
+      "uses": 2,
+      "abilities": ["Desert Cloak", "Dune Veil"]
+    },
+    {
+      "className": "SePriorityBonusAbAttr",
+      "file": "src/data/elite-redux/archetypes/se-priority-bonus.ts",
+      "line": 27,
+      "uses": 1,
+      "abilities": ["Overzealous"]
+    },
+    {
+      "className": "SelfDamageOnAttackAbAttr",
+      "file": "src/data/elite-redux/archetypes/self-damage-on-attack.ts",
+      "line": 58,
+      "uses": 3,
+      "abilities": ["Blood Price", "Soul Linker", "Super Strain"]
+    },
+    {
+      "className": "SelfHighestStatBoostOnSummonAbAttr",
+      "file": "src/data/elite-redux/archetypes/self-highest-stat-boost-on-summon.ts",
+      "line": 41,
+      "uses": 6,
+      "abilities": ["Berserk DNA", "Greater Spirit", "Majestic Moth", "Sea Guardian", "Sun Worship", "Turf War"]
+    },
+    {
+      "className": "SelfHighestStatMultiplierAbAttr",
+      "file": "src/data/elite-redux/archetypes/self-highest-stat-multiplier.ts",
+      "line": 46,
+      "uses": 11,
+      "abilities": [
+        "Big Leaves",
+        "Ectoplasm",
+        "Photovoltaic",
+        "Raging Storm",
+        "Rite Of Spring",
+        "Sand Bender",
+        "Sand Fiend",
+        "Sand Force",
+        "Solar Power",
+        "Whiteout"
+      ]
+    },
+    {
+      "className": "SelfPersistentBleedAbAttr",
+      "file": "src/data/elite-redux/archetypes/self-persistent-bleed.ts",
+      "line": 24,
+      "uses": 1,
+      "abilities": ["Blood Stain"]
+    },
+    {
+      "className": "SelfSwitchOnMoveTypeAbAttr",
+      "file": "src/data/elite-redux/archetypes/self-switch-on-move-type.ts",
+      "line": 23,
+      "uses": 1,
+      "abilities": ["Hollow Ice Zone"]
+    },
+    {
+      "className": "SelfSwitchOnStatLowerAbAttr",
+      "file": "src/data/elite-redux/archetypes/self-switch-on-stat-lower.ts",
+      "line": 33,
+      "uses": 1,
+      "abilities": ["Tactical Retreat"]
+    },
+    {
+      "className": "SetFogOnHitAbAttr",
+      "file": "src/data/elite-redux/archetypes/set-fog-on-hit.ts",
+      "line": 29,
+      "uses": 1,
+      "abilities": ["Fog Machine"]
+    },
+    {
+      "className": "SetTargetAbilityOnMoveAbAttr",
+      "file": "src/data/elite-redux/archetypes/set-target-ability-on-move.ts",
+      "line": 29,
+      "uses": 1,
+      "abilities": ["Temporal Rupture"]
+    },
+    {
+      "className": "SkipChargeTurnAbAttr",
+      "file": "src/data/elite-redux/archetypes/skip-charge-turn.ts",
+      "line": 36,
+      "uses": 1,
+      "abilities": ["Accelerate"]
+    },
+    {
+      "className": "SpeedBonusToStatAbAttr",
+      "file": "src/data/elite-redux/archetypes/speed-bonus-to-stat.ts",
+      "line": 75,
+      "uses": 28,
+      "abilities": [
+        "Blur",
+        "Elude",
+        "Impulse",
+        "Iron Giant",
+        "Juggernaut",
+        "Mach 3",
+        "Max Acceleration",
+        "Power Core",
+        "Sky Sovereign ",
+        "Sleek Scales",
+        "Slipstream",
+        "Speed Force",
+        "Sumo Guard",
+        "Terminal Velocity",
+        "Unstable Core"
+      ]
+    },
+    {
+      "className": "StabAddAbAttr",
+      "file": "src/data/elite-redux/archetypes/stab-add.ts",
+      "line": 94,
+      "uses": 59,
+      "abilities": [
+        "Acidic Slime",
+        "Amphibious",
+        "Arcane Force",
+        "Aurora Borealis",
+        "Bejeweled",
+        "Blaze Release",
+        "Bodhisattva",
+        "Brain Food",
+        "Brainpower",
+        "Color Spectrum",
+        "Deviate",
+        "Draconic Might",
+        "Draconize",
+        "Dragonfruit",
+        "Emanate",
+        "Enlightened",
+        "Fertilize",
+        "Fighting Spirit",
+        "Hand Barnacles",
+        "Heartless Style",
+        "Hydrate",
+        "Immolate",
+        "Intoxicate",
+        "Komodo",
+        "Lead Claws",
+        "Lunar Eclipse",
+        "Mineralize",
+        "Mob Boss",
+        "Molten Coat",
+        "Moon Spirit",
+        "Moonarch",
+        "Mystic Power",
+        "Nucleus",
+        "Old Mariner",
+        "Pollinate",
+        "Psychic Supremacy",
+        "Qigong",
+        "Sludgy Mix",
+        "Solar Flare",
+        "Spectralize",
+        "Stainless Steel",
+        "Steel Beetle",
+        "Stellarize",
+        "Storm Cloud",
+        "Tectonize",
+        "Tender Affection",
+        "Twinkle Toes",
+        "Two-Faced",
+        "Unicorn",
+        "Unown Power",
+        "Warrior's Spear",
+        "Waterborne"
+      ]
+    },
+    {
+      "className": "StabSuppressAuraAbAttr",
+      "file": "src/data/elite-redux/archetypes/stab-suppress-aura.ts",
+      "line": 22,
+      "uses": 2,
+      "abilities": ["Relic Stone", "Titan"]
+    },
+    {
+      "className": "StatBlendAbAttr",
+      "file": "src/data/elite-redux/archetypes/stat-blend.ts",
+      "line": 34,
+      "uses": 2,
+      "abilities": ["Best Offense", "Magus Blades"]
+    },
+    {
+      "className": "StatChangeOnAttackAbAttr",
+      "file": "src/data/elite-redux/archetypes/stat-change-on-attack.ts",
+      "line": 62,
+      "uses": 9,
+      "abilities": ["Archmage", "Familiar", "Sinister Claws"]
+    }
+  ]
+}

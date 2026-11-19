@@ -1,0 +1,396 @@
+{
+  "batch": "B12",
+  "classes": [
+    {
+      "className": "FaintCountTriggerAbAttr",
+      "file": "src/data/elite-redux/archetypes/stat-multiplier-per-faint.ts",
+      "line": 38,
+      "uses": 1,
+      "abilities": ["Soul Harvest"]
+    },
+    {
+      "className": "PerFaintStatMultiplierAbAttr",
+      "file": "src/data/elite-redux/archetypes/stat-multiplier-per-faint.ts",
+      "line": 52,
+      "uses": 3,
+      "abilities": ["Soul Harvest"]
+    },
+    {
+      "className": "StatTriggerOnKoAbAttr",
+      "file": "src/data/elite-redux/archetypes/stat-trigger-on-event.ts",
+      "line": 215,
+      "uses": 10,
+      "abilities": [
+        "Adrenaline Rush",
+        "As One",
+        "Breezy Neigh",
+        "ChillngNeigh",
+        "Dragon's Ritual",
+        "Forsaken Heart",
+        "Haunting Frenzy",
+        "Hubris",
+        "Hydra",
+        "Super Strain"
+      ]
+    },
+    {
+      "className": "StatTriggerOnHitAbAttr",
+      "file": "src/data/elite-redux/archetypes/stat-trigger-on-event.ts",
+      "line": 270,
+      "uses": 13,
+      "abilities": [
+        "Anger Point",
+        "Balloon Blitz",
+        "Balloon Bomb",
+        "Berserker Rage",
+        "Crowned Sword",
+        "Cryo Architect",
+        "Fortitude",
+        "Furnace",
+        "Ice Plumes",
+        "Inflatable",
+        "Petal Shield",
+        "Super Hot Goo",
+        "Tipping Point"
+      ]
+    },
+    {
+      "className": "StatTriggerOnEntryAbAttr",
+      "file": "src/data/elite-redux/archetypes/stat-trigger-on-event.ts",
+      "line": 330,
+      "uses": 1,
+      "abilities": ["Petal Shield"]
+    },
+    {
+      "className": "StatTriggerOnStatLoweredAbAttr",
+      "file": "src/data/elite-redux/archetypes/stat-trigger-on-event.ts",
+      "line": 367,
+      "uses": 13,
+      "abilities": [
+        "Coward",
+        "Dust Cloud",
+        "Emergency Exit",
+        "Emperor's Wrath",
+        "Fire Ruler",
+        "King's Wrath",
+        "Knight's Honor",
+        "Queen's Mourning",
+        "Rattled",
+        "Run Away",
+        "Tactical Retreat",
+        "Wimp Out"
+      ]
+    },
+    {
+      "className": "StatTriggerOnAllyStatLoweredAbAttr",
+      "file": "src/data/elite-redux/archetypes/stat-trigger-on-event.ts",
+      "line": 408,
+      "uses": 6,
+      "abilities": ["Emperor's Wrath", "Fire Ruler", "King's Wrath", "Knight's Honor", "Queen's Mourning"]
+    },
+    {
+      "className": "StatusCascadeAbAttr",
+      "file": "src/data/elite-redux/archetypes/status-cascade.ts",
+      "line": 37,
+      "uses": 1,
+      "abilities": ["Neurotoxin"]
+    },
+    {
+      "className": "StatusChanceMultiplierAbAttr",
+      "file": "src/data/elite-redux/archetypes/status-chance-multiplier.ts",
+      "line": 25,
+      "uses": 6,
+      "abilities": ["Chandelier", "Cryomancy", "Cryostasis", "Pyromancy", "Thermomancy"]
+    },
+    {
+      "className": "StatusEffectImmunityAbAttrEr",
+      "file": "src/data/elite-redux/archetypes/status-immunity.ts",
+      "line": 94,
+      "uses": 6,
+      "abilities": ["Blood Stigma", "Hyper Cleanse", "Iron Giant", "Juggernaut", "Rude Awakening", "Sumo Guard"]
+    },
+    {
+      "className": "IntimidateImmunityAbAttrEr",
+      "file": "src/data/elite-redux/archetypes/status-immunity.ts",
+      "line": 173,
+      "uses": 2,
+      "abilities": ["Discipline", "Overwhelm"]
+    },
+    {
+      "className": "StatusMoveTypeImmunityBypassAbAttr",
+      "file": "src/data/elite-redux/archetypes/status-move-type-bypass.ts",
+      "line": 31,
+      "uses": 1,
+      "abilities": ["Mycelium Might"]
+    },
+    {
+      "className": "SuperEffectiveMultiplierBoostAbAttr",
+      "file": "src/data/elite-redux/archetypes/super-effective-multiplier-boost.ts",
+      "line": 38,
+      "uses": 5,
+      "abilities": ["Arcane Force", "Brain Food", "Iron Serpent", "Psychic Supremacy", "Winged King"]
+    },
+    {
+      "className": "TargetHighestStatDropAbAttr",
+      "file": "src/data/elite-redux/archetypes/target-highest-stat-drop.ts",
+      "line": 35,
+      "uses": 1,
+      "abilities": ["Malicious"]
+    },
+    {
+      "className": "ActivateOncePerBattleEntryWindowAbAttr",
+      "file": "src/data/elite-redux/archetypes/time-limited-effectiveness-floor.ts",
+      "line": 42,
+      "uses": 1,
+      "abilities": ["Forewarn"]
+    },
+    {
+      "className": "TimeLimitedEffectivenessFloorAbAttr",
+      "file": "src/data/elite-redux/archetypes/time-limited-effectiveness-floor.ts",
+      "line": 66,
+      "uses": 2,
+      "abilities": ["Forewarn", "Soothsayer"]
+    },
+    {
+      "className": "ToxicTerrainSelfPoisonOnSummonAbAttr",
+      "file": "src/data/elite-redux/archetypes/toxic-terrain-self-poison.ts",
+      "line": 55,
+      "uses": 1,
+      "abilities": ["Toxic Boost"]
+    },
+    {
+      "className": "ToxicTerrainSelfPoisonOnTerrainChangeAbAttr",
+      "file": "src/data/elite-redux/archetypes/toxic-terrain-self-poison.ts",
+      "line": 62,
+      "uses": 1,
+      "abilities": ["Toxic Boost"]
+    },
+    {
+      "className": "TrapDurationModifierAbAttr",
+      "file": "src/data/elite-redux/archetypes/trap-duration-modifier.ts",
+      "line": 51,
+      "uses": 3,
+      "abilities": ["Tangled Tails", "Tentalock", "Wildfire"]
+    },
+    {
+      "className": "TurnDecayDamageMultiplierAbAttr",
+      "file": "src/data/elite-redux/archetypes/turn-decay-damage-multiplier.ts",
+      "line": 30,
+      "uses": 1,
+      "abilities": ["Lethargy"]
+    },
+    {
+      "className": "TypeConversionAbAttr",
+      "file": "src/data/elite-redux/archetypes/type-conversion.ts",
+      "line": 123,
+      "uses": 39,
+      "abilities": [
+        "Banshee",
+        "Bejeweled",
+        "Blaze Release",
+        "Brainpower",
+        "Cosmic Wings",
+        "Crystallize",
+        "Draconic Might",
+        "Draconize",
+        "Dragonfruit",
+        "Emanate",
+        "Enlightened",
+        "Fertilize",
+        "Fighting Spirit",
+        "Grievous Spear",
+        "Grim Jab",
+        "Heartless Style",
+        "Immolate",
+        "Intoxicate",
+        "Komodo",
+        "Lead Claws",
+        "Mineralize",
+        "Molten Coat",
+        "Nucleus",
+        "Pollinate",
+        "Power Metal",
+        "Qigong",
+        "Sand Song",
+        "Sludgy Mix",
+        "Snow Song",
+        "Solar Flare",
+        "Spectral Shroud",
+        "Steel Beetle",
+        "Superconductor",
+        "Tectonize",
+        "Twinkle Toes",
+        "Unicorn",
+        "Warrior's Spear"
+      ]
+    },
+    {
+      "className": "TypeConversionPowerBoostAbAttr",
+      "file": "src/data/elite-redux/archetypes/type-conversion.ts",
+      "line": 215,
+      "uses": 10,
+      "abilities": [
+        "Banshee",
+        "Bejeweled",
+        "Crystallize",
+        "Grievous Spear",
+        "Grim Jab",
+        "Power Metal",
+        "Sand Song",
+        "Snow Song",
+        "Spectral Shroud",
+        "Superconductor"
+      ]
+    },
+    {
+      "className": "TypeDamageBoostAbAttr",
+      "file": "src/data/elite-redux/archetypes/type-damage-boost.ts",
+      "line": 101,
+      "uses": 63,
+      "abilities": [
+        "3 > 1",
+        "Aerialist",
+        "Aerilate",
+        "Antarctic Bird",
+        "Aquatic Dweller",
+        "Atlantic Ruler",
+        "Atomic Burst",
+        "Atomic Punch",
+        "Combustion",
+        "Crude Steel",
+        "Deep Freeze",
+        "Devious Present",
+        "Doom Blast",
+        "Dune Terror",
+        "Electric Burst",
+        "Electrocytes",
+        "Fae Heart",
+        "Fey Flight",
+        "Fighter",
+        "Flock",
+        "Fluttering Spirit",
+        "Forest Rage",
+        "Foul Energy",
+        "Galvanize",
+        "Gladiator",
+        "Hellblaze",
+        "Hydro Circuit",
+        "Imposing Wings",
+        "Infernal Rage",
+        "Malicious Empathy",
+        "Nocturnal",
+        "Overwhelming Mind",
+        "Pixilate",
+        "Plasma Lamp",
+        "Psychic Mind",
+        "Purgatory",
+        "Reaper's Embarce",
+        "Refrigerate",
+        "Riptide",
+        "Rockhard Will",
+        "Short Circuit",
+        "Smoldering Wood",
+        "Solar Panel",
+        "Stainless Steel",
+        "Steelworker",
+        "Stonecutter",
+        "Thunder Gods Vessel",
+        "Two-Faced",
+        "Warmonger",
+        "We Will Rock You",
+        "Weighted Scales"
+      ]
+    },
+    {
+      "className": "TypeRecoilAbAttr",
+      "file": "src/data/elite-redux/archetypes/type-damage-boost.ts",
+      "line": 224,
+      "uses": 5,
+      "abilities": ["Doom Blast", "Electric Burst", "Infernal Rage", "Two-Faced"]
+    },
+    {
+      "className": "OffensiveTypeMultiplierAbAttr",
+      "file": "src/data/elite-redux/archetypes/type-effectiveness-mod.ts",
+      "line": 105,
+      "uses": 6,
+      "abilities": ["Dragonslayer", "Fae Hunter", "Firefighter", "King of the Jungle", "Lumberjack", "Monster Hunter"]
+    },
+    {
+      "className": "TypeFilteredEffectChanceMultiplierAbAttr",
+      "file": "src/data/elite-redux/archetypes/type-filtered-effect-chance.ts",
+      "line": 24,
+      "uses": 1,
+      "abilities": ["Corrupted Mind"]
+    },
+    {
+      "className": "TypeGatedStatTriggerOnAttackAbAttr",
+      "file": "src/data/elite-redux/archetypes/type-gated-stat-trigger-on-attack.ts",
+      "line": 40,
+      "uses": 2,
+      "abilities": ["Spin To Win", "Spinning Top"]
+    },
+    {
+      "className": "TypeImmunityHighestAttackStatStageAbAttr",
+      "file": "src/data/elite-redux/archetypes/type-immunity-highest-attack-stat-stage.ts",
+      "line": 35,
+      "uses": 5,
+      "abilities": ["Lightning Aspect", "Lightning Rod", "Reservoir", "Sap Sipper", "Storm Drain"]
+    },
+    {
+      "className": "TypedImmunityWithArenaTagAbAttr",
+      "file": "src/data/elite-redux/archetypes/typed-immunity-with-arena-tag.ts",
+      "line": 35,
+      "uses": 1,
+      "abilities": ["Evaporate"]
+    },
+    {
+      "className": "UserFieldFlagImmunityAbAttr",
+      "file": "src/data/elite-redux/archetypes/user-field-flag-immunity.ts",
+      "line": 26,
+      "uses": 1,
+      "abilities": ["Noise Cancel"]
+    },
+    {
+      "className": "WakeStatBoostAbAttr",
+      "file": "src/data/elite-redux/archetypes/wake-stat-boost.ts",
+      "line": 44,
+      "uses": 1,
+      "abilities": ["Rude Awakening"]
+    },
+    {
+      "className": "WeatherBasedMoveBlockAbAttr",
+      "file": "src/data/elite-redux/archetypes/weather-based-move-block.ts",
+      "line": 46,
+      "uses": 2,
+      "abilities": ["Neutralizing Fog", "Weather Control"]
+    },
+    {
+      "className": "WeatherGroundAirborneAbAttr",
+      "file": "src/data/elite-redux/archetypes/weather-ground-airborne.ts",
+      "line": 31,
+      "uses": 1,
+      "abilities": ["Desert Spirit"]
+    },
+    {
+      "className": "WeatherStatMultiplierAbAttr",
+      "file": "src/data/elite-redux/archetypes/weather-stat-multiplier.ts",
+      "line": 102,
+      "uses": 5,
+      "abilities": ["Abominable Monster", "Ethereal Rush", "Rite Of Spring", "Smokey Maneuvers", "Thermal Slide"]
+    },
+    {
+      "className": "WeatherTypeBoostAbAttr",
+      "file": "src/data/elite-redux/archetypes/weather-terrain-interaction.ts",
+      "line": 188,
+      "uses": 2,
+      "abilities": ["Catastrophe"]
+    },
+    {
+      "className": "WeatherDamageReductionAbAttr",
+      "file": "src/data/elite-redux/archetypes/weather-terrain-interaction.ts",
+      "line": 351,
+      "uses": 2,
+      "abilities": ["Christmas Spirit", "Dune Terror"]
+    }
+  ]
+}

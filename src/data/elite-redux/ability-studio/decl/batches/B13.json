@@ -1,0 +1,306 @@
+{
+  "batch": "B13",
+  "classes": [
+    {
+      "className": "FinalSeasonEntryAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 122,
+      "uses": 1,
+      "abilities": ["Final Season"]
+    },
+    {
+      "className": "FinalSeasonFogAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 140,
+      "uses": 1,
+      "abilities": ["Final Season"]
+    },
+    {
+      "className": "FinalSeasonPowerAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 154,
+      "uses": 1,
+      "abilities": ["Final Season"]
+    },
+    {
+      "className": "FoulHarvestAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 193,
+      "uses": 1,
+      "abilities": ["Foul Harvest"]
+    },
+    {
+      "className": "PorousResetAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 265,
+      "uses": 1,
+      "abilities": ["Porous"]
+    },
+    {
+      "className": "PorousSoundReductionAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 271,
+      "uses": 1,
+      "abilities": ["Porous"]
+    },
+    {
+      "className": "PorousChargeAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 277,
+      "uses": 1,
+      "abilities": ["Porous"]
+    },
+    {
+      "className": "PorousPowerAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 290,
+      "uses": 1,
+      "abilities": ["Porous"]
+    },
+    {
+      "className": "AnnealResetAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 316,
+      "uses": 1,
+      "abilities": ["Anneal"]
+    },
+    {
+      "className": "AnnealAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 321,
+      "uses": 1,
+      "abilities": ["Anneal"]
+    },
+    {
+      "className": "VaporBodyAccuracyAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 350,
+      "uses": 1,
+      "abilities": ["Vapor Body"]
+    },
+    {
+      "className": "HeavyweightPowerAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 371,
+      "uses": 2,
+      "abilities": ["Heavyweight", "Meteor Mass"]
+    },
+    {
+      "className": "HeavyweightDropAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 380,
+      "uses": 1,
+      "abilities": ["Heavyweight"]
+    },
+    {
+      "className": "GlamRockAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 400,
+      "uses": 1,
+      "abilities": ["Glam Rock"]
+    },
+    {
+      "className": "SedimentBloomMarkerAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 439,
+      "uses": 1,
+      "abilities": ["Sediment Bloom"]
+    },
+    {
+      "className": "TwoFacedPowerAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 483,
+      "uses": 1,
+      "abilities": ["Two-Faced Unleashed"]
+    },
+    {
+      "className": "TwoFacedRecoilAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 512,
+      "uses": 1,
+      "abilities": ["Two-Faced Unleashed"]
+    },
+    {
+      "className": "SetlistResetAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 548,
+      "uses": 1,
+      "abilities": ["Setlist"]
+    },
+    {
+      "className": "SetlistPowerAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 609,
+      "uses": 1,
+      "abilities": ["Setlist"]
+    },
+    {
+      "className": "SetlistAccuracyAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 617,
+      "uses": 1,
+      "abilities": ["Setlist"]
+    },
+    {
+      "className": "FanFavoritePowerAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 633,
+      "uses": 1,
+      "abilities": ["Fan Favorite"]
+    },
+    {
+      "className": "FanFavoriteAccuracyAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 641,
+      "uses": 1,
+      "abilities": ["Fan Favorite"]
+    },
+    {
+      "className": "RingGeneralEntryAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 657,
+      "uses": 1,
+      "abilities": ["Ring General"]
+    },
+    {
+      "className": "RingGeneralTrapAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 662,
+      "uses": 1,
+      "abilities": ["Ring General"]
+    },
+    {
+      "className": "DeadeyeMarkAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 672,
+      "uses": 1,
+      "abilities": ["Deadeye Draw"]
+    },
+    {
+      "className": "DeadeyeCritAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 690,
+      "uses": 1,
+      "abilities": ["Deadeye Draw"]
+    },
+    {
+      "className": "DeadeyeMarkerAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 695,
+      "uses": 1,
+      "abilities": ["Deadeye Draw"]
+    },
+    {
+      "className": "CenterSpreadReductionAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 710,
+      "uses": 1,
+      "abilities": ["Center of Attention"]
+    },
+    {
+      "className": "CenterOfAttentionAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 715,
+      "uses": 1,
+      "abilities": ["Center of Attention"]
+    },
+    {
+      "className": "EclipseWingTurnEndAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 780,
+      "uses": 1,
+      "abilities": ["Eclipse Wing"]
+    },
+    {
+      "className": "SpiritPunchAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 793,
+      "uses": 1,
+      "abilities": ["Spirit Punch"]
+    },
+    {
+      "className": "EncoreSetResetAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 828,
+      "uses": 1,
+      "abilities": ["Encore Set"]
+    },
+    {
+      "className": "EncoreSetAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 833,
+      "uses": 1,
+      "abilities": ["Encore Set"]
+    },
+    {
+      "className": "SkyhookAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 874,
+      "uses": 1,
+      "abilities": ["Skyhook"]
+    },
+    {
+      "className": "BootHillAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 906,
+      "uses": 1,
+      "abilities": ["Boot Hill"]
+    },
+    {
+      "className": "ReductionPowerAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 1007,
+      "uses": 1,
+      "abilities": ["Reduction"]
+    },
+    {
+      "className": "CrackedVesselRestoreTypesAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 1039,
+      "uses": 1,
+      "abilities": ["Cracked Vessel"]
+    },
+    {
+      "className": "LivingChromeReductionAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 1080,
+      "uses": 1,
+      "abilities": ["Living Chrome"]
+    },
+    {
+      "className": "EclipseWingPowerAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 1334,
+      "uses": 1,
+      "abilities": ["Eclipse Wing"]
+    },
+    {
+      "className": "EclipseWingMarkerAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 1343,
+      "uses": 1,
+      "abilities": ["Eclipse Wing"]
+    },
+    {
+      "className": "LivingChromeMarkerAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 1346,
+      "uses": 1,
+      "abilities": ["Living Chrome"]
+    },
+    {
+      "className": "CrackedVesselMarkerAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 1349,
+      "uses": 1,
+      "abilities": ["Cracked Vessel"]
+    },
+    {
+      "className": "SuperegoMarkerAbAttr",
+      "file": "src/data/elite-redux/abilities/newcomer-signature-mechanics.ts",
+      "line": 1352,
+      "uses": 1,
+      "abilities": ["Superego"]
+    }
+  ]
+}
