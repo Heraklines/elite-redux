@@ -274,6 +274,31 @@ export const TEMPLATES: Readonly<Record<string, ScenarioSpec>> = {
     foeMoves: [MoveId.EXPLOSION],
     turns: [celebrate("BerryPhase")],
   },
+  /** B05 chunk 2. The HOLDER lands critical hits (attacker-side crit hooks: crit damage multiplier). */
+  "holder-crits-foe": {
+    ...BASE,
+    id: "holder-crits-foe",
+    label: "The holder lands critical hits on the enemy",
+    foe: SpeciesId.SNORLAX,
+    foeLevel: 100,
+    foeMoves: [MoveId.CELEBRATE],
+    crits: true,
+    turns: [use(MoveId.TACKLE), use(MoveId.TACKLE)],
+  },
+  /** B05 chunk 2. A poisoned (or whatever the status axis says) holder sits through the end-of-turn status tick. */
+  "holder-status-turns": {
+    ...BASE,
+    id: "holder-status-turns",
+    label: "The holder has a status condition and sits through three turns",
+    foeMoves: [MoveId.CELEBRATE],
+    turns: [celebrate(), celebrate(), celebrate()],
+    setup: ({ holder }) => {
+      // A status axis was applied before this runs; only poison an unaffected holder.
+      if (holder.status == null) {
+        setStatusOf(holder, StatusEffect.POISON);
+      }
+    },
+  },
   /** The holder is low enough to want its berry; the enemy hits it. */
   "holder-low-hp-turns": {
     ...BASE,
@@ -324,6 +349,8 @@ const t = {
   doubles: "doubles-ally",
   reserve: "hit-with-reserve",
   flags: "while-active-flags",
+  holderCrits: "holder-crits-foe",
+  statusTurns: "holder-status-turns",
 } as const;
 
 /** WHEN id to the template that reaches it. Reviewed by hand; `reach.test.ts` proves it with a probe attr. */
@@ -375,7 +402,7 @@ const WHEN_TEMPLATE: Readonly<Record<string, string>> = {
   "calc.damage-taken": t.hit,
   "calc.stab": t.attack,
   "calc.crit-stage": t.attack,
-  "calc.crit-multiplier": t.crit,
+  "calc.crit-multiplier": t.holderCrits,
   "calc.crit-roll": t.attack,
   "calc.hit-count": t.attack,
   "calc.max-multi-hit": t.attack,
@@ -414,7 +441,7 @@ const WHEN_TEMPLATE: Readonly<Record<string, string>> = {
   "cancel.interaction": t.hit,
   "cancel.crit": t.crit,
   "cancel.item-theft": t.item,
-  "cancel.indirect-damage": t.weather,
+  "cancel.indirect-damage": t.statusTurns,
   "cancel.one-hit-ko": t.hit,
   "cancel.forced-switch": t.forced,
   "cancel.explosive-moves": t.boom,

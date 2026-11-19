@@ -4703,8 +4703,25 @@ export class BlockStatusDamageAbAttr extends CancelInteractionAbAttr {
     this.effects = effects;
   }
 
-  override canApply({ pokemon, cancelled }: AbAttrParamsWithCancel): boolean {
-    return !cancelled.value && !!pokemon.status?.effect && this.effects.includes(pokemon.status.effect);
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrParamsWithCancel) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `guards` (nothing was blocked yet), then
+   * `gate` (the holder has one of the listed statuses). No residual, no random draw.
+   */
+  override canApply(params: AbAttrParamsWithCancel): boolean {
+    return gatedCanApply<AbAttrParamsWithCancel>(this, params);
+  }
+
+  /** Safety rule that stays in the class: damage that an earlier ability already blocked needs no second block. */
+  public guards({ cancelled }: AbAttrParamsWithCancel): boolean {
+    return !cancelled.value;
+  }
+
+  /** The replaceable condition: the holder has one of the listed statuses. */
+  public gate({ pokemon }: AbAttrParamsWithCancel): boolean {
+    return !!pokemon.status?.effect && this.effects.includes(pokemon.status.effect);
   }
 }
 
@@ -4741,7 +4758,16 @@ export class ChangeMovePriorityAbAttr extends AbAttr {
     this.changeAmount = changeAmount;
   }
 
-  override canApply({ pokemon, move }: ChangeMovePriorityAbAttrParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: ChangeMovePriorityAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole rule is the replaceable `gate`, there is no residual. */
+  override canApply(params: ChangeMovePriorityAbAttrParams): boolean {
+    return gatedCanApply<ChangeMovePriorityAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the constructor closure. */
+  public gate({ pokemon, move }: ChangeMovePriorityAbAttrParams): boolean {
     return this.moveFunc(pokemon, move);
   }
 
@@ -4760,7 +4786,16 @@ export class ChangeMovePriorityInBracketAbAttr extends AbAttr {
     this.moveFunc = moveFunc;
   }
 
-  override canApply({ pokemon, move }: ChangeMovePriorityAbAttrParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: ChangeMovePriorityAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole rule is the replaceable `gate`, there is no residual. */
+  override canApply(params: ChangeMovePriorityAbAttrParams): boolean {
+    return gatedCanApply<ChangeMovePriorityAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the constructor closure. */
+  public gate({ pokemon, move }: ChangeMovePriorityAbAttrParams): boolean {
     return this.moveFunc(pokemon, move);
   }
 

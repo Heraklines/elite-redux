@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// Instance bindings of batch B05 (chunk 1 of 4), keyed by (abilityId, attrIndex). Written by hand from the live attrs.
+// Instance bindings of batch B05 (chunks 1 and 2 of 4), keyed by (abilityId, attrIndex). Written by hand from the live attrs.
 //
-// Only SetMoveAccuracyAbAttr has a gate. The seven other classes of this chunk are presence flags (no closure, no gate),
-// so they need no binding.
-import { bindCondition } from "#data/elite-redux/ability-studio/bindings";
+// Chunk 1: only SetMoveAccuracyAbAttr has a gate; the seven other classes are presence flags (no closure, no gate), so they need
+// no binding. Chunk 2 (further down): condition closures and gates of the crit, block and priority classes.
+import { bindCondition, bindLegacyClosure } from "#data/elite-redux/ability-studio/bindings";
 
 // =============================================================================================
 // SetMoveAccuracyAbAttr (Tier B). Slot "gate": the original first clause `moveIds.includes(move.id)`.
@@ -18,3 +18,111 @@ import { bindCondition } from "#data/elite-redux/ability-studio/bindings";
 bindCondition(5065, 0, { id: "move.is-move", moveId: "HYPNOSIS" }, "gate"); // Hypnotist, [HYPNOSIS], 90
 bindCondition(5103, 2, { id: "move.is-move", moveId: "HYPNOSIS" }, "gate"); // Lunar Eclipse, [HYPNOSIS], 90
 bindCondition(5487, 0, { id: "move.is-move", moveId: "SING" }, "gate"); // Lullaby, [SING], 90
+
+
+// =============================================================================================
+// Chunk 2 of 4. Written by hand from the live attrs (the dump printed every closure and field).
+// =============================================================================================
+
+// ---------------------------------------------------------------------------------------------
+// ConditionalCritAbAttr (Tier A). Slot ctor:0, a PokemonAttackCondition (user, target, move); the holder is the user, "other"
+// is the target. Unlisted users: none (all 16 attrs below).
+// ---------------------------------------------------------------------------------------------
+
+// `user.tempSummonData.waveTurnCount === 1`
+bindCondition(5171, 0, { id: "time.first-turn" }); // Ambush
+bindCondition(5270, 0, { id: "time.first-turn" }); // Showdown Mode
+bindCondition(5482, 0, { id: "time.first-turn" }); // Hunter's Mark
+bindCondition(20002, 0, { id: "time.first-turn" }); // Ultra Recon Hunter
+
+// `move.id === MoveId.SPACIAL_REND` (460)
+bindCondition(5230, 1, { id: "move.is-move", moveId: "SPACIAL_REND" }); // Heaven Asunder
+
+// `target.getMoveEffectiveness(user, move) > 1` (the three spellings of the null check, `target != null`, `!!target` and
+// `target != null && user != null`, make no difference: the engine always passes both)
+const SUPER_EFFECTIVE = { id: "move.effectiveness", cmp: "gt", n: 1 };
+bindCondition(5078, 1, SUPER_EFFECTIVE); // Fatal Precision
+bindCondition(5078, 3, SUPER_EFFECTIVE); // Fatal Precision (second copy of the same rule)
+bindCondition(5388, 2, SUPER_EFFECTIVE); // Final Blow
+bindCondition(5622, 2, SUPER_EFFECTIVE); // Flawless Precision
+bindCondition(20008, 8, SUPER_EFFECTIVE); // Heartless Style
+bindCondition(20008, 10, SUPER_EFFECTIVE); // Heartless Style (second copy of the same rule)
+
+// the target is poisoned (1), badly poisoned (2) or paralysed (3), OR has the ER_BLEED tag, OR its Speed stage is below 0:
+// `target.status?.effect in {1,2,3} || target.getTag("ER_BLEED") != null || target.getStatStage(Stat.SPD) < 0`; no target = false.
+const FOE_IS_HURT = {
+  any: [
+    { id: "status.has", who: "other", status: "POISON" },
+    { id: "status.has", who: "other", status: "TOXIC" },
+    { id: "status.has", who: "other", status: "PARALYSIS" },
+    { id: "tag.has", who: "other", tag: "ER_BLEED" },
+    { id: "stage.compare", who: "other", stat: "SPD", cmp: "lt", n: 0 },
+  ],
+};
+bindCondition(196, 0, FOE_IS_HURT); // Merciless
+bindCondition(5419, 0, FOE_IS_HURT); // Depravity
+bindCondition(5473, 1, FOE_IS_HURT); // Relentless
+
+bindLegacyClosure(
+  5436,
+  1,
+  "Ape Shift: pokemon.getHpRatio() < .5 uses the HP ratio ROUNDED to two decimals (true below 49.5% HP); hp.at-most/at-least compare exact integers, so no existing atom gives the same answer (request R-B05-12)",
+); // Ape Shift
+
+// ---------------------------------------------------------------------------------------------
+// BlockStatusDamageAbAttr (Tier B). Slot "gate": `!!pokemon.status?.effect && effects.includes(status.effect)`. `!cancelled.value`
+// stays in the class as its first clause (guards). The lists are POISON = 1, TOXIC = 2, BURN = 6 read from the live attrs.
+// ---------------------------------------------------------------------------------------------
+const POISONED_OR_TOXIC = {
+  any: [
+    { id: "status.has", who: "holder", status: "POISON" },
+    { id: "status.has", who: "holder", status: "TOXIC" },
+  ],
+};
+const POISONED_TOXIC_OR_BURNED = {
+  any: [
+    { id: "status.has", who: "holder", status: "POISON" },
+    { id: "status.has", who: "holder", status: "TOXIC" },
+    { id: "status.has", who: "holder", status: "BURN" },
+  ],
+};
+const BURNED = { id: "status.has", who: "holder", status: "BURN" };
+bindCondition(63, 1, POISONED_TOXIC_OR_BURNED, "gate"); // Marvel Scale, [POISON, TOXIC, BURN]
+bindCondition(90, 1, POISONED_OR_TOXIC, "gate"); // Poison Heal, [TOXIC, POISON]
+bindCondition(137, 1, POISONED_OR_TOXIC, "gate"); // Toxic Boost, [POISON, TOXIC]
+bindCondition(138, 1, BURNED, "gate"); // Flare Boost, [BURN]
+bindCondition(5943, 2, POISONED_TOXIC_OR_BURNED, "gate"); // Rainbow Fish, [POISON, TOXIC, BURN]
+bindCondition(6051, 2, POISONED_OR_TOXIC, "gate"); // Decay, [POISON, TOXIC]
+
+// ---------------------------------------------------------------------------------------------
+// ChangeMovePriorityAbAttr and ChangeMovePriorityInBracketAbAttr (Tier B). Slot "gate": `moveFunc(pokemon, move)`, the holder is
+// the user of the move.
+// ---------------------------------------------------------------------------------------------
+const STATUS_MOVE = { id: "move.category", category: "STATUS" };
+bindCondition(158, 0, STATUS_MOVE, "gate"); // Prankster: move.category === STATUS, +1
+bindCondition(298, 0, STATUS_MOVE, "gate"); // Mycelium Might (in bracket): move.category === STATUS, LAST
+bindCondition(
+  177,
+  0,
+  {
+    all: [
+      { id: "hp.full", who: "holder" },
+      { id: "move.type", type: "FLYING", effective: true },
+    ],
+  },
+  "gate",
+); // Gale Wings: pokemon.isFullHp() && pokemon.getMoveType(move) === FLYING, +1
+bindCondition(205, 0, { id: "move.flag", flag: "TRIAGE_MOVE" }, "gate"); // Triage: move.hasFlag(TRIAGE_MOVE), +3
+bindCondition(6083, 4, { id: "move.is-move", moveId: "FOCUS_PUNCH" }, "gate"); // Monk: move.id === 264, +3
+bindLegacyClosure(
+  290,
+  0,
+  "Opportunist: true when ANY opponent has getHpRatio() <= .5 (rounded ratio), inside a try/catch; no atom reads the list of opponents or the rounded ratio (request R-B05-12)",
+  "gate",
+); // Opportunist
+bindLegacyClosure(
+  6015,
+  2,
+  "Penta-Punch: the rule is move.id === ErMoveId.FIVE_STAR_FURY (5156), an Elite Redux move id; move.is-move only names MoveId members (request R-B05-13)",
+  "gate",
+); // Penta-Punch

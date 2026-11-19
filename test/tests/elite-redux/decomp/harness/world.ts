@@ -381,4 +381,26 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     accuracy: new NumberHolder(ctx.move.accuracy),
     simulated: false,
   }),
+  // Added by B05 chunk 2. Move.getPriority / getPriorityModifier (move.ts:1445, :1455): the user is the holder, the
+  // number is the move priority (a bracket value for ChangeMovePriorityInBracketAbAttr; the shape is the same).
+  "calc.priority": ctx => ({
+    pokemon: ctx.holder,
+    move: ctx.move,
+    priority: new NumberHolder(ctx.move.priority),
+    simulated: false,
+  }),
+  // Pokemon.getCritStage (pokemon.ts:2063): only the holder and the stage number.
+  "calc.crit-stage": ctx => ({ pokemon: ctx.holder, critStage: new NumberHolder(0) }),
+  // Pokemon.getAttackDamage (pokemon.ts:6071): a critical hit starts at 1.5 (a plain hit at 1, which MultCrit skips).
+  "calc.crit-multiplier": ctx => ({ pokemon: ctx.holder, critMult: new NumberHolder(1.5), simulated: false }),
+  // Pokemon.getCriticalHitResult (pokemon.ts:6438): the holder attacks `target`, the number is "will crit".
+  "calc.crit-roll": ctx => ({
+    pokemon: ctx.holder,
+    target: ctx.foe,
+    move: ctx.move,
+    isCritical: new BooleanHolder(false),
+  }),
+  // Cancel checks with no opponent (turn-end-phase.ts:89, move.ts:4713).
+  "cancel.indirect-damage": ctx => ({ pokemon: ctx.holder, cancelled: new BooleanHolder(false) }),
+  "cancel.one-hit-ko": ctx => ({ pokemon: ctx.holder, cancelled: new BooleanHolder(false) }),
 };

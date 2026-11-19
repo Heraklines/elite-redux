@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "0ef07a9a369fbe",
+  "hash": "196f9dd9ea831d",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -124,6 +124,347 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.block-non-direct-damage",
+      "className": "BlockNonDirectDamageAbAttr",
+      "label": "Block all indirect damage",
+      "summary": "I take no damage that does not come straight from a move: poison, burn, weather, hazards, recoil and Rough Skin style damage. Example: Magic Guard.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.indirect-damage",
+      "whenLabel": "While the game checks if indirect damage hurts me",
+      "synonyms": [
+        "magic guard",
+        "no poison damage",
+        "no recoil",
+        "no weather damage",
+        "immune to hazards",
+        "passive damage immunity",
+        "only direct damage"
+      ],
+      "examples": [
+        "Take no damage from poison, burn, sandstorm or recoil, like Magic Guard"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when the damage was already blocked by something earlier"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 10
+    },
+    {
+      "id": "block.block-one-hit-ko",
+      "className": "BlockOneHitKOAbAttr",
+      "label": "Block one-hit knockout moves",
+      "summary": "Moves that knock out in one hit, whatever the HP, fail against me (the Fissure and Guillotine kind). Surviving a normal hit at full HP is a different effect.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.one-hit-ko",
+      "whenLabel": "While the game checks if a one-hit KO works on me",
+      "synonyms": [
+        "sturdy",
+        "ohko immunity",
+        "fissure immunity",
+        "no instant knockout",
+        "immune to sheer cold",
+        "guillotine"
+      ],
+      "examples": [
+        "Fissure and Sheer Cold fail against me, like Sturdy"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when the move was already blocked by something earlier"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.block-status-damage",
+      "className": "BlockStatusDamageAbAttr",
+      "label": "Block damage from chosen status conditions",
+      "summary": "I take no damage from these status conditions: Poison, Toxic. Example: poisoned or badly poisoned and still no end-of-turn damage, like Poison Heal.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.indirect-damage",
+      "whenLabel": "While the game checks if indirect damage hurts me",
+      "synonyms": [
+        "poison heal",
+        "no poison damage",
+        "no burn damage",
+        "status damage immunity",
+        "toxic boost",
+        "marvel scale",
+        "flare boost"
+      ],
+      "examples": [
+        "No damage from poison or toxic, like Poison Heal",
+        "No damage from burn, like Flare Boost"
+      ],
+      "params": [
+        {
+          "id": "statuses",
+          "label": "Status conditions it blocks damage from (comma separated names)",
+          "control": "text",
+          "default": "POISON,TOXIC",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "status.has",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when the damage was already blocked by something earlier"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 6
+    },
+    {
+      "id": "block.bonus-crit",
+      "className": "BonusCritAbAttr",
+      "label": "Raise my critical hit chance by one level",
+      "summary": "Every move I use is one level more likely to be a critical hit. Example: a normal 1 in 24 chance becomes 1 in 8, and a 1 in 8 chance becomes 1 in 2.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.crit-stage",
+      "whenLabel": "While the game calculates critical hit stage",
+      "synonyms": [
+        "super luck",
+        "better crit chance",
+        "high crit rate",
+        "critical hit boost",
+        "crit level",
+        "lucky strikes"
+      ],
+      "examples": [
+        "All my moves crit more often, like Super Luck"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.change-move-priority",
+      "className": "ChangeMovePriorityAbAttr",
+      "label": "Change priority of chosen moves",
+      "summary": "Moves that fit the rule get 1 priority. Example: +1 moves before normal moves, +3 moves before almost everything.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.priority",
+      "whenLabel": "While the game calculates my move's priority",
+      "synonyms": [
+        "go first",
+        "move first",
+        "priority boost",
+        "gale wings",
+        "prankster",
+        "triage",
+        "quick attack",
+        "act before the foe"
+      ],
+      "examples": [
+        "Status moves get +1 priority, like Prankster",
+        "Flying moves get +1 priority at full HP, like Gale Wings"
+      ],
+      "params": [
+        {
+          "id": "amount",
+          "label": "Priority change (+1 = acts before normal moves, negative = later)",
+          "control": "slider",
+          "default": 1,
+          "editable": true,
+          "min": -7,
+          "max": 7,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.change-priority",
+        "params": [
+          "amount"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 6
+    },
+    {
+      "id": "block.change-move-priority-in-bracket",
+      "className": "ChangeMovePriorityInBracketAbAttr",
+      "label": "Move first or last among moves of equal priority",
+      "summary": "Moves that fit the rule go last among moves of the same priority, whatever the Speed. Example: Mycelium Might status moves go last.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.priority",
+      "whenLabel": "While the game calculates my move's priority",
+      "synonyms": [
+        "go last",
+        "move last",
+        "turn order in bracket",
+        "mycelium might",
+        "lagging tail",
+        "quick claw",
+        "act first among equals"
+      ],
+      "examples": [
+        "Status moves always go last among equal-priority moves, like Mycelium Might"
+      ],
+      "params": [
+        {
+          "id": "position",
+          "label": "Place in the turn order (First, Normal or Last)",
+          "control": "select",
+          "default": "LAST",
+          "editable": true,
+          "options": [
+            "FIRST",
+            "NORMAL",
+            "LAST"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A drenched holder still goes last afterwards unless it was already forced to go first",
+        "Moves of a higher priority still go before it: only the order among equal priority changes"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "position"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.conditional-crit",
+      "className": "ConditionalCritAbAttr",
+      "label": "Guarantee a critical hit",
+      "summary": "My hit is always a critical hit when the rule you pick is true. Example: always crit against a poisoned foe, or on the first turn out.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.crit-roll",
+      "whenLabel": "While the game decides if a hit is critical",
+      "synonyms": [
+        "always crit",
+        "guaranteed crit",
+        "sure critical hit",
+        "merciless",
+        "never miss a crit",
+        "auto crit",
+        "100% critical"
+      ],
+      "examples": [
+        "Always crit against poisoned foes, like Merciless",
+        "Always crit super effective hits, like Fatal Precision"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when the hit is already guaranteed to be a critical hit",
+        "A target that blocks critical hits (Battle Armor, Shell Armor) still stops it: this only sets the guarantee"
+      ],
+      "effect": {
+        "id": "effect.force-crit",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 15
     },
     {
       "id": "block.double-self-inflicted-damage",
@@ -379,6 +720,58 @@
         "do": true
       },
       "uses": 1
+    },
+    {
+      "id": "block.mult-crit",
+      "className": "MultCritAbAttr",
+      "label": "Make my critical hits hit harder",
+      "summary": "My critical hits get an extra damage multiplier of 1.5. Example: 1.5 turns the usual 1.5x critical hit damage into 2.25x.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.crit-multiplier",
+      "whenLabel": "While the game calculates critical hit damage",
+      "synonyms": [
+        "sniper",
+        "critical damage boost",
+        "stronger crits",
+        "crit damage",
+        "bigger critical hits",
+        "super sniper"
+      ],
+      "examples": [
+        "Critical hits do 2.25x damage instead of 1.5x, like Sniper"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Extra critical hit damage (1.5 = crits hit 50% harder)",
+          "control": "slider",
+          "default": 1.5,
+          "editable": true,
+          "min": 1,
+          "max": 4,
+          "step": 0.05
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only counts when the hit is a critical hit (a plain hit has no critical hit bonus to multiply)",
+        "Not used while my own ability is being ignored"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 4
     },
     {
       "id": "block.overrule-crit",
