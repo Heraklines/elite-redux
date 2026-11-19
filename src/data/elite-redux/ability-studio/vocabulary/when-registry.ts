@@ -335,8 +335,16 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     "While the game calculates burn damage on me",
     "Move flow",
     "burnDamage",
+  ),
+  calc(
+    "cancel.burn-attack-cut",
+    "BypassBurnDamageReductionAbAttr",
+    [H, SIM],
+    "While the game checks if my burn or frostbite weakens my attacks",
+    "Cancel checks",
+    "cancelled",
     {
-      alsoDispatchKeys: ["BypassBurnDamageReductionAbAttr"],
+      synonyms: ["guts", "rage point", "burn attack drop", "ignore burn"],
     },
   ),
   calc(

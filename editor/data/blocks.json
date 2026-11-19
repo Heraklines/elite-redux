@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "11f58b4e1ee697",
-  "hash": "1f814d2757ab4e",
+  "vocabularyHash": "1d50feb8353e55",
+  "hash": "0db006ff4d2ab2",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -126,6 +126,46 @@
       "uses": 3
     },
     {
+      "id": "block.bypass-burn-damage-reduction",
+      "className": "BypassBurnDamageReductionAbAttr",
+      "label": "Keep my attacks at full strength while burned",
+      "summary": "A burn no longer halves my physical attacks, and frostbite no longer halves my special attacks. Example: a burned Pokemon with this deals the same damage as an unburned one.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.burn-attack-cut",
+      "whenLabel": "While the game checks if my burn or frostbite weakens my attacks",
+      "synonyms": [
+        "guts",
+        "rage point",
+        "ignore burn",
+        "burn does not weaken attack",
+        "no burn attack drop",
+        "burn immunity to attack cut"
+      ],
+      "examples": [
+        "A burn does not halve my attack, like Guts"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only matters while I am burned (physical moves) or have frostbite (special moves)",
+        "Not used while my ability is being ignored",
+        "Does nothing when another effect already cancelled the halving"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 8
+    },
+    {
       "id": "block.cud-chew-consume-berry",
       "className": "CudChewConsumeBerryAbAttr",
       "label": "Eat last turn's berries again",
@@ -208,6 +248,45 @@
       "uses": 1
     },
     {
+      "id": "block.double-berry-effect",
+      "className": "DoubleBerryEffectAbAttr",
+      "label": "Double the strength of berries I eat",
+      "summary": "Berries I eat work twice as strongly: healing, stat boosts and restored PP are doubled, and berries that soften a hit soften it twice as much. Example: a berry that heals 10 HP heals 20.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.berry-effect",
+      "whenLabel": "While the game calculates a berry's healing",
+      "synonyms": [
+        "ripen",
+        "apple pie",
+        "stronger berries",
+        "double berry",
+        "berry boost",
+        "berries heal more"
+      ],
+      "examples": [
+        "Berries heal and boost twice as much, like Ripen"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only matters when I actually eat a berry",
+        "Applies to the berry's healing, stat boost, PP and damage-softening effects"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
       "id": "block.float",
       "className": "FloatAbAttr",
       "label": "I float above the ground",
@@ -234,6 +313,45 @@
       "feasibility": [
         "The engine query 'grounded' decides the final answer: Iron Ball, Air Balloon, Gravity and Ingrain-style grounding tags override it"
       ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 5
+    },
+    {
+      "id": "block.full-burn-damage-immunity",
+      "className": "FullBurnDamageImmunityAbAttr",
+      "label": "Take no damage from my own burn",
+      "summary": "The damage my burn does at the end of every turn is 0. Example: a burned Pokemon with 160 max HP loses 0 HP instead of 10.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.burn-damage",
+      "whenLabel": "While the game calculates burn damage on me",
+      "synonyms": [
+        "heatproof",
+        "iron giant",
+        "no burn damage",
+        "burn does not hurt",
+        "burn immune damage",
+        "fireproof burn"
+      ],
+      "examples": [
+        "My burn does no damage at the end of the turn, like Iron Giant"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only matters while I am burned",
+        "Nothing happens to other end-of-turn damage such as poison"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
       "reusableAlone": {
         "when": true,
         "if": false,
@@ -452,6 +570,129 @@
       "uses": 1
     },
     {
+      "id": "block.post-biome-change-terrain-change",
+      "className": "PostBiomeChangeTerrainChangeAbAttr",
+      "label": "Set the terrain again when the area changes",
+      "summary": "When the game moves on to a new area, I set the terrain to Electric if it is not already active. Example: Electric Terrain is back in the next area.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.biome-changed",
+      "whenLabel": "When the biome changes",
+      "synonyms": [
+        "keep terrain after biome change",
+        "terrain on new area",
+        "electric surge",
+        "grassy surge",
+        "psychic surge",
+        "misty surge",
+        "terrain on new biome"
+      ],
+      "examples": [
+        "Set Electric Terrain again when the area changes, like Electric Surge"
+      ],
+      "params": [
+        {
+          "id": "terrain",
+          "label": "Which terrain is set",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "MISTY",
+            "ELECTRIC",
+            "GRASSY",
+            "PSYCHIC",
+            "TOXIC"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The terrain must differ from the one on the field right now",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.set-terrain",
+        "params": [
+          "terrain"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 8
+    },
+    {
+      "id": "block.post-biome-change-weather-change",
+      "className": "PostBiomeChangeWeatherChangeAbAttr",
+      "label": "Set the weather again when the area changes",
+      "summary": "When the game moves on to a new area, I set the weather to Extremely harsh sunlight again, but only while a lasting weather is still active. Example: Harsh Sun stays in the next area.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.biome-changed",
+      "whenLabel": "When the biome changes",
+      "synonyms": [
+        "keep weather after biome change",
+        "weather survives new area",
+        "primal weather",
+        "desolate land",
+        "primordial sea",
+        "delta stream",
+        "weather on new biome"
+      ],
+      "examples": [
+        "Set Harsh Sun again when the area changes, like Desolate Land"
+      ],
+      "params": [
+        {
+          "id": "weather",
+          "label": "Which weather is set",
+          "control": "select",
+          "default": "HARSH_SUN",
+          "editable": true,
+          "options": [
+            "NONE",
+            "SUNNY",
+            "RAIN",
+            "SANDSTORM",
+            "HAIL",
+            "SNOW",
+            "FOG",
+            "HEAVY_RAIN",
+            "HARSH_SUN",
+            "STRONG_WINDS",
+            "TEMPEST_STORM",
+            "SNOWY_WRATH",
+            "EERIE_FOG"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A lasting weather (Harsh Sun, Heavy Rain or Strong Winds) must be active when the area changes",
+        "The weather must differ from the current one, and no weather lock may be up",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.set-weather",
+        "params": [
+          "weather"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 6
+    },
+    {
       "id": "block.post-damage-force-switch",
       "className": "PostDamageForceSwitchAbAttr",
       "label": "Switch out when my HP gets low",
@@ -512,6 +753,56 @@
       ],
       "effect": {
         "id": "effect.force-switch-out",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.post-dancing-move",
+      "className": "PostDancingMoveAbAttr",
+      "label": "Copy a dance move that was just used",
+      "summary": "After any Pokemon uses a dance move, I use the same move right away, aimed the same way. Example: a foe uses Swords Dance, then I use Swords Dance too.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-any-move",
+      "whenLabel": "After anyone uses a move",
+      "synonyms": [
+        "dancer",
+        "samba",
+        "copy dance",
+        "repeat the move",
+        "echo a move",
+        "copycat dance",
+        "copy move"
+      ],
+      "examples": [
+        "Use the same move right after any dance move, like Dancer"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.flag",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move cannot come from me, so I never copy my own move",
+        "I cannot copy while I am flying, diving or underground",
+        "Only attack moves and status moves are copied",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.package",
         "params": []
       },
       "reusableAlone": {
@@ -746,7 +1037,7 @@
         "Does nothing in a simulated preview"
       ],
       "effect": {
-        "id": "effect.change-form",
+        "id": "effect.package",
         "params": []
       },
       "reusableAlone": {
@@ -920,7 +1211,7 @@
         "Does nothing in a simulated preview"
       ],
       "effect": {
-        "id": "effect.heal-percent",
+        "id": "effect.package",
         "params": []
       },
       "reusableAlone": {
@@ -929,6 +1220,46 @@
         "do": true
       },
       "uses": 1
+    },
+    {
+      "id": "block.prevent-berry-use",
+      "className": "PreventBerryUseAbAttr",
+      "label": "Stop my foes from eating their berries",
+      "summary": "While I am on the field, opposing Pokemon cannot eat their held berries, and the ability pop-up shows when it stops one. Example: a foe at low HP cannot use its Sitrus Berry.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.berry-use",
+      "whenLabel": "While the game checks if a berry can be eaten",
+      "synonyms": [
+        "unnerve",
+        "as one",
+        "crowned king",
+        "block berries",
+        "no berries for foes",
+        "berry lock",
+        "klutz"
+      ],
+      "examples": [
+        "Foes cannot eat their berries while I am out, like Unnerve"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only the opposing side is stopped, never my own berries",
+        "Does nothing when another effect already blocked this berry"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 9
     },
     {
       "id": "block.received-move-damage-multiplier",
@@ -1058,7 +1389,65 @@
       ],
       "effect": {
         "id": "effect.stat-stage",
-        "params": []
+        "params": [
+          "stat",
+          "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.stat-stage-change-multiplier",
+      "className": "StatStageChangeMultiplierAbAttr",
+      "label": "Multiply every stat change that happens to me",
+      "summary": "Every stat raise or drop on me is multiplied by 2 before it lands. Example: 2 turns a +1 into +2 and a -1 into -2; -1 turns a +1 into a -1.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.stage-change-amount",
+      "whenLabel": "While the game calculates how far my stats move",
+      "synonyms": [
+        "simple",
+        "contrary",
+        "double stat changes",
+        "reverse stat changes",
+        "flip stat boosts",
+        "stat change multiplier",
+        "invert stat drops"
+      ],
+      "examples": [
+        "Double every stat change on me, like Simple",
+        "Turn raises into drops and drops into raises, like Contrary"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Stat change multiplier (2 = doubled, -1 = reversed)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": -4,
+          "max": 4,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Skipped when the stat change ignores abilities, such as a drop bounced back by a mirror",
+        "The stat limits of -6 and +6 still apply to the result"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "multiplier"
+        ]
       },
       "reusableAlone": {
         "when": true,

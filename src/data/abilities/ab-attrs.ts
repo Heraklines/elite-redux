@@ -5611,11 +5611,23 @@ export class MoodyAbAttr extends PostTurnAbAttr {
       if (canRaise.length > 0) {
         const raisedStat = canRaise[pokemon.randBattleSeedInt(canRaise.length)];
         canLower = canLower.filter(s => s !== raisedStat);
-        globalScene.phaseManager.unshiftNew("StatStageChangePhase", pokemon.getBattlerIndex(), true, [raisedStat], this.raise);
+        globalScene.phaseManager.unshiftNew(
+          "StatStageChangePhase",
+          pokemon.getBattlerIndex(),
+          true,
+          [raisedStat],
+          this.raise,
+        );
       }
       if (canLower.length > 0) {
         const loweredStat = canLower[pokemon.randBattleSeedInt(canLower.length)];
-        globalScene.phaseManager.unshiftNew("StatStageChangePhase", pokemon.getBattlerIndex(), true, [loweredStat], -this.lower);
+        globalScene.phaseManager.unshiftNew(
+          "StatStageChangePhase",
+          pokemon.getBattlerIndex(),
+          true,
+          [loweredStat],
+          -this.lower,
+        );
       }
     }
   }
@@ -5649,7 +5661,13 @@ export class SpeedBoostAbAttr extends PostTurnAbAttr {
   }
 
   override apply({ pokemon }: AbAttrBaseParams): void {
-    globalScene.phaseManager.unshiftNew("StatStageChangePhase", pokemon.getBattlerIndex(), true, [this.stat], this.stages);
+    globalScene.phaseManager.unshiftNew(
+      "StatStageChangePhase",
+      pokemon.getBattlerIndex(),
+      true,
+      [this.stat],
+      this.stages,
+    );
   }
 }
 
@@ -5843,7 +5861,26 @@ export class PostMoveUsedAbAttr extends AbAttr {
 
 /** Triggers after a dance move is used either by the opponent or the player */
 export class PostDancingMoveAbAttr extends PostMoveUsedAbAttr {
-  override canApply({ source, pokemon, move }: PostMoveUsedAbAttrParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveUsedAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): `gate` (the dance test, replaceable) then `residual`, in the original clause order. */
+  override canApply(params: PostMoveUsedAbAttrParams): boolean {
+    return gatedCanApply<PostMoveUsedAbAttrParams>(this, params);
+  }
+
+  /**
+   * The replaceable condition: only dance moves (the PostMoveUsed trigger now fires for ALL moves so ER
+   * copy-by-filter abilities can hook it; gate the vanilla Dancer here).
+   * Uses the user-aware flag check so ER move-flag injection (Taekkyeon:
+   * "all attacks are dances") makes the source's attacks count as dances.
+   */
+  public gate({ source, move }: PostMoveUsedAbAttrParams): boolean {
+    return move.getMove().doesFlagEffectApply({ flag: MoveFlags.DANCE_MOVE, user: source });
+  }
+
+  /** Kept in the class (feasibility): the move cannot come from the Dancer, and the Dancer cannot be semi-invulnerable. */
+  public residual({ source, pokemon }: PostMoveUsedAbAttrParams): boolean {
     /** Tags that prevent Dancer from replicating the move */
     const forbiddenTags = [
       BattlerTagType.FLYING,
@@ -5851,14 +5888,9 @@ export class PostDancingMoveAbAttr extends PostMoveUsedAbAttr {
       BattlerTagType.UNDERGROUND,
       BattlerTagType.HIDDEN,
     ];
-    // Only dance moves (the PostMoveUsed trigger now fires for ALL moves so ER
-    // copy-by-filter abilities can hook it; gate the vanilla Dancer here).
-    // Uses the user-aware flag check so ER move-flag injection (Taekkyeon:
-    // "all attacks are dances") makes the source's attacks count as dances.
     // The move to replicate cannot come from the Dancer.
     return (
-      move.getMove().doesFlagEffectApply({ flag: MoveFlags.DANCE_MOVE, user: source })
-      && source.getBattlerIndex() !== pokemon.getBattlerIndex()
+      source.getBattlerIndex() !== pokemon.getBattlerIndex()
       && !pokemon.summonData.tags.some(tag => forbiddenTags.includes(tag.tagType))
     );
   }

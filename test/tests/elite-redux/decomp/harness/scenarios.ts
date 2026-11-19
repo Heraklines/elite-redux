@@ -369,6 +369,8 @@ const WHEN_TEMPLATE: Readonly<Record<string, string>> = {
   "calc.run-chance": t.quiet,
   "calc.weight": t.hit,
   "calc.burn-damage": t.inflicted,
+  // The holder attacks while burned (probe axis status BURN), so the damage calculation asks it (B06 chunk 2).
+  "cancel.burn-attack-cut": t.attack,
   "calc.status-duration": t.inflicted,
   "calc.berry-effect": t.low,
   "calc.berry-threshold": t.low,

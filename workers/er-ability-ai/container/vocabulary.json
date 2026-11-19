@@ -746,9 +746,24 @@
       ],
       "label": "While the game calculates burn damage on me",
       "group": "Move flow",
-      "modifies": "burnDamage",
-      "alsoDispatchKeys": [
-        "BypassBurnDamageReductionAbAttr"
+      "modifies": "burnDamage"
+    },
+    {
+      "id": "cancel.burn-attack-cut",
+      "kind": "calc",
+      "dispatchKey": "BypassBurnDamageReductionAbAttr",
+      "provides": [
+        "holder",
+        "simulated"
+      ],
+      "label": "While the game checks if my burn or frostbite weakens my attacks",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "synonyms": [
+        "guts",
+        "rage point",
+        "burn attack drop",
+        "ignore burn"
       ]
     },
     {
@@ -5037,5 +5052,5 @@
       ]
     }
   ],
-  "hash": "11f58b4e1ee697"
+  "hash": "1d50feb8353e55"
 }

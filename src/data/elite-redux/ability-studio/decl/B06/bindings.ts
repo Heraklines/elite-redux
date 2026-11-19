@@ -137,3 +137,19 @@ bindLegacyClosure(
   "Cud Chew: no atom for I ate a berry last turn (summonData.berriesEatenLast.length > 0) (R-B06-9)",
   "gate",
 );
+
+// =============================================================================================
+// B06 chunk 2
+//
+// PostDancingMoveAbAttr, slot gate: `move.getMove().doesFlagEffectApply({ flag: DANCE_MOVE, user: source })` ("the move that was just
+// used is a dance move"). The library atom move.flag calls the same predicate with the move user (the `other` of this moment). The
+// two residual clauses (not my own move, not semi-invulnerable) stay in the class as feasibility and are not bound.
+// Dancer (216, attr 0) and Samba (5469, attr 1) are the only users of this class; the ER copy-by-filter family is the subclass
+// CopyMoveByFilterAbAttr, which replaces canApply and has no gate.
+//
+// Not bound here (no constructor closure and no gate): PostBiomeChangeWeatherChangeAbAttr, PostBiomeChangeTerrainChangeAbAttr,
+// StatStageChangeMultiplierAbAttr, BypassBurnDamageReductionAbAttr, FullBurnDamageImmunityAbAttr, DoubleBerryEffectAbAttr and
+// PreventBerryUseAbAttr.
+// =============================================================================================
+bindCondition(216, 0, { id: "move.flag", flag: "DANCE_MOVE" }, "gate"); // Dancer
+bindCondition(5469, 1, { id: "move.flag", flag: "DANCE_MOVE" }, "gate"); // Samba

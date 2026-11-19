@@ -29,6 +29,7 @@ import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
+import { PokemonMove } from "#moves/pokemon-move";
 import type { GameManager } from "#test/framework/game-manager";
 import { BooleanHolder, NumberHolder } from "#utils/common";
 
@@ -342,6 +343,14 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     move,
     damage,
     hitResult: HitResult.EFFECTIVE,
+    simulated: false,
+  }),
+  // PostMoveUsedAbAttr: the engine passes the SOURCE's PokemonMove (canApply calls move.getMove()) and the targets (B06 chunk 2).
+  "event.after-any-move": ({ holder, foe, move }) => ({
+    pokemon: holder,
+    source: foe,
+    move: new PokemonMove(move.id),
+    targets: [foe.getBattlerIndex()],
     simulated: false,
   }),
   "calc.damage-taken": ctx => ({
