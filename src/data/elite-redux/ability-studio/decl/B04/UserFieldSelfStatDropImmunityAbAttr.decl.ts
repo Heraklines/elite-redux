@@ -22,8 +22,7 @@
 // No RNG, no closure, no binding.
 import { UserFieldSelfStatDropImmunityAbAttr } from "#abilities/ab-attrs";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
-import { STAT_OPTIONS } from "#data/elite-redux/ability-studio/vocabulary/enums";
-import { EVERY_STAT, oneStatOrEveryCodec, statWords } from "./shared-codecs";
+import { EVERY_STAT, oneStatOrEveryCodec, STAT_CHOICES, statWords } from "./shared-codecs";
 
 export default defineDecl(UserFieldSelfStatDropImmunityAbAttr, {
   tier: "A",
@@ -52,7 +51,7 @@ export default defineDecl(UserFieldSelfStatDropImmunityAbAttr, {
       label: "Which stat is protected (or all stats)",
       editable: true,
       default: EVERY_STAT,
-      options: [EVERY_STAT, ...STAT_OPTIONS],
+      options: [EVERY_STAT, ...STAT_CHOICES],
       codec: oneStatOrEveryCodec,
     },
   ],

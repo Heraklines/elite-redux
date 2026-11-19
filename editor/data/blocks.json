@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "07cb9344de8e45",
+  "hash": "18cff0c8171d7a",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -129,7 +129,7 @@
       "id": "block.confusion-on-status-effect",
       "className": "ConfusionOnStatusEffectAbAttr",
       "label": "Confuse the foe after I give it a chosen status",
-      "summary": "After I give a foe Poison, Toxic, that foe also becomes confused for 2 to 5 turns, if it can be confused.",
+      "summary": "After I give a foe Poison, Bad poison, that foe also gets Confusion for 2 to 5 turns, if it can.",
       "tier": "A",
       "kind": "event-effect",
       "status": "decomposed",
@@ -149,18 +149,51 @@
       "params": [
         {
           "id": "statuses",
-          "label": "Statuses that also cause confusion (comma separated, for example Poison, Toxic)",
+          "label": "Statuses that also trigger it (comma separated, for example Poison, Bad poison)",
           "control": "text",
-          "default": "POISON,TOXIC",
+          "default": "Poison, Bad poison",
           "editable": true,
           "options": [
-            "POISON",
-            "TOXIC",
-            "PARALYSIS",
-            "SLEEP",
-            "FREEZE",
-            "BURN"
+            "Poison",
+            "Bad poison",
+            "Paralysis",
+            "Sleep",
+            "Freeze",
+            "Burn"
           ]
+        },
+        {
+          "id": "tag",
+          "label": "Battle effect the foe also gets",
+          "control": "select",
+          "default": "Confusion",
+          "editable": true,
+          "options": [
+            "Confusion",
+            "Heal Block"
+          ]
+        },
+        {
+          "id": "turnsMin",
+          "label": "Shortest time it lasts (turns)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "turnsMax",
+          "label": "Longest time it lasts (turns)",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true
         }
       ],
       "conditions": [],
@@ -171,7 +204,11 @@
       ],
       "effect": {
         "id": "effect.package",
-        "params": []
+        "params": [
+          "tag",
+          "turnsMin",
+          "turnsMax"
+        ]
       },
       "reusableAlone": {
         "when": true,
@@ -982,17 +1019,17 @@
           "id": "stat",
           "label": "Which stat is protected (or all stats)",
           "control": "select",
-          "default": "ALL",
+          "default": "Every stat",
           "editable": true,
           "options": [
-            "ALL",
-            "ATK",
-            "DEF",
-            "SPATK",
-            "SPDEF",
-            "SPD",
-            "ACC",
-            "EVA"
+            "Every stat",
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Sp. Def",
+            "Speed",
+            "Accuracy",
+            "Evasion"
           ]
         }
       ],
@@ -1146,17 +1183,17 @@
           "id": "stat",
           "label": "Which stat is protected (or all stats)",
           "control": "select",
-          "default": "ALL",
+          "default": "Every stat",
           "editable": true,
           "options": [
-            "ALL",
-            "ATK",
-            "DEF",
-            "SPATK",
-            "SPDEF",
-            "SPD",
-            "ACC",
-            "EVA"
+            "Every stat",
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Sp. Def",
+            "Speed",
+            "Accuracy",
+            "Evasion"
           ]
         }
       ],
@@ -1209,15 +1246,15 @@
           "id": "statuses",
           "label": "Status conditions I am immune to (comma separated; leave empty for every status)",
           "control": "text",
-          "default": "BURN",
+          "default": "Burn",
           "editable": true,
           "options": [
-            "POISON",
-            "TOXIC",
-            "PARALYSIS",
-            "SLEEP",
-            "FREEZE",
-            "BURN"
+            "Poison",
+            "Bad poison",
+            "Paralysis",
+            "Sleep",
+            "Freeze",
+            "Burn"
           ]
         }
       ],
@@ -1266,17 +1303,17 @@
           "id": "stat",
           "label": "Which stat is protected (or all stats)",
           "control": "select",
-          "default": "ALL",
+          "default": "Every stat",
           "editable": true,
           "options": [
-            "ALL",
-            "ATK",
-            "DEF",
-            "SPATK",
-            "SPDEF",
-            "SPD",
-            "ACC",
-            "EVA"
+            "Every stat",
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Sp. Def",
+            "Speed",
+            "Accuracy",
+            "Evasion"
           ]
         }
       ],
@@ -1327,15 +1364,15 @@
           "id": "statuses",
           "label": "Status conditions my partner is immune to (comma separated; leave empty for every status)",
           "control": "text",
-          "default": "SLEEP",
+          "default": "Sleep",
           "editable": true,
           "options": [
-            "POISON",
-            "TOXIC",
-            "PARALYSIS",
-            "SLEEP",
-            "FREEZE",
-            "BURN"
+            "Poison",
+            "Bad poison",
+            "Paralysis",
+            "Sleep",
+            "Freeze",
+            "Burn"
           ]
         }
       ],

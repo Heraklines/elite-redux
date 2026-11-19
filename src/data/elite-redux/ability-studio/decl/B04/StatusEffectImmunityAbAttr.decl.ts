@@ -23,8 +23,7 @@
 // No RNG, no closure, no binding. One user carries an attr-level condition (see notes).
 import { StatusEffectImmunityAbAttr } from "#abilities/ab-attrs";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
-import { STATUS_OPTIONS } from "#data/elite-redux/ability-studio/vocabulary/enums";
-import { statusListCodec, statusWords } from "./shared-codecs";
+import { STATUS_CHOICES, statusListCodec, statusWords } from "./shared-codecs";
 
 export default defineDecl(StatusEffectImmunityAbAttr, {
   tier: "A",
@@ -51,8 +50,8 @@ export default defineDecl(StatusEffectImmunityAbAttr, {
       control: "text",
       label: "Status conditions I am immune to (comma separated; leave empty for every status)",
       editable: true,
-      default: "BURN",
-      options: STATUS_OPTIONS,
+      default: "Burn",
+      options: STATUS_CHOICES,
       codec: statusListCodec,
       spread: true,
     },

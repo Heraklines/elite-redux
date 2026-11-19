@@ -19,8 +19,7 @@
 // No RNG, no closure, no binding.
 import { UserFieldStatusEffectImmunityAbAttr } from "#abilities/ab-attrs";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
-import { STATUS_OPTIONS } from "#data/elite-redux/ability-studio/vocabulary/enums";
-import { statusListCodec, statusWords } from "./shared-codecs";
+import { STATUS_CHOICES, statusListCodec, statusWords } from "./shared-codecs";
 
 export default defineDecl(UserFieldStatusEffectImmunityAbAttr, {
   tier: "A",
@@ -46,8 +45,8 @@ export default defineDecl(UserFieldStatusEffectImmunityAbAttr, {
       control: "text",
       label: "Status conditions my partner is immune to (comma separated; leave empty for every status)",
       editable: true,
-      default: "SLEEP",
-      options: STATUS_OPTIONS,
+      default: "Sleep",
+      options: STATUS_CHOICES,
       codec: statusListCodec,
       spread: true,
     },

@@ -25,8 +25,7 @@
 // (`AbAttr.addCondition`); none of the users of THIS class does (checked in the live dump).
 import { ProtectStatAbAttr } from "#abilities/ab-attrs";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
-import { STAT_OPTIONS } from "#data/elite-redux/ability-studio/vocabulary/enums";
-import { EVERY_STAT, oneStatOrEveryCodec, statWords } from "./shared-codecs";
+import { EVERY_STAT, oneStatOrEveryCodec, STAT_CHOICES, statWords } from "./shared-codecs";
 
 export default defineDecl(ProtectStatAbAttr, {
   tier: "A",
@@ -56,7 +55,7 @@ export default defineDecl(ProtectStatAbAttr, {
       label: "Which stat is protected (or all stats)",
       editable: true,
       default: EVERY_STAT,
-      options: [EVERY_STAT, ...STAT_OPTIONS],
+      options: [EVERY_STAT, ...STAT_CHOICES],
       codec: oneStatOrEveryCodec,
     },
   ],
