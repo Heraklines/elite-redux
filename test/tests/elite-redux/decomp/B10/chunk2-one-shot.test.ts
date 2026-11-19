@@ -66,7 +66,7 @@ describe("B10: Power Outage pair (OneShotTypeBoost and its follow-up)", () => {
       [POWER, sitePower()],
       [FOLLOWUP, siteFollowup()],
     ] as const) {
-      expect(readDeclParams(module, site.attr)).toEqual({ type: "ELECTRIC", factor: 2 });
+      expect(readDeclParams(module, site.attr)).toEqual(module === POWER ? { type: "ELECTRIC", multiplier: 2 } : { type: "ELECTRIC", factor: 2 });
       const rebuilt = recomposeAttr(module, site.attr, site.abilityId, site.attrIndex);
       expect(rebuilt).not.toBe(site.attr);
       expect(attrFingerprint(rebuilt as never)).toEqual(attrFingerprint(site.attr as never));
@@ -91,7 +91,10 @@ describe("B10: Power Outage pair (OneShotTypeBoost and its follow-up)", () => {
       setTypesOf(holder, [PokemonType.ELECTRIC, PokemonType.FLYING]);
       const boosted = (move: typeof tackle): number => {
         const value = new NumberHolder(40);
-        power.apply({ pokemon: holder, opponent: foe, move, power: value, simulated: false } as never);
+        const params = { pokemon: holder, opponent: foe, move, power: value, simulated: false } as never;
+        if (power.canApply(params)) {
+          power.apply(params);
+        }
         return value.value;
       };
       const after = (move: typeof tackle, simulated: boolean) =>
@@ -131,24 +134,18 @@ describe("B10: Power Outage pair (OneShotTypeBoost and its follow-up)", () => {
     const { holder, foe } = await startWorld(phaserGame);
     forgetFlag(holder);
     const power = recomposeAttr(POWER, sitePower().attr, sitePower().abilityId, sitePower().attrIndex, {
-      params: { type: "FIRE", factor: 3 },
+      params: { type: "FIRE", multiplier: 3 },
     });
     const value = new NumberHolder(10);
-    power.apply({
-      pokemon: holder,
-      opponent: foe,
-      move: allMoves[MoveId.THUNDERBOLT],
-      power: value,
-      simulated: false,
-    } as never);
+    const run = (move: (typeof allMoves)[number]) => {
+      const params = { pokemon: holder, opponent: foe, move, power: value, simulated: false } as never;
+      if (power.canApply(params)) {
+        power.apply(params);
+      }
+    };
+    run(allMoves[MoveId.THUNDERBOLT]);
     expect(value.value, "an Electric move is not boosted by a Fire setting").toBe(10);
-    power.apply({
-      pokemon: holder,
-      opponent: foe,
-      move: allMoves[MoveId.EMBER],
-      power: value,
-      simulated: false,
-    } as never);
+    run(allMoves[MoveId.EMBER]);
     expect(value.value, "a Fire move is tripled").toBe(30);
   });
 });

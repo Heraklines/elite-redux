@@ -16,9 +16,9 @@
 //    OffensiveTypeChartOverrideAbAttr with `addCondition`; `recomposeAttr` copies it onto the rebuild, so it is not a
 //    constructor slot.
 //
-// Chunk 2 of 5 binds the Tier B gates (slot "gate") of OncePerEntryContactDamageReductionAbAttr, PassiveRecoveryAbAttr and
-// PoisonedFoePurgeAbAttr, written by hand after reading each class and its live users. The other five classes of the chunk are Tier C
-// and have nothing to bind: OneShotTypeBoostAbAttr, OneShotTypeBoostFollowupAbAttr, OutgoingStatDropMultiplierAbAttr,
+// Chunk 2 of 5 binds the Tier B gates (slot "gate") of OncePerEntryContactDamageReductionAbAttr, OneShotTypeBoostAbAttr,
+// OneShotTypeBoostFollowupAbAttr, PassiveRecoveryAbAttr and PoisonedFoePurgeAbAttr, written by hand after reading each class and its live users. The other three classes of the chunk are Tier C
+// and have nothing to bind: OutgoingStatDropMultiplierAbAttr,
 // PartyCountMultiHitAbAttr (no closure anywhere: each takes a number or an options object of plain values) and
 // PersistentFieldAuraAbAttr (its only closure, the ally filter, sits under an options key that no constructor slot reaches, so it is
 // carried by the `allies` param instead).
@@ -102,3 +102,11 @@ bindLegacyClosure(
   "Asleep OR Comatose-like (isComatoseLike): the library has no atom for the Comatose half, request R-B10-23 in requests/B10.md",
   "gate",
 ); // Peaceful Slumber (first part): 1/8 while asleep
+
+// =============================================================================================
+// OneShotTypeBoostAbAttr and OneShotTypeBoostFollowupAbAttr (Tier B, Power Outage). Slot "gate" = pokemon.getMoveType(move) === opts.type
+// (the effective type, so effective: true). The type is also the class's `type` param (gateParams). The one-time flag is the guard and
+// stays in the class (request R-B10-19).
+// =============================================================================================
+bindCondition(5706, 0, { id: "move.type", type: "ELECTRIC", effective: true }, "gate"); // Power Outage: boost, Electric moves
+bindCondition(5706, 1, { id: "move.type", type: "ELECTRIC", effective: true }, "gate"); // Power Outage: lose Electric after one
