@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "183ee419a1669c",
+  "hash": "011ee3842de16a",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -1616,6 +1616,98 @@
       "uses": 1
     },
     {
+      "id": "block.post-summon-copy-ally-stats",
+      "className": "PostSummonCopyAllyStatsAbAttr",
+      "label": "Copy my ally's stat changes when I enter (like Costar)",
+      "summary": "When I enter a double battle, my stat boosts and drops and my crit boosts (Focus Energy, Dragon Cheer, Laser Focus) become my ally's. Example: an ally at +2 Attack gives me +2 Attack.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "costar",
+        "copy ally boosts",
+        "mirror partner stats",
+        "copy stat changes",
+        "share ally buffs",
+        "clone ally stages"
+      ],
+      "examples": [
+        "Copy my ally's stat boosts and crit boost when I enter, like Costar"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "It must be a battle with more than one Pokemon per side (a single battle has no ally)",
+        "My ally must be on the field and able to fight, otherwise nothing happens and the ability does not show",
+        "In a triple battle it copies only the first ally",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": false
+      },
+      "packageReason": "Package, justified above: Tier C, 1 attr of 1 ability, no closure: Costar (294 attr 0). Library gaps (requests/B03.md): `effect.copy-ally-stat-changes` (set my stages to my ally's and copy its crit boosts), the atom `party.ally-active` (`getAlly()?.isActive(true)`; `party.ally-exists` asks only `getAlly() !== undefined`, which also holds for a fainted or off-field ally) and `party.multi-battle` (`getBattlerCount() > 1`; `party.doubles` reads `battle.double`, which is false in a triple). The single-player L2 battle has no ally, so canApply is false there; the doubles behaviour is proven by test/tests/elite-redux/decomp/B03/chunk4.test.ts. Suspected game bugs, NOT fixed: (1) when the ally carries Dragon Cheer, `pokemon.getTag(CritBoostTag)` returns the FIRST crit-boost tag of the holder (`getTag` with a class matches subclasses), so if I already had Focus Energy the ally's crit stage number is written onto that Focus Energy tag instead of the Dragon Cheer tag; (2) the Dragon Cheer, Focus Energy and Laser Focus tags are only added, never removed, so a holder that has a boost the ally lacks keeps it (stat stages, on the other hand, are overwritten, including with 0).",
+      "uses": 1
+    },
+    {
+      "id": "block.post-summon-form-change",
+      "className": "PostSummonFormChangeAbAttr",
+      "label": "Change to my right form when I enter",
+      "summary": "When I enter the battle, if I am not in the form I should have, I change form. Example: a Pokemon at 50% HP or less enters in its low-HP form.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "zen mode",
+        "schooling",
+        "shields down",
+        "power construct",
+        "ice face",
+        "tera shift",
+        "change form on entry",
+        "switch form when sent out"
+      ],
+      "examples": [
+        "Change into my low-HP form when I enter at half HP or less, like Zen Mode"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": false,
+          "editable": false,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "My species must have a form change registered for this ability",
+        "It does nothing in a preview",
+        "It does nothing when I am already in the form I should have",
+        "It also works when I gain this ability in the middle of a battle, but it is not repeated after a form change"
+      ],
+      "effect": {
+        "id": "effect.change-form",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 7
+    },
+    {
       "id": "block.post-summon-heal-status",
       "className": "PostSummonHealStatusAbAttr",
       "label": "Cure my status problem when I enter",
@@ -2197,6 +2289,46 @@
       "uses": 4
     },
     {
+      "id": "block.post-summon-transform",
+      "className": "PostSummonTransformAbAttr",
+      "label": "Transform into a random foe when I enter (like Imposter)",
+      "summary": "When I enter the battle, I transform into a random foe that can be copied: its looks, stats, moves, ability and types. Example: against two foes, one of them is picked at random.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "imposter",
+        "ditto",
+        "copy the foe",
+        "become the opponent",
+        "transform on entry",
+        "clone foe"
+      ],
+      "examples": [
+        "Transform into a random opposing Pokemon when I enter, like Imposter"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one foe must be copiable: neither of us may be transformed already, neither of us may hide behind an illusion, the foe may not have a Substitute, and neither of us may be a fusion",
+        "It only works when I enter the battle, not when I gain the ability in the middle of a battle"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": false
+      },
+      "packageReason": "Package, justified above: Tier C, 1 attr of 1 ability, no closure: Imposter (150 attr 0). Library gaps (requests/B03.md): `effect.transform-into-foe` (transform into a foe, choice: random copiable foe), the guard `can-transform-into-foe` (the five Transform restrictions, non-removable: removing it would crash the transform phase on a fusion or an illusion) and, for the pick, the choice param. Quirks recorded, not fixed: (1) `apply` ignores `simulated`, so a simulated entry would still queue the transform phase; (2) `canApply` draws its random number even in a simulated call; (3) `getOpponents()` is asked without an `isActive` filter, while `canTransformInto` does not check that the foe is alive; (4) the field `targetIndex` is written by `canApply` and read by `apply`, so two `canApply` calls before one `apply` would use the last pick (fine while dispatch is sequential). Behaviour is proven by test/tests/elite-redux/decomp/B03/chunk4.test.ts.",
+      "uses": 1
+    },
+    {
       "id": "block.post-summon-unnamed-message",
       "className": "PostSummonUnnamedMessageAbAttr",
       "label": "Show a fixed text message when I enter",
@@ -2243,6 +2375,65 @@
         "do": true
       },
       "uses": 2
+    },
+    {
+      "id": "block.post-summon-user-field-remove-status-effect",
+      "className": "PostSummonUserFieldRemoveStatusEffectAbAttr",
+      "label": "Cure status problems on my side when I enter",
+      "summary": "When I enter the battle, I and every ally on the field that has one of these status problems (Sleep) are cured. Example: sleep is cured on my whole side.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "sweet veil",
+        "pastel veil",
+        "cure team status",
+        "cleanse allies",
+        "wake up my team",
+        "remove sleep from my side",
+        "heal party status"
+      ],
+      "examples": [
+        "Wake up my whole side from sleep when I enter, like Sweet Veil",
+        "Cure poison and bad poison on my side when I enter, like Pastel Veil"
+      ],
+      "params": [
+        {
+          "id": "statuses",
+          "label": "Status problems to cure (comma separated: Poison, Toxic, Paralysis, Sleep, Freeze, Burn)",
+          "control": "text",
+          "default": "SLEEP",
+          "editable": true,
+          "options": [
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Somebody on my side must be able to fight (always true while I am on the field), otherwise nothing happens",
+        "It does nothing in a preview",
+        "It also works when I gain this ability in the middle of a battle, not only on entry",
+        "The ability bar is not shown; every cured Pokemon gets its own \"was cured\" message, in speed order"
+      ],
+      "effect": {
+        "id": "effect.cure-status",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.post-summon-weather-change",

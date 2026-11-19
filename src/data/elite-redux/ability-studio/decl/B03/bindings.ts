@@ -274,3 +274,70 @@ bindLegacyClosure(
   "Download: the gate compares the foes' rounded average Defense with their rounded average Sp. Def; needs the atom foe.average-defense-not-higher (request in requests/B03.md)",
   "gate",
 );
+
+// =============================================================================================
+// PostSummonFormChangeAbAttr (Tier A). Slot ctor:0 is a FORM FUNCTION (pokemon) => form number, not a yes/no closure. The
+// class only asks `formFunc(p) !== p.formIndex` ("the form I should have is not my form"), so the yes/no rule behind each
+// function is written below as the gate it will become. None can be bound yet: the library has no slot kind that compiles a
+// yes/no rule into a form function ("form function" request, chunk 1), no `mon.form-number` atom (the closures compare the
+// form NUMBER, `mon.in-form` compares the form KEY text), no `mon.level` atom (Schooling) and no whole-percent HP rounding (the
+// closures call `getHpRatio()`, which rounds to the nearest 1%, so `hp.at-most` exact differs at 50.1%). Requests: requests/B03.md.
+// =============================================================================================
+// Zen Mode (161 attr 1): formFunc = hp <= 0.5 ? 1 : 0.
+//   gate = any[ all[hp.at-most 50% whole-percent, not form-number 1], all[not hp.at-most 50% whole-percent, not form-number 0] ]
+bindLegacyClosure(
+  161,
+  1,
+  "Zen Mode: the form function is `hp <= 0.5 ? 1 : 0`; needs the atom mon.form-number (the closure compares the form number, mon.in-form compares the form key) and the form-function slot (requests/B03.md)",
+  "ctor:0",
+);
+// Shields Down (197 attr 1): formFunc = formIndex >= 7 ? formIndex : formIndex % 7 + (hp <= 0.5 ? 7 : 0).
+//   (below form 7 the target is formIndex + 7 at or below half HP and formIndex itself above it; from form 7 up it is formIndex)
+//   gate = all[ form-number < 7, hp.at-most 50% whole-percent ]
+bindLegacyClosure(
+  197,
+  1,
+  "Shields Down: the form function is `formIndex >= 7 ? formIndex : formIndex % 7 + (hp <= 0.5 ? 7 : 0)`, arithmetic on the form number; needs mon.form-number (with a cmp and a number) and the form-function slot (requests/B03.md)",
+  "ctor:0",
+);
+// Schooling (208 attr 1): formFunc = level < 20 || hp <= 0.25 ? 0 : 1.
+//   gate = any[ all[any[level < 20, hp.at-most 25%], not form-number 0], all[not any[level < 20, hp.at-most 25%], not form-number 1] ]
+bindLegacyClosure(
+  208,
+  1,
+  "Schooling: the form function is `level < 20 || hp <= 0.25 ? 0 : 1`; needs the atoms mon.level and mon.form-number and the form-function slot (requests/B03.md)",
+  "ctor:0",
+);
+// Power Construct (211 attr 1): formFunc = formIndex + 2, only ever asked when the attr-level condition
+// `hp <= 0.5 && (formIndex is 2 or 3)` holds (that condition is carried verbatim on the rebuild, see the `extra` slot request).
+//   gate = always true once the attr-level condition holds, because `formIndex + 2` never equals `formIndex`
+bindLegacyClosure(
+  211,
+  1,
+  "Power Construct: the form function is `formIndex + 2` (always a different form once the attr-level HP and form condition holds); needs the form-function slot and the extra slot (requests/B03.md)",
+  "ctor:0",
+);
+// Ice Face (248 attr 2): formFunc = () => 0, attr-level condition = Hail or Snow weather (not suppressed).
+//   gate = not form-number 0
+bindLegacyClosure(
+  248,
+  2,
+  "Ice Face: the form function is `() => 0`; needs mon.form-number and the form-function slot, and the attr-level weather condition needs the extra slot (requests/B03.md)",
+  "ctor:0",
+);
+// Tera Shift (307 attr 0): formFunc = getFormKey() ? 0 : 1.
+//   gate = any[ all[not in-form "", not form-number 0], all[in-form "", not form-number 1] ]
+bindLegacyClosure(
+  307,
+  0,
+  "Tera Shift: the form function is `getFormKey() ? 0 : 1`; needs mon.form-number (to compare the number it returns) and the form-function slot (requests/B03.md)",
+  "ctor:0",
+);
+// Revelation (5586 attr 1): formFunc = hp > 0.25 ? revelationIndex : (formIndex === revelationIndex ? 0 : formIndex).
+//   gate = all[ hp above 25%, not form-number revelationIndex ] or all[ hp at most 25%, form-number revelationIndex ]
+bindLegacyClosure(
+  5586,
+  1,
+  "Revelation: the form function is `hp > 0.25 ? revelationIndex : (formIndex === revelationIndex ? 0 : formIndex)`, with a form number found at start-up; needs mon.form-number and the form-function slot (requests/B03.md)",
+  "ctor:0",
+);
