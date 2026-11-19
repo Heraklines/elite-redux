@@ -317,6 +317,8 @@ export interface ParamContext {
 
 export type ParamBuilder = (ctx: ParamContext) => Record<string, unknown>;
 
+const MATCHUP_VALUES: readonly number[] = [0, 0.25, 0.5, 1, 2, 4];
+
 const holderDamage = (ctx: ParamContext): NumberHolder => new NumberHolder(ctx.damage);
 
 export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
@@ -363,6 +365,17 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     opponent: ctx.foe,
     move: ctx.move,
     typeMultiplier: new NumberHolder(1),
+    cancelled: new BooleanHolder(false),
+    simulated: false,
+  }),
+  // The type-matchup moment (pokemon.ts, getAttackMoveEffectiveness): the matchup multiplier is a NumberHolder. It
+  // varies deterministically with the move and the damage value so a ceiling (Tera Shell) is probed above, at and
+  // below its cap; both builds of one evaluation get the same value.
+  "calc.type-matchup": ctx => ({
+    pokemon: ctx.holder,
+    opponent: ctx.foe,
+    move: ctx.move,
+    typeMultiplier: new NumberHolder(MATCHUP_VALUES[(ctx.move.id + (ctx.damage > 1 ? 1 : 0)) % MATCHUP_VALUES.length]),
     cancelled: new BooleanHolder(false),
     simulated: false,
   }),

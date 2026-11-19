@@ -59,7 +59,7 @@ export default defineDecl(TypeImmunityAddBattlerTagAbAttr, {
       ctorIndex: 1,
       path: "tagType",
       control: "select",
-      label: "Power-up it gains",
+      label: "Power-up it gains (Fire moves get 1.5 times stronger)",
       editable: false,
       default: "FIRE_BOOST",
       options: ["FIRE_BOOST"],

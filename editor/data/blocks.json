@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "19b4a3aed16a8d",
-  "hash": "151b55b4db497a",
+  "hash": "0ae19fd8f887cb",
   "blocks": [
     {
       "id": "block.allied-field-damage-reduction",
@@ -294,6 +294,54 @@
       "uses": 4
     },
     {
+      "id": "block.field-priority-move-immunity",
+      "className": "FieldPriorityMoveImmunityAbAttr",
+      "label": "Block priority moves used against my side",
+      "summary": "A foe's move that goes first (priority above 0) does nothing against this Pokemon or its ally. Example: Quick Attack fails. Moves aimed at the foe's own side still work.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-immunity",
+      "whenLabel": "While the game checks whether a move can hit me",
+      "synonyms": [
+        "queenly majesty",
+        "dazzling",
+        "armor tail",
+        "block priority",
+        "block quick attack",
+        "no priority moves",
+        "priority immunity"
+      ],
+      "examples": [
+        "Foes cannot use priority moves against my side, like Queenly Majesty"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when another ability already blocked the move",
+        "Never blocks a move aimed at the attacker itself or its own ally (Helping Hand, a self-boost)",
+        "Only blocks moves from foes, never from my own side"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 15
+    },
+    {
       "id": "block.float",
       "className": "FloatAbAttr",
       "label": "I float above the ground",
@@ -326,6 +374,66 @@
         "do": true
       },
       "uses": 5
+    },
+    {
+      "id": "block.full-hp-resist-type",
+      "className": "FullHpResistTypeAbAttr",
+      "label": "Limit how effective attacks are against me",
+      "summary": "Attacks never count as more effective than 0.5x against this Pokemon. Example: 0.5 turns a super effective hit into a not very effective one. Fixed-damage moves are skipped.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.type-matchup",
+      "whenLabel": "While the game calculates type matchup against me",
+      "synonyms": [
+        "tera shell",
+        "resist every attack",
+        "cap type effectiveness",
+        "no super effective hits",
+        "damage reduction from weaknesses",
+        "filter"
+      ],
+      "examples": [
+        "Every attack is at most not very effective while I am at full HP, like Tera Shell"
+      ],
+      "params": [
+        {
+          "id": "ceiling",
+          "label": "Highest allowed effectiveness (0.5 = not very effective, 1 = normal)",
+          "control": "number",
+          "default": 0.5,
+          "editable": true,
+          "min": 0,
+          "max": 4,
+          "step": 0.25,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "hp.full",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Moves that always do a fixed amount of damage (Seismic Toss, Dragon Rage) are not affected",
+        "Only an effectiveness above the highest allowed value is lowered, a weaker one is never raised",
+        "Not used for status moves, and not when the attacker's move ignores abilities"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.hp-threshold-form-change",
@@ -472,6 +580,106 @@
       "reusableAlone": {
         "when": true,
         "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.move-immunity",
+      "className": "MoveImmunityAbAttr",
+      "label": "Make moves that meet a rule have no effect",
+      "summary": "A move has no effect on this Pokemon when it meets the rule you choose. Example: the rule 'the move is a sound move' blocks every sound move, like Soundproof.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-immunity",
+      "whenLabel": "While the game checks whether a move can hit me",
+      "synonyms": [
+        "soundproof",
+        "bulletproof",
+        "overcoat",
+        "shield dust",
+        "good as gold",
+        "telepathy",
+        "immune to a kind of move",
+        "block a move group",
+        "block powder moves"
+      ],
+      "examples": [
+        "Immune to sound moves, like Soundproof",
+        "Immune to ball and bomb moves, like Bulletproof"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": false,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when another ability already blocked the move"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 10
+    },
+    {
+      "id": "block.non-super-effective-immunity",
+      "className": "NonSuperEffectiveImmunityAbAttr",
+      "label": "Block every hit that is not super effective",
+      "summary": "Damaging moves that are not super effective do nothing to this Pokemon. Example: a neutral or resisted move is blocked, a super effective move and a status move still work.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-immunity",
+      "whenLabel": "While the game checks whether a move can hit me",
+      "synonyms": [
+        "wonder guard",
+        "only super effective hits",
+        "immune unless super effective",
+        "block neutral hits",
+        "block resisted hits",
+        "only weakness hits"
+      ],
+      "examples": [
+        "Only super effective moves can hurt me, like Wonder Guard"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": true
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only works where the game asks for type immunities (not when the attacker ignores abilities)"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
         "do": true
       },
       "uses": 1
@@ -1021,6 +1229,428 @@
       "reusableAlone": {
         "when": true,
         "if": false,
+        "do": true
+      },
+      "uses": 4
+    },
+    {
+      "id": "block.type-immunity",
+      "className": "TypeImmunityAbAttr",
+      "label": "Block every move of one type, status moves too",
+      "summary": "Moves of the Water type do nothing to this Pokemon, status moves included. Example: Water blocks Water Gun and also a Water-type status move.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-immunity",
+      "whenLabel": "While the game checks whether a move can hit me",
+      "synonyms": [
+        "type immunity",
+        "immune to a type",
+        "no effect from a type",
+        "block a type",
+        "low tide",
+        "immune to status moves of a type"
+      ],
+      "examples": [
+        "Immune to every Water move, even Water-type status moves"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Immune to this type",
+          "control": "select",
+          "default": "WATER",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:1",
+          "removable": true,
+          "editable": true,
+          "optional": true
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Moves that hit every Pokemon or a whole side (Spikes, Rain Dance) are never blocked",
+        "A Pokemon never blocks its own move",
+        "Moves that count as another type for this Pokemon's other abilities are blocked as well"
+      ],
+      "effect": {
+        "id": "effect.immune-to-type",
+        "params": [
+          "type"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.type-immunity-add-battler-tag",
+      "className": "TypeImmunityAddBattlerTagAbAttr",
+      "label": "Absorb a type of move and power up instead",
+      "summary": "Moves of the Fire type do nothing, and this Pokemon gains the Fire boost instead. Example: Fire with the Fire boost makes its own Fire moves 1.5 times stronger, like Flash Fire.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-immunity",
+      "whenLabel": "While the game checks whether a move can hit me",
+      "synonyms": [
+        "flash fire",
+        "absorb and power up",
+        "fire boost",
+        "immune and boost",
+        "power up from a type",
+        "elemental vortex",
+        "absorb a move to get stronger"
+      ],
+      "examples": [
+        "Immune to Fire moves and power up my Fire moves when hit by one, like Flash Fire"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Immune to this type",
+          "control": "select",
+          "default": "FIRE",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "boost",
+          "label": "Power-up it gains (Fire moves get 1.5 times stronger)",
+          "control": "select",
+          "default": "FIRE_BOOST",
+          "editable": false,
+          "options": [
+            "FIRE_BOOST"
+          ]
+        },
+        {
+          "id": "turns",
+          "label": "Duration of the power-up (turns)",
+          "control": "number",
+          "default": 1,
+          "editable": false,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:3",
+          "removable": true,
+          "editable": true,
+          "optional": true
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Moves that hit every Pokemon or a whole side (Spikes, Rain Dance) are never blocked",
+        "A Pokemon never blocks its own move",
+        "The power-up is only gained when the move is really used (not when the game only previews it)"
+      ],
+      "branches": [
+        {
+          "label": "Block the move",
+          "conditions": [],
+          "effect": {
+            "id": "effect.immune-to-type",
+            "params": [
+              "type"
+            ]
+          }
+        },
+        {
+          "label": "Gain a power-up",
+          "conditions": [],
+          "effect": {
+            "id": "effect.apply-tag",
+            "params": [
+              "boost",
+              "turns"
+            ]
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.type-immunity-heal",
+      "className": "TypeImmunityHealAbAttr",
+      "label": "Absorb a type of move and heal instead",
+      "summary": "Moves of the Water type do nothing, and if this Pokemon is hurt it heals 25% of its max HP instead. Example: 25 means a quarter of its HP.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-immunity",
+      "whenLabel": "While the game checks whether a move can hit me",
+      "synonyms": [
+        "absorb",
+        "water absorb",
+        "volt absorb",
+        "earth eater",
+        "dry skin",
+        "heal from a type",
+        "immune and heal",
+        "drain a type of move"
+      ],
+      "examples": [
+        "Immune to Water moves and heal a quarter of max HP when hit by one, like Water Absorb"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Immune to this type",
+          "control": "select",
+          "default": "WATER",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "healPercent",
+          "label": "Heal this share of max HP (%)",
+          "control": "slider",
+          "default": 25,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Moves that hit every Pokemon or a whole side (Spikes, Rain Dance) are never blocked",
+        "A Pokemon never blocks its own move",
+        "The heal only happens when I am hurt and the move is really used (not when the game only previews it)"
+      ],
+      "branches": [
+        {
+          "label": "Block the move",
+          "conditions": [],
+          "effect": {
+            "id": "effect.immune-to-type",
+            "params": [
+              "type"
+            ]
+          }
+        },
+        {
+          "label": "Heal while hurt",
+          "conditions": [
+            "not hp.full (holder)"
+          ],
+          "effect": {
+            "id": "effect.heal-percent",
+            "params": [
+              "healPercent"
+            ]
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 9
+    },
+    {
+      "id": "block.type-immunity-stat-stage-change",
+      "className": "TypeImmunityStatStageChangeAbAttr",
+      "label": "Absorb a type of move and raise a stat instead",
+      "summary": "Moves of the Electric type do nothing, and this Pokemon's Speed changes by 1 stages instead. Example: 1 raises it by one stage, like Motor Drive.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-immunity",
+      "whenLabel": "While the game checks whether a move can hit me",
+      "synonyms": [
+        "absorb and boost",
+        "motor drive",
+        "well-baked body",
+        "justified",
+        "immune and raise a stat",
+        "stat boost from a type",
+        "lightning rod",
+        "sap sipper"
+      ],
+      "examples": [
+        "Immune to Electric moves and raise Speed by one stage when hit by one, like Motor Drive"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Immune to this type",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "stat",
+          "label": "Which stat changes",
+          "control": "select",
+          "default": "SPD",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ]
+        },
+        {
+          "id": "stages",
+          "label": "Number of stages (-6 to 6, negative lowers, 0 changes nothing)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:3",
+          "removable": true,
+          "editable": true,
+          "optional": true
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Moves that hit every Pokemon or a whole side (Spikes, Rain Dance) are never blocked",
+        "A Pokemon never blocks its own move",
+        "The stat only changes when the move is really used (not when the game only previews it)",
+        "A stat that is already at its limit does not move further"
+      ],
+      "branches": [
+        {
+          "label": "Block the move",
+          "conditions": [],
+          "effect": {
+            "id": "effect.immune-to-type",
+            "params": [
+              "type"
+            ]
+          }
+        },
+        {
+          "label": "Change my stat",
+          "conditions": [],
+          "effect": {
+            "id": "effect.stat-stage",
+            "params": [
+              "stat",
+              "stages"
+            ]
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
         "do": true
       },
       "uses": 4

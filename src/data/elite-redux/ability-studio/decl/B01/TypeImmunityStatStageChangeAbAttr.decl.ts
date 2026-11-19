@@ -67,7 +67,7 @@ export default defineDecl(TypeImmunityStatStageChangeAbAttr, {
       ctorIndex: 2,
       path: "stages",
       control: "number",
-      label: "Number of stages (1 to 6, negative lowers)",
+      label: "Number of stages (-6 to 6, negative lowers, 0 changes nothing)",
       editable: true,
       default: 1,
       min: -6,

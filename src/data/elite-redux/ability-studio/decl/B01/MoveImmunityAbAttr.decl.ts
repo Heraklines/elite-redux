@@ -62,11 +62,11 @@ export default defineDecl(MoveImmunityAbAttr, {
   flags: { rng: "none", state: "none", simulated: "ignores" },
   probes: [
     {
-      name: "a sound move, a ball move, a powder move and a plain move",
-      axes: { foeMove: ["HYPER_VOICE", "SHADOW_BALL", "SLEEP_POWDER", "TACKLE"] },
+      name: "a ball move, a powder move and a plain move",
+      axes: { foeMove: ["SHADOW_BALL", "SLEEP_POWDER", "TACKLE"] },
     },
   ],
   status: "decomposed",
   notes:
-    "Users (10 attrs): Shield Dust (19 attr 1), Overcoat (142 attr 1), Powder Burst (5243 attr 1), Guardian Coat (5539 attr 2): powder moves; Bulletproof (171) and Chestnut Shield (5657 attr 1): ball and bomb moves; Soundproof (43) and Parroting (5272 attr 1): sound moves; Telepathy (140): attack moves of my ally; Good as Gold (283): status moves except whole-side ones. Only Soundproof and Parroting are bound to library atoms, the other 8 are legacy-closures pending R-B01-10, R-B01-11 and R-B01-12. The condition is declared not removable: without it the class would make every move harmless, which is no sensible design. Subclasses MoveImmunityStatStageChangeAbAttr and WeatherBasedMoveBlockAbAttr call into this class from other batches. Oddity (not fixed): Telepathy only protects from the first ally (`getAlly()` is the first entry of `getAllies()`), so with a larger team on the field a second ally is not covered.",
+    "Users (10 attrs): Shield Dust (19 attr 1), Overcoat (142 attr 1), Powder Burst (5243 attr 1), Guardian Coat (5539 attr 2): powder moves; Bulletproof (171) and Chestnut Shield (5657 attr 1): ball and bomb moves; Soundproof (43) and Parroting (5272 attr 1): sound moves; Telepathy (140): attack moves of my ally; Good as Gold (283): status moves except whole-side ones. Only Soundproof and Parroting are bound to library atoms, the other 8 are legacy-closures pending R-B01-10, R-B01-11 and R-B01-12. The condition is declared not removable: without it the class would make every move harmless, which is no sensible design. Subclasses MoveImmunityStatStageChangeAbAttr and WeatherBasedMoveBlockAbAttr call into this class from other batches. Oddity (not fixed): Telepathy only protects from the first ally (`getAlly()` is the first entry of `getAllies()`), so with a larger team on the field a second ally is not covered. L2 note: the shared probe holds no sound move, because Parroting copies every sound move back at the foe, the level 30 Magikarp of the shared template faints and L2 all mode soft-locks at the reward screen. Soundproof and Parroting are twinned, with a mutation, against a level 100 Snorlax in test/tests/elite-redux/decomp/B01/sound-immunity-twin.test.ts.",
 });
