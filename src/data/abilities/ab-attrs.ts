@@ -332,13 +332,28 @@ export abstract class PreDefendAbAttr extends AbAttr {
 }
 
 export class PreDefendFullHpEndureAbAttr extends PreDefendAbAttr {
-  override canApply({ pokemon, damage }: PreDefendModifyDamageAbAttrParams): boolean {
-    return (
-      pokemon.isFullHp()
-      && pokemon.getMaxHp() > 1
-      && damage.value >= pokemon.hp
-      && !pokemon.getTag(BattlerTagType.STURDY)
-    );
+  /**
+   * Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. Declared with
+   * `declare` so it is not an own field of ordinary instances (the runtime configuration snapshot ignores it).
+   */
+  public declare gateOverride: ((params: PreDefendModifyDamageAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1): `gate`, then `residual`, in the original clause order and with the
+   * original short-circuiting. Subclasses that override `canApply` do not use the split.
+   */
+  override canApply(params: PreDefendModifyDamageAbAttrParams): boolean {
+    return gatedCanApply<PreDefendModifyDamageAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: "I am at full HP" (library atom `hp.full`), clause 1 of the old `canApply`. */
+  public gate({ pokemon }: PreDefendModifyDamageAbAttrParams): boolean {
+    return pokemon.isFullHp();
+  }
+
+  /** The feasibility that stays in the class (clauses 2 to 4 of the old `canApply`): max HP above 1, a lethal hit, not already enduring. */
+  public residual({ pokemon, damage }: PreDefendModifyDamageAbAttrParams): boolean {
+    return pokemon.getMaxHp() > 1 && damage.value >= pokemon.hp && !pokemon.getTag(BattlerTagType.STURDY);
   }
 
   override apply({ pokemon, simulated }: PreDefendModifyDamageAbAttrParams): void {
@@ -363,8 +378,12 @@ export interface StabBoostAbAttrParams extends AbAttrBaseParams {
 }
 
 export class StabBoostAbAttr extends AbAttr {
-  constructor() {
+  /** How much is added to a same-type bonus that already exists (0.5 turns 1.5x into 2x). */
+  private readonly bonus: number;
+
+  constructor(bonus = 0.5) {
     super(false);
+    this.bonus = bonus;
   }
 
   override canApply({ multiplier }: StabBoostAbAttrParams): boolean {
@@ -372,7 +391,7 @@ export class StabBoostAbAttr extends AbAttr {
   }
 
   override apply({ multiplier }: StabBoostAbAttrParams): void {
-    multiplier.value += 0.5;
+    multiplier.value += this.bonus;
   }
 }
 

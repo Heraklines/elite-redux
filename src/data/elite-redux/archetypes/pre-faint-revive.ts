@@ -126,7 +126,7 @@ export interface PreFaintReviveOptions {
  * recovery items / heals back to full).
  */
 export class PreFaintReviveAbAttr extends PreDefendFullHpEndureAbAttr {
-  private readonly gate: PreFaintReviveGate;
+  private readonly hpGate: PreFaintReviveGate;
   private readonly usage: PreFaintReviveUsage;
 
   constructor(opts: PreFaintReviveOptions = {}) {
@@ -135,13 +135,13 @@ export class PreFaintReviveAbAttr extends PreDefendFullHpEndureAbAttr {
     PreFaintReviveAbAttr.validateGate(gate);
     PreFaintReviveAbAttr.validateUsage(usage);
     super();
-    this.gate = gate;
+    this.hpGate = gate;
     this.usage = usage;
   }
 
   /** Read-only accessor for the configured HP gate. */
   public getGate(): PreFaintReviveGate {
-    return this.gate;
+    return this.hpGate;
   }
 
   /** Read-only accessor for the configured usage policy. */
@@ -209,11 +209,11 @@ export class PreFaintReviveAbAttr extends PreDefendFullHpEndureAbAttr {
    *   accept it as a separate arg to avoid double-calling on the Pokemon).
    */
   public matchesGate(hpRatio: number, isFullHp: boolean): boolean {
-    switch (this.gate.kind) {
+    switch (this.hpGate.kind) {
       case "full-hp":
         return isFullHp;
       case "hp-threshold":
-        return hpRatio >= this.gate.threshold;
+        return hpRatio >= this.hpGate.threshold;
     }
   }
 

@@ -13,7 +13,7 @@
 //     librarian adds number-valued form pickers (requests/B01.md, R-B01-3).
 // ReceivedTypeDamageMultiplierAbAttr builds its own closure from its `moveType` argument, which is a declared param,
 // so it needs no binding. The other classes of the chunk have no closure.
-import { bindLegacyClosure } from "#data/elite-redux/ability-studio/bindings";
+import { bindCondition, bindLegacyClosure } from "#data/elite-redux/ability-studio/bindings";
 
 // `() => 0`: always the base form.
 const BASE_FORM =
@@ -53,3 +53,8 @@ bindLegacyClosure(
   0,
   "Revelation: the form function returns the Revelation form index while the HP ratio is above 25%, otherwise the base form (or the current index when it is not the Revelation form); it returns a form number. Needs a form picker driven by an HP line (R-B01-3).",
 );
+
+// PreDefendFullHpEndureAbAttr (Tier B). Slot "gate": clause 1 of the old canApply, `pokemon.isFullHp()` on the holder.
+// The other three clauses (max HP above 1, a lethal hit, no STURDY tag yet) stay in the class as `residual`.
+bindCondition(5, 0, { id: "hp.full", who: "holder" }, "gate");
+bindCondition(5490, 1, { id: "hp.full", who: "holder" }, "gate");

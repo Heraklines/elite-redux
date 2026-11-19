@@ -1,8 +1,61 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "096ef32b703c2f",
+  "vocabularyHash": "19b4a3aed16a8d",
+  "hash": "151b55b4db497a",
   "blocks": [
+    {
+      "id": "block.allied-field-damage-reduction",
+      "className": "AlliedFieldDamageReductionAbAttr",
+      "label": "Change the damage my allies take",
+      "summary": "Damage my allies take is multiplied by 0.5. Example: 0.5 means they take half, 2 means double. Only works in battles with allies on the field.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.damage-taken",
+      "whenLabel": "While the game calculates damage I take",
+      "synonyms": [
+        "friend guard",
+        "protect allies",
+        "ally damage reduction",
+        "shield my partner",
+        "team guard",
+        "caretaker"
+      ],
+      "examples": [
+        "My ally takes half damage while I am on the field, like Friend Guard"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Damage multiplier for my allies (0.5 = half)",
+          "control": "number",
+          "default": 0.5,
+          "editable": true,
+          "min": 0,
+          "max": 4,
+          "step": 0.05
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only works when more than one Pokemon is on each side (doubles or bigger)",
+        "Every ally with this ability reduces the damage, so two of them stack",
+        "Ignored when the attacker's move ignores abilities (Mold Breaker style)"
+      ],
+      "effect": {
+        "id": "effect.multiply-damage-taken",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 3
+    },
     {
       "id": "block.attack-type-immunity",
       "className": "AttackTypeImmunityAbAttr",
@@ -124,6 +177,121 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.block-item-theft",
+      "className": "BlockItemTheftAbAttr",
+      "label": "Keep my held item from being stolen or swapped",
+      "summary": "Foes cannot take, knock off or swap my held item, and the ability pop-up shows when it stops one. Example: Thief and Trick fail on me.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.item-theft",
+      "whenLabel": "While the game checks if my item can be stolen",
+      "synonyms": [
+        "sticky hold",
+        "item lock",
+        "no knock off",
+        "protect held item",
+        "slime mold",
+        "item theft immunity"
+      ],
+      "examples": [
+        "Foes cannot steal my held item, like Sticky Hold",
+        "Trick and Knock Off fail against me"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when another ability already blocked this theft"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.block-recoil-damage-attr",
+      "className": "BlockRecoilDamageAttr",
+      "label": "Take no recoil damage from my own moves",
+      "summary": "Recoil from my own moves never hurts me. Example: Brave Bird or Double-Edge cost me no HP. Also stops the recoil of being enraged.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.indirect-damage",
+      "whenLabel": "While the game checks if indirect damage hurts me",
+      "synonyms": [
+        "rock head",
+        "no recoil",
+        "recoil immunity",
+        "immune to recoil",
+        "steel barrel",
+        "brute force"
+      ],
+      "examples": [
+        "Take no recoil damage from my own moves, like Rock Head",
+        "Brave Bird costs me no HP"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when another ability already blocked this recoil"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 5
+    },
+    {
+      "id": "block.double-battle-chance",
+      "className": "DoubleBattleChanceAbAttr",
+      "label": "Make double battles four times as likely",
+      "summary": "Wild encounters are four times more likely to be double battles while I am on the team. Example: a 1 in 8 chance becomes 1 in 2.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.double-battle-chance",
+      "whenLabel": "While the game rolls the chance of a double battle",
+      "synonyms": [
+        "more double battles",
+        "double battle chance",
+        "arena trap",
+        "no guard",
+        "wild double encounters"
+      ],
+      "examples": [
+        "Double battles show up four times as often, like Arena Trap"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The chance can never go below 1 in 1 (the game clamps it afterwards)"
+      ],
+      "effect": {
+        "id": "effect.more-double-battles",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 4
     },
     {
       "id": "block.float",
@@ -307,6 +475,53 @@
         "do": true
       },
       "uses": 1
+    },
+    {
+      "id": "block.post-battle-init-form-change",
+      "className": "PostBattleInitFormChangeAbAttr",
+      "label": "Reset my form when a battle begins",
+      "summary": "When a battle begins, my form is set back to the right one for my ability. Example: Zen Mode or Ice Face go back to their normal form.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.battle-start",
+      "whenLabel": "When a battle begins",
+      "synonyms": [
+        "revert form",
+        "reset form",
+        "back to normal form",
+        "zen mode",
+        "disguise",
+        "start in base form"
+      ],
+      "examples": [
+        "Return to my normal form at the start of every battle, like Zen Mode"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": false,
+          "editable": false,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The form must differ from the form my ability asks for",
+        "Does nothing in a simulated preview",
+        "The species must have a form change registered for its ability (otherwise nothing happens)"
+      ],
+      "effect": {
+        "id": "effect.ability-form-change",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 10
     },
     {
       "id": "block.post-damage-force-switch",
@@ -565,6 +780,55 @@
       "uses": 7
     },
     {
+      "id": "block.pre-defend-full-hp-endure",
+      "className": "PreDefendFullHpEndureAbAttr",
+      "label": "Survive a knockout hit with 1 HP",
+      "summary": "When I am at full HP, a hit that would knock me out leaves me with 1 HP instead, once per turn. Example: a 300 damage hit on a 200 HP Pokemon leaves 1 HP.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.damage-taken",
+      "whenLabel": "While the game calculates damage I take",
+      "synonyms": [
+        "sturdy",
+        "endure",
+        "survive at 1 hp",
+        "cannot be one hit knocked out",
+        "focus sash",
+        "immovable object"
+      ],
+      "examples": [
+        "Survive any hit that would knock me out while at full HP, like Sturdy"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "hp.full",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "My max HP must be above 1",
+        "The hit must be strong enough to knock me out",
+        "I must not already be enduring a hit this turn",
+        "Not used when the attacker's move ignores abilities"
+      ],
+      "effect": {
+        "id": "effect.survive-lethal-hit",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
       "id": "block.received-move-damage-multiplier",
       "className": "ReceivedMoveDamageMultiplierAbAttr",
       "label": "Take less (or more) damage",
@@ -628,6 +892,138 @@
         "do": true
       },
       "uses": 64
+    },
+    {
+      "id": "block.received-type-damage-multiplier",
+      "className": "ReceivedTypeDamageMultiplierAbAttr",
+      "label": "Take less (or more) damage from one type of move",
+      "summary": "Damage from Fire-type moves is multiplied by 0.5. Example: 0.5 means half damage, 2 means double.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.damage-taken",
+      "whenLabel": "While the game calculates damage I take",
+      "synonyms": [
+        "resist a type",
+        "type resistance",
+        "heatproof",
+        "thick fat",
+        "half damage from fire",
+        "weakness to a type"
+      ],
+      "examples": [
+        "Take half damage from Fire moves, like Heatproof",
+        "Take double damage from Fire moves"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Type of the incoming move",
+          "control": "select",
+          "default": "FIRE",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Damage multiplier (0.5 = half, 2 = double)",
+          "control": "number",
+          "default": 0.5,
+          "editable": true,
+          "min": 0,
+          "max": 4,
+          "step": 0.05
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Ignored when the attacker's move ignores abilities (Mold Breaker style)"
+      ],
+      "effect": {
+        "id": "effect.multiply-damage-taken",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 42
+    },
+    {
+      "id": "block.stab-boost",
+      "className": "StabBoostAbAttr",
+      "label": "Make my same-type bonus bigger",
+      "summary": "My moves that already get the same-type bonus get 0.5 more, so 1.5x becomes 2x. Example: a Water move from a Water type deals 2x with the default 0.5.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.stab",
+      "whenLabel": "While the game calculates same-type attack bonus",
+      "synonyms": [
+        "adaptability",
+        "stab boost",
+        "same type bonus",
+        "stronger stab",
+        "double stab",
+        "stab 2x"
+      ],
+      "examples": [
+        "Same-type moves deal 2x instead of 1.5x, like Adaptability"
+      ],
+      "params": [
+        {
+          "id": "bonus",
+          "label": "Extra same-type bonus (0.5 = 1.5x becomes 2x)",
+          "control": "number",
+          "default": 0.5,
+          "editable": true,
+          "min": 0,
+          "max": 2,
+          "step": 0.05
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only when the move already gets a same-type bonus (a bonus of more than 1x)",
+        "Ignored when the foe's move ignores my ability (Mold Breaker style)"
+      ],
+      "effect": {
+        "id": "effect.add-stab-bonus",
+        "params": [
+          "bonus"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 4
     }
   ]
 }

@@ -315,6 +315,15 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     },
   ),
   calc("calc.run-chance", "RunSuccessAbAttr", [H], "While the game rolls my chance to run away", "Move flow", "chance"),
+  calc(
+    "calc.double-battle-chance",
+    "DoubleBattleChanceAbAttr",
+    [H],
+    "While the game rolls the chance of a double battle",
+    "Move flow",
+    "chance",
+    { synonyms: ["double battle", "wild double encounter", "encounter chance"] },
+  ),
   calc("calc.weight", "WeightMultiplierAbAttr", [H], "While the game calculates my weight", "Move flow", "weight", {
     synonyms: ["heavy metal", "light metal"],
   }),

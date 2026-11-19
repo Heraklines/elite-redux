@@ -24,9 +24,9 @@ export default defineDecl(AlliedFieldDamageReductionAbAttr, {
   tier: "C",
   kind: "calc-modifier",
   when: "calc.damage-taken",
-  label: "Reduce the damage my allies take",
+  label: "Change the damage my allies take",
   summary: params =>
-    `Damage my allies take is multiplied by ${params.multiplier}. Example: 0.5 means they take half. Only works in battles with allies on the field.`,
+    `Damage my allies take is multiplied by ${params.multiplier}. Example: 0.5 means they take half, 2 means double. Only works in battles with allies on the field.`,
   synonyms: ["friend guard", "protect allies", "ally damage reduction", "shield my partner", "team guard", "caretaker"],
   examples: ["My ally takes half damage while I am on the field, like Friend Guard"],
   params: [
@@ -50,7 +50,7 @@ export default defineDecl(AlliedFieldDamageReductionAbAttr, {
     "Every ally with this ability reduces the damage, so two of them stack",
     "Ignored when the attacker's move ignores abilities (Mold Breaker style)",
   ],
-  effect: { id: "effect.package", params: ["multiplier"] },
+  effect: { id: "effect.multiply-damage-taken", params: ["multiplier"] },
   reusableAlone: { when: true, if: false, do: true },
   flags: { rng: "none", state: "none", simulated: "respects" },
   probes: [{ name: "an attack on the holder's ally in a double battle", axes: { foeMove: ["TACKLE", "WATER_GUN"] } }],
@@ -58,5 +58,5 @@ export default defineDecl(AlliedFieldDamageReductionAbAttr, {
     "The shared damage-taken template is a single battle, where the dispatch loop over allies is empty, so the original never evaluates this attr there; test/tests/elite-redux/decomp/B01/allied-field.test.ts runs a real double battle for the original and the rebuilt ability and compares the traces.",
   status: "decomposed",
   notes:
-    "Users (3 attrs): Friend Guard (attr 0, 0.75 raised to 0.5 at init), Food Lovers (attr 1) and Caretaker (attr 2), both 0.5. The ability-level `.ignorable()` of Friend Guard is an ability flag and not part of this class. Request in requests/B01.md: a precise effect 'multiply the damage my allies take' (the existing one says 'I take'), and a harness template for doubles. In this hook the holder is the ally, see the header.",
+    "Users (3 attrs): Friend Guard (attr 0, 0.75 raised to 0.5 at init), Food Lovers (attr 1) and Caretaker (attr 2), both 0.5. The ability-level `.ignorable()` of Friend Guard is an ability flag and not part of this class. The effect is the existing effect.multiply-damage-taken (same arithmetic, `damage.value = toDmgValue(damage.value * multiplier)`), whose label says 'I take': in this WHEN the damage it multiplies is the ally's; a clearer ally label is requested (R-B01-6). Own doubles twin test in B01/allied-field.test.ts. In this hook the holder is the ally, see the header.",
 });

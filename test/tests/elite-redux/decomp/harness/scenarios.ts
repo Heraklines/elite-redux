@@ -365,6 +365,7 @@ const WHEN_TEMPLATE: Readonly<Record<string, string>> = {
   "calc.speed-bypass": t.quiet,
   "calc.trap-check": t.switchOut,
   "calc.run-chance": t.quiet,
+  "calc.double-battle-chance": t.quiet,
   "calc.weight": t.hit,
   "calc.burn-damage": t.inflicted,
   "calc.status-duration": t.inflicted,

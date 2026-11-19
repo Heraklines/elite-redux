@@ -60,6 +60,7 @@
     "calc.burn-damage": "foe-inflicts-status: the engine never evaluated a ReduceBurnDamageAbAttr attr of the holder",
     "calc.crit-multiplier": "foe-crits-holder: the engine never evaluated a MultCritAbAttr attr of the holder",
     "calc.defensive-stat-pick": "foe-crits-holder: the engine never evaluated a CritUseLowerDefensiveStatAbAttr attr of the holder",
+    "calc.double-battle-chance": "quiet-turns: the engine never evaluated a DoubleBattleChanceAbAttr attr of the holder (wild encounter generation runs before a battle exists)",
     "calc.ignore-type-immunity": "holder-hits-foe: the engine never evaluated a IgnoreTypeImmunityAbAttr attr of the holder",
     "calc.incoming-effect-chance": "foe-hits-holder: the engine never evaluated a IgnoreMoveEffectsAbAttr attr of the holder",
     "calc.incoming-move": "foe-hits-holder: the engine never evaluated a PreDefendAbAttr attr of the holder",

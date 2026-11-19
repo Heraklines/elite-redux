@@ -20,7 +20,7 @@ export default defineDecl(BlockRecoilDamageAttr, {
   tier: "C",
   kind: "calc-modifier",
   when: "cancel.indirect-damage",
-  label: "Take no recoil damage",
+  label: "Take no recoil damage from my own moves",
   summary: () =>
     "Recoil from my own moves never hurts me. Example: Brave Bird or Double-Edge cost me no HP. Also stops the recoil of being enraged.",
   synonyms: ["rock head", "no recoil", "recoil immunity", "immune to recoil", "steel barrel", "brute force"],

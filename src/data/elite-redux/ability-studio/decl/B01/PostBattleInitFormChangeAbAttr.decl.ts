@@ -44,7 +44,7 @@ export default defineDecl(PostBattleInitFormChangeAbAttr, {
     "Does nothing in a simulated preview",
     "The species must have a form change registered for its ability (otherwise nothing happens)",
   ],
-  effect: { id: "effect.change-form", params: [] },
+  effect: { id: "effect.ability-form-change", params: [] },
   reusableAlone: { when: true, if: false, do: true },
   flags: { rng: "none", state: "none", simulated: "respects" },
   probes: [{ name: "start of a battle", axes: {} }],
@@ -52,5 +52,5 @@ export default defineDecl(PostBattleInitFormChangeAbAttr, {
     "The shared battle-start template never calls applyAbAttrs for the start of a battle, so no template evaluates this attr; the test/tests/elite-redux/decomp/B01/post-battle-init.test.ts drives the real dispatch with a stand-in form function.",
   status: "decomposed",
   notes:
-    "Users (10 attrs, all legacy-closure): Zen Mode, Schooling, Disguise (attr 3), Ice Face (attr 5), Zero to Hero (attr 2) and Patchwork (attr 3) return 0; Shields Down returns formIndex % 7 (keeps its colour); Battle Bond returns 1 and carries an attr-level condition (Greninja, not fused); Power Construct returns formIndex - 2 and carries an attr-level condition (form 4 or 5); Revelation returns the School form above 25% HP and the base form at or below it. The class is also pushed by init-elite-redux-unown-school.ts (Revelation) and appears in Pokemon.FORM_CHANGE_DRIVER_ATTRS (pokemon.ts:3581), which lets a locked innate still drive a form change. Needs: effect 'run the ability form change' (request R-B01-4).",
+    "Users (10 attrs, all legacy-closure): Zen Mode, Schooling, Disguise (attr 3), Ice Face (attr 5), Zero to Hero (attr 2) and Patchwork (attr 3) return 0; Shields Down returns formIndex % 7 (keeps its colour); Battle Bond returns 1 and carries an attr-level condition (Greninja, not fused); Power Construct returns formIndex - 2 and carries an attr-level condition (form 4 or 5); Revelation returns the School form above 25% HP and the base form at or below it. The class is also pushed by init-elite-redux-unown-school.ts (Revelation) and appears in Pokemon.FORM_CHANGE_DRIVER_ATTRS (pokemon.ts:3581), which lets a locked innate still drive a form change. The effect is effect.ability-form-change ('Change to the form my ability asks for'): the target form comes from the species' registered ability-trigger form changes, never from the closure number (R-B01-4).",
 });
