@@ -23,10 +23,10 @@ export default defineDecl(PostFaintFormChangeAbAttr, {
   tier: "A",
   kind: "event-effect",
   when: "event.faint",
-  label: "Change form when I faint if my ability asks for it",
+  label: "Go back to my normal form when I faint",
   summary: () =>
-    "When I faint, if my form is not the one my ability asks for, I change form. Example: Disguise puts Mimikyu back in its disguised form after it faints.",
-  synonyms: ["disguise", "battle bond", "power construct", "revert form on faint", "form change on faint", "patchwork"],
+    "When I faint, if I am not already in the form I should be in, I change form. Example: Disguise puts Mimikyu back in its disguised form after it faints.",
+  synonyms: ["disguise", "battle bond", "power construct", "revert form on faint", "form change on faint", "patchwork", "revert form", "back to base form", "normal form", "go back"],
   examples: ["Go back to my first form when I faint, like Disguise"],
   params: [],
   noParamsReason:
@@ -37,7 +37,7 @@ export default defineDecl(PostFaintFormChangeAbAttr, {
   ],
   guards: [],
   feasibility: [
-    "The form my ability asks for must differ from my current form",
+    "I must not already be in the form I should be in",
     "My species must have a form change registered for its ability (otherwise nothing happens)",
     "Does nothing in a simulated preview",
   ],

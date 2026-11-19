@@ -18,7 +18,7 @@ export default defineDecl(HealFromBerryUseAbAttr, {
   tier: "A",
   kind: "event-effect",
   when: "event.berry-eaten",
-  label: "Heal some HP after I eat a berry",
+  label: "Heal a share of my max HP after I eat a berry",
   summary: params =>
     `After I eat a berry, I heal ${Math.round(Number(params.healShare) * 100)}% of my max HP. Example: 0.33 heals a third of max HP, 1 heals all of it.`,
   synonyms: ["cheek pouch", "gluttony", "voracity", "berry heal", "heal after eating", "recover hp from berries"],
@@ -42,7 +42,7 @@ export default defineDecl(HealFromBerryUseAbAttr, {
   feasibility: [
     "Heals the share of max HP rounded down, at least 1 HP",
     "Does nothing in a simulated preview",
-    "A holder that eats several berries in one round heals once",
+    "After a berry I eat in battle I heal once per round; a berry eaten through a move (like Bug Bite) heals once per berry",
   ],
   effect: { id: "effect.package", params: [] },
   reusableAlone: { when: true, if: false, do: true },

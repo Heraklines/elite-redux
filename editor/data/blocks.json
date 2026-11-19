@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1d50feb8353e55",
-  "hash": "131be96c072cdb",
+  "hash": "16c77adb989b55",
   "blocks": [
     {
       "id": "block.arena-trap",
@@ -410,7 +410,7 @@
     {
       "id": "block.heal-from-berry-use",
       "className": "HealFromBerryUseAbAttr",
-      "label": "Heal some HP after I eat a berry",
+      "label": "Heal a share of my max HP after I eat a berry",
       "summary": "After I eat a berry, I heal 33% of my max HP. Example: 0.33 heals a third of max HP, 1 heals all of it.",
       "tier": "A",
       "kind": "event-effect",
@@ -445,7 +445,7 @@
       "feasibility": [
         "Heals the share of max HP rounded down, at least 1 HP",
         "Does nothing in a simulated preview",
-        "A holder that eats several berries in one round heals once"
+        "After a berry I eat in battle I heal once per round; a berry eaten through a move (like Bug Bite) heals once per berry"
       ],
       "effect": {
         "id": "effect.package",
@@ -1079,8 +1079,8 @@
     {
       "id": "block.post-faint-form-change",
       "className": "PostFaintFormChangeAbAttr",
-      "label": "Change form when I faint if my ability asks for it",
-      "summary": "When I faint, if my form is not the one my ability asks for, I change form. Example: Disguise puts Mimikyu back in its disguised form after it faints.",
+      "label": "Go back to my normal form when I faint",
+      "summary": "When I faint, if I am not already in the form I should be in, I change form. Example: Disguise puts Mimikyu back in its disguised form after it faints.",
       "tier": "A",
       "kind": "event-effect",
       "status": "decomposed",
@@ -1092,7 +1092,11 @@
         "power construct",
         "revert form on faint",
         "form change on faint",
-        "patchwork"
+        "patchwork",
+        "revert form",
+        "back to base form",
+        "normal form",
+        "go back"
       ],
       "examples": [
         "Go back to my first form when I faint, like Disguise"
@@ -1108,7 +1112,7 @@
       ],
       "guards": [],
       "feasibility": [
-        "The form my ability asks for must differ from my current form",
+        "I must not already be in the form I should be in",
         "My species must have a form change registered for its ability (otherwise nothing happens)",
         "Does nothing in a simulated preview"
       ],
