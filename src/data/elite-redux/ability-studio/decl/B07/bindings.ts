@@ -17,7 +17,7 @@
 // WHEN `calc.ability-bypass` provides neither `other` nor `moveUser`, so the atoms `move.type`, `move.category` and
 // `move.effectiveness` cannot be evaluated there. Request R-B07-1 (requests/B07.md) asks the librarian for both; each
 // reason below carries the library form that replaces it.
-import { bindLegacyClosure } from "#data/elite-redux/ability-studio/bindings";
+import { bindCondition, bindLegacyClosure } from "#data/elite-redux/ability-studio/bindings";
 
 const ALWAYS_TRUE =
   "The constructor default `() => true`: no condition. Library form once a (pokemon, move) context exists (R-B07-1): an empty ALL group, which is always true.";
@@ -60,3 +60,27 @@ for (const [abilityId, attrIndex] of [
   bindLegacyClosure(abilityId, attrIndex, ALWAYS_TRUE, "ctor:0");
   bindLegacyClosure(abilityId, attrIndex, GATE_REASON, "gate");
 }
+
+// =============================================================================================
+// Chunk 3 of 4 (added). Three classes carry a closure or a gate; the other five (MoneyAbAttr, IllusionPreSummonAbAttr,
+// PostDefendIllusionBreakAbAttr, IllusionPostBattleAbAttr and the parked IllusionBreakAbAttr) have none, so they need no binding.
+// Each line below was read from the dump of the live attrs (closure source and fields), nothing is generated.
+// =============================================================================================
+
+// FormBlockDamageAbAttr, slot ctor:3, a PokemonDefendCondition `(target, user, move)`. The frame's holder is the target.
+// Disguise (209, attr 2): the constructor default `() => true`, so an empty ALL group (always true).
+bindCondition(209, 2, { all: [] }, "ctor:3"); // Disguise
+// Ice Face (248, attr 4): `(_target, _user, move) => move.category === MoveCategory.PHYSICAL` (category 0).
+bindCondition(248, 4, { id: "move.category", category: "PHYSICAL" }, "ctor:3"); // Ice Face
+
+// PostSummonStatStageChangeOnArenaAbAttr (Tier B), slot gate: the original first clause of canApply,
+// `arena.getTagOnSide(arenaTagType, holder's own side) ?? false`, with the tag TAILWIND. The tag is the `arenaTag` setting, which
+// `gateParams` writes into the atom, so a moved setting moves this gate.
+bindCondition(274, 1, { id: "field.arena-tag", tag: "TAILWIND", side: "holder-side" }, "gate"); // Wind Rider
+
+// PreventBypassSpeedChanceAbAttr, slot ctor:0, `(_pokemon, move) => move.category === MoveCategory.STATUS` (category 2).
+bindLegacyClosure(
+  298,
+  1,
+  "Mycelium Might: `move.category === STATUS` on the move the holder chose this turn. Library form once a (pokemon, move) context exists (R-B07-1) and calc.speed-bypass provides the chosen move (R-B07-12): the atom move.category with category STATUS.",
+); // Mycelium Might

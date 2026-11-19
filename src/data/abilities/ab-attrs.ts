@@ -6806,9 +6806,29 @@ export class PostSummonStatStageChangeOnArenaAbAttr extends PostSummonStatStageC
     this.statResolver = statResolver;
   }
 
+  /**
+   * Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. Declared with
+   * `declare` so it is not an own field of ordinary instances (the runtime configuration snapshot ignores it).
+   */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1): `gate`, then `residual`, in the original clause order and with the
+   * original short-circuiting (there are no guards and no frame rewrite).
+   */
   override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The replaceable condition (library atom `field.arena-tag`, side holder-side): the tag is up on the holder's own side. */
+  public gate(params: AbAttrBaseParams): boolean {
     const side = params.pokemon.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY;
-    return (globalScene.arena.getTagOnSide(this.arenaTagType, side) ?? false) && super.canApply(params);
+    return Boolean(globalScene.arena.getTagOnSide(this.arenaTagType, side) ?? false);
+  }
+
+  /** What stays in the class: the parent's own check (always true today), kept in its original place after the gate. */
+  public residual(params: AbAttrBaseParams): boolean {
+    return super.canApply(params);
   }
 
   override apply(params: AbAttrBaseParams): void {
