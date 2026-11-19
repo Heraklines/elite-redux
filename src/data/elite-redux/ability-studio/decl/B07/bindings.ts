@@ -84,3 +84,23 @@ bindLegacyClosure(
   1,
   "Mycelium Might: `move.category === STATUS` on the move the holder chose this turn. Library form once a (pokemon, move) context exists (R-B07-1) and calc.speed-bypass provides the chosen move (R-B07-12): the atom move.category with category STATUS.",
 ); // Mycelium Might
+
+// MoneyAbAttr (Tier B), slot gate: the original second clause of canApply, `victory` (the battle that just ended was won). The WHEN
+// event.after-battle provides no victory slot and no library atom reads it, so this is a legacy closure until atom battle.won exists
+// (R-B07-10, merged with B06 R-B06-19). The first clause, `!simulated`, is feasibility and stays in the class (guards).
+bindLegacyClosure(
+  118,
+  0,
+  "Honey Gather: gate `victory` (the battle was won), read from the PostBattle frame. Library form once event.after-battle provides the victory flag and the atom battle.won exists (R-B07-10).",
+  "gate",
+); // Honey Gather
+
+// PostDefendIllusionBreakAbAttr (Tier B), slot gate: the original first clause of canApply, `hitResult` is EFFECTIVE, SUPER_EFFECTIVE,
+// NOT_VERY_EFFECTIVE or ONE_HIT_KO. A legacy closure until atom hit.damaged exists (R-B07-10); the WHEN event.after-hit already provides
+// the hitResult slot. The second clause (a disguise is on) is feasibility and stays in the class (residual).
+bindLegacyClosure(
+  149,
+  2,
+  "Illusion: gate `hitResult` is a damaging result (EFFECTIVE, SUPER_EFFECTIVE, NOT_VERY_EFFECTIVE or ONE_HIT_KO). Library form once the atom hit.damaged exists (R-B07-10).",
+  "gate",
+); // Illusion

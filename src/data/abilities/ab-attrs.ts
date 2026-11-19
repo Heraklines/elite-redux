@@ -6767,13 +6767,39 @@ export class IgnoreTypeStatusEffectImmunityAbAttr extends AbAttr {
 
 /** Gives money to the user after the battle. */
 export class MoneyAbAttr extends PostBattleAbAttr {
-  override canApply({ simulated, victory }: PostBattleAbAttrParams): boolean {
-    // TODO: Consider moving the simulated check to the apply method
-    return !simulated && victory;
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostBattleAbAttrParams) => boolean) | undefined;
+
+  /** Share of this wave's prize money that is added to the pile (0.2 = 20%). */
+  private readonly bonusFraction: number;
+
+  /** @param bonusFraction - Share of the wave's prize money added after a win (default 0.2, Honey Gather). */
+  constructor(bonusFraction = 0.2) {
+    super(true);
+    this.bonusFraction = bonusFraction;
+  }
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order `!simulated && victory`: `guards` (never pay out in a
+   * simulated preview), then `gate` (the battle was won). There is no residual and there is no random draw.
+   */
+  override canApply(params: PostBattleAbAttrParams): boolean {
+    return gatedCanApply<PostBattleAbAttrParams>(this, params);
+  }
+
+  // TODO: Consider moving the simulated check to the apply method
+  /** Feasibility that stays in the class: a preview never pays out. */
+  public guards({ simulated }: PostBattleAbAttrParams): boolean {
+    return !simulated;
+  }
+
+  /** The replaceable condition: the battle that just ended was won. */
+  public gate({ victory }: PostBattleAbAttrParams): boolean {
+    return victory;
   }
 
   override apply(_params: PostBattleAbAttrParams): void {
-    globalScene.currentBattle.moneyScattered += globalScene.getWaveMoneyAmount(0.2);
+    globalScene.currentBattle.moneyScattered += globalScene.getWaveMoneyAmount(this.bonusFraction);
   }
 }
 
@@ -7007,11 +7033,23 @@ export class IllusionBreakAbAttr extends AbAttr {
 
 /** @sealed */
 export class PostDefendIllusionBreakAbAttr extends PostDefendAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
   override apply({ pokemon }: PostMoveInteractionAbAttrParams): void {
     pokemon.breakIllusion();
   }
 
-  override canApply({ pokemon, hitResult }: PostMoveInteractionAbAttrParams): boolean {
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `gate` (a damaging hit landed), then `residual`
+   * (there is a disguise to drop). No guards, no frame rewrite and no random draw.
+   */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the hit did damage (a miss, a block, a status move or indirect damage does not count). */
+  public gate({ hitResult }: PostMoveInteractionAbAttrParams): boolean {
     // TODO: I remember this or a derivative being declared elsewhere - merge the 2 into 1
     // and store it somewhere globally accessible
     const damagingHitResults: ReadonlySet<HitResult> = new Set([
@@ -7020,7 +7058,12 @@ export class PostDefendIllusionBreakAbAttr extends PostDefendAbAttr {
       HitResult.NOT_VERY_EFFECTIVE,
       HitResult.ONE_HIT_KO,
     ]);
-    return damagingHitResults.has(hitResult) && pokemon.summonData.illusion != null;
+    return damagingHitResults.has(hitResult);
+  }
+
+  /** What stays in the class: there is a disguise to drop. */
+  public residual({ pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    return pokemon.summonData.illusion != null;
   }
 }
 

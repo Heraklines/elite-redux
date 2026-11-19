@@ -4,20 +4,23 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// B07 chunk 3 / event effect, Tier C (one-piece effect, no closure). See ../PRECEDENTS.md.
+// B07 chunk 3 / event effect, Tier B (the damaging-hit gate lives in canApply). See ../PRECEDENTS.md.
 //
 // "After I am hit, IF the hit did damage and I have a disguise on, drop the disguise". PostDefendAbAttr is dispatched from the move
-// phases with `{ pokemon, opponent, move, damage, hitResult, simulated }`. Clauses, in the ORIGINAL order (ab-attrs.ts):
-//   canApply  1. `hitResult` is EFFECTIVE, SUPER_EFFECTIVE, NOT_VERY_EFFECTIVE or ONE_HIT_KO. CONDITION in spirit: "a damaging hit
-//                landed" (a miss, a block, a status move and indirect damage do not count). No library atom reads the hit result; R-B07-10.
-//             2. `pokemon.summonData.illusion != null`   feasibility: there is a disguise to drop.
-//   apply     `pokemon.breakIllusion()`: clears the look-alike, plays the transform sound and redraws the sprite.
-// No random draw, no state of its own, no constructor argument except the inherited `showAbility`.
+// phases with `{ pokemon, opponent, move, damage, hitResult, simulated }`. canApply is now `gate && residual` in the ORIGINAL clause order
+// (no guards, no frame rewrite, no random draw):
+//   1. gate      `hitResult` is EFFECTIVE, SUPER_EFFECTIVE, NOT_VERY_EFFECTIVE or ONE_HIT_KO: the CONDITION "a damaging hit landed" (a miss,
+//                a block, a status move and indirect damage do not count). No library atom reads the hit result yet, so the gate is bound
+//                as a legacy closure and requested as atom hit.damaged (R-B07-10); the binding swaps to the atom once it exists.
+//   2. residual  `pokemon.summonData.illusion != null`   feasibility: there is a disguise to drop.
+//   apply        `pokemon.breakIllusion()`: clears the look-alike, plays the transform sound and redraws the sprite.
+// No random draw, no state of its own, no constructor argument except the inherited `showAbility`. The class edit is the pure Tier B
+// move of code (gate and residual methods, gateOverride declared).
 import { PostDefendIllusionBreakAbAttr } from "#abilities/ab-attrs";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 
 export default defineDecl(PostDefendIllusionBreakAbAttr, {
-  tier: "C",
+  tier: "B",
   kind: "event-effect",
   when: "event.after-hit",
   label: "Drop my disguise when a damaging hit lands",
@@ -35,12 +38,9 @@ export default defineDecl(PostDefendIllusionBreakAbAttr, {
   params: [],
   noParamsReason:
     "A fixed rule with nothing to choose: any damaging hit drops the disguise. The only constructor argument is showAbility, which is never exposed (fixed to true).",
-  conditions: [],
+  conditions: [{ slot: "gate", ctx: "params", removable: true, editable: true }],
   guards: [],
-  feasibility: [
-    "Only a hit that did damage counts (a miss, a blocked move, a status move or indirect damage does not)",
-    "Does nothing when I am not disguised",
-  ],
+  feasibility: ["Does nothing when I am not disguised"],
   // No library effect says "drop my disguise"; request R-B07-9 (effect.reveal-illusion). The hit-result test is R-B07-10.
   effect: { id: "effect.package", params: [] },
   fixedCtorArgs: { 0: true },
@@ -51,5 +51,5 @@ export default defineDecl(PostDefendIllusionBreakAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "Tier C, one-piece effect. User (live dump): Illusion (149, attr 2), showAbility true. The class never reads `simulated`, so a dispatch that is only a preview would still drop the disguise (the engine only dispatches PostDefend for real hits). A TODO in the source says the damaging-hit-result set is declared elsewhere too; it is not merged here.",
+    "Tier B (review fix): the damaging-hit clause is split out as the gate and bound as a legacy closure until atom hit.damaged exists (R-B07-10). User (live dump): Illusion (149, attr 2), showAbility true. The class never reads `simulated`, so a dispatch that is only a preview would still drop the disguise (the engine only dispatches PostDefend for real hits). A TODO in the source says the damaging-hit-result set is declared elsewhere too; it is not merged here.",
 });

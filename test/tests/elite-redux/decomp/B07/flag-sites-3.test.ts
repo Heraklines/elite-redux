@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { MoneyAbAttr } from "#abilities/ab-attrs";
 // B07 chunk 3: the engine sites that the shared L1 / L2 suites cannot reach for the eight classes of the chunk.
 //
 // The shared battle twin has no scenario that ends a battle (event.after-battle), replaces or suppresses the holder's ability, picks a
@@ -15,8 +16,8 @@
 //   control   Ball Fetch (no such attr)
 //
 // The rebuilt run must equal the original one and the control must differ. The control is what proves the scenario really reaches the
-// site, so equal results are never two empty recordings. The parked class (IllusionBreakAbAttr) and the legacy-closure class
-// (PreventBypassSpeedChanceAbAttr) have no rebuilt attr, so only original and control are compared for them.
+// site, so equal results are never two empty recordings. The parked class (IllusionBreakAbAttr) and the classes whose only condition is a legacy closure
+// (PreventBypassSpeedChanceAbAttr, and the gates of MoneyAbAttr and PostDefendIllusionBreakAbAttr until R-B07-10) have no rebuilt attr, so only original and control are compared for them.
 import type { Ability } from "#abilities/ability";
 import { applyAbAttrs, applyOnLoseAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
@@ -120,6 +121,17 @@ describe("B07 chunk 3 at the engine sites", () => {
     return { original, rebuilt, control };
   }
 
+  /** original / control for a class whose gate is still a legacy closure (so no rebuilt attr exists yet, like the other legacy classes). */
+  async function twoWays<T>(
+    abilityId: number,
+    read: (ctx: Ctx) => T | Promise<T>,
+    setup: Setup = {},
+  ): Promise<{ original: T; control: T }> {
+    const original = await observe(abilityId, setup, read);
+    const control = await observe(BALL_FETCH, setup, read);
+    return { original, control };
+  }
+
   /** A disguise that costs nothing to put on or take off (the sprite reload is not part of the rule). */
   function disguise(holder: Holder, foe: Ctx["foe"]): void {
     vi.spyOn(holder, "loadAssets").mockResolvedValue(undefined as never);
@@ -148,13 +160,52 @@ describe("B07 chunk 3 at the engine sites", () => {
         expected: globalScene.getWaveMoneyAmount(0.2),
       };
     };
-    const result = await threeWays(HONEY_GATHER, 0, read);
+    const result = await twoWays(HONEY_GATHER, read);
     expect(result.original.won).toBe(result.original.expected);
     expect(result.original.won).toBeGreaterThan(0);
     expect(result.original.lost).toBe(0);
     expect(result.original.preview).toBe(0);
-    expect(result.rebuilt).toEqual(result.original);
     expect(result.control).toEqual({ won: 0, lost: 0, preview: 0, expected: result.original.expected });
+  });
+
+  it("MoneyAbAttr: the bonus is a constructor setting that defaults to the shipped 20%, and the split gate can be replaced", async () => {
+    const original = (allAbilities[HONEY_GATHER] as Ability).attrs[0] as MoneyAbAttr;
+    expect(original.constructor.name).toBe("MoneyAbAttr");
+    expect((original as unknown as { bonusFraction: number }).bonusFraction).toBe(0.2);
+    const dflt = new MoneyAbAttr();
+    const half = new MoneyAbAttr(0.5);
+    const everyBattle = new MoneyAbAttr(0.5);
+    everyBattle.gateOverride = () => true;
+    const read = ({ holder }: Ctx) => {
+      const pile = (attr: MoneyAbAttr, victory: boolean, simulated = false): number => {
+        globalScene.currentBattle.moneyScattered = 0;
+        if (attr.canApply({ pokemon: holder, victory, simulated })) {
+          attr.apply({ pokemon: holder, victory, simulated });
+        }
+        return globalScene.currentBattle.moneyScattered;
+      };
+      return {
+        original: pile(original, true),
+        dflt: pile(dflt, true),
+        half: pile(half, true),
+        halfLost: pile(half, false),
+        halfPreview: pile(half, true, true),
+        // a replaced gate decides instead of "battle won", the guard (no payout in a preview) still holds
+        replacedLost: pile(everyBattle, false),
+        replacedPreview: pile(everyBattle, false, true),
+        want20: globalScene.getWaveMoneyAmount(0.2),
+        want50: globalScene.getWaveMoneyAmount(0.5),
+      };
+    };
+    const result = await observe(BALL_FETCH, {}, read);
+    expect(result.original).toBe(result.want20);
+    expect(result.dflt).toBe(result.want20);
+    expect(result.half).toBe(result.want50);
+    expect(result.want50).toBeGreaterThan(result.want20);
+    expect(result.halfLost).toBe(0);
+    expect(result.halfPreview).toBe(0);
+    expect(result.replacedLost).toBe(result.want50);
+    expect(result.replacedPreview).toBe(0);
   });
 
   // ---------------------------------------------------------------------------------------------
@@ -217,7 +268,7 @@ describe("B07 chunk 3 at the engine sites", () => {
         notDisguised: outcome(HitResult.EFFECTIVE, false),
       };
     };
-    const result = await threeWays(ILLUSION, 2, read);
+    const result = await twoWays(ILLUSION, read);
     // true = the disguise is still on afterwards.
     expect(result.original).toEqual({
       effective: false,
@@ -230,7 +281,6 @@ describe("B07 chunk 3 at the engine sites", () => {
       indirect: true,
       notDisguised: false,
     });
-    expect(result.rebuilt).toEqual(result.original);
     expect(result.control).toEqual({
       effective: true,
       superEffective: true,

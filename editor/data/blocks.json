@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "09a11fbcbe3a8e",
+  "hash": "09d4328dd354d2",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -846,7 +846,7 @@
       "className": "MoneyAbAttr",
       "label": "Earn bonus prize money after a win",
       "summary": "After I win a battle, a bonus of 20% of this wave's usual prize money is added to the money picked up. Example: Honey Gather.",
-      "tier": "C",
+      "tier": "B",
       "kind": "event-effect",
       "status": "decomposed",
       "when": "event.after-battle",
@@ -863,17 +863,37 @@
       "examples": [
         "Earn some extra prize money after every battle I win, like Honey Gather"
       ],
-      "params": [],
-      "conditions": [],
+      "params": [
+        {
+          "id": "bonus",
+          "label": "Bonus prize money (% of this wave's usual prize money)",
+          "control": "number",
+          "default": 20,
+          "editable": true,
+          "min": 0,
+          "max": 500,
+          "step": 1,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
       "guards": [],
       "feasibility": [
-        "Only after the battle was won",
         "Does nothing in a simulated preview",
         "The bonus joins the money picked up after the battle, so Amulet Coin and Happy Hour still multiply it"
       ],
       "effect": {
         "id": "effect.package",
-        "params": []
+        "params": [
+          "bonus"
+        ]
       },
       "reusableAlone": {
         "when": true,
@@ -1089,7 +1109,7 @@
       "className": "PostDefendIllusionBreakAbAttr",
       "label": "Drop my disguise when a damaging hit lands",
       "summary": "After I take a damaging hit while disguised as another Pokemon, my disguise is dropped and everybody sees my real look. Example: Zoroark loses its Illusion.",
-      "tier": "C",
+      "tier": "B",
       "kind": "event-effect",
       "status": "decomposed",
       "when": "event.after-hit",
@@ -1106,10 +1126,16 @@
         "Stop looking like a teammate as soon as I take damage, like Zoroark"
       ],
       "params": [],
-      "conditions": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
       "guards": [],
       "feasibility": [
-        "Only a hit that did damage counts (a miss, a blocked move, a status move or indirect damage does not)",
         "Does nothing when I am not disguised"
       ],
       "effect": {
