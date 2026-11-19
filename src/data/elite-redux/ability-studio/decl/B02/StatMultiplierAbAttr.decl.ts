@@ -92,7 +92,6 @@ export default defineDecl(StatMultiplierAbAttr, {
       name: "no status and a status",
       axes: { status: ["NONE", "BURN", "PARALYSIS"], foeMove: ["TACKLE", "WATER_GUN"] },
     },
-    { name: "the weather the speed abilities react to", axes: { weather: ["NONE", "RAIN", "SUNNY", "SANDSTORM", "SNOW"] } },
   ],
   status: "decomposed",
   notes:

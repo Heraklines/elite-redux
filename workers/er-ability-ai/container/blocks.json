@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "1c9306b4a4c843",
+  "hash": "039f33354f277f",
   "blocks": [
     {
       "id": "block.add-move-flag",
@@ -347,6 +347,81 @@
       "uses": 2
     },
     {
+      "id": "block.ally-stat-multiplier",
+      "className": "AllyStatMultiplierAbAttr",
+      "label": "Multiply one stat, accuracy or evasion of my ally",
+      "summary": "Whenever the game uses my ally's Accuracy, it is multiplied by 1.2. Example: 1.2 = 20% higher. Only works in a double battle.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "victory star",
+        "ally accuracy boost",
+        "partner stat boost",
+        "help my partner",
+        "team accuracy",
+        "ally speed up",
+        "ally attack up"
+      ],
+      "examples": [
+        "Raise my partner's accuracy by 20%, like Victory Star",
+        "Double my ally's Speed"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat of my ally (Attack, Defense, Sp. Atk, Sp. Def, Speed, Accuracy or Evasion)",
+          "control": "select",
+          "default": "ACC",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Stat multiplier (1.2 = 20% higher, 0.5 = half)",
+          "control": "number",
+          "default": 1.2,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05
+        },
+        {
+          "id": "canBeIgnored",
+          "label": "Mold Breaker style moves and abilities can switch it off",
+          "control": "boolean",
+          "default": true,
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-stat",
+        "params": [
+          "stat",
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.attack-type-immunity",
       "className": "AttackTypeImmunityAbAttr",
       "label": "Be immune to one type of attack",
@@ -655,6 +730,46 @@
         "do": true
       },
       "uses": 5
+    },
+    {
+      "id": "block.gorilla-tactics",
+      "className": "GorillaTacticsAbAttr",
+      "label": "Lock me into my first move and boost my Attack",
+      "summary": "After the first move I use, I can only use that move while I stay in, and my Attack is multiplied by 1.5. Example: the Choice Band effect without the item.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.my-move-starts",
+      "whenLabel": "When my move starts to execute",
+      "synonyms": [
+        "gorilla tactics",
+        "choice band",
+        "locked into a move",
+        "move lock",
+        "choice lock",
+        "only use one move",
+        "attack boost but locked"
+      ],
+      "examples": [
+        "Be locked into the first move I use but hit 50% harder, like Gorilla Tactics"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "I am not already locked into a move",
+        "I have already used a real move (not Struggle) that I can be locked into"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.hp-threshold-form-change",
@@ -1392,6 +1507,184 @@
         "do": true
       },
       "uses": 6
+    },
+    {
+      "id": "block.post-attack-apply-status-effect",
+      "className": "PostAttackApplyStatusEffectAbAttr",
+      "label": "Sometimes give the foe a status when my attack lands",
+      "summary": "After my damaging move hits, 30% chance to give the foe Poison. With several statuses one is picked at random. Foes that block extra effects are not affected.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "toxic chain",
+        "komodo",
+        "poison chance on hit",
+        "status on attack",
+        "inflict status when I hit",
+        "burn chance",
+        "paralyze chance",
+        "offensive status"
+      ],
+      "examples": [
+        "30% chance to badly poison the foe when my attack lands, like Toxic Chain"
+      ],
+      "params": [
+        {
+          "id": "chance",
+          "label": "Chance (%)",
+          "control": "slider",
+          "default": 30,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "statuses",
+          "label": "Statuses (comma separated; one is picked at random when there are several)",
+          "control": "text",
+          "default": "POISON",
+          "editable": true,
+          "options": [
+            "NONE",
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN",
+            "FAINT"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.damaging",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The foe must not have an ability that blocks the extra effects of moves (like Shield Dust)",
+        "The foe must not be myself",
+        "The foe must be able to receive the status (it is not immune and nothing blocks it)"
+      ],
+      "gateParams": [
+        {
+          "param": "chance",
+          "block": "rng.chance",
+          "field": "pct"
+        }
+      ],
+      "effect": {
+        "id": "effect.inflict-status",
+        "params": [
+          "statuses"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.post-attack-contact-apply-status-effect",
+      "className": "PostAttackContactApplyStatusEffectAbAttr",
+      "label": "Sometimes give the foe a status when my contact attack lands",
+      "summary": "After my damaging contact move hits, 30% chance to give the foe Poison. With several statuses one is picked at random. Foes that block extra effects are not affected.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "poison touch",
+        "flame body offense",
+        "venom crown",
+        "toxic touch",
+        "status on contact attack",
+        "inflict status when I touch",
+        "burn chance on contact",
+        "paralyze chance on contact",
+        "my contact moves poison"
+      ],
+      "examples": [
+        "30% chance to poison the foe when my contact move hits, like Poison Touch"
+      ],
+      "params": [
+        {
+          "id": "chance",
+          "label": "Chance (%)",
+          "control": "slider",
+          "default": 30,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "statuses",
+          "label": "Statuses (comma separated; one is picked at random when there are several)",
+          "control": "text",
+          "default": "POISON",
+          "editable": true,
+          "options": [
+            "NONE",
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN",
+            "FAINT"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The foe must not have an ability that blocks the extra effects of moves (like Shield Dust)",
+        "The foe must not be myself",
+        "The foe must be able to receive the status (it is not immune and nothing blocks it)"
+      ],
+      "gateParams": [
+        {
+          "param": "chance",
+          "block": "rng.chance",
+          "field": "pct"
+        }
+      ],
+      "effect": {
+        "id": "effect.inflict-status",
+        "params": [
+          "statuses"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 10
     },
     {
       "id": "block.post-damage-force-switch",
@@ -2526,6 +2819,127 @@
         "do": true
       },
       "uses": 64
+    },
+    {
+      "id": "block.sage-power-move-lock",
+      "className": "SagePowerMoveLockAbAttr",
+      "label": "Lock me into the first move I use",
+      "summary": "After the first move I use, I can only use that move while I stay in. My stats do not change. Example: the Choice lock without the item and without a boost.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.my-move-starts",
+      "whenLabel": "When my move starts to execute",
+      "synonyms": [
+        "sage power",
+        "choice lock",
+        "locked into a move",
+        "move lock",
+        "only use one move",
+        "choice scarf lock",
+        "stuck with one move"
+      ],
+      "examples": [
+        "Be locked into the first move I use, like Sage Power"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "I am not already locked into a move",
+        "I have already used a real move (not Struggle) that I can be locked into"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.stat-multiplier",
+      "className": "StatMultiplierAbAttr",
+      "label": "Multiply one of my stats, accuracy or evasion",
+      "summary": "Whenever the game uses my Attack, it is multiplied by 1.5. Example: 1.5 = 50% higher, 0.5 = half. Works for accuracy and evasion too.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "huge power",
+        "pure power",
+        "swift swim",
+        "chlorophyll",
+        "compound eyes",
+        "guts",
+        "stat boost",
+        "attack up",
+        "speed up",
+        "defense up",
+        "double attack",
+        "lower speed"
+      ],
+      "examples": [
+        "Double my Attack, like Huge Power",
+        "Raise my Speed by 50% in the rain, like Swift Swim",
+        "Raise my accuracy by 30%, like Compound Eyes"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat (Attack, Defense, Sp. Atk, Sp. Def, Speed, Accuracy or Evasion)",
+          "control": "select",
+          "default": "ATK",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Stat multiplier (1.5 = 50% higher, 0.5 = half)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:2",
+          "removable": true,
+          "editable": true,
+          "optional": true
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-stat",
+        "params": [
+          "stat",
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 62
     },
     {
       "id": "block.user-field-move-type-power-boost",
