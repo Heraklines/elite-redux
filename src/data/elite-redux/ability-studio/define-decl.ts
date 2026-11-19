@@ -66,6 +66,11 @@ export interface DeclParam {
   readonly control: ParamControl;
   readonly label: string;
   readonly editable: boolean;
+  /**
+   * Tier B: the gate binding never repeats this param (only the effect or the residual reads it), so editing it
+   * needs no gateParams entry. L0 demands this or a gateParams entry for every editable param of a gated class.
+   */
+  readonly gateIndependent?: boolean;
   /** Value used by `build` when the caller gives none. */
   readonly default: ParamValue;
   readonly min?: number;
@@ -133,6 +138,13 @@ export interface DeclProbe {
   readonly axes: Readonly<Record<string, readonly (string | number | boolean)[]>>;
 }
 
+export interface DeclGateParam {
+  readonly param: string;
+  readonly block: string;
+  readonly field: string;
+  readonly scale?: number | undefined;
+}
+
 export interface ClassDecl {
   readonly tier: DeclTier;
   readonly kind: DeclKind;
@@ -162,6 +174,13 @@ export interface ClassDecl {
   readonly provides?: readonly SlotId[] | undefined;
   readonly requires?: readonly SlotId[] | undefined;
   readonly probes?: readonly DeclProbe[] | undefined;
+  /**
+   * Tier B: editable params that the gate binding repeats as a literal. `recomposeAttr` writes the live value of
+   * `param` (times `scale`, default 1) into field `field` of every `block` atom in the bound gate tree, so moving the
+   * slider moves the compiled gate too. Without this entry an editable param would be silently ignored once a
+   * gate binding exists.
+   */
+  readonly gateParams?: readonly DeclGateParam[] | undefined;
   /**
    * Written reason why the L2 battle twin cannot reach this class's WHEN (no scenario template drives
    * it; see decomp-l2-reach.json) and the class is verified statically instead. Without it, L2 refuses

@@ -52,6 +52,7 @@ export default defineDecl(PostDefendContactApplyStatusEffectAbAttr, {
       control: "text",
       label: "Statuses (comma separated; one is picked at random when there are several)",
       editable: true,
+      gateIndependent: true,
       default: "POISON",
       // Names such as POISON,PARALYSIS,SLEEP. The class takes them as rest arguments.
       options: enumOptions(StatusEffect),
@@ -59,6 +60,7 @@ export default defineDecl(PostDefendContactApplyStatusEffectAbAttr, {
       spread: true,
     },
   ],
+  gateParams: [{ param: "chance", block: "rng.chance", field: "pct" }],
   conditions: [
     // The gate is the group [move.flag MAKES_CONTACT, status.has other NONE, rng.chance pct], in that order.
     { slot: "gate", ctx: "params", removable: true, editable: true },

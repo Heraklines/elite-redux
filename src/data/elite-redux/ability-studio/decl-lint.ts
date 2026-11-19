@@ -91,6 +91,22 @@ export function lintDecl(module: DeclModule): string[] {
       say(`condition slot "${condition.slot}" must be ctor:N or gate`);
     }
   }
+  if (decl.conditions.some(condition => condition.slot === "gate")) {
+    const covered = new Set((decl.gateParams ?? []).map(entry => entry.param));
+    for (const param of decl.params) {
+      if (param.editable && param.path !== undefined && !covered.has(param.id) && param.gateIndependent !== true) {
+        say(
+          `param "${param.id}" is editable but the gate binding may repeat it as a literal: list it in gateParams, `
+            + "or set editable false, or gateIndependent true when only the effect reads it",
+        );
+      }
+    }
+  }
+  for (const entry of decl.gateParams ?? []) {
+    if (!decl.params.some(param => param.id === entry.param && param.editable)) {
+      say(`gateParams names "${entry.param}", which is not an editable param`);
+    }
+  }
   for (const index of Object.keys(decl.fixedCtorArgs ?? {})) {
     claim(Number(index), `fixed argument ${index}`);
   }

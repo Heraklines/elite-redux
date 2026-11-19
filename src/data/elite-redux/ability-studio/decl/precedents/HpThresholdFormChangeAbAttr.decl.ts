@@ -79,6 +79,7 @@ export default defineDecl(HpThresholdFormChangeAbAttr, {
       control: "boolean",
       label: "Cure my status when I change form",
       editable: true,
+      gateIndependent: true,
       default: false,
     },
     {
@@ -88,11 +89,18 @@ export default defineDecl(HpThresholdFormChangeAbAttr, {
       path: "formAboveThreshold",
       control: "select",
       label: "I am in the form while my HP is",
-      editable: true,
+      // Not editable: the direction decides the SHAPE of the gate (XOR for the low-HP form, XNOR for the high-HP
+      // form), which each user's gate binding spells out. The compiled gate would silently ignore a change, so staff
+      // replace the whole gate instead.
+      editable: false,
       default: "at-or-below",
       options: ["at-or-below", "above"],
       codec: directionCodec,
     },
+  ],
+  gateParams: [
+    { param: "threshold", block: "hp.at-most", field: "pct" },
+    { param: "formKey", block: "mon.in-form", field: "key" },
   ],
   conditions: [
     // any[ all[hp-test, not in-form], all[opposite hp-test, in-form] ], spelled out per user in bindings.ts.

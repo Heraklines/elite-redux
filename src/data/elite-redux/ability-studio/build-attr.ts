@@ -11,7 +11,13 @@
 import type { AbAttr } from "#abilities/ab-attrs";
 import type { AbAttrCondition } from "#types/ability-types";
 import { getBinding } from "./bindings";
-import { type DeclCondition, type DeclModule, type DeclParam, isAbsentOptional } from "./define-decl";
+import {
+  type DeclCondition,
+  type DeclGateParam,
+  type DeclModule,
+  type DeclParam,
+  isAbsentOptional,
+} from "./define-decl";
 import { type GatedAttr, setGateOverride } from "./gate-residual";
 import type { ConditionNode } from "./vocabulary/composition-types";
 import {
@@ -158,6 +164,36 @@ export function readDeclParams(module: DeclModule, attr: AbAttr): ParamValues {
   return values;
 }
 
+/** Copies `spec` with the live param values written into the atoms named by the declaration's `gateParams`. */
+function applyGateParams(spec: unknown, gateParams: readonly DeclGateParam[], params: ParamValues): unknown {
+  if (typeof spec !== "object" || spec === null) {
+    return spec;
+  }
+  const node = spec as Record<string, unknown>;
+  for (const key of ["all", "any"] as const) {
+    if (Array.isArray(node[key])) {
+      return { [key]: (node[key] as unknown[]).map(child => applyGateParams(child, gateParams, params)) };
+    }
+  }
+  if ("not" in node) {
+    return { not: applyGateParams(node.not, gateParams, params) };
+  }
+  const patched = { ...((node.params as Record<string, unknown> | undefined) ?? {}) };
+  for (const entry of gateParams) {
+    const value = params[entry.param];
+    if (node.block !== entry.block) {
+      continue;
+    }
+    if (typeof value === "number") {
+      // toPrecision drops float noise from the scale (0.35 * 100 is 35.00000000000001 otherwise).
+      patched[entry.field] = Number((value * (entry.scale ?? 1)).toPrecision(12));
+    } else if (typeof value === "string") {
+      patched[entry.field] = value;
+    }
+  }
+  return { ...node, params: patched };
+}
+
 /**
  * decompose -> recompose: rebuilds a registered attr from its declaration, its live params and its
  * bindings. A condition slot without a library binding (and without an override) makes this throw,
@@ -171,6 +207,7 @@ export function recomposeAttr(
   overrides: { readonly params?: ParamValues; readonly conds?: Readonly<Record<string, CondInput>> } = {},
 ): AbAttr {
   const conds: Record<string, CondInput> = {};
+  const liveParams = { ...readDeclParams(module, attr), ...overrides.params };
   for (const slot of module.decl.conditions) {
     if (isAbsentOptional(attr, slot)) {
       continue;
@@ -184,13 +221,12 @@ export function recomposeAttr(
       }
       continue;
     }
-    conds[slot.slot] = binding.spec;
+    conds[slot.slot] =
+      slot.slot === "gate" && module.decl.gateParams !== undefined
+        ? (applyGateParams(binding.spec, module.decl.gateParams, liveParams) as ConditionNode)
+        : binding.spec;
   }
-  const rebuilt = buildAttr(
-    module,
-    { ...readDeclParams(module, attr), ...overrides.params },
-    { ...conds, ...overrides.conds },
-  );
+  const rebuilt = buildAttr(module, liveParams, { ...conds, ...overrides.conds });
   // The attr-level condition (AbAttr.addCondition: ability composition, upgrades) is not a constructor argument
   // and not part of the class's own rule, so it is carried over as it is.
   const attrLevel = (attr as unknown as { extraCondition?: AbAttrCondition }).extraCondition;

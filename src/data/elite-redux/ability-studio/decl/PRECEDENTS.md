@@ -29,7 +29,7 @@ For class `Foo` in your batch `Bnn`:
 | `decl/Bnn/Foo.decl.ts` | `export default defineDecl(Foo, {...})`. The file name is the class name (PascalCase is allowed here by `.ls-lint.yml`). |
 | `decl/Bnn/bindings.ts` | One `bindCondition(abilityId, attrIndex, spec, slot)` per constructor closure or Tier B gate of every user of the class. `bindLegacyClosure(abilityId, attrIndex, reason, slot)` when no atom exists. |
 | `test/tests/elite-redux/decomp/Bnn/*.test.ts` | Only what the shared L1 and L2 suites cannot see (memory, a stand-in Pokemon for a form you cannot get in a battle, draw order). |
-| `requests/Bnn.md` | Atoms, effects, guards or WHENs you need from the librarian (B19). Not code. |
+| `requests/Bnn.md` | Atoms, effects, guards or WHENs you need from the librarian (B19). Not code. Create the directory and file yourself if it does not exist; a plain list of id, what it must do and which ability needs it. |
 
 The registry collects `decl/**/*.decl.ts` and `decl/**/bindings.ts` with `import.meta.glob`. You never edit the
 registry, `init-abilities.ts`, `apply-ab-attrs.ts` or another batch's files.
@@ -64,7 +64,7 @@ They run in real battles and are the proof that a staff-built rule equals a ship
   ORIGINAL clause order, using `gatedCanApply` from `gate-residual.ts`. Add `public declare gateOverride`. Keep every
   short-circuit: the order of the clauses is the order of the random draws and of the side effects. The split is the
   only edit a batch may make to a class, and it must be a pure move of code. See the three Tier B classes' diffs in
-  the commit that added these precedents.
+  the commit "Add the ten golden precedent declarations" (`git log --grep 'golden precedent'`).
 - **Tier C** (atomic): one block with typed params, guards bundled, extra IFs can only be ANDed on top.
 
 A clause is exactly one of: a **condition** (a rule staff may change: below 50% HP), a **guard** (a rule whose removal
@@ -154,8 +154,14 @@ combinations of a probe (so put the boundaries first).
 7. **Options-object constructors** (`new X({ a, b })`): give every param the same `ctorIndex` and its own `ctorOption`.
 8. **Rest-argument constructors** (`constructor(chance, ...effects)`): `spread: true` with a list codec.
 9. **Booleans that mean two things** (`formAboveThreshold`) become a `select` with a codec so staff read words.
-10. **A param duplicated by a binding** (Wimp Out's `hpRatio` and its gate's `ratio`) is expected; L1's attr
-    differential is what proves they agree for each user. Edit both or neither.
+10. **A param repeated as a literal in a gate binding** (Wimp Out's `hpRatio` and its gate's `ratio`, Static's
+    `chance` and the gate's `pct`, Ape Shift's `threshold` and `pct`, `formKey` and `key`): list it in the
+    declaration's `gateParams` (`{ param, block, field, scale? }`). `recomposeAttr` then writes the live param into
+    that field of every matching atom in the bound gate, so a moved slider moves the compiled gate. L0 refuses an
+    editable param of a gated class that is neither in `gateParams`, nor `gateIndependent: true` (only the effect
+    reads it), nor `editable: false` (HpThreshold's `direction`, which changes the SHAPE of the gate).
+    `test/.../precedents/gate-params.test.ts` proves it for the three classes. A param that changes the gate's shape
+    cannot be a `gateParams` entry; make it non-editable.
 11. **`simulated`**: record what the class really does (`"ignores"` for the PostDamage and contact-status classes).
     Where the atom and the class differ for simulated calls, say so in `notes`; do not paper over it.
 12. **Flags and engine queries are never dispatched**, so no trace event shows them "evaluated". The L2 harness treats a

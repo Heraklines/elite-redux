@@ -39,6 +39,7 @@ export default defineDecl(PostDamageForceSwitchAbAttr, {
       default: 0.5,
     },
   ],
+  gateParams: [{ param: "hpRatio", block: "hp.crossed-below", field: "ratio" }],
   conditions: [
     // The gate: library atom hp.crossed-below; each user's binding repeats its own hpRatio (bindings.ts).
     { slot: "gate", ctx: "params", lib: "hp.crossed-below", removable: true, editable: true },
@@ -57,5 +58,5 @@ export default defineDecl(PostDamageForceSwitchAbAttr, {
   ],
   status: "verified",
   notes:
-    "Precedent for Tier B. The crossing test is the shared free function hpCrossedBelow (Shell Bell term included) and receives the EFFECTIVE damage (a multi-hit move rewrites it to the whole turn's damage in `prepare`). Wimp Out and Emergency Exit use the default 0.5. The ratio lives twice by design: the hpRatio param (the class's own field, used by the default gate) and the ratio of the gate binding (used once staff replace the gate); the L1 attr differential proves they agree for the two users.",
+    "Precedent for Tier B. The crossing test is the shared free function hpCrossedBelow (Shell Bell term included) and receives the EFFECTIVE damage (a multi-hit move rewrites it to the whole turn's damage in `prepare`). Wimp Out and Emergency Exit use the default 0.5. The ratio lives twice (the hpRatio param and the literal ratio of each gate binding), and `gateParams` keeps them equal: recomposeAttr writes the live hpRatio into the binding's hp.crossed-below atom, so the slider (0.35 for the golden recipe) moves the compiled gate. gate-params.test.ts proves it.",
 });
