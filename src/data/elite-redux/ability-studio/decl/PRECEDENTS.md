@@ -194,3 +194,32 @@ combinations of a probe (so put the boundaries first).
 L0 clean (labels, synonyms, ctor indices, requires within provides, every closure bound or marked legacy); L1 identical
 for every attr of every user and equal over the grid, draws included; L2 one twin per distinct param signature with the
 original shown to evaluate the rebuilt attr; `notes` that say who reviewed what; the coverage ratchet did not fall.
+
+
+## The catalog your declaration feeds (editor, worker, AI)
+
+Every declaration you commit shows up, with no extra work, in three generated files and in the AI builder:
+
+| File | What it holds |
+| --- | --- |
+| `editor/data/vocabulary.json` | The pure vocabulary (triggers, conditions, effects, safety rules, slots) and its hash. |
+| `editor/data/blocks.json` | One entry per declaration: label, summary, synonyms, examples, params, conditions, guards, `gateParams`. The block id is `blockIdForClass(className)`, for example `block.post-damage-force-switch`. |
+| `editor/data/instances.json` | One entry per declared `(abilityId, attrIndex)`: block id, live param values, bindings, coverage bucket. It also lists the classes that have no declaration yet (reported, never an error). |
+
+The AI container (`workers/er-ability-ai/container`) searches `vocabulary.json` and `blocks.json` by label, synonyms and
+examples first, so **your synonyms and examples are what lets staff find your block**. Write them in staff words ("eject",
+"half damage"), never class or ability names. The editor worker validates `composition` with the same validator
+(`vocabulary/validate-core.ts`) against the bundled `vocabulary.json`.
+
+Regenerate after you add or change a declaration (it writes only the catalog, nothing else in `editor/data`):
+
+```
+ER_WRITE_CATALOG=1 npx vitest run test/tests/elite-redux/tools/dump-catalog.test.ts
+```
+
+`test/tests/elite-redux/decomp/catalog.test.ts` fails when `blocks.json` or a container copy no longer matches the live
+declarations, and when the bundled vocabulary hash differs from the one the game computes. Commit the regenerated files
+with your batch. If two batches both regenerate, resolve the conflict by regenerating, never by hand.
+
+`test/tests/elite-redux/decomp/ai/` is the AI regression set (the four audited failures plus staff phrases). It does not
+need a declaration from you, but when you add a vocabulary entry that a phrase should use, add the phrase there.

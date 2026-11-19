@@ -17,10 +17,17 @@
 //                               every starter-selectable species
 //   editor/data/items.json    — player reward pool entries (key/tier/weight)
 //   editor/data/trainers.json — frequency-knob defaults + factory species list
+//   editor/data/vocabulary.json — the pure ability vocabulary (WHEN, IF, DO, guards, slots) + its hash
+//   editor/data/blocks.json     — one entry per class declaration (label, synonyms, examples, params, ...)
+//   editor/data/instances.json  — (abilityId, attrIndex, block, params, bindings) per declared attr, plus the
+//                                 report of classes that are not declared yet
+//   workers/er-ability-ai/container/{vocabulary,blocks}.json + validate-composition.mjs — the AI server copies
+//   editor/data/ability-components.json is kept for the transition (the editor still reads it).
 import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { speciesStarterCosts } from "#balance/starters";
 import { allAbilities, allSpecies } from "#data/data-lists";
 import { describeAbilityStudioComponent } from "#data/elite-redux/ability-studio/component-semantics";
+import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
 import {
   ABILITY_STUDIO_DIRECT_SOURCE_ABILITY_IDS,
   abilityStudioRuntimeCapabilityHookLabel,
@@ -55,6 +62,7 @@ import { ModifierTier } from "#enums/modifier-tier";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { modifierPool } from "#modifiers/modifier-pools";
+import { describeCatalog, writeCatalog } from "#test/tests/elite-redux/tools/catalog-writer";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
@@ -664,6 +672,14 @@ describe("tools — dump editor SPA data", () => {
       "Cheek Pouch",
     ]);
     writeFileSync("editor/data/ability-components.json", `${JSON.stringify(abilityComponents)}\n`, "utf8");
+
+    // ---- vocabulary.json / blocks.json / instances.json (spec section 5, catalog generator) -------------
+    // Only SERIALISES the hand-written declarations and bindings. Classes without a declaration are
+    // REPORTED here, never an error: the 18 batches are still declaring them (the ratchet lives in L0).
+    const catalog = writeCatalog();
+    // eslint-disable-next-line no-console
+    console.log(describeCatalog(catalog));
+    expect(catalog.blocks.blocks.length).toBe(declRegistry.all().length);
 
     // Sanity: the roster covers every starter-cost entry that is a real species,
     // includes vanilla + ER customs, and lost nobody to a missing const key.

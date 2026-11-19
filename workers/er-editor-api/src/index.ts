@@ -40,6 +40,12 @@
 //   ALLOWED_ORIGIN        — the editor's origin (or "*")
 // =============================================================================
 
+// The pure, game-free vocabulary (spec section 5): the validator core takes the vocabulary as an argument and
+// imports no registry, and the vocabulary itself is the bundled JSON the catalog generator writes. A drift
+// test (test/tests/elite-redux/decomp/catalog.test.ts) compares its hash with the one the game computes.
+import bundledVocabulary from "../../../editor/data/vocabulary.json";
+import { validateCompositionWith } from "../../../src/data/elite-redux/ability-studio/vocabulary/validate-core";
+import type { VocabularyJson } from "../../../src/data/elite-redux/ability-studio/vocabulary/vocabulary-json";
 import {
   type CustomTrainerConflict,
   commitCustomTrainersWithRetry,
@@ -114,6 +120,21 @@ interface R2BucketLike {
 const DEFAULT_WORKFLOW_FILE = "deploy-staging.yml";
 
 type ValidationResult = { ok: true } | { ok: false; error: string };
+
+/** The vocabulary the worker validates `composition` against (bundled at deploy time, never read from the game). */
+export const BUNDLED_VOCABULARY = bundledVocabulary as unknown as VocabularyJson;
+
+/**
+ * Plain-language problems with a V2 `composition` array (block ids exist, params match their schema and range,
+ * `requires` is covered by what the trigger provides, no unknown fields); empty when valid.
+ */
+export function validateComposition(
+  rules: unknown,
+  path = "composition",
+  vocabulary: VocabularyJson = BUNDLED_VOCABULARY,
+): string[] {
+  return validateCompositionWith(rules, vocabulary, path);
+}
 
 interface EditableFile {
   /** Repo path the delta is merged into (the ONLY paths this Worker writes). */
@@ -851,8 +872,9 @@ export function validateCustomAbilitiesDelta(
     if (!isPlainObject(value)) {
       return { ok: false, error: `${key}: ability must be an object or null` };
     }
-    if (value.version !== 1) {
-      return { ok: false, error: `${key}.version: must be 1` };
+    // Version 2 only means the blueprint may carry `composition`; version 1 stays accepted and byte-identical.
+    if (value.version !== 1 && value.version !== 2) {
+      return { ok: false, error: `${key}.version: must be 1 or 2` };
     }
     if (!Number.isInteger(value.id) || (value.id as number) < 20000 || (value.id as number) > 29999) {
       return { ok: false, error: `${key}.id: must be 20000-29999` };
@@ -938,6 +960,12 @@ export function validateCustomAbilitiesDelta(
         componentRuleKeys.add(ruleKey);
       }
     }
+    if (value.composition !== undefined) {
+      const problems = validateComposition(value.composition, `${key}.composition`);
+      if (problems.length > 0) {
+        return { ok: false, error: problems[0] };
+      }
+    }
     if (!Array.isArray(value.rules) || value.rules.length > 24) {
       return { ok: false, error: `${key}.rules: must contain at most 24 entries` };
     }
@@ -948,6 +976,7 @@ export function validateCustomAbilitiesDelta(
       value.includes.length
         + (Array.isArray(value.mechanics) ? value.mechanics.length : 0)
         + (Array.isArray(value.componentRules) ? value.componentRules.length : 0)
+        + (Array.isArray(value.composition) ? value.composition.length : 0)
         + value.rules.length
         + value.modifiers.length
       === 0

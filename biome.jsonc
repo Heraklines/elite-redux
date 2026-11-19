@@ -67,6 +67,15 @@
       // class as the er-*.ts modules above.
       "!!src/data/elite-redux/er-egg-moves.json",
       "!!src/data/elite-redux/er-custom-trainer*.json",
+      // Elite Redux: the ability-vocabulary catalog written by test/tests/elite-redux/tools/dump-editor-data.test.ts
+      // (JSON.stringify output) and its copies in the AI container, including the esbuild-bundled validator.
+      // catalog.test.ts compares them byte for byte with what the generator writes, so biome must not touch them.
+      "!!editor/data/vocabulary.json",
+      "!!editor/data/blocks.json",
+      "!!editor/data/instances.json",
+      "!!workers/er-ability-ai/container/vocabulary.json",
+      "!!workers/er-ability-ai/container/blocks.json",
+      "!!workers/er-ability-ai/container/validate-composition.mjs",
       // Elite Redux: auto-generated SpeciesId companion enum (B1b).
       "!!src/enums/er-species-id.ts",
       // Elite Redux: auto-generated AbilityId/MoveId companion enums (B2).

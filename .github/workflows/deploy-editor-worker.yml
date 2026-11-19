@@ -6,6 +6,8 @@ on:
       - feat/elite-redux-port
     paths:
       - "workers/er-editor-api/**"
+      - "editor/data/vocabulary.json"
+      - "src/data/elite-redux/ability-studio/vocabulary/**"
       - .github/workflows/deploy-editor-worker.yml
   workflow_dispatch:
 
@@ -30,7 +32,7 @@ jobs:
       - uses: ./.github/actions/setup-deps
 
       - name: Test editor Worker uploads and approvals
-        run: pnpm exec vitest run test/node/editor-media-upload.test.ts test/node/editor-suggestion-approval.test.ts
+        run: pnpm exec vitest run test/node/editor-media-upload.test.ts test/node/editor-suggestion-approval.test.ts test/tests/elite-redux/decomp/catalog.test.ts
 
       - name: Deploy ER Editor Worker
         run: npx wrangler deploy --config workers/er-editor-api/wrangler.toml

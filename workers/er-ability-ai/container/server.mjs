@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import readline from "node:readline";
+import { pathToFileURL } from "node:url";
 
 const port = Number(process.env.PORT || 8080);
 const codexHome = process.env.CODEX_HOME || "/var/lib/ability-ai/codex";
@@ -421,6 +422,12 @@ function assemblyPlanSchemaForSearch(searchContext, catalog, payload) {
   schema.properties.draft.properties.modifiers.items = primitiveSchemas.modifierSchema;
   if (isPrimitiveStatRuleRequest(payload)) {
     schema.properties.draft.properties.componentRules = { type: "array", maxItems: 0 };
+  }
+  if (searchContext.vocabulary) {
+    const composition = compositionSchemaFor(searchContext.vocabulary);
+    Object.assign(schema.$defs, composition.defs);
+    schema.properties.draft.properties.composition = composition.property;
+    schema.properties.draft.required.push("composition");
   }
   return schema;
 }
@@ -947,7 +954,12 @@ function validateBlueprintShape(result, payload) {
   if (typeof result.explanation !== "string" || result.explanation.trim().length === 0) {
     throw new Error("The model did not explain the generated draft");
   }
-  if (blueprint.version !== 1 || !Number.isInteger(blueprint.id) || blueprint.id < 20000 || blueprint.id > 29999) {
+  if (
+    (blueprint.version !== 1 && blueprint.version !== 2)
+    || !Number.isInteger(blueprint.id)
+    || blueprint.id < 20000
+    || blueprint.id > 29999
+  ) {
     throw new Error("The model returned invalid blueprint identity fields");
   }
   if (typeof blueprint.name !== "string" || blueprint.name.trim().length < 2 || blueprint.name.length > 40) {
@@ -966,7 +978,13 @@ function validateBlueprintShape(result, payload) {
       throw new Error(`The model returned an invalid ${key} list`);
     }
   }
-  if (Object.keys(limits).every(key => blueprint[key].length === 0)) {
+  if (
+    blueprint.composition !== undefined
+    && (!Array.isArray(blueprint.composition) || blueprint.composition.length > 32)
+  ) {
+    throw new Error("The model returned an invalid composition list");
+  }
+  if (Object.keys(limits).every(key => blueprint[key].length === 0) && blueprint.composition?.length === 0) {
     throw new Error("The model returned an empty ability blueprint");
   }
   const componentKeys = new Set();
@@ -1112,6 +1130,7 @@ function validateSources(result, payload) {
       validateParameterOverrides(effect, candidate.parameters, payload, `DO ${sourceKey(effect)}`);
     }
   }
+  validateCompositionBlueprint(result);
 }
 
 function requestedMoveIds(payload) {
@@ -1158,6 +1177,9 @@ function blueprintMoveIds(result, payload) {
     rule.conditions?.forEach(collect);
     rule.effects?.forEach(collect);
   }
+  for (const moveId of compositionMoveIds(result.blueprint, payload)) {
+    ids.add(moveId);
+  }
   return ids;
 }
 
@@ -1183,18 +1205,25 @@ function requestedStatChanges(prompt) {
 }
 
 function blueprintHasStatChange(result, expected) {
-  return (result.blueprint.rules || []).some(rule =>
-    (rule.effects || []).some(
-      effect =>
-        effect.kind === "stat-stage"
-        && effect.target === expected.target
-        && effect.stat === expected.stat
-        && Number(effect.stages) === expected.stages,
-    ),
+  return (
+    compositionHasStatChange(result.blueprint, expected)
+    || (result.blueprint.rules || []).some(rule =>
+      (rule.effects || []).some(
+        effect =>
+          effect.kind === "stat-stage"
+          && effect.target === expected.target
+          && effect.stat === expected.stat
+          && Number(effect.stages) === expected.stages,
+      ),
+    )
   );
 }
 
-function blueprintMovePower(result, moveId) {
+function blueprintMovePower(result, moveId, payload = {}) {
+  const composed = compositionMovePower(result.blueprint, payload, moveId);
+  if (composed !== null) {
+    return composed;
+  }
   const sources = [];
   for (const rule of result.blueprint.componentRules || []) {
     sources.push(rule.hook, ...(rule.prerequisiteHooks || []), ...(rule.conditions || []), ...(rule.effects || []));
@@ -1242,7 +1271,7 @@ function validatePromptRequirements(result, payload) {
   const powerMatch = payload.prompt.match(/\b(\d{1,3})\s*(?:BP|base power)\b/i);
   if (powerMatch) {
     const expectedPower = Number(powerMatch[1]);
-    const wrongPowerMove = requiredMoves.find(moveId => blueprintMovePower(result, moveId) !== expectedPower);
+    const wrongPowerMove = requiredMoves.find(moveId => blueprintMovePower(result, moveId, payload) !== expectedPower);
     if (wrongPowerMove !== undefined) {
       const move = payload.moveIndex.find(candidate => Number(candidate.id) === wrongPowerMove);
       throw new Error(`Generated draft did not set ${move?.name || wrongPowerMove} to ${expectedPower} BP`);
@@ -1418,7 +1447,7 @@ function catalogValueScore(query, value) {
   return score;
 }
 
-function executeCatalogSearch(payload, rawPlan) {
+function executeCatalogSearch(payload, rawPlan, assets = activeVocabularyAssets) {
   const plan = normalizeCatalogSearchPlan(rawPlan, payload);
   const requestedMoves = requestedMoveEntries(payload);
   const components = new Map();
@@ -1493,7 +1522,9 @@ function executeCatalogSearch(payload, rawPlan) {
       type: move.type,
       category: move.category,
       power: move.power,
+      enumName: moveEnumName(move.name),
     })),
+    vocabulary: assets ? vocabularyContextFor(assets, payload.prompt) : undefined,
     components: [...components.values()].slice(0, 120).map((component, index) => ({
       componentId: `c${index}`,
       selectableParts: {
@@ -1559,10 +1590,12 @@ function expandAssemblyPlan(result, searchContext) {
   if (!draft) {
     throw new Error("The model returned an empty ability blueprint");
   }
+  const composition = Array.isArray(draft.composition) ? draft.composition : [];
   return {
     explanation: result.explanation,
     blueprint: {
-      version: 1,
+      // Version 2 only means the blueprint carries `composition`; everything else stays a version 1 blueprint.
+      version: composition.length > 0 ? 2 : 1,
       id: 20000,
       name: draft.name,
       description: draft.description,
@@ -1580,6 +1613,17 @@ function expandAssemblyPlan(result, searchContext) {
         conditions: (rule.conditions || []).map(part => expandAssemblyPart(part, searchContext, "condition")),
         effects: (rule.effects || []).map(part => expandAssemblyPart(part, searchContext, "effect")),
       })),
+      ...(composition.length > 0
+        ? {
+            composition: composition.map(rule => ({
+              key: rule.key,
+              when: { block: rule.when?.block },
+              if: rule.if || [],
+              do: rule.do || [],
+              chance: rule.chance ?? 100,
+            })),
+          }
+        : {}),
       rules: draft.rules || [],
       modifiers: draft.modifiers || [],
       flags: draft.flags,
@@ -1640,6 +1684,7 @@ function normalizePrimitiveAliases(result) {
     eva: "EVA",
     evasion: "EVA",
   };
+  normalizeCompositionParams(result);
   for (const rule of [...(result.blueprint.rules || []), ...(result.blueprint.componentRules || [])]) {
     const triggerKey = normalizedPrimitiveAlias(rule.trigger);
     if (rule.trigger != null) {
@@ -1688,7 +1733,707 @@ CATALOG SEARCH PLAN SCHEMA:
 ${JSON.stringify(_catalogSearchPlanSchema)}`;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Vocabulary-first search and composition (spec section 5, AI server).
+//
+// The container ships three generated files next to this script (written by the catalog writer,
+// test/tests/elite-redux/tools/catalog-writer.ts): vocabulary.json (WHEN, IF, DO, guards, slots),
+// blocks.json (one entry per class declaration: label, synonyms, examples) and validate-composition.mjs (the
+// game's own validator, bundled). The request is searched against them FIRST, by label, synonyms and examples.
+// Whole-attr components (componentCandidates) stay as the fallback for mechanics the vocabulary cannot build.
+// The plan schema's enums and the composition rules come from the same data, so a vocabulary change needs no
+// change here (the AI regression set gates vocabulary changes).
+
+const assetDirectory =
+  process.env.ABILITY_AI_ASSET_DIR
+  || (typeof process.argv?.[1] === "string" ? process.argv[1].replace(/[\\/][^\\/]*$/, "") : "")
+  || "/app";
+
+let vocabularyAssetsPromise;
+// The assets of the request being generated (one request runs at a time), read by validateSources.
+let activeVocabularyAssets = null;
+
+function setActiveVocabularyAssets(assets) {
+  activeVocabularyAssets = assets;
+}
+
+const vocabularyStopWords = new Set([
+  "a",
+  "ability",
+  "after",
+  "all",
+  "an",
+  "and",
+  "any",
+  "are",
+  "as",
+  "at",
+  "be",
+  "by",
+  "can",
+  "do",
+  "for",
+  "from",
+  "get",
+  "gets",
+  "has",
+  "have",
+  "i",
+  "if",
+  "in",
+  "is",
+  "it",
+  "its",
+  "make",
+  "makes",
+  "me",
+  "my",
+  "of",
+  "on",
+  "or",
+  "pokemon",
+  "so",
+  "that",
+  "the",
+  "then",
+  "this",
+  "to",
+  "up",
+  "when",
+  "whenever",
+  "while",
+  "with",
+]);
+
+function vocabStem(word) {
+  let stem = word;
+  if (stem.length > 4 && stem.endsWith("ies")) {
+    stem = `${stem.slice(0, -3)}y`;
+  } else if (stem.length > 5 && stem.endsWith("ing")) {
+    stem = stem.slice(0, -3);
+  } else if (stem.length > 4 && stem.endsWith("ed")) {
+    stem = stem.slice(0, -2);
+  } else if (stem.length > 3 && stem.endsWith("s") && !stem.endsWith("ss")) {
+    stem = stem.slice(0, -1);
+  }
+  if (stem.length > 3 && stem.at(-1) === stem.at(-2) && !/[aeiouls]/.test(stem.at(-1))) {
+    stem = stem.slice(0, -1);
+  }
+  return stem;
+}
+
+function vocabWords(value) {
+  return normalizedSearchText(String(value ?? "").replace(/\{[^}]*\}/g, " "))
+    .split(" ")
+    .filter(word => word.length >= 2 && !vocabularyStopWords.has(word))
+    .map(vocabStem);
+}
+
+function vocabPhrase(value) {
+  const words = vocabWords(value);
+  return words.length === 0 ? "" : ` ${words.join(" ")} `;
+}
+
+function paramWords(params) {
+  return (params || []).flatMap(param => [param.label, param.id]);
+}
+
+function vocabularyEntry(kind, def, extra = {}) {
+  const field = values => new Set(values.flatMap(value => vocabWords(value)));
+  const synonyms = def.synonyms || [];
+  const examples = def.examples || [];
+  const entry = {
+    kind,
+    id: def.id,
+    def,
+    usable: extra.usable !== false,
+    labelTerms: field([def.label]),
+    synonymTerms: field(synonyms),
+    exampleTerms: field(examples),
+    idTerms: field([def.id.replace(/[._-]+/g, " ")]),
+    otherTerms: field([def.group, def.summary, def.whenLabel, ...(extra.other || []), ...paramWords(def.params)]),
+    synonymPhrases: synonyms.map(vocabPhrase).filter(Boolean),
+    examplePhrases: examples.map(vocabPhrase).filter(Boolean),
+    labelPhrase: vocabPhrase(def.label),
+    optionTerms: new Set(
+      (def.params || []).flatMap(param =>
+        Array.isArray(param.options)
+          ? param.options.flatMap(option => vocabWords(String(option).replace(/_/g, " ")))
+          : [],
+      ),
+    ),
+  };
+  entry.allTerms = new Set([
+    ...entry.labelTerms,
+    ...entry.synonymTerms,
+    ...entry.exampleTerms,
+    ...entry.idTerms,
+    ...entry.otherTerms,
+  ]);
+  return entry;
+}
+
+const vocabularyIndexes = new WeakMap();
+
+/** Entries for every trigger, condition, effect and block, plus the inverse document frequency of every word. */
+function buildVocabularyIndex(vocabulary, blocks) {
+  const cached = vocabularyIndexes.get(vocabulary);
+  if (cached && cached.blocks === blocks) {
+    return cached;
+  }
+  const entries = [];
+  for (const when of vocabulary.whens) {
+    entries.push(vocabularyEntry("when", when, { usable: when.composable === true && when.kind !== "while-active" }));
+  }
+  for (const condition of vocabulary.conditions) {
+    entries.push(vocabularyEntry("condition", condition, { usable: condition.escapeHatch !== true }));
+  }
+  for (const effect of vocabulary.effects) {
+    entries.push(
+      vocabularyEntry("effect", effect, { usable: effect.implemented === true && effect.kind !== "package" }),
+    );
+  }
+  for (const block of blocks || []) {
+    entries.push(vocabularyEntry("block", block, { other: [block.kind] }));
+  }
+  const documentFrequency = new Map();
+  for (const entry of entries) {
+    for (const term of entry.allTerms) {
+      documentFrequency.set(term, (documentFrequency.get(term) || 0) + 1);
+    }
+  }
+  const index = { vocabulary, blocks, entries, documentFrequency };
+  vocabularyIndexes.set(vocabulary, index);
+  return index;
+}
+
+function scoreVocabularyEntry(index, entry, query) {
+  let score = 0;
+  const total = index.entries.length;
+  for (const term of query.terms) {
+    const weight = Math.log(1 + total / (index.documentFrequency.get(term) || total));
+    if (entry.labelTerms.has(term)) {
+      score += 6 * weight;
+    }
+    if (entry.synonymTerms.has(term)) {
+      score += 5 * weight;
+    }
+    if (entry.exampleTerms.has(term)) {
+      score += 3 * weight;
+    }
+    if (entry.idTerms.has(term)) {
+      score += 3 * weight;
+    }
+    if (entry.otherTerms.has(term)) {
+      score += weight;
+    }
+    if (entry.optionTerms.has(term)) {
+      score += 3 * weight;
+    }
+  }
+  for (const phrase of entry.synonymPhrases) {
+    if ((phrase.trim().includes(" ") || phrase.length >= 7) && query.phrase.includes(phrase)) {
+      score += 25;
+    }
+  }
+  for (const phrase of entry.examplePhrases) {
+    if (query.phrase.includes(phrase)) {
+      score += 40;
+    }
+  }
+  if (entry.labelPhrase && query.phrase.includes(entry.labelPhrase)) {
+    score += 20;
+  }
+  return score;
+}
+
+const vocabularyResultLimits = { when: 16, condition: 24, effect: 16, block: 10, notBuildable: 6 };
+
+/**
+ * Ranks the vocabulary against a request. Blocks (whole-class declarations) are searched too, and what a
+ * matching block is built from (its trigger, its effect, its condition atoms) is boosted, so "wimp out" finds
+ * the force-switch effect and the after-taking-damage trigger even though those words are not in their labels.
+ */
+function searchVocabulary(vocabulary, blocks, prompt) {
+  const index = buildVocabularyIndex(vocabulary, blocks);
+  const query = { terms: new Set(vocabWords(prompt)), phrase: vocabPhrase(prompt) };
+  const scored = new Map(
+    index.entries.map(entry => [
+      `${entry.kind}:${entry.id}`,
+      { entry, score: scoreVocabularyEntry(index, entry, query) },
+    ]),
+  );
+  const blockHits = [...scored.values()]
+    .filter(hit => hit.entry.kind === "block" && hit.score > 0)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, vocabularyResultLimits.block);
+  for (const { entry, score } of blockHits) {
+    const block = entry.def;
+    const boosts = [
+      ["when", block.when],
+      ["effect", block.effect?.id],
+      ...(block.conditions || []).map(condition => ["condition", condition.lib]),
+    ];
+    for (const [kind, id] of boosts) {
+      const target = id ? scored.get(`${kind}:${id}`) : undefined;
+      if (target) {
+        target.score += score * 0.6;
+      }
+    }
+  }
+  const ranked = kind =>
+    [...scored.values()]
+      .filter(hit => hit.entry.kind === kind && hit.score > 0)
+      .sort((left, right) => right.score - left.score || (left.entry.id < right.entry.id ? -1 : 1));
+  const usable = kind => ranked(kind).filter(hit => hit.entry.usable);
+  // Every buildable trigger is offered (there are few, and "reduce damage" does not name its trigger); the
+  // ranking only decides the order and which ones survive the cap.
+  const everyUsableWhen = [...scored.values()]
+    .filter(hit => hit.entry.kind === "when" && hit.entry.usable)
+    .sort((left, right) => right.score - left.score || (left.entry.id < right.entry.id ? -1 : 1));
+  return {
+    whens: everyUsableWhen.slice(0, vocabularyResultLimits.when),
+    conditions: usable("condition").slice(0, vocabularyResultLimits.condition),
+    effects: usable("effect").slice(0, vocabularyResultLimits.effect),
+    blocks: blockHits,
+    notBuildable: ["when", "effect"]
+      .flatMap(kind =>
+        ranked(kind)
+          .filter(hit => !hit.entry.usable)
+          .slice(0, vocabularyResultLimits.notBuildable),
+      )
+      .sort((left, right) => right.score - left.score)
+      .slice(0, vocabularyResultLimits.notBuildable),
+  };
+}
+
+function compactParam(param) {
+  const card = { id: param.id, label: param.label };
+  if (param.control === "select") {
+    card.type = "select";
+    card.options = param.options;
+  } else if (param.control === "boolean") {
+    card.type = "boolean";
+  } else if (param.control === "text") {
+    card.type = "text";
+  } else {
+    card.type = param.integer === true ? "integer" : "number";
+    card.min = param.min;
+    card.max = param.max;
+  }
+  card.default = param.default;
+  return card;
+}
+
+function whenCard(when) {
+  return {
+    id: when.id,
+    label: when.label,
+    kind: when.kind,
+    provides: when.provides,
+    ...(when.modifies === undefined ? {} : { modifies: when.modifies }),
+  };
+}
+
+function conditionCard(condition) {
+  return {
+    id: condition.id,
+    label: condition.label,
+    requires: condition.requires,
+    ...(condition.whoParam === undefined ? {} : { whoParam: condition.whoParam }),
+    ...(condition.pure === false ? { rollsDice: true } : {}),
+    params: (condition.params || []).map(compactParam),
+  };
+}
+
+function effectCard(effect) {
+  return {
+    id: effect.id,
+    label: effect.label,
+    kind: effect.kind,
+    ...(effect.modifies === undefined ? {} : { modifies: effect.modifies }),
+    requires: effect.requires,
+    params: (effect.params || []).map(compactParam),
+    ...(effect.guards?.length > 0 ? { lockedSafetyRules: effect.guards } : {}),
+    ...(effect.feasibility?.length > 0 ? { alsoRequires: effect.feasibility } : {}),
+  };
+}
+
+function recipeCard(block) {
+  return {
+    id: block.id,
+    label: block.label,
+    summary: block.summary,
+    when: block.when,
+    ...(block.effect ? { effect: block.effect.id } : {}),
+    conditions: (block.conditions || []).map(condition => condition.lib).filter(Boolean),
+    examples: block.examples,
+  };
+}
+
+/** Can `effect` run under `when` (slots, kind and the calculated value)? Mirrors validateEffect of the shared validator. */
+function effectFitsWhen(effect, when) {
+  if (!(effect.requires || []).every(slot => when.provides.includes(slot))) {
+    return false;
+  }
+  if (effect.kind === "calc") {
+    return when.kind === "calc" && when.modifies === effect.modifies;
+  }
+  return effect.kind === "event" && when.kind === "event";
+}
+
+function conditionFitsWhen(condition, when) {
+  if (!(condition.requires || []).every(slot => when.provides.includes(slot))) {
+    return false;
+  }
+  return (
+    when.kind !== "calc" || (condition.rollsDice !== true && !["time.once-per", "time.nth-use"].includes(condition.id))
+  );
+}
+
+/** The plain-language composition rules, derived from the vocabulary actually offered to the model. */
+function compositionRuleLines(cards) {
+  const limits = activeVocabularyAssets?.limits || {
+    rules: 32,
+    conditionsPerRule: 16,
+    effectsPerRule: 8,
+    groupDepth: 4,
+  };
+  const lines = [
+    "A composition rule is WHEN (the trigger) + IF (a list of conditions that must ALL hold) + DO (a list of effects) + chance (1-100, default 100, rolled after every IF).",
+    "Reference triggers, conditions and effects only by the ids listed in VOCABULARY. Triggers take no settings. Give a condition or effect only the settings it advertises; leave a setting out to take its default.",
+    "A block can be used only when everything it requires is provided by the trigger (requires is a subset of provides). The schema lists only compatible ids per trigger.",
+    'Triggers of kind calc ("While the game calculates ...") change a value in the middle of a calculation: they accept only effects of kind calc whose modifies equals the trigger\'s modifies, only conditions that never roll dice or remember things (no rng.chance, time.once-per, time.nth-use), and chance must be 100. Triggers of kind event accept effects of kind event only.',
+    'Conditions can only make a rule fire less often. For OR use {"any": [...]}, for NOT use {"not": condition}, for AND list them or use {"all": [...]}. Do not recreate a locked safety rule (lockedSafetyRules) as a condition; it always runs.',
+    `Limits: ${limits.rules} rules, ${limits.conditionsPerRule} conditions per rule, ${limits.effectsPerRule} effects per rule, groups nested at most ${limits.groupDepth} deep. Distinct WHEN clauses need distinct rules.`,
+    "Effects under notBuildableYet are listed so they can be named but cannot run. If the request needs one, build the closest safe composition and say what is missing in explanation.",
+  ];
+  for (const when of cards.whens) {
+    const effects = cards.effects.filter(effect => effectFitsWhen(effect, when)).map(effect => effect.id);
+    lines.push(
+      `${when.id} (${when.kind}${when.modifies ? `, changes ${when.modifies}` : ""}) provides ${when.provides.join(", ")}; effects: ${effects.join(", ") || "none offered"}`,
+    );
+  }
+  return lines;
+}
+
+/** The vocabulary part of the search context: cards for the best matches, recipes, and the composition rules. */
+function vocabularyContextFor(assets, prompt) {
+  const hits = searchVocabulary(assets.vocabulary, assets.blocks, prompt);
+  const cards = {
+    whens: hits.whens.map(hit => whenCard(hit.entry.def)),
+    conditions: hits.conditions.map(hit => conditionCard(hit.entry.def)),
+    effects: hits.effects.map(hit => effectCard(hit.entry.def)),
+  };
+  // An effect that fits none of the offered triggers is useless, and a trigger without a fitting effect cannot
+  // build a rule: pull in the best compatible partner so every offered trigger can end in at least one effect.
+  const everyWhen = assets.vocabulary.whens.filter(when => when.composable === true);
+  for (const when of everyWhen) {
+    if (cards.whens.some(card => card.id === when.id) && !cards.effects.some(effect => effectFitsWhen(effect, when))) {
+      const partner = assets.vocabulary.effects.find(
+        effect => effect.implemented === true && effectFitsWhen(effect, when),
+      );
+      if (partner) {
+        cards.effects.push(effectCard(partner));
+      }
+    }
+  }
+  return {
+    hash: assets.vocabulary.hash,
+    whens: cards.whens,
+    conditions: cards.conditions,
+    effects: cards.effects,
+    recipes: hits.blocks.map(hit => recipeCard(hit.entry.def)),
+    notBuildableYet: hits.notBuildable.map(hit => ({ id: hit.entry.id, label: hit.entry.def.label })),
+    rules: compositionRuleLines(cards),
+  };
+}
+
+function sanitizedDefName(prefix, id) {
+  return `${prefix}_${id.replace(/[^A-Za-z0-9_]+/g, "_")}`;
+}
+
+function vocabularyParamSchema(param) {
+  switch (param.type) {
+    case "select":
+      return { enum: param.options };
+    case "boolean":
+      return { type: "boolean" };
+    case "text":
+      return { type: "string", maxLength: 120 };
+    default:
+      return {
+        type: param.type === "integer" ? "integer" : "number",
+        ...(typeof param.min === "number" ? { minimum: param.min } : {}),
+        ...(typeof param.max === "number" ? { maximum: param.max } : {}),
+      };
+  }
+}
+
+function vocabularyBlockSchema(card) {
+  return {
+    type: "object",
+    properties: {
+      block: { const: card.id },
+      params: {
+        type: "object",
+        properties: Object.fromEntries((card.params || []).map(param => [param.id, vocabularyParamSchema(param)])),
+        additionalProperties: false,
+      },
+    },
+    required: ["block"],
+    additionalProperties: false,
+  };
+}
+
+/**
+ * The `composition` part of the assembly plan schema, built from the vocabulary cards: the trigger enum, and per
+ * group of triggers that provide the same things, enums of the conditions and effects that can run there. Each block
+ * has ONE definition (typed params with their enums and ranges) shared by every group.
+ */
+function compositionSchemaFor(vocabularyContext) {
+  const defs = {};
+  const blockRef = (prefix, card) => {
+    const name = sanitizedDefName(prefix, card.id);
+    defs[name] = vocabularyBlockSchema(card);
+    return { $ref: `#/$defs/${name}` };
+  };
+  const groups = new Map();
+  for (const when of vocabularyContext.whens) {
+    const key = `${when.kind}|${when.modifies || ""}|${[...when.provides].sort().join(",")}`;
+    const group = groups.get(key) || { whens: [], sample: when };
+    group.whens.push(when);
+    groups.set(key, group);
+  }
+  const ruleVariants = [];
+  let groupNumber = 0;
+  for (const group of groups.values()) {
+    const conditions = vocabularyContext.conditions.filter(card => conditionFitsWhen(card, group.sample));
+    const effects = vocabularyContext.effects.filter(card => effectFitsWhen(card, group.sample));
+    if (effects.length === 0) {
+      continue;
+    }
+    groupNumber++;
+    const nodeName = `conditionNode_${groupNumber}`;
+    const node = { $ref: `#/$defs/${nodeName}` };
+    const variants = conditions.map(card => blockRef("condition", card));
+    variants.push(
+      {
+        type: "object",
+        properties: { all: { type: "array", items: node, minItems: 1, maxItems: 16 } },
+        required: ["all"],
+        additionalProperties: false,
+      },
+      {
+        type: "object",
+        properties: { any: { type: "array", items: node, minItems: 1, maxItems: 16 } },
+        required: ["any"],
+        additionalProperties: false,
+      },
+      { type: "object", properties: { not: node }, required: ["not"], additionalProperties: false },
+    );
+    defs[nodeName] = { anyOf: variants };
+    ruleVariants.push({
+      type: "object",
+      properties: {
+        key: { type: "string", pattern: "^[a-z0-9-]{2,48}$" },
+        when: {
+          type: "object",
+          properties: { block: { enum: group.whens.map(when => when.id) } },
+          required: ["block"],
+          additionalProperties: false,
+        },
+        if: { type: "array", items: node, maxItems: 16 },
+        do: {
+          type: "array",
+          items: { anyOf: effects.map(card => blockRef("effect", card)) },
+          minItems: 1,
+          maxItems: 8,
+        },
+        chance:
+          group.sample.kind === "calc"
+            ? { type: "integer", enum: [100] }
+            : { type: "integer", minimum: 1, maximum: 100 },
+      },
+      required: ["key", "when", "if", "do", "chance"],
+      additionalProperties: false,
+    });
+  }
+  return {
+    defs,
+    property: { type: "array", maxItems: 32, items: ruleVariants.length > 0 ? { anyOf: ruleVariants } : { not: {} } },
+  };
+}
+
+async function readVocabularyAssets() {
+  const read = async name => JSON.parse(await readFile(`${assetDirectory}/${name}`, "utf8"));
+  const vocabulary = await read("vocabulary.json");
+  const catalog = await read("blocks.json");
+  const validator = await import(pathToFileURL(`${assetDirectory}/validate-composition.mjs`).href);
+  if (typeof validator.validateCompositionWith !== "function") {
+    throw new Error("validate-composition.mjs does not export validateCompositionWith");
+  }
+  // blocks.json carries the hash of the vocabulary it was generated with; a stale one is ignored, not trusted.
+  const blocks = catalog.vocabularyHash === vocabulary.hash ? catalog.blocks : [];
+  return {
+    vocabulary,
+    blocks,
+    validate: (rules, path) => validator.validateCompositionWith(rules, vocabulary, path),
+    limits: validator.VALIDATOR_LIMITS,
+  };
+}
+
+/** The vocabulary assets of this container, or null when they are missing (the older component-only flow then runs). */
+function loadVocabularyAssets() {
+  vocabularyAssetsPromise ??= readVocabularyAssets().catch(error => {
+    console.error(JSON.stringify({ event: "ability-vocabulary-unavailable", message: error.message || String(error) }));
+    return null;
+  });
+  return vocabularyAssetsPromise;
+}
+
+/** Plain-language problems the shared validator finds in the composition the model produced; throws so the repair loop sees them. */
+function validateCompositionBlueprint(result, assets = activeVocabularyAssets) {
+  const rules = result.blueprint?.composition;
+  if (!Array.isArray(rules) || rules.length === 0) {
+    return;
+  }
+  if (!assets) {
+    throw new Error("The ability builder cannot check compositions right now");
+  }
+  const problems = assets.validate(rules, "composition");
+  if (problems.length > 0) {
+    throw new Error(`The composition was rejected: ${problems.slice(0, 6).join("; ")}`);
+  }
+}
+
+/**
+ * Models write "fire" for FIRE and "Steam Eruption" for STEAM_ERUPTION. A select value that matches an option
+ * ignoring case and punctuation is corrected before validation; a text move id becomes the enum name.
+ */
+function normalizeCompositionParams(result) {
+  const assets = activeVocabularyAssets;
+  if (!assets || !Array.isArray(result.blueprint?.composition)) {
+    return;
+  }
+  const defs = new Map([...assets.vocabulary.conditions, ...assets.vocabulary.effects].map(def => [def.id, def]));
+  const loose = value =>
+    String(value)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "");
+  for (const rule of result.blueprint.composition) {
+    if (typeof rule.when?.block === "string") {
+      rule.when.block = rule.when.block.trim().toLowerCase();
+    }
+    for (const ref of [...(rule.if || []).flatMap(node => conditionBlockRefs(node)), ...(rule.do || [])]) {
+      const def = defs.get(ref.block);
+      if (!def || !ref.params) {
+        continue;
+      }
+      for (const param of def.params || []) {
+        const value = ref.params[param.id];
+        if (typeof value !== "string") {
+          continue;
+        }
+        if (param.control === "select") {
+          const option = (param.options || []).find(candidate => loose(candidate) === loose(value));
+          if (option !== undefined) {
+            ref.params[param.id] = option;
+          }
+        } else if (param.control === "text" && param.id === "moveId") {
+          ref.params[param.id] = moveEnumName(value);
+        }
+      }
+    }
+  }
+}
+
+function conditionBlockRefs(node, found = []) {
+  if (!node || typeof node !== "object") {
+    return found;
+  }
+  if (typeof node.block === "string") {
+    found.push(node);
+  }
+  for (const child of [...(node.all || []), ...(node.any || []), ...(node.not ? [node.not] : [])]) {
+    conditionBlockRefs(child, found);
+  }
+  return found;
+}
+
+/** Every effect and condition reference of the composition rules, in order. */
+function compositionBlockRefs(blueprint) {
+  return (blueprint.composition || []).flatMap(rule => [
+    ...(rule.if || []).flatMap(node => conditionBlockRefs(node)),
+    ...(rule.do || []),
+  ]);
+}
+
+function moveEnumName(name) {
+  return String(name || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
+/** Moves a composition mentions (a scripted follow-up, an is-move or last-move condition), by move id. */
+function compositionMoveIds(blueprint, payload) {
+  const ids = new Set();
+  for (const ref of compositionBlockRefs(blueprint)) {
+    const moveName = ref.params?.moveId;
+    if (typeof moveName !== "string") {
+      continue;
+    }
+    const move = (payload.moveIndex || []).find(candidate => moveEnumName(candidate.name) === moveEnumName(moveName));
+    if (move) {
+      ids.add(Number(move.id));
+    }
+  }
+  return ids;
+}
+
+function compositionMovePower(blueprint, payload, moveId) {
+  for (const ref of compositionBlockRefs(blueprint)) {
+    if (ref.block !== "effect.scripted-move") {
+      continue;
+    }
+    const move = (payload.moveIndex || []).find(
+      candidate => moveEnumName(candidate.name) === moveEnumName(ref.params?.moveId),
+    );
+    if (move && Number(move.id) === moveId) {
+      return Number(ref.params?.power ?? 50);
+    }
+  }
+  return null;
+}
+
+function compositionHasStatChange(blueprint, expected) {
+  return (blueprint.composition || []).some(rule =>
+    (rule.do || []).some(
+      effect =>
+        effect.block === "effect.stat-stage"
+        && (effect.params?.target ?? "holder") === expected.target
+        && (effect.params?.stat ?? "ATK") === expected.stat
+        && Number(effect.params?.stages ?? 1) === expected.stages,
+    ),
+  );
+}
+
 function modelPrompt(payload, searchContext = executeCatalogSearch(payload, null), planSchema = assemblyPlanSchema) {
+  const { vocabulary, ...contextWithoutVocabulary } = searchContext;
+  const vocabularyGuidance = vocabulary
+    ? `
+VOCABULARY FIRST: the worker searched the ability vocabulary (triggers, conditions, effects, and the known recipes that use them) for this request. Build the ability as draft.composition rules from VOCABULARY whenever it can express a clause: set when.block to a trigger id, if[] to condition blocks, do[] to effect blocks, each as {"block": id, "params": {...}} with only advertised settings. Follow COMPOSITION RULES exactly. Use draft.componentRules (whole runtime components), primitive rules or modifiers only for clauses VOCABULARY cannot express, and never express the same clause twice. Compositions are checked by the same validator the game uses; a rejected block id, a setting out of range, or a block the trigger cannot provide comes back to you as plain-language feedback. For effect.scripted-move set moveId to the move's enumName from requestedMoves and power to the requested BP. "After a Fire or Water move" is ONE condition: {"any": [{"block": "move.type", "params": {"type": "FIRE"}}, {"block": "move.type", "params": {"type": "WATER"}}]}. Recipes show how known abilities are built; reuse their trigger and effect ids, never their names.`
+    : "";
+  const vocabularySections = vocabulary
+    ? `VOCABULARY (ranked by the search; hash ${vocabulary.hash}):
+${JSON.stringify({ whens: vocabulary.whens, conditions: vocabulary.conditions, effects: vocabulary.effects, recipes: vocabulary.recipes, notBuildableYet: vocabulary.notBuildableYet })}
+
+COMPOSITION RULES:
+${vocabulary.rules.map(line => `- ${line}`).join("\n")}
+
+`
+    : "";
   return `You assemble Elite Redux Pokemon abilities from a closed catalog. Return exactly one compact assembly plan matching ASSEMBLY PLAN SCHEMA and nothing else: no markdown, commentary, or code fences. Never write code, commands, files, runtime class names, ability ids for runtime components, or unsupported mechanics. The worker expands catalog component IDs into exact runtime objects after your response. Before returning, verify that the draft has at least one include, componentRule, primitive rule, or modifier and that every componentRule has one hook and at least one effect.
 
 Triggers, conditions, and effects are independent. Recombine them freely. componentRules may mix catalog component selections with configurable primitive conditions and effects. Prefer primitive rules whenever PRIMITIVE CATALOG expresses the requested mechanic exactly. Event IF components can be observed under their native dispatcher and consumed by any WHEN hook. Hook-bound DO/THEN components can be armed by any WHEN hook and execute once through their native dispatcher. Use includes only when the user explicitly wants the complete existing ability.
@@ -1696,16 +2441,16 @@ Triggers, conditions, and effects are independent. Recombine them freely. compon
 The worker executed every requested search against the complete runtime catalog and expanded the exact matches below. Select a runtime hook, condition, or effect only by its componentId and selectableParts. A component is valid as a hook only when selectableParts.hook is true. A condition or effect partIndex must appear in selectableParts.conditionIndexes or selectableParts.effectIndexes for that role. For hooks set partIndex to null. Use parameterOverrides only with paths advertised by the selected component's parameters. An optionsRef points to the zero-based list in COMPONENT OPTION SETS; choose the option value, never its label. Move parameters must use an id from the move matches in CATALOG SEARCH RESULTS. Ability parameters must use an id from the ability matches in CATALOG SEARCH RESULTS. Leave optional parameters absent unless requested. A trigger's holder is the ability owner, not the move target. Damaging scripted moves normally target an opponent. Chance is 1-100 and defaults to 100 unless requested. Primitive conditions and effects must use PRIMITIVE CATALOG. If the request cannot be represented exactly, create the closest safe draft and state the limitation in explanation. Keep name and description player-facing and precise.
 
 Every requested clause must appear in the mechanics. Distinct WHEN clauses require distinct rules. A component may be reused in multiple IF or DO/THEN entries with separate parameterOverrides. For "after a Fire or Water move", use conditionLogic:"any" with conditions:[{"kind":"move","filter":{"type":"FIRE"}},{"kind":"move","filter":{"type":"WATER"}}]. Do not invent a condition kind for OR or put several types into filter.type. If CATALOG SEARCH RESULTS lists a requested move, use a runtime component whose editable parameter control is "move" and set its parameterOverrides to that move id; set an advertised power parameter when the request specifies BP. Never approximate a scripted move with a primitive move filter or a move-list status proc. Never add an included ability unless the user explicitly names that complete ability and it appears in the ability matches.
-${isPrimitiveStatRuleRequest(payload) ? "This request is fully expressible as a primitive stat-stage rule. Leave componentRules empty and implement it only in draft.rules." : ""}
+${isPrimitiveStatRuleRequest(payload) ? "This request is fully expressible as a primitive stat-stage rule. Leave componentRules empty and implement it only in draft.rules." : ""}${vocabularyGuidance}
 
-PRIMITIVE CATALOG:
+${vocabularySections}PRIMITIVE CATALOG:
 ${JSON.stringify(payload.primitiveCatalog)}
 
 COMPONENT OPTION SETS:
 ${JSON.stringify(payload.componentOptionSets || [])}
 
 CATALOG SEARCH RESULTS (every component has a short componentId for selection):
-${JSON.stringify(searchContext)}
+${JSON.stringify(contextWithoutVocabulary)}
 
 FINAL REQUEST TO IMPLEMENT:
 ${payload.prompt}
@@ -2129,11 +2874,17 @@ async function runNim(payload, emit) {
     throw new Error("The ability builder is temporarily unavailable");
   }
   const models = openaiKey ? [openaiModel] : [...new Set([nimModel, nimFallbackModel].filter(Boolean))];
-  emit({ type: "status", message: "Searching the complete ability catalog" });
+  setActiveVocabularyAssets(await loadVocabularyAssets());
+  emit({
+    type: "status",
+    message: activeVocabularyAssets
+      ? "Searching the ability vocabulary, then the complete ability catalog"
+      : "Searching the complete ability catalog",
+  });
   const searchContext = executeCatalogSearch(payload, null);
   emit({
     type: "status",
-    message: `Building from ${searchContext.components.length} matched runtime mechanics`,
+    message: `Building from ${searchContext.vocabulary ? `${searchContext.vocabulary.effects.length} matched effects and ` : ""}${searchContext.components.length} matched runtime mechanics`,
   });
   const planSchema = assemblyPlanSchemaForSearch(searchContext, payload.primitiveCatalog || {}, payload);
   const modelSearchContext = isPrimitiveStatRuleRequest(payload)
