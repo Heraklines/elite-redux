@@ -68,11 +68,8 @@ export default defineDecl(PostSummonRemoveBattlerTagAbAttr, {
   effect: { id: "effect.remove-tag", params: ["tags"] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "none", simulated: "ignores" },
-  probes: [
-    { name: "entry with none of the effects", axes: {} },
-    { name: "entry while confused", axes: {} },
-  ],
+  probes: [{ name: "entry with none of the effects", axes: {} }],
   status: "decomposed",
   notes:
-    "Tier B, 2 users, no closure: Oblivious (12 attr 1: Infatuation and Taunt; ER also adds Fear to its immunities, but that lives in another class) and Own Tempo (20 attr 1: Confusion). `canApply` was `immuneTags.some(t => !!pokemon.getTag(t))`, now `gate`; no guards, no residual, no draws. Gate bindings are `any` over `tag.has` (same `getTag(...) !== undefined` test). The `tags` param is editable:false because the gate repeats the list; request `tag.has-any` (list of battle effects) plus a `gateParams` entry would make it editable. Quirks recorded, not fixed: `apply` ignores `simulated` (a preview would remove the effects), and `effect.remove-tag` in the library takes ONE battle effect while this class removes a list. Second dispatch (after any move that targets me, move-end-phase.ts) is not expressible as a WHEN yet (requests/B03.md).",
+    "L2 covers only the no-effect path (the harness has no axis that puts a battle effect on the holder, so a while confused probe would be the same scenario); chunk3.test.ts covers the gate-true path. Tier B, 2 users, no closure: Oblivious (12 attr 1: Infatuation and Taunt; ER also adds Fear to its immunities, but that lives in another class) and Own Tempo (20 attr 1: Confusion). `canApply` was `immuneTags.some(t => !!pokemon.getTag(t))`, now `gate`; no guards, no residual, no draws. Gate bindings are `any` over `tag.has` (same `getTag(...) !== undefined` test). The `tags` param is editable:false because the gate repeats the list; request `tag.has-any` (list of battle effects) plus a `gateParams` entry would make it editable. Quirks recorded, not fixed: `apply` ignores `simulated` (a preview would remove the effects), and `effect.remove-tag` in the library takes ONE battle effect while this class removes a list. Second dispatch (after any move that targets me, move-end-phase.ts) is not expressible as a WHEN yet (requests/B03.md).",
 });

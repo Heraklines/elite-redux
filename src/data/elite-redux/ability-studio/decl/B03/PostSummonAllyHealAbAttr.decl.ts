@@ -65,7 +65,7 @@ export default defineDecl(PostSummonAllyHealAbAttr, {
     "At least one active ally standing next to me must exist, otherwise nothing happens and the ability does not show",
     "It does nothing in a preview",
   ],
-  reusableAlone: { when: true, if: true, do: true },
+  reusableAlone: { when: true, if: true, do: false },
   flags: { rng: "none", state: "none", simulated: "respects" },
   probes: [{ name: "entry with the default field", axes: {} }],
   status: "decomposed",

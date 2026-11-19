@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "18dbd2e8156534",
+  "hash": "183ee419a1669c",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -1502,7 +1502,7 @@
       "reusableAlone": {
         "when": true,
         "if": true,
-        "do": true
+        "do": false
       },
       "uses": 3
     },
