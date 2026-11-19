@@ -13,9 +13,28 @@
 // WHEN: battler-tags.ts (FlinchedTag.lapse) dispatches FlinchEffectAbAttr after the flinch message, only when the Pokemon really loses its
 // move to the flinch (the tag lapses before the move).
 import { FlinchStatStageChangeAbAttr } from "#abilities/ab-attrs";
+import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
-import { enumListCodec } from "#data/elite-redux/ability-studio/param-codecs";
+import { enumCodec } from "#data/elite-redux/ability-studio/param-codecs";
 import { Stat } from "#enums/stat";
+
+/** Player words for the stat names shown in the summary. */
+const STAT_WORDS: Record<string, string> = {
+  ATK: "Attack",
+  DEF: "Defense",
+  SPATK: "Sp. Attack",
+  SPDEF: "Sp. Defense",
+  SPD: "Speed",
+  ACC: "Accuracy",
+  EVA: "Evasiveness",
+};
+
+const oneStat = enumCodec(Stat, "stat");
+/** One stat name in the editor, a one-item list for the constructor. */
+const oneStatListCodec: ParamCodec = {
+  toCtor: value => [oneStat.toCtor(value)],
+  fromInstance: raw => (Array.isArray(raw) && raw.length === 1 ? oneStat.fromInstance(raw[0]) : undefined),
+};
 
 export default defineDecl(FlinchStatStageChangeAbAttr, {
   tier: "A",
@@ -23,7 +42,7 @@ export default defineDecl(FlinchStatStageChangeAbAttr, {
   when: "event.flinched",
   label: "Change my stats when I flinch",
   summary: params =>
-    `When I flinch, my ${params.stats} change by ${params.stages} stages. Example: Steadfast raises Speed by 1 stage.`,
+    `When I flinch, my ${STAT_WORDS[String(params.stat)] ?? "chosen stat"} changes by ${params.stages} ${Math.abs(Number(params.stages)) === 1 ? "stage" : "stages"} (a negative number lowers it). Example: Steadfast raises Speed by 1 stage.`,
   synonyms: [
     "steadfast",
     "rattled",
@@ -36,16 +55,18 @@ export default defineDecl(FlinchStatStageChangeAbAttr, {
   examples: ["Raise Speed by 1 stage when I flinch, like Steadfast"],
   params: [
     {
-      id: "stats",
+      id: "stat",
       ctorIndex: 0,
       path: "stats",
-      control: "text",
-      label: "Stats that change (comma separated)",
+      control: "select",
+      label: "Stat that changes",
       editable: true,
       gateIndependent: true,
       default: "SPD",
       options: ["ATK", "DEF", "SPATK", "SPDEF", "SPD", "ACC", "EVA"],
-      codec: enumListCodec(Stat, "stat"),
+      // The class takes a LIST of stats; the library effect takes one. All three users change exactly one (Speed), so the
+      // setting is one stat and the codec wraps it in a one-item list. An instance with several stats is not representable.
+      codec: oneStatListCodec,
     },
     {
       id: "stages",
@@ -68,7 +89,7 @@ export default defineDecl(FlinchStatStageChangeAbAttr, {
     "Each stat can only go up to +6 or down to -6; at the limit the stat change reports that it cannot go further",
     "Does nothing in a simulated preview",
   ],
-  effect: { id: "effect.stat-stage", params: ["stats", "stages"] },
+  effect: { id: "effect.stat-stage", params: ["stat", "stages"] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "none", simulated: "respects" },
   l2StaticReason:
@@ -76,5 +97,5 @@ export default defineDecl(FlinchStatStageChangeAbAttr, {
   probes: [{ name: "a foe hits me", axes: { foeMove: ["TACKLE"] } }],
   status: "decomposed",
   notes:
-    "Users (3 attrs, none with a closure): Steadfast (80, attr 0), Rattled (155, attr 2, added by the ER vanilla-rebalance file with `ab.attrs.push`), Superheavy (5549, attr 0). All three are Speed +1. Oddity, not fixed: the effect is spelled as `effect.stat-stage` with a stat LIST; the library effect has a single `stat` setting (request R-B06-24: let effect.stat-stage take a list of stats). The target is always the holder.",
+    "Users (3 attrs, none with a closure): Steadfast (80, attr 0), Rattled (155, attr 2, added by the ER vanilla-rebalance file with `ab.attrs.push`), Superheavy (5549, attr 0). All three are Speed +1. Review fix: the setting is now ONE stat (`stat`, wrapped into a one-item list for the constructor) so it matches `effect.stat-stage` exactly (stat + stages). The class itself can take several stats at once; the editor has no multi-choice control, so a list of stats is request R-B06-24 (a multi-choice control and a stats list on effect.stat-stage). No user needs it. The target is always the holder.",
 });

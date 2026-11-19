@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1d50feb8353e55",
-  "hash": "0549d2fa23116b",
+  "hash": "06530d2515aaa4",
   "blocks": [
     {
       "id": "block.arena-trap",
@@ -371,7 +371,7 @@
       "id": "block.flinch-stat-stage-change",
       "className": "FlinchStatStageChangeAbAttr",
       "label": "Change my stats when I flinch",
-      "summary": "When I flinch, my Speed change by 1 stages. Example: Steadfast raises Speed by 1 stage.",
+      "summary": "When I flinch, my chosen stat changes by 1 stage (a negative number lowers it). Example: Steadfast raises Speed by 1 stage.",
       "tier": "A",
       "kind": "event-effect",
       "status": "decomposed",
@@ -391,9 +391,9 @@
       ],
       "params": [
         {
-          "id": "stats",
-          "label": "Stats that change (comma separated)",
-          "control": "text",
+          "id": "stat",
+          "label": "Stat that changes",
+          "control": "select",
           "default": "SPD",
           "editable": true,
           "options": [
@@ -429,7 +429,7 @@
       "effect": {
         "id": "effect.stat-stage",
         "params": [
-          "stats",
+          "stat",
           "stages"
         ]
       },
@@ -1856,7 +1856,7 @@
       "id": "block.reduce-status-effect-duration",
       "className": "ReduceStatusEffectDurationAbAttr",
       "label": "Wake up from sleep faster",
-      "summary": "Each turn I try to move while my Sleep status lasts, it counts down one extra turn, so I wake up about twice as fast. Example: Early Bird.",
+      "summary": "Each turn I try to move while I am asleep, my sleep counts down 1 extra turn, so I wake up much sooner. Example: Early Bird (1 extra turn).",
       "tier": "A",
       "kind": "calc-modifier",
       "status": "decomposed",
@@ -1877,13 +1877,24 @@
       "params": [
         {
           "id": "status",
-          "label": "Status that counts down one extra turn each turn",
+          "label": "Status that counts down faster (only Sleep has a counter the game asks about)",
           "control": "select",
           "default": "SLEEP",
-          "editable": true,
+          "editable": false,
           "options": [
             "SLEEP"
           ]
+        },
+        {
+          "id": "turns",
+          "label": "Extra turns taken off each turn I try to move",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true
         }
       ],
       "conditions": [],
@@ -1894,7 +1905,9 @@
       ],
       "effect": {
         "id": "effect.package",
-        "params": []
+        "params": [
+          "turns"
+        ]
       },
       "reusableAlone": {
         "when": true,

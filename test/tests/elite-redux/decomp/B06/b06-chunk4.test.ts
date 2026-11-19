@@ -314,6 +314,13 @@ describe("ReduceStatusEffectDurationAbAttr (Early Bird)", () => {
       const burn = new NumberHolder(3);
       expect(attr.canApply({ pokemon: holder, statusEffect: StatusEffect.BURN, duration: burn }), label).toBe(false);
     }
+    // The amount is a setting now: 2 extra turns take 2 off.
+    const moved = recomposeAttr(moduleOf("ReduceStatusEffectDurationAbAttr"), original, 48, 0, {
+      params: { turns: 2 },
+    }) as ReduceStatusEffectDurationAbAttr;
+    const twice = new NumberHolder(5);
+    moved.apply({ pokemon: holder, statusEffect: StatusEffect.SLEEP, duration: twice });
+    expect(twice.value).toBe(3);
   }, 600000);
 
   async function sleepTurns(abilityId: number, counter: number): Promise<MoveResult[]> {
@@ -393,12 +400,12 @@ describe("FlinchStatStageChangeAbAttr (Steadfast, Rattled, Superheavy)", () => {
         attrIndex,
       ) as FlinchStatStageChangeAbAttr;
       const moved = recomposeAttr(moduleOf("FlinchStatStageChangeAbAttr"), original, abilityId, attrIndex, {
-        params: { stats: "ATK,DEF", stages: -2 },
+        params: { stat: "ATK", stages: -2 },
       }) as FlinchStatStageChangeAbAttr;
       const expectations: [FlinchStatStageChangeAbAttr, Stat[], number][] = [
         [original, [Stat.SPD], 1],
         [rebuilt, [Stat.SPD], 1],
-        [moved, [Stat.ATK, Stat.DEF], -2],
+        [moved, [Stat.ATK], -2],
       ];
       for (const [attr, stats, stages] of expectations) {
         unshift.mockClear();

@@ -6490,11 +6490,14 @@ export interface ReduceStatusEffectDurationAbAttrParams extends AbAttrBaseParams
  */
 export class ReduceStatusEffectDurationAbAttr extends AbAttr {
   private readonly statusEffect: StatusEffect;
+  /** How many extra turns are taken off each time the duration is asked for (1 = Early Bird). */
+  private readonly turns: number;
 
-  constructor(statusEffect: StatusEffect) {
+  constructor(statusEffect: StatusEffect, turns = 1) {
     super(false);
 
     this.statusEffect = statusEffect;
+    this.turns = turns;
   }
 
   override canApply({ statusEffect }: ReduceStatusEffectDurationAbAttrParams): boolean {
@@ -6502,7 +6505,7 @@ export class ReduceStatusEffectDurationAbAttr extends AbAttr {
   }
 
   override apply({ duration }: ReduceStatusEffectDurationAbAttrParams): void {
-    duration.value -= 1;
+    duration.value -= this.turns;
   }
 }
 
