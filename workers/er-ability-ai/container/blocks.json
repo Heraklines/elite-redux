@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "096ef32b703c2f",
+  "hash": "0ef07a9a369fbe",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -121,6 +121,78 @@
       "reusableAlone": {
         "when": true,
         "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.double-self-inflicted-damage",
+      "className": "DoubleSelfInflictedDamageAbAttr",
+      "label": "Double the self-hit damage of confused or enraged foes",
+      "summary": "While I am on the field, foes that hurt themselves from confusion or from enrage recoil take twice as much. Example: a 40 damage confusion hit becomes 80.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "double confusion damage",
+        "confusion self hit",
+        "enrage recoil",
+        "hurt itself",
+        "self damage",
+        "cosmic daze",
+        "cosmic dust"
+      ],
+      "examples": [
+        "Confused foes hit themselves for double damage, like Cosmic Daze"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only the damage a foe does to itself from confusion or enrage recoil is doubled; hits from my own attacks are not",
+        "Enrage recoil that a recoil blocker (Rock Head, Magic Guard) cancels stays cancelled"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.drench-immunity",
+      "className": "DrenchImmunityAbAttr",
+      "label": "Cannot be drenched",
+      "summary": "While I have this, the Drenched slowdown cannot be put on me, so I keep my normal move order. Example: a foe's Water move cannot make me move last.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "drench immunity",
+        "immune to drenched",
+        "no water slowdown",
+        "cannot be slowed",
+        "amphibious",
+        "old mariner",
+        "poseidon's dominion"
+      ],
+      "examples": [
+        "Cannot become drenched, like Amphibious",
+        "Water moves cannot make me move last"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Water types and Pokemon with a Water-absorbing ability are already immune to being drenched; that rule is separate and stays in the Drenched effect"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
         "do": true
       },
       "uses": 3
@@ -307,6 +379,42 @@
         "do": true
       },
       "uses": 1
+    },
+    {
+      "id": "block.overrule-crit",
+      "className": "OverruleCritAbAttr",
+      "label": "Make crits bypass damage cuts and double resisted damage",
+      "summary": "When my attack is a critical hit, the target's damage-cutting abilities (like Multiscale or Filter) are ignored, and a resisted hit does double damage.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "overrule",
+        "magistrate",
+        "crit ignores abilities",
+        "critical hit breaks resistance",
+        "ignore damage reduction on crit",
+        "double damage when resisted"
+      ],
+      "examples": [
+        "Critical hits ignore Multiscale and deal double damage if resisted, like Overrule"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Both parts only happen on a critical hit while my own ability is not being ignored",
+        "Only the damage-cutting abilities of the target and its allies are skipped (the ones that reduce the damage taken); other defensive abilities still work",
+        "The doubling only happens when the move is resisted (type effectiveness below 1)"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.post-damage-force-switch",
@@ -628,6 +736,256 @@
         "do": true
       },
       "uses": 64
+    },
+    {
+      "id": "block.set-move-accuracy",
+      "className": "SetMoveAccuracyAbAttr",
+      "label": "Raise a move's base accuracy to a set percent",
+      "summary": "The moves I pick get a base accuracy of at least 90%. Accuracy and evasion changes still count on top. Example: Hypnosis goes from 60% to 90%.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.accuracy",
+      "whenLabel": "While the game calculates my move's accuracy",
+      "synonyms": [
+        "better accuracy",
+        "accuracy boost",
+        "improve accuracy",
+        "sleep move accuracy",
+        "hypnotist",
+        "lullaby",
+        "lunar eclipse"
+      ],
+      "examples": [
+        "Hypnosis has 90% accuracy, like Hypnotist",
+        "Sing has 90% accuracy, like Lullaby"
+      ],
+      "params": [
+        {
+          "id": "moves",
+          "label": "Moves it improves (comma separated names)",
+          "control": "text",
+          "default": "HYPNOSIS",
+          "editable": false
+        },
+        {
+          "id": "accuracy",
+          "label": "Base accuracy (%)",
+          "control": "slider",
+          "default": 90,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.is-move",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Moves that never miss are left alone",
+        "It only raises accuracy: a move whose accuracy is already at or above the value keeps its own"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "accuracy"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.spread-target-by-flag",
+      "className": "SpreadTargetByFlagAbAttr",
+      "label": "Make single-target moves with a property hit both foes",
+      "summary": "My single-target moves with the Sound based property hit both foes. Multi-hit moves never spread. Example: with Sound, Sing hits both foes.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "hit both foes",
+        "spread move",
+        "double target",
+        "all opponents",
+        "artillery",
+        "amplifier",
+        "sweeping edge"
+      ],
+      "examples": [
+        "Single-target sound moves hit both foes, like Amplifier",
+        "Slicing moves hit both foes, like Sweeping Edge"
+      ],
+      "params": [
+        {
+          "id": "flag",
+          "label": "Move property that makes the move hit both foes",
+          "control": "select",
+          "default": "SOUND_BASED",
+          "editable": true,
+          "options": [
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only single-target moves that aim at a foe (or at any other Pokemon) are promoted; moves that already hit several targets, or only the user, are unchanged",
+        "Moves that hit several times (multi-hit moves) never spread"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 8
+    },
+    {
+      "id": "block.stealth-rock-immunity",
+      "className": "StealthRockImmunityAbAttr",
+      "label": "Absorb Stealth Rock instead of taking damage",
+      "summary": "When I switch in on a side with Stealth Rock, I take no damage and heal 1/4 of my max HP unless I am already full. Example: 200 max HP heals 50.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "stealth rock immunity",
+        "rock hazard immunity",
+        "heal from stealth rock",
+        "no entry hazard damage",
+        "mountaineer",
+        "ice plumes",
+        "free climb"
+      ],
+      "examples": [
+        "Take no Stealth Rock damage and heal from it, like Mountaineer"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The heal only happens when I am not at full HP, and the rocks stay on the field",
+        "Other entry hazards (Spikes, Toxic Spikes) are not affected by this"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.suppress-field-abilities-when-enraged",
+      "className": "SuppressFieldAbilitiesWhenEnragedAbAttr",
+      "label": "Switch off other Pokemon's abilities while I am enraged",
+      "summary": "While I am enraged, every other Pokemon on the field (foes and allies) has its abilities switched off for as long as it stays out. I keep my own ability.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "mental pollution",
+        "suppress abilities",
+        "ability suppression",
+        "neutralizing gas",
+        "gastro acid",
+        "silence abilities",
+        "enrage"
+      ],
+      "examples": [
+        "Everyone else loses their ability while I am enraged, like Mental Pollution"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "It only starts once I am enraged, and it ends when I stop being enraged (for example when I switch out) or when the other Pokemon leaves the field",
+        "Abilities that cannot be suppressed (the ones Neutralizing Gas also cannot switch off) stay on",
+        "It stops working while the holder's own ability is itself suppressed or the holder has fainted"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.suppress-field-effects",
+      "className": "SuppressFieldEffectsAbAttr",
+      "label": "Switch off terrain, rooms and gravity",
+      "summary": "While I am on the field, terrains, Trick Room, Inverse Room and Gravity have no effect. They stay set and work again when I leave. Example: Trick Room stops reversing speed.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "negate terrain",
+        "no trick room",
+        "no gravity",
+        "field effects off",
+        "cloud nine for terrain",
+        "clueless",
+        "ignore rooms"
+      ],
+      "examples": [
+        "Terrain and Trick Room do nothing while I am out, like Clueless"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Weather is switched off by a separate block (the Cloud Nine kind); this one never touches weather",
+        "It stops working while the holder's own ability is suppressed (Neutralizing Gas, Gastro Acid style effects)"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
     }
   ]
 }

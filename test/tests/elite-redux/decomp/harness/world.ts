@@ -373,4 +373,12 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     power: new NumberHolder(ctx.move.power),
     simulated: false,
   }),
+  // Move.calculateBattleAccuracy (move.ts:1249): the USER is the holder, there is no opponent, and the number is the
+  // base accuracy of the move before the evasion and accuracy stages. Added by B05 (SetMoveAccuracyAbAttr).
+  "calc.accuracy": ctx => ({
+    pokemon: ctx.holder,
+    move: ctx.move,
+    accuracy: new NumberHolder(ctx.move.accuracy),
+    simulated: false,
+  }),
 };

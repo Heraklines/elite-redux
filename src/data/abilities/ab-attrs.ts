@@ -4591,8 +4591,25 @@ export class SetMoveAccuracyAbAttr extends AbAttr {
     this.accuracyValue = accuracyValue;
   }
 
-  override canApply({ move, accuracy }: SetMoveAccuracyAbAttrParams): boolean {
-    return this.moveIds.includes(move.id) && accuracy.value !== -1 && accuracy.value < this.accuracyValue;
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: SetMoveAccuracyAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `gate` (the move is one of the listed moves),
+   * then `residual` (the move does not always hit and its base accuracy is below the set value). No random draw.
+   */
+  override canApply(params: SetMoveAccuracyAbAttrParams): boolean {
+    return gatedCanApply<SetMoveAccuracyAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the move is one of the listed moves. */
+  public gate({ move }: SetMoveAccuracyAbAttrParams): boolean {
+    return this.moveIds.includes(move.id);
+  }
+
+  /** Feasibility that stays in the class: never-miss moves (-1) are left alone, and accuracy is only ever raised. */
+  public residual({ accuracy }: SetMoveAccuracyAbAttrParams): boolean {
+    return accuracy.value !== -1 && accuracy.value < this.accuracyValue;
   }
 
   override apply({ accuracy }: SetMoveAccuracyAbAttrParams): void {
