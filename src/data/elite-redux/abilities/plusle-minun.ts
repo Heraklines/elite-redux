@@ -41,7 +41,7 @@
 import { AbAttr, PostAttackAbAttr, PostTurnAbAttr, VariableMovePowerAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
-import { AbilityId } from "#enums/ability-id";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { Command } from "#enums/command";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
@@ -134,7 +134,7 @@ export function isPlusMinusAligned(pokemon: Pokemon): boolean {
   if (!pokemon.isActive(true)) {
     return false;
   }
-  if (pokemon.hasAbility(AbilityId.PLUS) || pokemon.hasAbility(AbilityId.MINUS)) {
+  if (abilityQuery(pokemon, ENGINE_QUERY.PLUS_PAIRING) || abilityQuery(pokemon, ENGINE_QUERY.MINUS_PAIRING)) {
     return true;
   }
   return pokemon.getAllActiveAbilityAttrs().some(a => a && SUITE_ABATTR_NAMES.has(a.constructor?.name ?? ""));

@@ -10,6 +10,7 @@ import { getBiomeBgmLoopPoint } from "#data/biome-bgm-loop-points";
 import { getDailyForcedWaveBiomePoolTier } from "#data/daily-seed/daily-run";
 import { allBiomes } from "#data/data-lists";
 import { isRaichuTerrainMoveCancelled } from "#data/elite-redux/abilities/fakemon-pitch-raichu";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import {
   getEncounterSpeciesWeightMultiplier,
   isToxicTerrainProtected,
@@ -35,7 +36,6 @@ import {
   getWeatherStartMessage,
   Weather,
 } from "#data/weather";
-import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import type { BattlerIndex } from "#enums/battler-index";
@@ -559,8 +559,10 @@ export class Arena {
       if (p === source) {
         continue;
       }
-      const isCastformWithForecast = p.hasAbility(AbilityId.FORECAST) && p.species.speciesId === SpeciesId.CASTFORM;
-      const isCherrimWithFlowerGift = p.hasAbility(AbilityId.FLOWER_GIFT) && p.species.speciesId === SpeciesId.CHERRIM;
+      const isCastformWithForecast =
+        abilityQuery(p, ENGINE_QUERY.FORECAST_FORM) && p.species.speciesId === SpeciesId.CASTFORM;
+      const isCherrimWithFlowerGift =
+        abilityQuery(p, ENGINE_QUERY.FLOWER_GIFT_FORM) && p.species.speciesId === SpeciesId.CHERRIM;
 
       if (isCastformWithForecast || isCherrimWithFlowerGift) {
         globalScene.triggerPokemonFormChange(p, SpeciesFormChangeWeatherTrigger);
@@ -572,9 +574,11 @@ export class Arena {
   public triggerWeatherBasedFormChangesToNormal(): void {
     for (const p of inSpeedOrder(ArenaTagSide.BOTH)) {
       const isCastformWithForecast =
-        p.hasAbility(AbilityId.FORECAST, false, true) && p.species.speciesId === SpeciesId.CASTFORM;
+        abilityQuery(p, ENGINE_QUERY.FORECAST_FORM, { canApply: false, ignoreOverride: true })
+        && p.species.speciesId === SpeciesId.CASTFORM;
       const isCherrimWithFlowerGift =
-        p.hasAbility(AbilityId.FLOWER_GIFT, false, true) && p.species.speciesId === SpeciesId.CHERRIM;
+        abilityQuery(p, ENGINE_QUERY.FLOWER_GIFT_FORM, { canApply: false, ignoreOverride: true })
+        && p.species.speciesId === SpeciesId.CHERRIM;
 
       if (isCastformWithForecast || isCherrimWithFlowerGift) {
         globalScene.triggerPokemonFormChange(p, SpeciesFormChangeRevertWeatherFormTrigger);

@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { fieldPositionForSlot } from "#data/battle-format";
 import { processSedimentBlooms } from "#data/elite-redux/abilities/newcomer-signature-mechanics";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { lapseTimedAbilitySuppressions } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import { syncBlisteringSunFieldPair } from "#data/elite-redux/ability-upgrades/requested-field-effects";
 import { isToxicTerrainProtected } from "#data/elite-redux/archetypes/ability-meta-consumers";
@@ -15,7 +16,6 @@ import { completeMoodyFormationTurn } from "#data/elite-redux/moody/moody-format
 import { notifyMoodyRuntimeTurnEnd } from "#data/elite-redux/moody/moody-runtime-field-engine";
 import { consumeMoodyDeferredDamage } from "#data/elite-redux/moody/moody-scene-adapter";
 import { TerrainType } from "#data/terrain";
-import { AbilityId } from "#enums/ability-id";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
 import { HitResult } from "#enums/hit-result";
 import { PokemonType } from "#enums/pokemon-type";
@@ -82,7 +82,7 @@ export class TurnEndPhase extends FieldPhase {
         if (
           globalScene.arena.terrain?.terrainType === TerrainType.TOXIC
           && pokemon.isGrounded()
-          && !pokemon.hasAbility(AbilityId.POISON_HEAL)
+          && !abilityQuery(pokemon, ENGINE_QUERY.POISON_HEAL_RECOVERY)
           && !pokemon.getTypes(true, true).some(t => globalScene.arena.terrain?.isTypeDamageImmune(t))
         ) {
           const cancelled = new BooleanHolder(false);

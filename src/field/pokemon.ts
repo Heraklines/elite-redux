@@ -106,9 +106,12 @@ import { getGraftedTypes } from "#data/elite-redux/abilities/type-graft";
 import {
   ABILITY_STUDIO_RUNTIME_CAPABILITIES,
   type AbilityStudioRuntimeCapability,
+  abilityHasEngineQuery,
+  abilityQuery,
   abilityStudioAbilityHasCapability,
   abilityStudioAbilityReferencesSource,
   abilityStudioRuntimeComponentIsActive,
+  ENGINE_QUERY,
 } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import {
   isAbilityIdSuppressed,
@@ -2206,7 +2209,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       PersistentFieldAuraAbAttr.applyAuras(this, stat, statVal);
     }
 
-    const unburdenSpeedProtected = stat === Stat.SPD && !ignoreAbility && this.hasAbility(AbilityId.UNBURDEN);
+    const unburdenSpeedProtected =
+      stat === Stat.SPD && !ignoreAbility && abilityQuery(this, ENGINE_QUERY.UNBURDEN_SPEED);
     const stageMultiplier = wonderRoomSwapped
       ? 1 // ER Wonder Room: swapped ATK/SpAtk ignore stat stages ("buffs")
       : this.getStatStageMultiplier(stat, opponent, move, ignoreOppAbility, isCritical, simulated, ignoreHeldItems);
@@ -2301,7 +2305,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         // Shedinja's kit (Cheating Death / Magic Guard) replaces Wonder Guard, so it
         // fell through to the normal formula (base HP 1 -> ~95 at high level). Key the
         // 1-HP rule on the species line too (its mega baseStats HP is already 1).
-        if (this.hasAbility(AbilityId.WONDER_GUARD, false, true) || this.hasSpecies(SpeciesId.SHEDINJA)) {
+        if (
+          abilityQuery(this, ENGINE_QUERY.WONDER_GUARD_SINGLE_HP, { canApply: false, ignoreOverride: true })
+          || this.hasSpecies(SpeciesId.SHEDINJA)
+        ) {
           statHolder.value = 1;
         }
         if (this.hp > statHolder.value || this.hp === undefined) {
@@ -3539,7 +3546,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         || (this.customPokemonData?.erRunUnlockedAbilitySlots?.length ?? 0) > 0
         || this.getPassiveAbilities()
           .slice(0, 3)
-          .some(a => a?.id === AbilityId.TRUANT);
+          .some(a => abilityHasEngineQuery(a, ENGINE_QUERY.TRUANT_LOAFING, this));
     } else if (this.isEnemy()) {
       // ER: enemies ALWAYS have their innates active (no candy-unlock gate) — unlike
       // the player, whose innate slots are gated by `passiveAttr` above. This only
@@ -3595,7 +3602,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // bypassed the unlock gate (the "Battle Bond procced/boosted while locked" bug).
     // When the slot IS unlocked, the form (when a path exists) or the boost fires
     // normally. Excluded explicitly here, the inverse of the STANCE_CHANGE case.
-    if (ability.id === AbilityId.BATTLE_BOND) {
+    if (abilityHasEngineQuery(ability, ENGINE_QUERY.BATTLE_BOND_FORM, this)) {
       return false;
     }
     // ER relocates Stance Change into an INNATE slot (Aegislash #480). Unlike the
@@ -3604,7 +3611,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // on `hasAbility(STANCE_CHANGE)`. Treat it as a driver so its innate slot is
     // never candy/level gated; otherwise Aegislash stays stuck in one form until
     // the slot unlocks (the cause of the "stance change stuck" report).
-    if (ability.id === AbilityId.STANCE_CHANGE) {
+    if (abilityHasEngineQuery(ability, ENGINE_QUERY.STANCE_CHANGE_FORMS, this)) {
       return true;
     }
     return Pokemon.FORM_CHANGE_DRIVER_ATTRS.some(attr =>
@@ -3740,7 +3747,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
           || globalScene.gameMode?.isDaily === true // ER Innate Shrine (#514): a mon attuned at the Temple shrine has all its // innate slots unlocked for the run.
           || this.customPokemonData?.erInnateShrineUnlocked === true // ER Ability Capsule run-unlock (maintainer request): the INVERSE of the // Curiosity lock - a slot the player paid a capsule to "unlock an innate for // the run" fires this run without the permanent candy unlock. Stored as the // ER slot index (passiveSlot + 1), serialized run-only on customPokemonData; // never writes starterData.passiveAttr. The Curiosity lock above (which // returns false before reaching here) still wins, so a run-unlocked slot that // is ALSO Curiosity-locked stays dead.
           || this.customPokemonData?.erRunUnlockedAbilitySlots?.includes(passiveSlot + 1) === true
-          || ability.id === AbilityId.TRUANT;
+          || abilityHasEngineQuery(ability, ENGINE_QUERY.TRUANT_LOAFING, this);
         if (!freeInnate && !isSlotActive(passiveAttr, passiveSlot as 0 | 1 | 2)) {
           return false;
         }
@@ -4009,7 +4016,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       !isElectrodynamicsPosition(this)
       && (!!this.getTag(GroundedTag)
         || (!this.isOfType(PokemonType.FLYING, true, true)
-          && !this.hasAbility(AbilityId.LEVITATE) // Elite Redux: `FloatAbAttr` (Hover, Fey Flight, …) ungrounds like Levitate.
+          && !abilityQuery(this, ENGINE_QUERY.LEVITATE_FLOAT) // Elite Redux: `FloatAbAttr` (Hover, Fey Flight, …) ungrounds like Levitate.
           && !this.hasAbilityWithAttr("FloatAbAttr")
           && !this.getTag(BattlerTagType.FLOATING)
           && !this.getTag(SemiInvulnerableTag)))
@@ -6924,7 +6931,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       notifyMoodyRuntimeVolatileApplied(this, tagType);
       if (
         (tagType === BattlerTagType.CONFUSED || tagType === BattlerTagType.ER_ENRAGE)
-        && this.hasAbility(AbilityId.BERSERK)
+        && abilityQuery(this, ENGINE_QUERY.BERSERK_VOLATILE_BOOST)
       ) {
         const stat = this.getStat(Stat.SPATK, false) > this.getStat(Stat.ATK, false) ? Stat.SPATK : Stat.ATK;
         globalScene.phaseManager.unshiftNew("StatStageChangePhase", this.getBattlerIndex(), true, [stat], 1);

@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { isReleasedCommander } from "#data/elite-redux/ability-upgrades/requested-field-effects";
 import {
   getCoopController,
@@ -15,7 +16,6 @@ import type { ReplayCommandKind } from "#data/elite-redux/replay-trace";
 import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
 import { applyShowdownSyncCommand } from "#data/elite-redux/showdown/showdown-sync-command";
 import { getMoveTargets } from "#data/moves/move-utils";
-import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { Command } from "#enums/command";
 import { MoveId } from "#enums/move-id";
@@ -263,7 +263,7 @@ export class EnemyCommandPhase extends FieldPhase {
     // in an ally Dondozo iff some ally carries a COMMANDED tag SOURCED by it.
     if (
       battle.getBattlerCount() > 1
-      && enemyPokemon.hasAbility(AbilityId.COMMANDER)
+      && abilityQuery(enemyPokemon, ENGINE_QUERY.COMMANDER_HOSTING)
       && !isReleasedCommander(enemyPokemon)
       && enemyPokemon
         .getAllies()

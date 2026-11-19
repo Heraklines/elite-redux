@@ -5,8 +5,8 @@
  */
 
 import { globalScene } from "#app/global-scene";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import type { PokemonSpecies } from "#data/pokemon-species";
-import { AbilityId } from "#enums/ability-id";
 import type { PokeballType } from "#enums/pokeball";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { Pokemon } from "#field/pokemon";
@@ -141,7 +141,9 @@ export function getCapturedBattleMoneyGainMultiplier(): number {
 
 /** Whether an eligible active Stench source currently protects Toxic Terrain. */
 export function isToxicTerrainProtected(): boolean {
-  return globalScene.getField(true).some(pokemon => pokemon?.hasAbility(AbilityId.STENCH));
+  return globalScene
+    .getField(true)
+    .some(pokemon => pokemon != null && abilityQuery(pokemon, ENGINE_QUERY.STENCH_TOXIC_TERRAIN));
 }
 
 /**

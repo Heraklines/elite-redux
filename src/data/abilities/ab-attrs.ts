@@ -11,6 +11,7 @@ import {
   ER_REAP_AND_SOW_ABILITY_ID,
 } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
 import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { suppressAbilityIdForTurns } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import { clearErAilments, hasErAilment } from "#data/elite-redux/er-status-cure";
 import { SpeciesFormChangeAbilityTrigger, SpeciesFormChangeWeatherTrigger } from "#data/form-change-triggers";
@@ -1189,7 +1190,10 @@ export class EffectSporeAbAttr extends PostDefendContactApplyStatusEffectAbAttr 
 
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
     const attacker = params.opponent;
-    return !(attacker.isOfType(PokemonType.GRASS) || attacker.hasAbility(AbilityId.OVERCOAT)) && super.canApply(params);
+    return (
+      !(attacker.isOfType(PokemonType.GRASS) || abilityQuery(attacker, ENGINE_QUERY.OVERCOAT_POWDER_IMMUNITY))
+      && super.canApply(params)
+    );
   }
 }
 
@@ -1354,8 +1358,10 @@ export class PostDefendAbilitySwapAbAttr extends PostDefendAbAttr {
       move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
       && attacker.getAbility().swappable
       && !(
-        pokemon.hasAbility(AbilityId.WANDERING_SPIRIT)
-        && [AbilityId.MUMMY, AbilityId.LINGERING_AROMA, AbilityId.WANDERING_SPIRIT].some(id => attacker.hasAbility(id))
+        abilityQuery(pokemon, ENGINE_QUERY.WANDERING_SPIRIT_SWAP)
+        && (attacker.hasAbility(AbilityId.MUMMY)
+          || attacker.hasAbility(AbilityId.LINGERING_AROMA)
+          || abilityQuery(attacker, ENGINE_QUERY.WANDERING_SPIRIT_SWAP))
       )
     );
   }
@@ -1386,7 +1392,9 @@ export class PostDefendAbilityGiveAbAttr extends PostDefendAbAttr {
   override canApply({ move, opponent: attacker, pokemon }: PostMoveInteractionAbAttrParams): boolean {
     const mummyFamily =
       [AbilityId.MUMMY, AbilityId.LINGERING_AROMA].includes(this.ability)
-      && [AbilityId.MUMMY, AbilityId.LINGERING_AROMA, AbilityId.WANDERING_SPIRIT].some(id => attacker.hasAbility(id));
+      && (attacker.hasAbility(AbilityId.MUMMY)
+        || attacker.hasAbility(AbilityId.LINGERING_AROMA)
+        || abilityQuery(attacker, ENGINE_QUERY.WANDERING_SPIRIT_SWAP));
     return (
       move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
       && attacker.getAbility().suppressable
@@ -7371,7 +7379,7 @@ export class SummonTerrainAiMovegenMoveStatsAbAttr extends AiMovegenMoveStatsAbA
    */
   constructor(moveType: PokemonType, boostedMove?: [boostedMove: MoveId, boostAmount: number]) {
     super(({ pokemon, move, powerMult }: AiMovegenMoveStatsAbAttrParams) => {
-      if (pokemon.hasAbility(AbilityId.LEVITATE) || pokemon.isOfType(PokemonType.FLYING)) {
+      if (abilityQuery(pokemon, ENGINE_QUERY.LEVITATE_FLOAT) || pokemon.isOfType(PokemonType.FLYING)) {
         return;
       }
       if (move.type === moveType) {
@@ -7508,7 +7516,10 @@ export class PostDamageForceSwitchAbAttr extends PostDamageAbAttr {
           // Will not activate if the Pokémon's HP falls below half by a move affected by Sheer Force.
           // TODO: Make this use the sheer force disable condition
         }
-        if (allMoves[enemyLastMoveUsed.move].chance >= 0 && source.hasAbility(AbilityId.SHEER_FORCE)) {
+        if (
+          allMoves[enemyLastMoveUsed.move].chance >= 0
+          && abilityQuery(source, ENGINE_QUERY.SHEER_FORCE_SECONDARY_EFFECTS)
+        ) {
           return false;
         }
         // Activate only after the last hit of multistrike moves
@@ -7554,7 +7565,7 @@ export class PostDamageForceSwitchAbAttr extends PostDamageAbAttr {
 
 export function isComatoseLike(pokemon: Pokemon): boolean {
   return (
-    pokemon.hasAbility(AbilityId.COMATOSE)
+    abilityQuery(pokemon, ENGINE_QUERY.COMATOSE_SLEEP)
     || pokemon.getActiveAbilitySources().some(source => source.ability.id === (ER_HONK_SHOO_ABILITY_ID as AbilityId))
   );
 }
@@ -7566,8 +7577,8 @@ function getPokemonWithWeatherBasedForms() {
     .getField(true)
     .filter(
       p =>
-        (p.hasAbility(AbilityId.FORECAST) && p.species.speciesId === SpeciesId.CASTFORM)
-        || (p.hasAbility(AbilityId.FLOWER_GIFT) && p.species.speciesId === SpeciesId.CHERRIM),
+        (abilityQuery(p, ENGINE_QUERY.FORECAST_FORM) && p.species.speciesId === SpeciesId.CASTFORM)
+        || (abilityQuery(p, ENGINE_QUERY.FLOWER_GIFT_FORM) && p.species.speciesId === SpeciesId.CHERRIM),
     );
 }
 function hasActiveReapAndSow(pokemon: Pokemon): boolean {

@@ -4,12 +4,12 @@ import { EntryHazardTag } from "#data/arena-tag";
 import { MysteryEncounterPostSummonTag } from "#data/battler-tags";
 import { erBadSpliceOnOpponentSummon } from "#data/elite-redux/abilities/bad-splice";
 import { erMudballOnOpponentSummon } from "#data/elite-redux/abilities/bernerd-roster-mechanics";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erApplyCursedIdol } from "#data/elite-redux/er-relics";
 import { erTacticalOnSummon } from "#data/elite-redux/er-tactical-items";
 import { erApplyTerrainSeeds } from "#data/elite-redux/er-terrain-seeds";
-import { AbilityId } from "#enums/ability-id";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { PokemonType } from "#enums/pokemon-type";
@@ -92,7 +92,7 @@ export class PostSummonPhase extends PokemonPhase {
     const isSwimmer =
       pokemon.isOfType(PokemonType.WATER)
       || pokemon.isOfType(PokemonType.FLYING)
-      || pokemon.hasAbility(AbilityId.LEVITATE);
+      || abilityQuery(pokemon, ENGINE_QUERY.LEVITATE_FLOAT);
     if ((rule.swimmerSpdDrop && !isSwimmer) || (rule.groundedSpdDrop && pokemon.isGrounded())) {
       globalScene.phaseManager.unshiftNew("StatStageChangePhase", pokemon.getBattlerIndex(), true, [Stat.SPD], -1);
     }

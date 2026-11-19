@@ -27,7 +27,7 @@
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
-import { AbilityId } from "#enums/ability-id";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
@@ -79,7 +79,7 @@ function rescueAtkThreshold(): number {
 function canRescue(p: Pokemon): boolean {
   return (
     p.isOfType(PokemonType.FLYING)
-    || p.hasAbility(AbilityId.LEVITATE)
+    || abilityQuery(p, ENGINE_QUERY.LEVITATE_FLOAT)
     || p.getWeight() <= LIGHT_WEIGHT_KG
     || p.getStat(Stat.ATK) >= rescueAtkThreshold()
   );

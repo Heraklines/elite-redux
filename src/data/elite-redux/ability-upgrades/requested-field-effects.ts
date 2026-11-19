@@ -5,6 +5,7 @@
  */
 
 import { globalScene } from "#app/global-scene";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -137,7 +138,7 @@ export function getRequestedFieldDamageMultiplier(source: Pokemon, target: Pokem
 
   if (
     /\baura\b/i.test(move.name)
-    && globalScene.getField(true).some(holder => holder.hasAbility(AbilityId.AURA_BREAK))
+    && globalScene.getField(true).some(holder => abilityQuery(holder, ENGINE_QUERY.AURA_BREAK_INVERSION))
   ) {
     multiplier *= 0.75;
   }
@@ -225,7 +226,7 @@ export function resolveRequestedMoveType(
   move: Move,
   defaultType: PokemonType,
 ): PokemonType {
-  if (move.id !== MoveId.TERRAIN_PULSE || !source.hasAbility(AbilityId.MIMICRY)) {
+  if (move.id !== MoveId.TERRAIN_PULSE || !abilityQuery(source, ENGINE_QUERY.MIMICRY_TERRAIN_TYPE)) {
     return defaultType;
   }
   let bestType: PokemonType = MIMICRY_TERRAIN_PULSE_TYPES[0];

@@ -44,6 +44,7 @@ import type { EnemyPokemon, Pokemon } from "#field/pokemon";
 import { type Modifier, PokemonHeldItemModifier } from "#modifiers/modifier";
 import { ModifierType, PokemonHeldItemModifierType } from "#modifiers/modifier-type";
 import { BooleanHolder, type NumberHolder, toDmgValue } from "#utils/common";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 
 export type ErTacticalKind =
   | "expertBelt"
@@ -778,9 +779,9 @@ function erApplyBoosterEnergyOnSummon(pokemon: Pokemon): void {
     return;
   }
   let tag: BattlerTagType | null = null;
-  if (pokemon.hasAbility(AbilityId.PROTOSYNTHESIS)) {
+  if (abilityQuery(pokemon, ENGINE_QUERY.PROTOSYNTHESIS_BOOSTER)) {
     tag = BattlerTagType.PROTOSYNTHESIS;
-  } else if (pokemon.hasAbility(AbilityId.QUARK_DRIVE)) {
+  } else if (abilityQuery(pokemon, ENGINE_QUERY.QUARK_DRIVE_BOOSTER)) {
     tag = BattlerTagType.QUARK_DRIVE;
   }
   if (tag === null || pokemon.getTag(tag)) {

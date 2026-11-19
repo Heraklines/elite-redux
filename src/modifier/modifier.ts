@@ -7,6 +7,7 @@ import { erIsHeldItemDisabled } from "#data/battler-tags";
 import { getBerryEffectFunc, getBerryPredicate } from "#data/berry";
 import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
 import { erIsHeldItemSuppressed } from "#data/elite-redux/abilities/item-suppression";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { claimCommandAbilityProvenance } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import type { CoopWaveProgressionPresentationV2 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
@@ -788,7 +789,10 @@ export abstract class PokemonHeldItemModifier extends PersistentModifier {
     // Klutz suppresses every held-item effect on its holder. Form-change items
     // are identity triggers rather than battle bonuses and remain functional,
     // matching ER's Mega Stone exception.
-    if (pokemon.hasAbility(AbilityId.KLUTZ) && !(this instanceof PokemonFormChangeItemModifier)) {
+    if (
+      abilityQuery(pokemon, ENGINE_QUERY.KLUTZ_ITEM_SUPPRESSION)
+      && !(this instanceof PokemonFormChangeItemModifier)
+    ) {
       return false;
     }
     return true;

@@ -2,8 +2,8 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { SpeciesFormChangeAbilityTrigger } from "#data/form-change-triggers";
-import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { BerryType } from "#enums/berry-type";
 import { ModifierTier } from "#enums/modifier-tier";
@@ -215,7 +215,7 @@ function endTrainerBattleAndShowDialogue(): Promise<void> {
         // Hardcoded Eiscue for now in case it is fused with another pokemon
         if (
           pokemon.species.speciesId === SpeciesId.EISCUE
-          && pokemon.hasAbility(AbilityId.ICE_FACE)
+          && abilityQuery(pokemon, ENGINE_QUERY.ICE_FACE_FORM)
           && pokemon.formIndex === 1
         ) {
           globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeAbilityTrigger);

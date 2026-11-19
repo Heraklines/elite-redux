@@ -7,6 +7,7 @@ import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
 import { modifierTypes } from "#data/data-lists";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { isReleasedCommander } from "#data/elite-redux/ability-upgrades/requested-field-effects";
 import { isCoopV2ReplacementCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-replacement";
 import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
@@ -410,7 +411,11 @@ export class CommandPhase extends FieldPhase {
       }
     }
     const target = globalScene.getEnemyPokemon(false);
-    if (target?.isBoss() && target.bossSegmentIndex >= 1 && !target.hasAbility(AbilityId.WONDER_GUARD, false, true)) {
+    if (
+      target?.isBoss()
+      && target.bossSegmentIndex >= 1
+      && !abilityQuery(target, ENGINE_QUERY.WONDER_GUARD_BOSS_CATCH, { canApply: false, ignoreOverride: true })
+    ) {
       const challengedFinalBoss = isClassicFinalBoss && gameMode.hasAnyChallenges();
       if (
         (isClassicFinalBoss && (cursor < PokeballType.MASTER_BALL || challengedFinalBoss))
@@ -1797,7 +1802,13 @@ export class CommandPhase extends FieldPhase {
       if (
         targetPokemon?.isBoss()
         && targetPokemon?.bossSegmentIndex >= 1 // TODO: Decouple this hardcoded exception for wonder guard and just check the target...
-        && !targetPokemon?.hasAbility(AbilityId.WONDER_GUARD, false, true)
+        && !(
+          targetPokemon != null
+          && abilityQuery(targetPokemon, ENGINE_QUERY.WONDER_GUARD_BOSS_CATCH, {
+            canApply: false,
+            ignoreOverride: true,
+          })
+        )
       ) {
         // When facing the final boss, it must be weakened unless a Master Ball is used AND no challenges are active.
         // The message is customized for the final boss.

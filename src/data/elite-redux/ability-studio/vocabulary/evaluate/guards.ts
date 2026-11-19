@@ -10,7 +10,7 @@
 // nesting: guards 2 to 4 only apply when the source has a last move on record.
 
 import { allMoves } from "#data/data-lists";
-import { AbilityId } from "#enums/ability-id";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { MoveId } from "#enums/move-id";
 import { MoveResult } from "#enums/move-result";
 import type { Frame } from "./frame";
@@ -52,7 +52,9 @@ export const GUARD_EVALUATORS: Readonly<Record<string, GuardPredicate>> = {
     if (source === undefined || !enemyLastMoveUsed) {
       return true;
     }
-    return !(allMoves[enemyLastMoveUsed.move].chance >= 0 && source.hasAbility(AbilityId.SHEER_FORCE));
+    return !(
+      allMoves[enemyLastMoveUsed.move].chance >= 0 && abilityQuery(source, ENGINE_QUERY.SHEER_FORCE_SECONDARY_EFFECTS)
+    );
   },
   // Activate only after the last hit of multistrike moves.
   "after-final-hit": frame => {

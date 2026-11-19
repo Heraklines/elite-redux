@@ -1,10 +1,10 @@
 import { globalScene } from "#app/global-scene";
 import { allSpecies, modifierTypes } from "#data/data-lists";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { isErGenericPoolBanned } from "#data/elite-redux/er-generic-pool-bans";
 import { getLevelTotalExp } from "#data/exp";
 import type { PokemonSpecies } from "#data/pokemon-species";
-import { AbilityId } from "#enums/ability-id";
 import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
@@ -479,7 +479,7 @@ async function doNewTeamPostProcess(transformations: PokemonTransformation[]) {
       // Assume that the `status` instance can always safely be transferred to the new pokemon
       // This is the case (as of version 1.10.4)
       // Safeguard against COMATOSE here
-      if (!newPokemon.hasAbility(AbilityId.COMATOSE, false, true)) {
+      if (!abilityQuery(newPokemon, ENGINE_QUERY.COMATOSE_SLEEP, { canApply: false, ignoreOverride: true })) {
         newPokemon.status = oldStatus;
       }
     } else {
