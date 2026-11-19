@@ -5034,7 +5034,12 @@ export class PostWeatherChangeFormChangeAbAttr extends PostWeatherChangeAbAttr {
     this.formRevertingWeathers = formRevertingWeathers;
   }
 
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** Safety rule (guard `weather-form-species-only`): Castform with Forecast or Cherrim with Flower Gift, nothing else. */
+  public guards({ pokemon }: AbAttrBaseParams): boolean {
     const isCastformWithForecast =
       pokemon.species.speciesId === SpeciesId.CASTFORM && this.ability === AbilityId.FORECAST;
     const isCherrimWithFlowerGift =
@@ -5080,21 +5085,16 @@ export class IceFaceFormChangeAbAttr extends PostWeatherChangeAbAttr {
   public declare gateOverride: ((params: PostWeatherChangeAbAttrParams) => boolean) | undefined;
 
   /**
-   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `guards` (the holder is in the form
-   * that can change back), then `gate` (the new weather is hail or snow). Both are pure reads, no residual, no draw.
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order, all in `gate` (no guard): the holder is in the form
+   * that can change back, then the new weather is hail or snow. Both are pure reads, no residual, no draw.
    */
   override canApply(params: PostWeatherChangeAbAttrParams): boolean {
     return gatedCanApply<PostWeatherChangeAbAttrParams>(this, params);
   }
 
-  /** The holder is in the form this class restores from (`formIndex`). */
-  public guards({ pokemon }: PostWeatherChangeAbAttrParams): boolean {
-    return pokemon.formIndex === this.formIndex;
-  }
-
-  /** The replaceable condition: the weather that was just set is hail or snow. */
-  public gate({ weather }: PostWeatherChangeAbAttrParams): boolean {
-    return weather === WeatherType.HAIL || weather === WeatherType.SNOW;
+  /** The replaceable condition: the holder is in the form it restores from (`formIndex`) AND the new weather is hail or snow. */
+  public gate({ pokemon, weather }: PostWeatherChangeAbAttrParams): boolean {
+    return pokemon.formIndex === this.formIndex && (weather === WeatherType.HAIL || weather === WeatherType.SNOW);
   }
 
   override apply({ simulated, pokemon }: PostWeatherChangeAbAttrParams): void {
@@ -5127,21 +5127,16 @@ export class FogRestoreDisguiseFormChangeAbAttr extends PostWeatherChangeAbAttr 
   public declare gateOverride: ((params: PostWeatherChangeAbAttrParams) => boolean) | undefined;
 
   /**
-   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `guards` (the holder is in its busted
-   * form), then `gate` (the new weather is fog). Both are pure reads, no residual, no draw.
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order, all in `gate` (no guard): the holder is in its busted
+   * form, then the new weather is fog. Both are pure reads, no residual, no draw.
    */
   override canApply(params: PostWeatherChangeAbAttrParams): boolean {
     return gatedCanApply<PostWeatherChangeAbAttrParams>(this, params);
   }
 
-  /** The holder is in the busted form (`bustedFormIndex`). */
-  public guards({ pokemon }: PostWeatherChangeAbAttrParams): boolean {
-    return pokemon.formIndex === this.bustedFormIndex;
-  }
-
-  /** The replaceable condition: the weather that was just set is fog (either kind). */
-  public gate({ weather }: PostWeatherChangeAbAttrParams): boolean {
-    return isFogWeather(weather);
+  /** The replaceable condition: the holder is in the busted form (`bustedFormIndex`) AND the new weather is fog (either kind). */
+  public gate({ pokemon, weather }: PostWeatherChangeAbAttrParams): boolean {
+    return pokemon.formIndex === this.bustedFormIndex && isFogWeather(weather);
   }
 
   override apply({ simulated, pokemon }: PostWeatherChangeAbAttrParams): void {
@@ -5181,21 +5176,16 @@ export class PostSummonFogRestoreDisguiseAbAttr extends PostSummonAbAttr {
   public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
 
   /**
-   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `guards` (the holder is in its busted
-   * form), then `gate` (the weather on the field is fog). Both are pure reads, no residual, no draw.
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order, all in `gate` (no guard): the holder is in its busted
+   * form, then the weather on the field is fog. Both are pure reads, no residual, no draw.
    */
   override canApply(params: AbAttrBaseParams): boolean {
     return gatedCanApply<AbAttrBaseParams>(this, params);
   }
 
-  /** The holder is in the busted form (`bustedFormIndex`). */
-  public guards({ pokemon }: AbAttrBaseParams): boolean {
-    return pokemon.formIndex === this.bustedFormIndex;
-  }
-
-  /** The replaceable condition: the weather on the field is fog (either kind). */
-  public gate(_params: AbAttrBaseParams): boolean {
-    return isFogWeather(globalScene.arena.weatherType);
+  /** The replaceable condition: the holder is in the busted form (`bustedFormIndex`) AND the weather on the field is fog (either kind). */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
+    return pokemon.formIndex === this.bustedFormIndex && isFogWeather(globalScene.arena.weatherType);
   }
 
   override apply({ simulated, pokemon }: AbAttrBaseParams): void {

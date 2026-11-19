@@ -132,25 +132,40 @@ bindLegacyClosure(
 // no gate (their settings are constructor values), so they need no binding. The four Tier B classes below each have ONE gate.
 // =============================================================================================
 
-// The new weather is hail or snow: `weather === WeatherType.HAIL || weather === WeatherType.SNOW`.
+// The form test, kept as its own IF piece: `pokemon.formIndex === formIndex` (the class setting, 1 for every user).
+const inFormNumber = (formIndex: number) => ({ id: "mon.in-form-number", who: "holder", formIndex });
+
+// Ice Face (IceFaceFormChangeAbAttr, form 1): in form 1 AND the new weather is hail or snow
+// (`pokemon.formIndex === formIndex && (weather === WeatherType.HAIL || weather === WeatherType.SNOW)`).
 bindCondition(
   248,
   3,
   {
-    any: [
-      { id: "field.weather", weather: "HAIL" },
-      { id: "field.weather", weather: "SNOW" },
+    all: [
+      inFormNumber(1),
+      {
+        any: [
+          { id: "field.weather", weather: "HAIL" },
+          { id: "field.weather", weather: "SNOW" },
+        ],
+      },
     ],
   },
   "gate",
-); // Ice Face (IceFaceFormChangeAbAttr, form 1)
+);
 
 // The weather is fog or eerie fog: `isFogWeather(weather)` = `weather === FOG || weather === EERIE_FOG`. The attr is told the NEW weather
 // (arena.ts:537) and the arena has already stored it, so `arena.weatherType` (the atom) is the same value.
+// Each fog class also needs the holder in its busted form (form 1 for all users), a separate IF piece.
 const IS_FOG = {
-  any: [
-    { id: "field.weather", weather: "FOG" },
-    { id: "field.weather", weather: "EERIE_FOG" },
+  all: [
+    inFormNumber(1),
+    {
+      any: [
+        { id: "field.weather", weather: "FOG" },
+        { id: "field.weather", weather: "EERIE_FOG" },
+      ],
+    },
   ],
 };
 bindCondition(209, 5, IS_FOG, "gate"); // Disguise, when fog is set (FogRestoreDisguiseFormChangeAbAttr)

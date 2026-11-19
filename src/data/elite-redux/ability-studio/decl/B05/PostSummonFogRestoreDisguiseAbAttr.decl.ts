@@ -7,11 +7,10 @@
 // B05 / event effect, Tier B (the weather rule sits inside canApply). See ../PRECEDENTS.md.
 //
 // The switch-in half of Patchwork's fog rule (`PostSummonAbAttr`, WHEN "when I enter the battle"); the weather-change half is
-// FogRestoreDisguiseFormChangeAbAttr. canApply is now `guards && gate`, in the ORIGINAL clause order (no prepare step, no
-// residual, no random draw):
-//   1. guard  `pokemon.formIndex === this.bustedFormIndex`          the holder is in its busted form (kept in the class, it
-//                                                                    reads the `bustedFormIndex` setting)
-//   2. gate   `isFogWeather(globalScene.arena.weatherType)`         the weather on the field is fog or eerie fog  <- replaceable
+// FogRestoreDisguiseFormChangeAbAttr. canApply is now just `gate`, in the ORIGINAL clause order (no guard, no prepare step, no
+// residual, no random draw). Two pure facts, which the binding of each user spells out as separate IF pieces:
+//   1. `pokemon.formIndex === this.bustedFormIndex`          the holder is in its busted form (atom mon.in-form-number)
+//   2. `isFogWeather(globalScene.arena.weatherType)`         the weather on the field is fog or eerie fog (atoms field.weather)
 // apply: not when `simulated`; otherwise `triggerPokemonFormChange(pokemon, SpeciesFormChangeAbilityTrigger)`.
 // `shouldActivateOnFormChange()` is false, so the attr does NOT run again when the holder changes form mid-battle (otherwise
 // Disguise, once busted, would be restored at once while fog lasts and block every hit). It stays in the class: it is a safety
@@ -40,24 +39,24 @@ export default defineDecl(PostSummonFogRestoreDisguiseAbAttr, {
       integer: true,
       label: "Form number of my broken disguise (0 = first form, 1 = second form)",
       editable: true,
-      // Only the guard reads it; the weather gate never repeats it.
-      gateIndependent: true,
       default: 1,
     },
   ],
+  // The form number is a setting of the gate: the binding spells it out as a "mon.in-form-number" atom and gateParams keeps
+  // the atom and the setting in step.
+  gateParams: [{ param: "bustedFormIndex", block: "mon.in-form-number", field: "formIndex" }],
   conditions: [
-    // The gate: "the weather on the field is fog or eerie fog" (any of field.weather), spelled out per user in bindings.ts.
-    { slot: "gate", ctx: "params", lib: "field.weather", removable: true, editable: true },
+    // The gate: "I am in form number N" AND "the weather on the field is fog or eerie fog", spelled out per user in bindings.ts as two separate IF pieces.
+    { slot: "gate", ctx: "params", removable: true, editable: true },
   ],
   guards: [],
   feasibility: [
-    "Only while I am in the broken-disguise form named by the setting above",
     "It does not run again when I change form during the battle, so a disguise that just broke is not restored at once",
     "Which form I return to comes from the species' own form-change table",
     "Nothing happens during a simulated check",
   ],
-  // No library effect fires an ability form change yet (R-B05-19), so the effect is a package.
-  effect: { id: "effect.package", params: ["bustedFormIndex"] },
+  // The effect is the library piece "trigger-ability-form-change" (R-B05-19; listed, not implemented yet, the class still does it).
+  effect: { id: "effect.trigger-ability-form-change", params: [] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "none", simulated: "respects" },
   probes: [
@@ -68,5 +67,5 @@ export default defineDecl(PostSummonFogRestoreDisguiseAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "Tier B. Users (all bustedFormIndex 1, all bound as a gate = fog or eerie fog, two field.weather atoms): Disguise (209 attr 6), Patchwork (5396 attr 6 and attr 8). The form test is kept first as the class's `guards` to keep the original order; both clauses are pure reads. `shouldActivateOnFormChange` returning false is a method of the class and survives the rebuild because the rebuild keeps the class (checked in chunk3-sites.test.ts). The class is listed in FORM_CHANGE_DRIVER_ATTRS (pokemon.ts:3589).",
+    "Tier B. Users (all bustedFormIndex 1): Disguise (209 attr 6), Patchwork (5396 attr 6 and attr 8). Each is bound as gate = all[in form number 1, any[fog, eerie fog]]. The form test used to be a hidden `guards` method; it is now an ordinary condition (atom mon.in-form-number), the class has no guards, and both clauses are pure reads so their order does not matter. `shouldActivateOnFormChange` returning false is a method of the class and survives the rebuild because the rebuild keeps the class (checked in chunk3-sites.test.ts). The class is listed in FORM_CHANGE_DRIVER_ATTRS (pokemon.ts:3589). The effect is `effect.trigger-ability-form-change` (R-B05-19, listed, not implemented yet).",
 });
