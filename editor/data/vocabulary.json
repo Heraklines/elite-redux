@@ -1152,6 +1152,29 @@
       "moveUserIs": "holder"
     },
     {
+      "id": "calc.always-hit-check",
+      "kind": "calc",
+      "dispatchKey": "ConditionalAlwaysHitAbAttr",
+      "provides": [
+        "holder",
+        "other",
+        "move",
+        "moveUser"
+      ],
+      "label": "While the game checks whether my move can miss",
+      "group": "Damage and power",
+      "modifies": "accuracy",
+      "baseClassOnly": true,
+      "synonyms": [
+        "never miss",
+        "no guard",
+        "sure hit",
+        "perfect accuracy on",
+        "cannot miss"
+      ],
+      "moveUserIs": "holder"
+    },
+    {
       "id": "calc.defensive-stat-substitute",
       "kind": "calc",
       "dispatchKey": "DefensiveStatSubstituteAbAttr",
@@ -2601,6 +2624,30 @@
       ]
     },
     {
+      "id": "hit.critical",
+      "group": "Move",
+      "label": "The hit was a critical hit",
+      "requires": [
+        "other"
+      ],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "!!other.turnData?.attacksReceived?.[0]?.critical  (the first hit the other Pokemon took this turn)",
+        "source": "src/data/elite-redux/archetypes/chance-status-on-hit.ts ChanceStatusOnAttackAbAttr.canApply (critRequired)"
+      },
+      "synonyms": [
+        "crit",
+        "critical hit",
+        "lucky hit",
+        "crits only",
+        "when I crit"
+      ],
+      "examples": [
+        "Burn the target only when my attack was a critical hit"
+      ]
+    },
+    {
       "id": "move.has-effect-chance",
       "group": "Move",
       "label": "The move has a secondary effect chance",
@@ -2771,6 +2818,28 @@
       ],
       "examples": [
         "Boost damage while Tailwind is up"
+      ]
+    },
+    {
+      "id": "field.anyone-asleep",
+      "group": "Field",
+      "label": "A Pokemon on the field is asleep (my own Comatose counts for me)",
+      "requires": [],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "getField(true).some(p => p.status?.effect === SLEEP || (p === holder && isComatoseLike(p)))",
+        "source": "src/data/elite-redux/archetypes/conditional-damage.ts evaluateCondition (any-active-asleep)"
+      },
+      "synonyms": [
+        "someone is sleeping",
+        "sleeping pokemon",
+        "any sleeper",
+        "dream",
+        "asleep on the field"
+      ],
+      "examples": [
+        "Double my power while any Pokemon on the field is asleep"
       ]
     },
     {
@@ -3181,6 +3250,71 @@
       ],
       "examples": [
         "Take less damage until I have moved this turn"
+      ]
+    },
+    {
+      "id": "time.last-move-flag",
+      "group": "Time",
+      "label": "{who}'s last move had the {flag} property",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "other",
+          "options": [
+            "holder",
+            "other",
+            "ally"
+          ]
+        },
+        {
+          "id": "flag",
+          "label": "Move property",
+          "control": "select",
+          "default": "SOUND_BASED",
+          "options": [
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "const last = pokemon.getLastXMoves(1)[0]; last !== undefined && allMoves[last.move]?.hasFlag(MoveFlags[flag])",
+        "source": "src/data/elite-redux/init-elite-redux-ability-upgrades.ts (Radio Jam chanceResolver)"
+      },
+      "synonyms": [
+        "previous move was a sound move",
+        "last move type of move",
+        "used a sound move before",
+        "last used"
+      ],
+      "examples": [
+        "A better chance when the foe's last move was a sound move"
       ]
     },
     {
@@ -3806,6 +3940,41 @@
       ],
       "examples": [
         "Do not plant Leech Seed on a target that has Shield Dust"
+      ]
+    },
+    {
+      "id": "mon.switching-out",
+      "group": "Pokemon",
+      "label": "{who} is about to switch out",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "other",
+          "options": [
+            "holder",
+            "other",
+            "ally"
+          ]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "turnCommands[pokemon.getBattlerIndex()]?.command === 2 && !command.skip",
+        "source": "src/data/elite-redux/archetypes/conditional-damage.ts isTargetMidVoluntarySwitch"
+      },
+      "synonyms": [
+        "leaving the field",
+        "pivoting out",
+        "being recalled",
+        "mid-switch",
+        "switching"
+      ],
+      "examples": [
+        "Do not boost the hit on a sleeping foe that is leaving"
       ]
     },
     {
@@ -5206,5 +5375,5 @@
       ]
     }
   ],
-  "hash": "0a752a909ad620"
+  "hash": "0f607c6bca9468"
 }

@@ -344,6 +344,21 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     examples: ["Only react when the hit really damaged me, not when a status move like Growl reaches me"],
   },
   {
+    id: "hit.critical",
+    group: "Move",
+    label: "The hit was a critical hit",
+    requires: ["other"],
+    params: [],
+    pure: true,
+    formula: {
+      expr: "!!other.turnData?.attacksReceived?.[0]?.critical  (the first hit the other Pokemon took this turn)",
+      source:
+        "src/data/elite-redux/archetypes/chance-status-on-hit.ts ChanceStatusOnAttackAbAttr.canApply (critRequired)",
+    },
+    synonyms: ["crit", "critical hit", "lucky hit", "crits only", "when I crit"],
+    examples: ["Burn the target only when my attack was a critical hit"],
+  },
+  {
     id: "move.has-effect-chance",
     group: "Move",
     label: "The move has a secondary effect chance",
@@ -408,6 +423,20 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     formula: { expr: "arena.getTagOnSide(ArenaTagType[tag], side)", source: `${ARENA} getTagOnSide` },
     synonyms: ["screens", "hazards", "reflect", "light screen", "spikes", "tailwind"],
     examples: ["Boost damage while Tailwind is up"],
+  },
+  {
+    id: "field.anyone-asleep",
+    group: "Field",
+    label: "A Pokemon on the field is asleep (my own Comatose counts for me)",
+    requires: [],
+    params: [],
+    pure: true,
+    formula: {
+      expr: "getField(true).some(p => p.status?.effect === SLEEP || (p === holder && isComatoseLike(p)))",
+      source: "src/data/elite-redux/archetypes/conditional-damage.ts evaluateCondition (any-active-asleep)",
+    },
+    synonyms: ["someone is sleeping", "sleeping pokemon", "any sleeper", "dream", "asleep on the field"],
+    examples: ["Double my power while any Pokemon on the field is asleep"],
   },
   {
     id: "field.gravity",
@@ -567,6 +596,21 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     },
     synonyms: ["already moved", "moved this turn", "acted", "went first"],
     examples: ["Take less damage until I have moved this turn"],
+  },
+  {
+    id: "time.last-move-flag",
+    group: "Time",
+    label: "{who}'s last move had the {flag} property",
+    requires: [],
+    whoParam: "who",
+    params: [WHO("other"), selectParam("flag", "Move property", MOVE_FLAG_OPTIONS, "SOUND_BASED")],
+    pure: true,
+    formula: {
+      expr: "const last = pokemon.getLastXMoves(1)[0]; last !== undefined && allMoves[last.move]?.hasFlag(MoveFlags[flag])",
+      source: "src/data/elite-redux/init-elite-redux-ability-upgrades.ts (Radio Jam chanceResolver)",
+    },
+    synonyms: ["previous move was a sound move", "last move type of move", "used a sound move before", "last used"],
+    examples: ["A better chance when the foe's last move was a sound move"],
   },
   {
     id: "time.once-per",
@@ -807,6 +851,21 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     },
     synonyms: ["shield dust", "covert cloak", "blocks added effects", "immune to secondary effects", "no side effects"],
     examples: ["Do not plant Leech Seed on a target that has Shield Dust"],
+  },
+  {
+    id: "mon.switching-out",
+    group: "Pokemon",
+    label: "{who} is about to switch out",
+    requires: [],
+    whoParam: "who",
+    params: [WHO("other")],
+    pure: true,
+    formula: {
+      expr: "turnCommands[pokemon.getBattlerIndex()]?.command === Command.POKEMON && !command.skip",
+      source: "src/data/elite-redux/archetypes/conditional-damage.ts isTargetMidVoluntarySwitch",
+    },
+    synonyms: ["leaving the field", "pivoting out", "being recalled", "mid-switch", "switching"],
+    examples: ["Do not boost the hit on a sleeping foe that is leaving"],
   },
   {
     id: "mon.ability-ignorable",

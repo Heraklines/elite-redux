@@ -26,18 +26,36 @@
 // =============================================================================
 
 import { PostDefendStatStageChangeAbAttr, ReceivedMoveDamageMultiplierAbAttr } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { MoveCategory } from "#enums/move-category";
 import { Stat } from "#enums/stat";
 import type { PostMoveInteractionAbAttrParams, PreDefendModifyDamageAbAttrParams } from "#types/ability-types";
 
 /** Halves the FIRST damaging hit taken this battle (while the one-shot is unspent). */
-export class FirstDefendDamageReductionAbAttr extends ReceivedMoveDamageMultiplierAbAttr {
+export class FirstDefendDamageReductionAbAttr
+  extends ReceivedMoveDamageMultiplierAbAttr
+  implements GatedAttr<PreDefendModifyDamageAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreDefendModifyDamageAbAttrParams) => boolean) | undefined;
+
   constructor() {
     super((_target, _user, move) => move.category !== MoveCategory.STATUS, 0.5);
   }
 
+  /** Tier B split (ability studio spec 3.1): `gate` (the hit is a damaging move) then `residual` (the one-shot is unspent). */
   override canApply(params: PreDefendModifyDamageAbAttrParams): boolean {
-    return super.canApply(params) && !params.pokemon.waveData.firstDefendConsumed;
+    return gatedCanApply<PreDefendModifyDamageAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the parent's closure (the move deals damage). */
+  public gate(params: PreDefendModifyDamageAbAttrParams): boolean {
+    return super.canApply(params);
+  }
+
+  /** Feasibility that stays in the class: the first-hit shield has not been used up yet this battle. */
+  public residual(params: PreDefendModifyDamageAbAttrParams): boolean {
+    return !params.pokemon.waveData.firstDefendConsumed;
   }
 }
 
@@ -46,14 +64,31 @@ export class FirstDefendDamageReductionAbAttr extends ReceivedMoveDamageMultipli
  * stage and marks the one-shot spent. Extends the vanilla on-hit stat-drop attr
  * (attacker-targeted) and layers the once-per-battle gate + consume on top.
  */
-export class FirstDefendAttackerAtkDropAbAttr extends PostDefendStatStageChangeAbAttr {
+export class FirstDefendAttackerAtkDropAbAttr
+  extends PostDefendStatStageChangeAbAttr
+  implements GatedAttr<PostMoveInteractionAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
   constructor() {
     // selfTarget=false -> the drop lands on the attacker.
     super((_target, _user, move) => move.category !== MoveCategory.STATUS, Stat.ATK, -1, false);
   }
 
+  /** Tier B split (ability studio spec 3.1): `gate` (the hit is a damaging move) then `residual` (the one-shot is unspent). */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    return super.canApply(params) && !params.pokemon.waveData.firstDefendConsumed;
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the parent's closure (the move deals damage). */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    return super.canApply(params);
+  }
+
+  /** Feasibility that stays in the class: the first-hit shield has not been used up yet this battle. */
+  public residual(params: PostMoveInteractionAbAttrParams): boolean {
+    return !params.pokemon.waveData.firstDefendConsumed;
   }
 
   override apply(params: PostMoveInteractionAbAttrParams): void {

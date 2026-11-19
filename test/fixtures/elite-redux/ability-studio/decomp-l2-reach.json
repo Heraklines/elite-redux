@@ -56,6 +56,7 @@
     "event.weather-changed"
   ],
   "unreached": {
+    "calc.always-hit-check": "holder-hits-foe: not dispatched through applyAbAttrs; MoveEffectPhase.checkBypassAccAndInvuln scans the attackers attrs and calls matches(move, user, target) on any ConditionalAlwaysHitAbAttr, so the engine never evaluates the attr through a hook",
     "calc.attack-stat": "holder-hits-foe: not dispatched through applyAbAttrs; Pokemon.getBaseDamage scans the attackers attrs for a resolveStat function, so the engine never evaluates an AttackStatSubstituteAbAttr attr of the holder",
     "calc.berry-threshold": "holder-low-hp-turns: the engine never evaluated a ReduceBerryUseThresholdAbAttr attr of the holder",
     "calc.burn-damage": "foe-inflicts-status: the engine never evaluated a ReduceBurnDamageAbAttr attr of the holder",

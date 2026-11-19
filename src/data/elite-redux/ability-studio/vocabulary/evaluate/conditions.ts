@@ -8,9 +8,11 @@
 // original lambda used (isFullHp(), doesFlagEffectApply(), hpCrossedBelow(), ...). Conditions are
 // compiled ONCE into closures; they are never interpreted per call on a hot path.
 
-import { hpCrossedBelow } from "#abilities/ab-attrs";
+import { hpCrossedBelow, isComatoseLike } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { allMoves } from "#data/data-lists";
 import { DAMAGING_HIT_RESULTS } from "#data/elite-redux/archetypes/chance-status-on-hit";
+import { ConditionalDamageAbAttr } from "#data/elite-redux/archetypes/conditional-damage";
 import { Gender } from "#data/gender";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import { SpeciesFormChangeManualTrigger } from "#data/pokemon-forms/form-change-triggers";
@@ -231,6 +233,7 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
   },
   "move.drains": () => frame => frame.move?.hasAttr("HitHealAttr") ?? false,
   "hit.landed-damage": () => frame => frame.hitResult !== undefined && DAMAGING_HIT_RESULTS.has(frame.hitResult),
+  "hit.critical": () => frame => !!frame.other?.turnData?.attacksReceived?.[0]?.critical,
   "move.has-effect-chance": () => frame => frame.move !== undefined && frame.move.chance >= 0,
   "move.is-move": p => {
     const id = enumValue(MoveId, String(p.moveId), "move");
@@ -250,6 +253,10 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
     const tag = enumValue(ArenaTagType, String(p.tag), "field effect") as ArenaTagType;
     return frame => globalScene.arena.getTagOnSide(tag, sideOf(frame.holder, String(p.side))) !== undefined;
   },
+  "field.anyone-asleep": () => frame =>
+    globalScene
+      .getField(true)
+      .some(p => p.status?.effect === StatusEffect.SLEEP || (p === frame.holder && isComatoseLike(p))),
   "field.gravity": () => () => globalScene.arena.hasActiveGravity(),
   "field.trick-room": () => () => globalScene.arena.getTag(ArenaTagType.TRICK_ROOM) !== undefined,
 
@@ -315,6 +322,13 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
   "time.last-move": p => {
     const id = enumValue(MoveId, String(p.moveId), "move");
     return frame => holderLikeOf(frame, String(p.who))?.getLastXMoves()[0]?.move === id;
+  },
+  "time.last-move-flag": p => {
+    const flag = enumValue(MoveFlags, String(p.flag), "move property") as MoveFlags;
+    return frame => {
+      const last = holderLikeOf(frame, String(p.who))?.getLastXMoves(1)[0];
+      return last !== undefined && allMoves[last.move]?.hasFlag(flag) === true;
+    };
   },
   "time.once-per": p => {
     const scope = String(p.scope);
@@ -419,6 +433,10 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
   },
   "mon.protected-from-effects": p => frame =>
     holderLikeOf(frame, String(p.who))?.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr") ?? false,
+  "mon.switching-out": p => frame => {
+    const target = holderLikeOf(frame, String(p.who));
+    return target !== undefined && ConditionalDamageAbAttr.isTargetMidVoluntarySwitch(target);
+  },
   "mon.ability-ignorable": () => frame => frame.holder.getAbility().ignorable,
   "mon.in-form": p => frame => holderLikeOf(frame, String(p.who))?.getFormKey() === String(p.key),
   "mon.can-change-form": p => frame => {

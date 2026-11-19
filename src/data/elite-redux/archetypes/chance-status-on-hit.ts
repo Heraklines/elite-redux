@@ -55,6 +55,7 @@
 // =============================================================================
 
 import { PostAttackAbAttr, PostDefendAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
+import { allMoves } from "#data/data-lists";
 import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
@@ -503,7 +504,13 @@ export interface ChanceBattlerTagOnHitOptions {
  * incoming attacks should attribute the tag back to a specific move id; the
  * source pokemon is the defender (the ability holder).
  */
-export class ChanceBattlerTagOnHitAbAttr extends PostDefendAbAttr {
+export class ChanceBattlerTagOnHitAbAttr
+  extends PostDefendAbAttr
+  implements GatedAttr<PostMoveInteractionAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
   private readonly chance: number;
   private readonly tags: readonly BattlerTagType[];
   private readonly contactRequired: boolean;
@@ -568,7 +575,16 @@ export class ChanceBattlerTagOnHitAbAttr extends PostDefendAbAttr {
     return this.turns;
   }
 
+  /**
+   * Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `gate` (contact tiers, move filter, then the
+   * chance roll) and `residual` (the tag pick and the feasibility check).
+   */
   public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: contact tiers, move filter, then the chance roll (the roll is the LAST clause). */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
     const { pokemon, move, opponent: attacker } = params;
     if (
       this.contactExcluded
@@ -594,6 +610,12 @@ export class ChanceBattlerTagOnHitAbAttr extends PostDefendAbAttr {
         return false;
       }
     }
+    return true;
+  }
+
+  /** Feasibility that stays in the class, after the gate passed: pick the tag (a random draw when there are several) and check that the attacker can receive it. */
+  public residual(params: PostMoveInteractionAbAttrParams): boolean {
+    const { pokemon, opponent: attacker } = params;
     const tag = this.pickTag(pokemon);
     return attacker.canAddTag(tag);
   }
@@ -659,7 +681,10 @@ export class ChanceBattlerTagOnHitAbAttr extends PostDefendAbAttr {
  * (BITING_MOVE-gated PARALYSIS), `Flaming Jaws` (BITING_MOVE-gated BURN),
  * `Envenom` (POISON on any move), `Virus` (ELECTRIC-type-gated POISON), etc.
  */
-export class ChanceStatusOnAttackAbAttr extends PostAttackAbAttr {
+export class ChanceStatusOnAttackAbAttr extends PostAttackAbAttr implements GatedAttr<PostMoveInteractionAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
   private readonly chance: number;
   private readonly effects: readonly StatusEffect[];
   // The unified outcome pool ([...statuses, ...tags]) picked from under the
@@ -722,17 +747,31 @@ export class ChanceStatusOnAttackAbAttr extends PostAttackAbAttr {
     return this.contactRequired;
   }
 
+  /**
+   * Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: the parent's damaging-move check, the
+   * `simulated` shortcut (a simulated call passes at once, without any roll), then `guards` (the target is another
+   * Pokemon and is not protected from added effects), `gate` (contact tiers, move filter, critical hit, chance roll)
+   * and `residual` (the outcome pick and the feasibility check).
+   */
   public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { simulated, pokemon, move, opponent: target } = params;
     if (!super.canApply(params)) {
       return false;
     }
-    if (simulated) {
+    if (params.simulated) {
       return true;
     }
-    if (target.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr") || pokemon === target) {
-      return false;
-    }
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Safety rules that stay in the class: the target is another Pokemon and is not protected from added effects. */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    const { pokemon, opponent: target } = params;
+    return !(target.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr") || pokemon === target);
+  }
+
+  /** The replaceable condition: contact tiers, move filter, critical hit, then the chance roll (the roll is the LAST clause). */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    const { pokemon, move, opponent: target } = params;
     const makesContact = move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: pokemon, target });
     // Inherent contact flag (ignores the holder's contact-suppression). The
     // non-contact tier (`contactExcluded`) must key off whether the move is
@@ -761,6 +800,12 @@ export class ChanceStatusOnAttackAbAttr extends PostAttackAbAttr {
         return false;
       }
     }
+    return true;
+  }
+
+  /** Feasibility that stays in the class, after the gate passed: pick the outcome (a random draw when the pool has several) and check that the target can receive it. */
+  public residual(params: PostMoveInteractionAbAttrParams): boolean {
+    const { pokemon, opponent: target } = params;
     const outcome = this.pickOutcome(pokemon);
     if (outcome.kind === "status") {
       return target.canSetStatus(outcome.value, true, false, pokemon);
@@ -800,7 +845,13 @@ export class ChanceStatusOnAttackAbAttr extends PostAttackAbAttr {
  * (SOUND_BASED-gated CONFUSED), `Beautiful Music` (SOUND_BASED-gated INFATUATED),
  * `Radio Jam` (SOUND_BASED-gated DISABLED), `Haunting Frenzy` (FLINCHED), etc.
  */
-export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
+export class ChanceBattlerTagOnAttackAbAttr
+  extends PostAttackAbAttr
+  implements GatedAttr<PostMoveInteractionAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
   private readonly chance: number;
   private readonly tags: readonly BattlerTagType[];
   private readonly contactRequired: boolean;
@@ -928,23 +979,39 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
     return chance === 100 || pokemon.randBattleSeedInt(100) < chance;
   }
 
+  /**
+   * Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: the parent's attack check (a damaging move,
+   * or one of the listed moves), then `guards` (the target is another Pokemon and is not protected from added effects),
+   * `gate` (the move, the target's state, then the chance roll) and `residual` (the tag pick and the feasibility check).
+   */
   public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { pokemon, move, opponent: target } = params;
     if (!super.canApply(params)) {
       return false;
     }
-    if (target.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr") || pokemon === target) {
-      return false;
-    }
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Safety rules that stay in the class: the target is another Pokemon and is not protected from added effects. */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    const { pokemon, opponent: target } = params;
+    return !(target.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr") || pokemon === target);
+  }
+
+  /** The replaceable condition: the move (listed ids, contact tiers, filter), the target's state, then the chance roll (the roll is the LAST clause). */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    const { pokemon, move, opponent: target } = params;
     if (!this.matchesMove(move, pokemon, target)) {
       return false;
     }
     if (!this.matchesTarget(target)) {
       return false;
     }
-    if (!this.passesChance(pokemon, target, move)) {
-      return false;
-    }
+    return this.passesChance(pokemon, target, move);
+  }
+
+  /** Feasibility that stays in the class, after the gate passed: pick the tag (a random draw when there are several) and check that the target can receive it. */
+  public residual(params: PostMoveInteractionAbAttrParams): boolean {
+    const { pokemon, opponent: target } = params;
     const tag = this.pickTag(pokemon);
     return target.canAddTag(tag);
   }
@@ -970,6 +1037,18 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
     }
     return this.tags[pokemon.randBattleSeedInt(this.tags.length)];
   }
+}
+
+/**
+ * Radio Jam's per-hit chance (`chanceResolver` of {@linkcode ChanceBattlerTagOnAttackAbAttr}): 100 when the target has
+ * already moved this turn and its last move was a sound move, else 30. Moved here from the ability upgrade patch so the
+ * ability studio declaration can build the same attr again; the numbers and the reads are unchanged.
+ */
+export function radioJamChanceResolver(_holder: Pokemon, target: Pokemon): number {
+  const previousMove = target.getLastXMoves(1)[0];
+  return target.turnData.acted && previousMove && allMoves[previousMove.move]?.hasFlag(MoveFlags.SOUND_BASED)
+    ? 100
+    : 30;
 }
 
 /**

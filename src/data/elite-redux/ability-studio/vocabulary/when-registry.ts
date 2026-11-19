@@ -592,6 +592,18 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     },
   ),
   calc(
+    "calc.always-hit-check",
+    "ConditionalAlwaysHitAbAttr",
+    [H, O, M, MU],
+    "While the game checks whether my move can miss",
+    "Damage and power",
+    "accuracy",
+    {
+      baseClassOnly: true,
+      synonyms: ["never miss", "no guard", "sure hit", "perfect accuracy on", "cannot miss"],
+    },
+  ),
+  calc(
     "calc.defensive-stat-substitute",
     "DefensiveStatSubstituteAbAttr",
     [H],
@@ -1072,4 +1084,5 @@ export const WHEN_MOVE_USER: Readonly<Record<string, "holder" | "other">> = {
   "calc.outgoing-move": "holder",
   "calc.attack-stat": "holder",
   "calc.my-attack-matchup": "holder",
+  "calc.always-hit-check": "holder",
 };

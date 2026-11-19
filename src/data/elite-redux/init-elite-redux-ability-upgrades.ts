@@ -49,6 +49,7 @@ import { AttackStatSubstituteAbAttr } from "#data/elite-redux/archetypes/attack-
 import {
   ChanceBattlerTagOnAttackAbAttr,
   ChanceBattlerTagOnHitAbAttr,
+  radioJamChanceResolver,
 } from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
 import { CopyMoveByFilterAbAttr } from "#data/elite-redux/archetypes/copy-move-by-filter";
@@ -586,14 +587,7 @@ export function initEliteReduxAbilityUpgrades(): AbilityUpgradeResult {
             chance: 30,
             tags: [BattlerTagType.DISABLED],
             filter: { flag: MoveFlags.SOUND_BASED },
-            chanceResolver: (_holder, target) => {
-              const previousMove = target.getLastXMoves(1)[0];
-              return target.turnData.acted
-                && previousMove
-                && allMoves[previousMove.move]?.hasFlag(MoveFlags.SOUND_BASED)
-                ? 100
-                : 30;
-            },
+            chanceResolver: radioJamChanceResolver,
           }),
       ]),
     ),
