@@ -22,7 +22,7 @@ export default defineDecl(BugPowderImmunityAbAttr, {
   label: "Be immune to powder moves while Bug-type",
   summary: () =>
     "While I have this and I am Bug-type, powder moves (Spore, Sleep Powder, Stun Spore...) do nothing to me. A holder that is not Bug-type is still hit.",
-  synonyms: ["pollinate", "steel beetle", "powder immunity", "spore immune", "overcoat", "no powder moves"],
+  synonyms: ["pollinate", "steel beetle", "powder immunity", "spore immune", "no powder moves"],
   examples: ["Powder moves do not work on me if I am a Bug type, like Pollinate"],
   params: [],
   noParamsReason:

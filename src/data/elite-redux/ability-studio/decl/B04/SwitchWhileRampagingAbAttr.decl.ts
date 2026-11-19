@@ -38,7 +38,7 @@ export default defineDecl(SwitchWhileRampagingAbAttr, {
   conditions: [],
   guards: [],
   feasibility: [
-    "Only matters while a rampage move (Frenzy lock) is active; two-turn charging moves are not affected",
+    "Only matters while I am locked into a rampage move like Thrash or Outrage; two-turn charging moves are not affected",
     "Only the player's own Pokemon open a command menu, so it has no effect for enemy trainers",
   ],
   reusableAlone: { when: true, if: false, do: true },
