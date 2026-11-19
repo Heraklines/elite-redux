@@ -4250,12 +4250,16 @@ export interface EnemyMinDamageRollAbAttrParams extends AbAttrBaseParams {
  * every ability that lacks this attr.
  */
 export class EnemyMinDamageRollAbAttr extends AbAttr {
-  constructor() {
+  /**
+   * @param rollPercent - the damage roll every attack against the holder is forced to, in percent of the top value
+   * (default 85, the floor of the normal 85 to 100 spread; every shipped user keeps it)
+   */
+  constructor(public readonly rollPercent = 85) {
     super(false);
   }
 
   override apply({ rollMultiplier }: EnemyMinDamageRollAbAttrParams): void {
-    rollMultiplier.value = 0.85;
+    rollMultiplier.value = this.rollPercent / 100;
   }
 }
 

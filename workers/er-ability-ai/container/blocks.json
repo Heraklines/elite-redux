@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "0f70ce7e79cdd5",
+  "vocabularyHash": "1d655625a322e9",
+  "hash": "07f8b18730d1e7",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -223,7 +223,7 @@
       "guards": [],
       "feasibility": [],
       "effect": {
-        "id": "effect.negate",
+        "id": "effect.block-crit",
         "params": []
       },
       "reusableAlone": {
@@ -236,8 +236,8 @@
     {
       "id": "block.conditional-user-field-battler-tag-immunity",
       "className": "ConditionalUserFieldBattlerTagImmunityAbAttr",
-      "label": "Protect a qualifying partner from effects like drowsiness",
-      "summary": "My partner cannot get Drowsiness while it passes the check (Flower Veil: it is a Grass type). Example: choose Drowsiness and a Grass partner never gets drowsy.",
+      "label": "Protect my Grass-type partner from effects like drowsiness",
+      "summary": "My partner cannot get Drowsiness as long as my partner is a Grass type, like Flower Veil. Example: choose Drowsiness and a Grass partner never gets drowsy.",
       "tier": "A",
       "kind": "calc-modifier",
       "status": "decomposed",
@@ -312,8 +312,8 @@
     {
       "id": "block.conditional-user-field-protect-stat",
       "className": "ConditionalUserFieldProtectStatAbAttr",
-      "label": "Protect me and a qualifying partner from stat drops",
-      "summary": "Other Pokemon cannot lower any stat of me or of my partner while that Pokemon passes the check (Flower Veil: it is a Grass type). Drops from its own moves still land.",
+      "label": "Protect me and my Grass-type partner from stat drops",
+      "summary": "Other Pokemon cannot lower any stat of me or of my partner as long as the Pokemon being protected is a Grass type, like Flower Veil. Drops from its own moves still land.",
       "tier": "A",
       "kind": "calc-modifier",
       "status": "decomposed",
@@ -360,8 +360,8 @@
     {
       "id": "block.conditional-user-field-status-effect-immunity",
       "className": "ConditionalUserFieldStatusEffectImmunityAbAttr",
-      "label": "Protect a qualifying partner from status conditions",
-      "summary": "My partner cannot get Sleep from another Pokemon while it passes the check (Flower Veil: it is a Grass type).",
+      "label": "Protect my Grass-type partner from status conditions",
+      "summary": "My partner cannot get Sleep from another Pokemon as long as my partner is a Grass type, like Flower Veil. Example: a Grass-type partner cannot be burned by a foe's Will-O-Wisp.",
       "tier": "A",
       "kind": "calc-modifier",
       "status": "decomposed",
@@ -574,7 +574,7 @@
       "id": "block.enemy-min-damage-roll",
       "className": "EnemyMinDamageRollAbAttr",
       "label": "Make foes always roll the lowest damage against me",
-      "summary": "Attacks against me always use the lowest damage roll (85% of the top value) instead of a random 85 to 100%. Example: a hit that could do 85 to 100 damage does 85.",
+      "summary": "Attacks against me always use the same damage roll, 85% of the top value, instead of a random 85 to 100%. Example: at 85%, a hit that could do 85 to 100 damage does 85.",
       "tier": "A",
       "kind": "calc-modifier",
       "status": "decomposed",
@@ -592,15 +592,28 @@
       "examples": [
         "Foes always deal their minimum damage to me, like Bad Luck"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "rollPercent",
+          "label": "Damage roll (percent of the top value)",
+          "control": "slider",
+          "default": 85,
+          "editable": true,
+          "min": 85,
+          "max": 100,
+          "step": 1
+        }
+      ],
       "conditions": [],
       "guards": [],
       "feasibility": [
         "Damage previews (calculations that only look ahead) never use the damage roll, so this block does nothing there"
       ],
       "effect": {
-        "id": "effect.package",
-        "params": []
+        "id": "effect.set-damage-roll",
+        "params": [
+          "rollPercent"
+        ]
       },
       "reusableAlone": {
         "when": true,

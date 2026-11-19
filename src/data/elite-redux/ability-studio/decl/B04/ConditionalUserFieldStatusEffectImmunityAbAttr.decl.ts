@@ -41,9 +41,9 @@ export default defineDecl(ConditionalUserFieldStatusEffectImmunityAbAttr, {
   tier: "A",
   kind: "calc-modifier",
   when: "cancel.status-immunity-field",
-  label: "Protect a qualifying partner from status conditions",
+  label: "Protect my Grass-type partner from status conditions",
   summary: params =>
-    `My partner cannot get ${statusWords(params.statuses)} from another Pokemon while it passes the check (Flower Veil: it is a Grass type).`,
+    `My partner cannot get ${statusWords(params.statuses)} from another Pokemon as long as my partner is a Grass type, like Flower Veil. Example: a Grass-type partner cannot be burned by a foe's Will-O-Wisp.`,
   synonyms: [
     "flower veil",
     "jungle's guard",

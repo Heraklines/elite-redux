@@ -33,9 +33,9 @@ export default defineDecl(ConditionalUserFieldBattlerTagImmunityAbAttr, {
   tier: "A",
   kind: "calc-modifier",
   when: "cancel.battle-effect-immunity-field",
-  label: "Protect a qualifying partner from effects like drowsiness",
+  label: "Protect my Grass-type partner from effects like drowsiness",
   summary: params =>
-    `My partner cannot get ${effectWords(params.effects)} while it passes the check (Flower Veil: it is a Grass type). Example: choose Drowsiness and a Grass partner never gets drowsy.`,
+    `My partner cannot get ${effectWords(params.effects)} as long as my partner is a Grass type, like Flower Veil. Example: choose Drowsiness and a Grass partner never gets drowsy.`,
   synonyms: [
     "flower veil",
     "jungle's guard",

@@ -33,9 +33,9 @@ export default defineDecl(ConditionalUserFieldProtectStatAbAttr, {
   tier: "A",
   kind: "calc-modifier",
   when: "cancel.stat-protect-field",
-  label: "Protect me and a qualifying partner from stat drops",
+  label: "Protect me and my Grass-type partner from stat drops",
   summary: () =>
-    "Other Pokemon cannot lower any stat of me or of my partner while that Pokemon passes the check (Flower Veil: it is a Grass type). Drops from its own moves still land.",
+    "Other Pokemon cannot lower any stat of me or of my partner as long as the Pokemon being protected is a Grass type, like Flower Veil. Drops from its own moves still land.",
   synonyms: [
     "flower veil",
     "jungle's guard",

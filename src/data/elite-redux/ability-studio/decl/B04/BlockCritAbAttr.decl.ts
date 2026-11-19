@@ -42,9 +42,9 @@ export default defineDecl(BlockCritAbAttr, {
   conditions: [],
   guards: [],
   feasibility: [],
-  // The library "Block it" changes the frame value `cancelled`, while this trigger changes `blockCrit`; the block itself is
-  // built from the class, so it is unaffected. A matching library effect is requested (requests/B04.md).
-  effect: { id: "effect.negate", params: [] },
+  // "Stop critical hits against me" is the library effect that changes `blockCrit`, the value this trigger lets staff change
+  // (the general "Block it" changes `cancelled`, which would not match).
+  effect: { id: "effect.block-crit", params: [] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "none", simulated: "respects" },
   probes: [
@@ -55,5 +55,5 @@ export default defineDecl(BlockCritAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "Users (live dump, 16 attrs of 15 abilities): Battle Armor, Shell Armor, Stalwart (attr 1, added by the ER rebalance patch), Faraday Cage, Toxic Shell, Voltron (attr 1 under two ids), Shattered Armor, Fortress, Droideka, Exosuit, Exo Armor, Thunder Gods Vessel, Malicious Empathy, Old Ocean Relic, Spin To Win. Whether Mold Breaker style effects bypass a user is an ability-level flag (`ignorable`), not part of this block (Stalwart is deliberately not ignorable, see init-elite-redux-vanilla-rebalance.ts:1495). The L2 template makes the foe crit (`crits: true`), and the class is evaluated at that moment. The effect 'Block it' of the library modifies `cancelled`, not `blockCrit`, so a staff-built rule 'When the game checks if I can be critically hit, then Block it' is rejected by the composition validator today (requests/B04.md asks for a matching effect).",
+    "Users (live dump, 16 attrs of 15 abilities): Battle Armor, Shell Armor, Stalwart (attr 1, added by the ER rebalance patch), Faraday Cage, Toxic Shell, Voltron (attr 1 under two ids), Shattered Armor, Fortress, Droideka, Exosuit, Exo Armor, Thunder Gods Vessel, Malicious Empathy, Old Ocean Relic, Spin To Win. Whether Mold Breaker style effects bypass a user is an ability-level flag (`ignorable`), not part of this block (Stalwart is deliberately not ignorable, see init-elite-redux-vanilla-rebalance.ts:1495). The L2 template makes the foe crit (`crits: true`), and the class is evaluated at that moment. The matching library effect `effect.block-crit` (modifies `blockCrit`) was added with this chunk, so a staff-built rule 'When the game checks if I can be critically hit, then Stop critical hits against me' passes the composition validator.",
 });

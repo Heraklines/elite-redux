@@ -446,6 +446,14 @@ describe("B04 chunk 3: classes the shared L1 grid and L2 templates cannot fully 
     expect(() => buildAttr(module, { stat: "Accuracy" })).toThrow(/must be one of Attack, Defense/);
     expect(buildAttr(declRegistry.get("BlockCritAbAttr")!)).toBeInstanceOf(BlockCritAbAttr);
     expect(buildAttr(declRegistry.get("EnemyMinDamageRollAbAttr")!)).toBeInstanceOf(EnemyMinDamageRollAbAttr);
+    // The roll percent is a real setting: the default is 85, a staff value builds and is written as percent / 100.
+    expect((buildAttr(declRegistry.get("EnemyMinDamageRollAbAttr")!) as EnemyMinDamageRollAbAttr).rollPercent).toBe(85);
+    const strongerRoll = buildAttr(declRegistry.get("EnemyMinDamageRollAbAttr")!, {
+      rollPercent: 90,
+    }) as EnemyMinDamageRollAbAttr;
+    const strongerHolder = new NumberHolder(1);
+    strongerRoll.apply({ pokemon: holder, rollMultiplier: strongerHolder, simulated: false } as Params);
+    expect(strongerHolder.value).toBe(0.9);
 
     // Real damage: the same hit against the same defender with each ability.
     const hit = (defender: Pokemon, source: Pokemon): number =>
