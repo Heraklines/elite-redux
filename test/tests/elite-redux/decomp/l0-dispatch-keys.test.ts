@@ -101,7 +101,12 @@ describe("L0 dispatch keys (Step 0 worklist)", () => {
  * Elite Redux marker classes (they extend AbAttr directly and live in abilities/newcomer-signature-mechanics.ts, so they
  * are not in pokerogue's AbilityAttrs map). They are flag keys of while.active so that L0 finds them as the WHEN's class.
  */
-const ER_MARKER_FLAG_KEYS: ReadonlySet<string> = new Set(["SedimentBloomMarkerAbAttr", "VaporBodyAccuracyAbAttr"]);
+const ER_MARKER_FLAG_KEYS: ReadonlySet<string> = new Set([
+  "CenterOfAttentionAbAttr",
+  "DeadeyeMarkerAbAttr",
+  "SedimentBloomMarkerAbAttr",
+  "VaporBodyAccuracyAbAttr",
+]);
 
 describe("L0 WHEN registry", () => {
   it("has unique ids and no dispatch key claimed by two WHENs", () => {

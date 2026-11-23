@@ -1723,6 +1723,8 @@
         "BadDreamsImmunityAbAttr",
         "BlockRedirectAbAttr",
         "BugPowderImmunityAbAttr",
+        "CenterOfAttentionAbAttr",
+        "DeadeyeMarkerAbAttr",
         "DoubleSelfInflictedDamageAbAttr",
         "DrenchImmunityAbAttr",
         "FloatAbAttr",
@@ -5024,5 +5026,5 @@
       ]
     }
   ],
-  "hash": "10742527cbb1df"
+  "hash": "154ee2e9860e4f"
 }

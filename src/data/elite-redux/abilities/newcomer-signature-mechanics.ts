@@ -9,6 +9,7 @@ import {
   ArenaTrapAbAttr,
   type CheckTrappedAbAttrParams,
   ConditionalCritAbAttr,
+  type ConditionalCritAbAttrParams,
   ForceSwitchOutHelper,
   ForceSwitchOutImmunityAbAttr,
   MovePowerBoostAbAttr,
@@ -1211,14 +1212,27 @@ export class RingGeneralTrapAbAttr extends ArenaTrapAbAttr implements GatedAttr<
 }
 
 const DEADEYE_MARK = new WeakMap<Pokemon, Pokemon>();
-export class DeadeyeMarkAbAttr extends PostAttackAbAttr {
+export class DeadeyeMarkAbAttr extends PostAttackAbAttr implements GatedAttr<PostMoveInteractionAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B (ability studio spec 3.1), original clause order: `guards` = the base attack condition (a library condition
+   * through the "ctor:0" binding) and "damage was dealt", `gate` = the move is an arrow-based or a pulse move (library
+   * conditions). There is no residual. All clauses are pure, no RNG.
+   */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    return (
-      super.canApply(params)
-      && params.damage > 0
-      && (params.move.hasFlag(MoveFlags.ARROW_BASED) || params.move.hasFlag(MoveFlags.PULSE_MOVE))
-    );
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
   }
+
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    return super.canApply(params) && params.damage > 0;
+  }
+
+  public gate({ move }: PostMoveInteractionAbAttrParams): boolean {
+    return move.hasFlag(MoveFlags.ARROW_BASED) || move.hasFlag(MoveFlags.PULSE_MOVE);
+  }
+
   override apply({ pokemon, opponent }: PostMoveInteractionAbAttrParams): void {
     DEADEYE_MARK.set(pokemon, opponent);
     globalScene.phaseManager.queueMessage(
@@ -1229,9 +1243,41 @@ export class DeadeyeMarkAbAttr extends PostAttackAbAttr {
 function deadeyeApplies(user: Pokemon, target: Pokemon | null, move: Move): boolean {
   return !!target && DEADEYE_MARK.get(user) === target && move.hasFlag(MoveFlags.PULSE_MOVE) && target.isOnField();
 }
-export class DeadeyeCritAbAttr extends ConditionalCritAbAttr {
+export class DeadeyeCritAbAttr extends ConditionalCritAbAttr implements GatedAttr<ConditionalCritAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: ConditionalCritAbAttrParams) => boolean) | undefined;
+
+  /**
+   * The old constructor closure was `deadeyeApplies` (a target exists, it is the foe I marked, the move is a pulse move,
+   * the foe is on the field). The pulse-move rule is a design condition a player may want to change, so it now lives in
+   * the editable `gate`; the base class gets an always-true closure and its `canApply` only adds "not already a crit".
+   */
   constructor() {
-    super(deadeyeApplies);
+    super(() => true);
+  }
+
+  /**
+   * Tier B (ability studio spec 3.1). The original order was: not already critical, a target exists, the target is my
+   * mark, the move is a pulse move, the target is on the field. Every clause is pure (no RNG, no side effect), so the
+   * pulse-move clause may move in front of the two memory clauses without changing any result: `guards` = not already
+   * critical (the base class with its always-true closure) and a target exists, `gate` = the move is a pulse move
+   * (library condition), `residual` = the target is the foe I marked (a private memory, no library condition yet,
+   * R-B13-34) and it is on the field.
+   */
+  override canApply(params: ConditionalCritAbAttrParams): boolean {
+    return gatedCanApply<ConditionalCritAbAttrParams>(this, params);
+  }
+
+  public guards(params: ConditionalCritAbAttrParams): boolean {
+    return super.canApply(params) && !!params.target;
+  }
+
+  public gate({ move }: ConditionalCritAbAttrParams): boolean {
+    return move.hasFlag(MoveFlags.PULSE_MOVE);
+  }
+
+  public residual({ pokemon, target }: ConditionalCritAbAttrParams): boolean {
+    return DEADEYE_MARK.get(pokemon) === target && target.isOnField();
   }
 }
 export class DeadeyeMarkerAbAttr extends AbAttr {
@@ -1249,12 +1295,43 @@ export function clearDeadeyeMarksFor(pokemon: Pokemon): void {
   }
 }
 
-export class CenterSpreadReductionAbAttr extends ReceivedMoveDamageMultiplierAbAttr {
-  constructor() {
-    super((_holder, _attacker, move) => move.isMultiTarget(), 0.75);
+export class CenterSpreadReductionAbAttr
+  extends ReceivedMoveDamageMultiplierAbAttr
+  implements GatedAttr<PreDefendModifyDamageAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreDefendModifyDamageAbAttrParams) => boolean) | undefined;
+
+  /**
+   * The old constructor closure was `move.isMultiTarget()`; it is now the editable `gate` and the base class gets an
+   * always-true closure. The damage multiplier is an ability studio param (the default is the original 0.75).
+   */
+  constructor(damageMultiplier = 0.75) {
+    super(() => true, damageMultiplier);
+  }
+
+  /** Tier B (ability studio spec 3.1): the one clause of the original closure lives in `gate`; there is no residual. */
+  override canApply(params: PreDefendModifyDamageAbAttrParams): boolean {
+    return gatedCanApply<PreDefendModifyDamageAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the move is a spread move (`Move.isMultiTarget`, even when only one target is left). */
+  public gate({ move }: PreDefendModifyDamageAbAttrParams): boolean {
+    return move.isMultiTarget();
   }
 }
 export class CenterOfAttentionAbAttr extends AbAttr {
+  /** The stat that falls on a foe that hit my ally instead of me (ability studio param; the default is Sp. Atk). */
+  public readonly penaltyStat: BattleStat;
+  /** The stage change of that stat (ability studio param; the default is the original -1). */
+  public readonly penaltyStages: number;
+
+  constructor(penaltyStat: BattleStat = Stat.SPATK, penaltyStages = -1) {
+    super();
+    this.penaltyStat = penaltyStat;
+    this.penaltyStages = penaltyStages;
+  }
+
   override apply(): void {}
 }
 
@@ -1319,10 +1396,28 @@ export function tryEclipseWing(defender: Pokemon, source: Pokemon | undefined): 
   return true;
 }
 
-export class EclipseWingTurnEndAbAttr extends PostTurnAbAttr {
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
-    return ECLIPSE_COUNTER_TARGET.get(pokemon)?.isFainted() === true && !pokemon.isFainted();
+export class EclipseWingTurnEndAbAttr extends PostTurnAbAttr implements GatedAttr<AbAttrBaseParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /**
+   * Tier B (ability studio spec 3.1). The original order was: the foe my counter-strike aimed at has fainted, then I have
+   * not fainted. Both clauses are pure (no RNG, no side effect), so "I have not fainted" may come first without changing
+   * any result: `guards` = I have not fainted (the shared safety rule), `gate` = the foe my counter-strike aimed at has
+   * fainted (a private memory, no library condition yet, R-B13-35). There is no residual.
+   */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
   }
+
+  public guards({ pokemon }: AbAttrBaseParams): boolean {
+    return !pokemon.isFainted();
+  }
+
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
+    return ECLIPSE_COUNTER_TARGET.get(pokemon)?.isFainted() === true;
+  }
+
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
     ECLIPSE_COUNTER_TARGET.delete(pokemon);
     if (!simulated) {
@@ -1332,32 +1427,79 @@ export class EclipseWingTurnEndAbAttr extends PostTurnAbAttr {
 }
 
 const SPIRIT_PUNCH_RECORD = new WeakMap<Pokemon, object>();
-export class SpiritPunchAbAttr extends PostAttackAbAttr {
+export class SpiritPunchAbAttr extends PostAttackAbAttr implements GatedAttr<PostMoveInteractionAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Power of the echo as a percent of the move's power (ability studio param; the default is the original 30). */
+  public readonly echoPercent: number;
+  /** Power of the echo when I have the bonus type, in percent (ability studio param; the default is the original 50). */
+  public readonly bonusEchoPercent: number;
+  /** The type of the echo (ability studio param; the default is the original Ghost). */
+  public readonly echoType: PokemonType;
+  /** The holder type that gets the stronger echo (ability studio param; the default is the original Ghost). */
+  public readonly bonusType: PokemonType;
+
+  /**
+   * The first two arguments are the base class's (attack condition, show ability); both stay `undefined` for every
+   * shipped user so the base defaults apply, exactly as when this class had no constructor.
+   */
+  constructor(
+    attackCondition?: ConstructorParameters<typeof PostAttackAbAttr>[0],
+    showAbility?: boolean,
+    echoPercent = 30,
+    bonusEchoPercent = 50,
+    echoType: PokemonType = PokemonType.GHOST,
+    bonusType: PokemonType = PokemonType.GHOST,
+  ) {
+    super(attackCondition, showAbility);
+    this.echoPercent = echoPercent;
+    this.bonusEchoPercent = bonusEchoPercent;
+    this.echoType = echoType;
+    this.bonusType = bonusType;
+  }
+
+  /**
+   * Tier B (ability studio spec 3.1), original clause order, all clauses pure, no RNG:
+   * `guards` = the base attack condition (a library condition through the "ctor:0" binding), damage was dealt, the hit
+   * was not blocked (no library conditions yet, R-B13-3 and R-B13-4); `gate` = the move is a punching move (library
+   * condition); `residual` = the move was a single hit, it is not one of the signature follow-up moves, and my last move
+   * was not already echoed (R-B13-5, a private once-per-move memory; R-B13-36 and R-B13-37 for the other two).
+   */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    return super.canApply(params) && params.damage > 0 && params.hitResult < HitResult.NO_EFFECT;
+  }
+
+  public gate({ move }: PostMoveInteractionAbAttrParams): boolean {
+    return move.hasFlag(MoveFlags.PUNCHING_MOVE);
+  }
+
+  public residual(params: PostMoveInteractionAbAttrParams): boolean {
     const record = params.pokemon.getLastXMoves(1)[0] as object | undefined;
     return (
-      super.canApply(params)
-      && params.damage > 0
-      && params.hitResult < HitResult.NO_EFFECT
-      && params.move.hasFlag(MoveFlags.PUNCHING_MOVE)
-      && params.pokemon.turnData.hitCount <= 1
+      params.pokemon.turnData.hitCount <= 1
       && !isSignatureFollowup(params.move)
       && !!record
       && SPIRIT_PUNCH_RECORD.get(params.pokemon) !== record
     );
   }
+
   override apply({ pokemon, opponent, move, simulated }: PostMoveInteractionAbAttrParams): void {
     SPIRIT_PUNCH_RECORD.set(pokemon, pokemon.getLastXMoves(1)[0] as object);
     if (simulated || opponent.isFainted()) {
       return;
     }
-    const multiplier = pokemon.isOfType(PokemonType.GHOST) ? 0.5 : 0.3;
+    const multiplier = (pokemon.isOfType(this.bonusType) ? this.bonusEchoPercent : this.echoPercent) / 100;
     globalScene.phaseManager.queueMessage(`${pokemon.getNameToRender()}'s Spirit Punch echoed!`);
     globalScene.phaseManager.unshiftNew(
       "ErSignatureFollowupPhase",
       pokemon,
       opponent,
-      signatureFollowup(move.id, move.power * multiplier, PokemonType.GHOST, move.category, true),
+      signatureFollowup(move.id, move.power * multiplier, this.echoType, move.category, true),
     );
   }
 }
@@ -1723,8 +1865,18 @@ export function applyCenterOfAttentionPenalty(attacker: Pokemon, target: Pokemon
     if (record) {
       CENTER_PENALTY_RECORD.set(attacker, record);
     }
+    // The protector's own marker attr says which stat falls and by how much; without one the original Sp. Atk -1 applies.
+    const marker = protectingAlly
+      .getAllActiveAbilityAttrs()
+      .find(attr => attr?.constructor?.name === "CenterOfAttentionAbAttr") as CenterOfAttentionAbAttr | undefined;
     globalScene.phaseManager.queueMessage(`${protectingAlly.getNameToRender()} drew the attacker's attention!`);
-    globalScene.phaseManager.unshiftNew("StatStageChangePhase", attacker.getBattlerIndex(), false, [Stat.SPATK], -1);
+    globalScene.phaseManager.unshiftNew(
+      "StatStageChangePhase",
+      attacker.getBattlerIndex(),
+      false,
+      [marker?.penaltyStat ?? Stat.SPATK],
+      marker?.penaltyStages ?? -1,
+    );
   }
 }
 const CENTER_PENALTY_RECORD = new WeakMap<Pokemon, object>();

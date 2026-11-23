@@ -974,6 +974,8 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
       "BadDreamsImmunityAbAttr",
       "BlockRedirectAbAttr",
       "BugPowderImmunityAbAttr",
+      "CenterOfAttentionAbAttr",
+      "DeadeyeMarkerAbAttr",
       "DoubleSelfInflictedDamageAbAttr",
       "DrenchImmunityAbAttr",
       "FloatAbAttr",

@@ -380,4 +380,13 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     trapped: new BooleanHolder(false),
     simulated: false,
   }),
+  // B13 chunk 4 (Deadeye Draw): the engine asks the ATTACKER (`pokemon`) whether a hit on `target` is a sure crit
+  // (`applyAbAttrs("ConditionalCritAbAttr", { pokemon: source, isCritical, target, move })`, field/pokemon.ts).
+  "calc.crit-roll": ctx => ({
+    pokemon: ctx.holder,
+    target: ctx.foe,
+    move: ctx.move,
+    isCritical: new BooleanHolder(false),
+    simulated: false,
+  }),
 };

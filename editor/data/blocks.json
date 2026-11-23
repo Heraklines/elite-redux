@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "10742527cbb1df",
-  "hash": "1d112be5f01e18",
+  "vocabularyHash": "154ee2e9860e4f",
+  "hash": "1ad587e5ec451f",
   "blocks": [
     {
       "id": "block.anneal",
@@ -267,6 +267,359 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.center-of-attention",
+      "className": "CenterOfAttentionAbAttr",
+      "label": "Punish a foe that hits my ally instead of me",
+      "summary": "When a foe damages one of my allies instead of me, that foe's Sp. Atk changes by -1 stage after the move. It works once per move the foe used.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "lower the attacker's stat",
+        "protect my ally",
+        "draw attention",
+        "follow me penalty",
+        "guard duty",
+        "center of attention"
+      ],
+      "examples": [
+        "A foe that hits my partner instead of me loses 1 Sp. Atk"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Stat that is changed on the foe",
+          "control": "select",
+          "default": "Sp. Atk",
+          "editable": true,
+          "options": [
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Sp. Def",
+            "Speed"
+          ]
+        },
+        {
+          "id": "stages",
+          "label": "Stage change (negative lowers, -6 to 6)",
+          "control": "number",
+          "default": -1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The foe's move must have dealt damage and must not be a status move",
+        "Only when the foe hit my ally and not me, and I am not the one being hit myself",
+        "Not when the foe's last move was aimed at me (its target list includes me)",
+        "Once per move the foe used (a private record inside the class)",
+        "The change always goes to the foe that attacked, never to me (fixed in the class)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "stat",
+          "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE for the whole rule, justified: the moment and every condition live in one engine function (applyCenterOfAttentionPenalty) that move-effect-phase.ts calls by name for EVERY damaging hit and that looks for this marker on the TARGET'S ALLY (and not on the holder). No dispatched hook exists for 'a foe damaged my ally', and the conditions read the foe's last move record and a once-per-move record, so a rebuilt attr cannot carry them. Requested: a WHEN 'When a foe damages my ally' with the slots holder (me), other (the foe), ally (the one hit), move and damage, plus the atoms 'the foe's move did not target me' and 'not yet penalised for this move' (R-B13-41), and the flag-key entry for while.active (R-B13-19; the minimal entry was added like the earlier chunks). Review of the numbers: the stat (Sp. Atk) and the change (-1) were literals, now constructor arguments 0 and 1 with the old values as defaults; applyCenterOfAttentionPenalty reads them from the protector's own marker attr, and uses Sp. Atk and -1 when none is found (same as before). Users: Center of Attention (5993, attr 1). ODDITIES (not fixed): (1) the function ignores `simulated`; (2) in a double battle with two marker holders the FIRST ally found in field order is the protector; (3) if the foe has no last move record the once-per-move check is skipped, so the penalty can repeat; (4) a spread move that hits both me and my ally is excluded only through the target list of the record.",
+      "uses": 1
+    },
+    {
+      "id": "block.center-spread-reduction",
+      "className": "CenterSpreadReductionAbAttr",
+      "label": "Take less damage from spread moves",
+      "summary": "While the game calculates the damage I take, spread moves are multiplied by 0.75. Example: 0.75 = takes a quarter less, even when only one target is left.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.damage-taken",
+      "whenLabel": "While the game calculates damage I take",
+      "synonyms": [
+        "spread move resist",
+        "resist earthquake",
+        "less damage from multi target moves",
+        "group move reduction",
+        "center of attention",
+        "doubles tank"
+      ],
+      "examples": [
+        "Take 25% less damage from moves that hit several Pokemon"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Damage multiplier (0.75 = a quarter less)",
+          "control": "number",
+          "default": 0.75,
+          "editable": true,
+          "min": 0,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-damage-taken",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.deadeye-crit",
+      "className": "DeadeyeCritAbAttr",
+      "label": "Always crit my marked foe with pulse moves",
+      "summary": "While the game decides if a hit is a critical hit, my pulse moves always crit the foe I marked, as long as it is on the field.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.crit-roll",
+      "whenLabel": "While the game decides if a hit is critical",
+      "synonyms": [
+        "guaranteed crit on mark",
+        "always crit",
+        "sure crit",
+        "crit the marked foe",
+        "sniper crit",
+        "deadeye draw"
+      ],
+      "examples": [
+        "My pulse moves always crit the foe I marked earlier"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must not already be a critical hit (nothing is left to force)",
+        "A target must exist",
+        "The target must be the foe I marked and still be on the field (a private memory kept by the marking part, R-B13-34)"
+      ],
+      "effect": {
+        "id": "effect.force-crit",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.deadeye-mark",
+      "className": "DeadeyeMarkAbAttr",
+      "label": "Mark the foe I hit with an arrow or pulse move",
+      "summary": "When my arrow or pulse move damages a foe, that foe becomes my mark. Only one foe is marked at a time, and the mark ends when either of us leaves the field.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "mark target",
+        "tag the foe",
+        "lock on",
+        "sniper mark",
+        "deadeye draw",
+        "pick a target",
+        "focus on one foe"
+      ],
+      "examples": [
+        "After my aura sphere or arrow hits, remember that foe so my next moves can focus on it"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "lib": "move.damaging",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really deal damage (checked inside the class until the librarian adds that condition, R-B13-3)",
+        "Only one foe can be marked at a time: a new mark replaces the old one"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE for the EFFECT only. The trigger (after my hit) and every condition are separate: the attack condition is a real constructor slot bound to move.damaging, the arrow-or-pulse rule is the gate (library atoms). Why the effect cannot be split with today's blocks: it stores a REFERENCE to the foe I hit in a private one-slot memory that three other places read by name (DeadeyeCritAbAttr, shouldDeadeyeUseLowerDefense in pokemon.ts, clearDeadeyeMarksFor in Pokemon.leaveField); the library has no 'mark a target' effect or 'the target is my mark' condition (requested as R-B13-34). It is a single assignment plus a message. 'damage > 0' stays inside the class (guard position, as in HeavyweightDrop) until R-B13-3 exists. Users: Deadeye Draw (5984, attr 0). ODDITIES (not fixed): (1) apply ignores `simulated` (no engine path simulates PostAttack today); (2) the ability text says 'cannon or arrow damage marks' but only pulse moves (cannon) benefit from the mark: DeadeyeCritAbAttr and the defence rule test PULSE_MOVE only, so an arrow-based hit marks a foe for nothing; (3) the mark is also replaced when a second foe is hit in a double battle, as the text says 'one foe at a time'.",
+      "uses": 1
+    },
+    {
+      "id": "block.deadeye-marker",
+      "className": "DeadeyeMarkerAbAttr",
+      "label": "Hit my marked foe's weaker defence with pulse moves",
+      "summary": "While I have this, my pulse moves against the foe I marked are calculated against whichever of its Defense and Sp. Def is lower.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "target weaker defense",
+        "ignore the stronger defense",
+        "exploit weakness",
+        "lower defense stat",
+        "deadeye draw",
+        "pierce"
+      ],
+      "examples": [
+        "My pulse moves hit the marked foe's weaker defence, like Deadeye Draw"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only against the foe I marked, only with a pulse move, only while that foe is on the field (tested inside the damage calculation, not by this ability: R-B13-34 and R-B13-38 ask for a moment and conditions)",
+        "It does nothing when the attacker's abilities are ignored (Mold Breaker style)",
+        "The weaker stat is compared with each stat's current value including stages; Defense wins a tie"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.eclipse-wing-turn-end",
+      "className": "EclipseWingTurnEndAbAttr",
+      "label": "Faint if my counter-strike knocked out its target",
+      "summary": "At the end of the turn, if the foe my counter-strike aimed at has fainted, I lose all my remaining HP and faint too.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "sacrifice after counter",
+        "faint at turn end",
+        "trade knock out",
+        "self knock out",
+        "eclipse wing",
+        "last stand"
+      ],
+      "examples": [
+        "If my counter-attack knocks the foe out, I faint at the end of the turn"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [
+        "not-fainted"
+      ],
+      "feasibility": [
+        "Only a Pokemon that struck back this battle has a foe to look at (the counter-strike is a separate part, Eclipse Wing's survive at 1 HP)",
+        "The memory of the foe is cleared every time this triggers, even if I do not faint"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE for the EFFECT only. The trigger (end of every turn) and the conditions are separate: the safety rule is the shared guard not-fainted, the 'my counter target fainted' clause is the editable gate. Why the effect cannot be split with today's blocks: it makes me lose ALL my remaining HP (damageAndUpdate(holder.hp, indirect)) and clears a private per-Pokemon memory; the library has no 'faint myself' effect and no memory-clearing block (requested as R-B13-35 `effect.faint-self` and the shared `effect.reset-memory`, R-B13-23), and `effect.recoil` is a share of damage dealt, not all remaining HP. The gate is a legacy-closure binding until R-B13-35 adds the atom 'the foe I struck back at has fainted' (it reads the WeakMap that tryEclipseWing fills). Users: Eclipse Wing (5971, attr 1; attr 0 is the power boost, attr 2 the marker). ODDITIES (not fixed): (1) apply clears the memory BEFORE its simulated check, so a simulated call spends it; no engine path simulates PostTurn today; (2) the guard now runs before the gate (order swapped, both pure); (3) because the memory is only cleared when this triggers, a counter target that is still alive keeps the memory for later turns, so the faint can happen turns later if that foe is knocked out by someone else.",
+      "uses": 1
+    },
+    {
+      "id": "block.encore-set-reset",
+      "className": "EncoreSetResetAbAttr",
+      "label": "Forget the move I played before when I enter",
+      "summary": "When I enter the battle, the damaging move I remembered from before is wiped, so the first move I use has nothing to echo.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "reset replay memory",
+        "forget last move",
+        "clear echo memory",
+        "fresh start on switch in",
+        "encore set",
+        "forget previous move"
+      ],
+      "examples": [
+        "Every time I come in, I forget which move I used before, so there is nothing to replay"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified: the effect is the reset of a private per-Pokemon record (previous move, last counted move record) that only EncoreSetAbAttr reads and writes; the library has no memory block to express a reset of it (requested as `effect.reset-memory`, R-B13-23, the same block Anneal's, Porous' and Setlist's resets need). It is a single assignment, so there is nothing further to split. The trigger is a normal switch-in WHEN and the class has no condition. Users: Encore Set (5988, attr 0). ODDITIES (not fixed): (1) apply ignores `simulated`; no engine path simulates PostSummon today; (2) the record is a WeakMap entry keyed by the Pokemon, so a replacement summoned from the party never sees an old record and the reset only matters when the same Pokemon comes back in.",
+      "uses": 1
     },
     {
       "id": "block.fan-favorite-accuracy",
@@ -1992,6 +2345,149 @@
         "do": true
       },
       "packageReason": "PACKAGE, justified: the effect is the reset of a private per-Pokemon record (a four-field state machine) that only the Setlist classes and finishSetlistMove use; the library has no memory block to express a reset of it (requested as `effect.reset-memory`, R-B13-23, the same block Anneal's and Porous' resets need). It is a single assignment, so there is nothing further to split. The trigger is a normal switch-in WHEN and the class has no condition. Users: Setlist (5989, attr 0). ODDITIES (not fixed): (1) apply ignores `simulated`; no engine path simulates PostSummon today. (2) SetlistTrackAbAttr, a fourth Setlist class in the same file, is never attached to any ability (the builder wires only reset, power and accuracy); the recording is done by finishSetlistMove from move-effect-phase.ts, so that class is dead code and is not in the inventory.",
+      "uses": 1
+    },
+    {
+      "id": "block.spirit-punch",
+      "className": "SpiritPunchAbAttr",
+      "label": "Echo my punching move as a second weaker hit",
+      "summary": "After my punching move hurts the target, the same move hits again as a Ghost-type echo at 30% power (50% if I am Ghost type). It ignores the target's Defense boosts.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "double punch",
+        "second hit",
+        "echo hit",
+        "ghost echo",
+        "spirit punch",
+        "ghostly follow up",
+        "extra punch"
+      ],
+      "examples": [
+        "My punches hit a second time as a Ghost echo at 30% power"
+      ],
+      "params": [
+        {
+          "id": "echoPercent",
+          "label": "Echo power (percent of the move's power)",
+          "control": "number",
+          "default": 30,
+          "editable": true,
+          "min": 1,
+          "max": 200,
+          "step": 5,
+          "gateIndependent": true
+        },
+        {
+          "id": "bonusEchoPercent",
+          "label": "Echo power when I have the bonus type (percent)",
+          "control": "number",
+          "default": 50,
+          "editable": true,
+          "min": 1,
+          "max": 200,
+          "step": 5,
+          "gateIndependent": true
+        },
+        {
+          "id": "echoType",
+          "label": "Type of the echo",
+          "control": "select",
+          "default": "Ghost",
+          "editable": true,
+          "options": [
+            "Normal",
+            "Fighting",
+            "Flying",
+            "Poison",
+            "Ground",
+            "Rock",
+            "Bug",
+            "Ghost",
+            "Steel",
+            "Fire",
+            "Water",
+            "Grass",
+            "Electric",
+            "Psychic",
+            "Ice",
+            "Dragon",
+            "Dark",
+            "Fairy"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "bonusType",
+          "label": "My type that makes the echo stronger",
+          "control": "select",
+          "default": "Ghost",
+          "editable": true,
+          "options": [
+            "Normal",
+            "Fighting",
+            "Flying",
+            "Poison",
+            "Ground",
+            "Rock",
+            "Bug",
+            "Ghost",
+            "Steel",
+            "Fire",
+            "Water",
+            "Grass",
+            "Electric",
+            "Psychic",
+            "Ice",
+            "Dragon",
+            "Dark",
+            "Fairy"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "lib": "move.damaging",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really deal damage and must not be blocked or immune (checked inside the class until the librarian adds those conditions, R-B13-3 and R-B13-4)",
+        "The move must be a single hit, not a multi-hit move (R-B13-36)",
+        "An echo never starts another echo: the move must not be one of the ability's own follow-up moves (R-B13-37)",
+        "Once per move I used (a private record inside the class, R-B13-5)",
+        "The echo does not happen if the target has already fainted",
+        "The echo always hits, ignores the target's Defense boosts, cannot crit and triggers no on-KO effects (fixed in the class)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "echoPercent",
+          "bonusEchoPercent",
+          "echoType",
+          "bonusType"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE for the EFFECT only. The trigger (after my hit) and the conditions that can be expressed are separate and bound to library atoms: the attack condition (ctor:0, move.damaging) and the punching rule (gate, move.flag). Why the effect cannot be split with today's blocks: it queues a SCRIPTED follow-up of the SAME move I just used at a share of ITS power (and the move's own category), with flags (always hits, ignores defence boosts, cannot crit, suppresses on-KO) held in module WeakSets; effect.scripted-move takes a fixed move id and a fixed power, so it cannot echo 'the move I used'. Requested: R-B13-40 `effect.echo-move` (echo the move I used at {percent}% power as a {type} hit, with the four fixed flags). Several conditions stay inside the class as guards/residual and are listed as 'also requires' with requests: damage dealt (R-B13-3), hit not blocked (R-B13-4), once per move (R-B13-5), a single-hit move (R-B13-36) and not-one-of-my-own-follow-ups (R-B13-37, a correctness rule that should become a guard). Review of the numbers: the 30% / 50% powers and the two types were literals; they are now trailing constructor arguments 2 to 5 (defaults reproduce the old values: 30/100 and 50/100 are the very doubles 0.3 and 0.5). Users: Spirit Punch (5983, attr 0). ODDITIES (not fixed): (1) apply stores the move record BEFORE its simulated and fainted-target checks, so a simulated call or a KO still spends the once-per-move memory; (2) a move with variable power (power -1) or 0 echoes at power max(1, floor(...)) because the helper clamps it; (3) the 'cannot crit' and 'no on-KO effects' of the ability text are enforced by the scripted move outside this class.",
       "uses": 1
     },
     {

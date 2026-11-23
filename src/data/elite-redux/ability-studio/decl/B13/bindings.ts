@@ -219,3 +219,56 @@ bindLegacyClosure(
   "Fan Favorite accuracy: livingBenchCount(holder) > 0, i.e. a party member of my side that is neither fainted nor on the field; needs the atom party.bench-count (R-B13-29)",
   "gate",
 );
+
+// ---------------------------------------------------------------------------------------------
+// Chunk 4: Eclipse Wing (5971, attr 1), Spirit Punch (5983), Deadeye Draw (5984, attrs 0 and 1), Center of Attention
+// (5993, attr 0). The marker classes (DeadeyeMarkerAbAttr, CenterOfAttentionAbAttr) and the entry reset
+// (EncoreSetResetAbAttr) have no condition to bind.
+// ---------------------------------------------------------------------------------------------
+
+// DeadeyeMarkAbAttr (Deadeye Draw attr 0), ctor:0 = the base class's default attack condition `move.category !== STATUS`.
+bindCondition(5984, 0, { id: "move.damaging" }, "ctor:0");
+
+// DeadeyeMarkAbAttr (Deadeye Draw attr 0), gate = clause 3 of canApply: `move.hasFlag(ARROW_BASED) || move.hasFlag(PULSE_MOVE)`.
+// Clauses 1 and 2 (base attack condition, damage > 0) are the class's `guards`.
+bindCondition(
+  5984,
+  0,
+  {
+    any: [
+      { id: "move.flag", flag: "ARROW_BASED" },
+      { id: "move.flag", flag: "PULSE_MOVE" },
+    ],
+  },
+  "gate",
+);
+
+// DeadeyeCritAbAttr (Deadeye Draw attr 1), gate = the pulse-move clause of the old closure `deadeyeApplies`:
+// `move.hasFlag(PULSE_MOVE)`. "Not already critical" and "a target exists" are the class's `guards`; "the target is my
+// mark and on the field" is its `residual` (a private memory, R-B13-34).
+bindCondition(5984, 1, { id: "move.flag", flag: "PULSE_MOVE" }, "gate");
+
+// CenterSpreadReductionAbAttr (Center of Attention attr 0), gate = the old closure `move.isMultiTarget()`.
+bindLegacyClosure(
+  5993,
+  0,
+  "Center of Attention spread reduction: move.isMultiTarget(), i.e. the move's target kind is one of ALL_OTHERS, ALL_NEAR_OTHERS, ALL_NEAR_ENEMIES, ALL_ENEMIES, USER_AND_ALLIES, ALL, USER_SIDE, ENEMY_SIDE, BOTH_SIDES; move.target-kind groups these differently (PARTY, USER, NEAR_ALLY, ALLY and USER_OR_NEAR_ALLY would match too); needs the atom move.hits-several-targets (R-B13-39)",
+  "gate",
+);
+
+// EclipseWingTurnEndAbAttr (Eclipse Wing attr 1), gate = clause 1 of canApply:
+// `ECLIPSE_COUNTER_TARGET.get(holder)?.isFainted() === true` (clause 2, "I have not fainted", is the guard not-fainted).
+bindLegacyClosure(
+  5971,
+  1,
+  "Eclipse Wing turn end: ECLIPSE_COUNTER_TARGET.get(holder)?.isFainted() === true, a private per-Pokemon memory filled by tryEclipseWing with the foe my counter-strike aimed at; needs the atom for 'the foe I struck back at has fainted' (R-B13-35)",
+  "gate",
+);
+
+// SpiritPunchAbAttr (Spirit Punch attr 0), ctor:0 = the base class's default attack condition `move.category !== STATUS`.
+bindCondition(5983, 0, { id: "move.damaging" }, "ctor:0");
+
+// SpiritPunchAbAttr (Spirit Punch attr 0), gate = clause 4 of canApply: `move.hasFlag(PUNCHING_MOVE)`.
+// Clauses 1 to 3 (base attack condition, damage > 0, hit not blocked) are the class's `guards`, clauses 5 to 8 (a
+// single-hit move, not a follow-up move, a last move record that was not counted yet) its `residual`.
+bindCondition(5983, 0, { id: "move.flag", flag: "PUNCHING_MOVE" }, "gate");
