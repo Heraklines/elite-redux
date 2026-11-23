@@ -2200,6 +2200,14 @@
     "bst": 285
   },
   {
+    "const": "SPECIES_CHROMIGHTY",
+    "name": "Chromighty",
+    "slug": "chromighty",
+    "id": 70059,
+    "dex": null,
+    "bst": 525
+  },
+  {
     "const": "SPECIES_CINCCINO",
     "name": "Cinccino",
     "slug": "cinccino",
@@ -2438,6 +2446,14 @@
     "id": 764,
     "dex": 764,
     "bst": 510
+  },
+  {
+    "const": "SPECIES_CONKAPITATOR",
+    "name": "Conkapitator",
+    "slug": "conkapitator",
+    "id": 70035,
+    "dex": null,
+    "bst": 505
   },
   {
     "const": "SPECIES_CONKELDURR",
@@ -3216,6 +3232,14 @@
     "bst": 485
   },
   {
+    "const": "SPECIES_DIPPOWDOWN",
+    "name": "Dippowdown",
+    "slug": "dippowdown",
+    "id": 70036,
+    "dex": null,
+    "bst": 525
+  },
+  {
     "const": "SPECIES_DISCUPID",
     "name": "Discupid",
     "slug": "discupid",
@@ -3944,6 +3968,14 @@
     "bst": 580
   },
   {
+    "const": "SPECIES_EQUILIBRA",
+    "name": "Equilibra",
+    "slug": "equilibra",
+    "id": 70038,
+    "dex": null,
+    "bst": 559
+  },
+  {
     "const": "SPECIES_ERATICATE",
     "name": "Eraticate",
     "slug": "eraticate",
@@ -4108,6 +4140,14 @@
     "name": "Falinks",
     "slug": "falinks",
     "id": 870,
+    "dex": 870,
+    "bst": 470
+  },
+  {
+    "const": "SPECIES_FALINKS_CONVERGENT",
+    "name": "Falinks Convergent",
+    "slug": "falinks_convergent",
+    "id": 70052,
     "dex": 870,
     "bst": 470
   },
@@ -4390,14 +4430,6 @@
     "id": 10306,
     "dex": 670,
     "bst": 391
-  },
-  {
-    "const": "SPECIES_FLOETTE_ETERNAL_FLOWER",
-    "name": "Floette Eternal Flower",
-    "slug": "floette_eternal_flower",
-    "id": 10308,
-    "dex": 670,
-    "bst": 551
   },
   {
     "const": "SPECIES_FLOETTE_ETERNAL_FLOWER_MEGA",
@@ -5784,12 +5816,28 @@
     "bst": 405
   },
   {
+    "const": "SPECIES_GURDURUR",
+    "name": "Gurdurur",
+    "slug": "gurdurur",
+    "id": 70034,
+    "dex": null,
+    "bst": 405
+  },
+  {
     "const": "SPECIES_GUZZLORD",
     "name": "Guzzlord",
     "slug": "guzzlord",
     "id": 799,
     "dex": 799,
     "bst": 570
+  },
+  {
+    "const": "SPECIES_GUZZLORD_M",
+    "name": "Guzzlord M",
+    "slug": "guzzlord_m",
+    "id": 70062,
+    "dex": 799,
+    "bst": 670
   },
   {
     "const": "SPECIES_GYARADEATH",
@@ -6448,6 +6496,14 @@
     "bst": 288
   },
   {
+    "const": "SPECIES_INTANGROWTH",
+    "name": "Intangrowth",
+    "slug": "intangrowth",
+    "id": 70056,
+    "dex": null,
+    "bst": 535
+  },
+  {
     "const": "SPECIES_INTELEON",
     "name": "Inteleon",
     "slug": "inteleon",
@@ -6576,6 +6632,14 @@
     "bst": 590
   },
   {
+    "const": "SPECIES_IRON_STREAM",
+    "name": "Iron Stream",
+    "slug": "iron_stream",
+    "id": 70053,
+    "dex": null,
+    "bst": 590
+  },
+  {
     "const": "SPECIES_IRON_THORNS",
     "name": "Iron Thorns",
     "slug": "iron_thorns",
@@ -6670,6 +6734,14 @@
     "id": 189,
     "dex": 189,
     "bst": 535
+  },
+  {
+    "const": "SPECIES_JUSTYKE",
+    "name": "Justyke",
+    "slug": "justyke",
+    "id": 70037,
+    "dex": null,
+    "bst": 379
   },
   {
     "const": "SPECIES_JYNX",
@@ -7352,6 +7424,14 @@
     "bst": 550
   },
   {
+    "const": "SPECIES_LICKILICKING",
+    "name": "Lickilicking",
+    "slug": "lickilicking",
+    "id": 70039,
+    "dex": null,
+    "bst": 555
+  },
+  {
     "const": "SPECIES_LICKILICKY",
     "name": "Lickilicky",
     "slug": "lickilicky",
@@ -7396,6 +7476,14 @@
     "name": "Lilligant",
     "slug": null,
     "id": 6549,
+    "dex": 549,
+    "bst": 500
+  },
+  {
+    "const": "SPECIES_LILLIGANT_VERDANT",
+    "name": "Lilligant Verdant",
+    "slug": "lilligant_verdant",
+    "id": 70057,
     "dex": 549,
     "bst": 500
   },
@@ -7990,6 +8078,14 @@
     "id": 10122,
     "dex": 310,
     "bst": 630
+  },
+  {
+    "const": "SPECIES_MANGLING_BLADE",
+    "name": "Mangling Blade",
+    "slug": "mangling_blade",
+    "id": 70040,
+    "dex": null,
+    "bst": 590
   },
   {
     "const": "SPECIES_MANKEY",
@@ -8696,6 +8792,14 @@
     "bst": 435
   },
   {
+    "const": "SPECIES_MISHAMANUS",
+    "name": "Mishamanus",
+    "slug": "mishamanus",
+    "id": 70051,
+    "dex": null,
+    "bst": 555
+  },
+  {
     "const": "SPECIES_MISMAGIUS",
     "name": "Mismagius",
     "slug": "mismagius",
@@ -9172,6 +9276,14 @@
     "name": "Octillery",
     "slug": "octillery",
     "id": 224,
+    "dex": 224,
+    "bst": 510
+  },
+  {
+    "const": "SPECIES_OCTILLERY_REDUX",
+    "name": "Octillery Redux",
+    "slug": "octillery_redux",
+    "id": 70041,
     "dex": 224,
     "bst": 510
   },
@@ -9696,6 +9808,14 @@
     "bst": 525
   },
   {
+    "const": "SPECIES_PENTASNUG",
+    "name": "Pentasnug",
+    "slug": "pentasnug",
+    "id": 70044,
+    "dex": null,
+    "bst": 525
+  },
+  {
     "const": "SPECIES_PENTAWUG",
     "name": "Pentawug",
     "slug": "pentawug",
@@ -10176,6 +10296,14 @@
     "bst": 410
   },
   {
+    "const": "SPECIES_PONYTA_REDUX",
+    "name": "Ponyta Redux",
+    "slug": "ponyta_redux",
+    "id": 70047,
+    "dex": 77,
+    "bst": 410
+  },
+  {
     "const": "SPECIES_POOCHYENA",
     "name": "Poochyena",
     "slug": "poochyena",
@@ -10230,6 +10358,14 @@
     "id": 233,
     "dex": 233,
     "bst": 515
+  },
+  {
+    "const": "SPECIES_POWER_PLANT",
+    "name": "Power Plant",
+    "slug": "power_plant",
+    "id": 70045,
+    "dex": null,
+    "bst": 570
   },
   {
     "const": "SPECIES_PRIMARINA",
@@ -10376,6 +10512,14 @@
     "bst": 617
   },
   {
+    "const": "SPECIES_PYROTHON",
+    "name": "Pyrothon",
+    "slug": "pyrothon",
+    "id": 70046,
+    "dex": null,
+    "bst": 550
+  },
+  {
     "const": "SPECIES_PYUKUMUKU",
     "name": "Pyukumuku",
     "slug": "pyukumuku",
@@ -10398,6 +10542,14 @@
     "id": 10507,
     "dex": 195,
     "bst": 610
+  },
+  {
+    "const": "SPECIES_QUAKERSBY",
+    "name": "Quakersby",
+    "slug": "quakersby",
+    "id": 70061,
+    "dex": null,
+    "bst": 523
   },
   {
     "const": "SPECIES_QUAQUAVAL",
@@ -10590,6 +10742,14 @@
     "id": 10544,
     "dex": 78,
     "bst": 640
+  },
+  {
+    "const": "SPECIES_RAPIDASH_REDUX",
+    "name": "Rapidash Redux",
+    "slug": "rapidash_redux",
+    "id": 70048,
+    "dex": 78,
+    "bst": 540
   },
   {
     "const": "SPECIES_RATFIOSO",
@@ -12152,6 +12312,14 @@
     "bst": 275
   },
   {
+    "const": "SPECIES_SLABBERIGUS",
+    "name": "Slabberigus",
+    "slug": "slabberigus",
+    "id": 70054,
+    "dex": null,
+    "bst": 483
+  },
+  {
     "const": "SPECIES_SLAKING",
     "name": "Slaking",
     "slug": "slaking",
@@ -12470,6 +12638,22 @@
     "id": 209,
     "dex": 209,
     "bst": 330
+  },
+  {
+    "const": "SPECIES_SNUGLETT",
+    "name": "Snuglett",
+    "slug": "snuglett",
+    "id": 70042,
+    "dex": null,
+    "bst": 265
+  },
+  {
+    "const": "SPECIES_SNUGTRIO",
+    "name": "Snugtrio",
+    "slug": "snugtrio",
+    "id": 70043,
+    "dex": null,
+    "bst": 425
   },
   {
     "const": "SPECIES_SOBBLE",
@@ -13040,6 +13224,14 @@
     "bst": 303
   },
   {
+    "const": "SPECIES_TAGELA",
+    "name": "Tagela",
+    "slug": "tagela",
+    "id": 70055,
+    "dex": null,
+    "bst": 435
+  },
+  {
     "const": "SPECIES_TAILLOW",
     "name": "Taillow",
     "slug": "taillow",
@@ -13214,6 +13406,14 @@
     "id": 216,
     "dex": 216,
     "bst": 350
+  },
+  {
+    "const": "SPECIES_TEMPORAL_SKULL",
+    "name": "Temporal Skull",
+    "slug": "temporal_skull",
+    "id": 70060,
+    "dex": null,
+    "bst": 570
   },
   {
     "const": "SPECIES_TENTACOOL",
@@ -13710,6 +13910,14 @@
     "id": 252,
     "dex": 252,
     "bst": 320
+  },
+  {
+    "const": "SPECIES_TREMBURR",
+    "name": "Tremburr",
+    "slug": "tremburr",
+    "id": 70033,
+    "dex": null,
+    "bst": 305
   },
   {
     "const": "SPECIES_TREVENANT",
@@ -14328,6 +14536,14 @@
     "bst": 651
   },
   {
+    "const": "SPECIES_VANTARROW",
+    "name": "Vantarrow",
+    "slug": "vantarrow",
+    "id": 70058,
+    "dex": null,
+    "bst": 525
+  },
+  {
     "const": "SPECIES_VAPOREON",
     "name": "Vaporeon",
     "slug": "vaporeon",
@@ -14712,6 +14928,14 @@
     "bst": 330
   },
   {
+    "const": "SPECIES_VOLTRIEVER",
+    "name": "Voltriever",
+    "slug": "voltriever",
+    "id": 70049,
+    "dex": null,
+    "bst": 520
+  },
+  {
     "const": "SPECIES_VULLABY",
     "name": "Vullaby",
     "slug": "vullaby",
@@ -14734,6 +14958,14 @@
     "id": 2037,
     "dex": 37,
     "bst": 309
+  },
+  {
+    "const": "SPECIES_WAILBORE",
+    "name": "Wailbore",
+    "slug": "wailbore",
+    "id": 70050,
+    "dex": null,
+    "bst": 525
   },
   {
     "const": "SPECIES_WAILMER",

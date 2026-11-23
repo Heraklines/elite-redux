@@ -269,3 +269,42 @@ bindCondition(
   },
   "gate",
 ); // Flower Gift, live list NONE, SANDSTORM, STRONG_WINDS, FOG, HAIL, HEAVY_RAIN, SNOW, RAIN
+
+// =============================================================================================
+// Chunk 4 of 4. Written by hand from the live attrs (the dump printed every field of every user).
+// =============================================================================================
+
+// ---------------------------------------------------------------------------------------------
+// PostWeatherLapseHealAbAttr and PostWeatherLapseDamageAbAttr (Tier B). Slot "gate": the class's own getCondition,
+// `getWeatherCondition(...weatherTypes)` (ab-attrs.ts:7735). It answers false while the weather effect is switched off
+// (Weather.isEffectSuppressed: Cloud Nine, Air Lock), true when the arena weather is a listed one, and for a list with SUNNY or
+// HARSH_SUN also true in Grassy Terrain while any field Pokemon has Reap and Sow. field.weather is the bare arena weather and has
+// neither of the two extra rules, so no existing atom gives the same answer: every gate is legacy-closure (request R-B05-25).
+// ---------------------------------------------------------------------------------------------
+const WEATHER_GATE_REASON =
+  "the class test getWeatherCondition also says no while Cloud Nine or Air Lock switch the weather off and, for a sun list, yes in Grassy Terrain with Reap and Sow; field.weather reads only the bare arena weather (request R-B05-25)";
+bindLegacyClosure(44, 0, `Rain Dish, RAIN or HEAVY_RAIN: ${WEATHER_GATE_REASON}`, "gate"); // Rain Dish
+bindLegacyClosure(
+  87,
+  0,
+  `Dry Skin damage, SUNNY or HARSH_SUN (also Reap and Sow in Grassy Terrain): ${WEATHER_GATE_REASON}`,
+  "gate",
+); // Dry Skin
+bindLegacyClosure(87, 1, `Dry Skin heal, RAIN or HEAVY_RAIN: ${WEATHER_GATE_REASON}`, "gate"); // Dry Skin
+bindLegacyClosure(115, 1, `Ice Body, HAIL or SNOW: ${WEATHER_GATE_REASON}`, "gate"); // Ice Body
+bindLegacyClosure(5632, 4, `Sundae, HAIL or SNOW: ${WEATHER_GATE_REASON}`, "gate"); // Sundae
+bindLegacyClosure(5953, 1, `Ice Body (second dex entry), HAIL or SNOW: ${WEATHER_GATE_REASON}`, "gate"); // Ice Body
+
+// ---------------------------------------------------------------------------------------------
+// PostTerrainChangeAddBattlerTagAttr (Tier B). Slot "gate": `!!terrainTypes.find(t => t === terrain)` over the terrain the dispatch
+// passes. field.terrain reads `arena.terrainType`, which is NONE while Clueless switches field effects off, so it is not the same
+// predicate (request R-B05-29): legacy-closure until an atom reads the `terrain` slot.
+// ---------------------------------------------------------------------------------------------
+bindLegacyClosure(
+  282,
+  1,
+  "Quark Drive, ELECTRIC: the class compares the terrain the dispatch passes; field.terrain reads arena.terrainType, which says NONE while Clueless is on the field (request R-B05-29)",
+  "gate",
+); // Quark Drive
+
+// PostTurnRandomBerryEffectAbAttr (Tier C): no condition slot, nothing to bind (Craving, 5591 attr 0).

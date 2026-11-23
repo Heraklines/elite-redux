@@ -5284,7 +5284,19 @@ export class PostWeatherLapseAbAttr extends AbAttr {
 
   apply(_params: Closed<PostWeatherLapseAbAttrParams>): void {}
 
+  /** Set by the ability studio compiler to replace the weather test (the gate) on a freshly built instance. */
+  public declare gateOverride: ((params: PostWeatherLapseAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B (ability studio spec 3.1): the weather test is the GATE and it lives here, not in `canApply`; the engine asks it
+   * BEFORE `canApply` (apply-ab-attrs.ts). Untouched, it is `getWeatherCondition(...weatherTypes)`. A replaced gate is called
+   * with the same two fields the dispatch passes: the holder, and the arena weather that weather-effect-phase.ts hands in.
+   */
   getCondition(): AbAttrCondition {
+    const override = this.gateOverride;
+    if (override !== undefined) {
+      return (pokemon: Pokemon) => override({ pokemon, weather: globalScene.arena.weather });
+    }
     return getWeatherCondition(...this.weatherTypes);
   }
 }
@@ -5376,8 +5388,25 @@ export class PostTerrainChangeAddBattlerTagAttr extends PostTerrainChangeAbAttr 
     this.terrainTypes = terrainTypes;
   }
 
-  override canApply({ pokemon, terrain }: PostTerrainChangeAbAttrParams): boolean {
-    return !!this.terrainTypes.find(t => t === terrain) && pokemon.canAddTag(this.tagType);
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostTerrainChangeAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order, no guard, no prepare, no random draw: `gate` (the new
+   * terrain is one of the listed ones), then `residual` (the holder can take the battle effect).
+   */
+  override canApply(params: PostTerrainChangeAbAttrParams): boolean {
+    return gatedCanApply<PostTerrainChangeAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the terrain that was just set is one of the listed ones. */
+  public gate({ terrain }: PostTerrainChangeAbAttrParams): boolean {
+    return !!this.terrainTypes.find(t => t === terrain);
+  }
+
+  /** Feasibility, stays in the class: the holder can take the battle effect. */
+  public residual({ pokemon }: PostTerrainChangeAbAttrParams): boolean {
+    return pokemon.canAddTag(this.tagType);
   }
 
   override apply({ pokemon, simulated }: PostTerrainChangeAbAttrParams): void {

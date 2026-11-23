@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "0c66eea3ba085d",
+  "vocabularyHash": "15910d442a0006",
+  "hash": "070ea4b95fd7d7",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -261,9 +261,9 @@
     {
       "id": "block.block-weather-damage-attr",
       "className": "BlockWeatherDamageAttr",
-      "label": "Take no damage from chosen weather",
+      "label": "Take no weather damage",
       "summary": "I take no end-of-turn damage from these weathers: Sandstorm. Example: no sandstorm chip damage, like Sand Veil.",
-      "tier": "A",
+      "tier": "B",
       "kind": "calc-modifier",
       "status": "decomposed",
       "when": "cancel.weather-damage",
@@ -288,10 +288,18 @@
           "label": "Weathers it protects from (comma separated names, empty = every weather)",
           "control": "text",
           "default": "SANDSTORM",
-          "editable": true
+          "editable": false
         }
       ],
-      "conditions": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "field.weather",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
       "guards": [],
       "feasibility": [
         "Does nothing when there is no weather",
@@ -299,9 +307,7 @@
       ],
       "effect": {
         "id": "effect.negate",
-        "params": [
-          "weathers"
-        ]
+        "params": []
       },
       "reusableAlone": {
         "when": true,
@@ -668,14 +674,12 @@
           "min": 0,
           "max": 30,
           "step": 1,
-          "integer": true,
-          "gateIndependent": true
+          "integer": true
         }
       ],
       "conditions": [
         {
           "slot": "gate",
-          "lib": "field.weather",
           "removable": true,
           "editable": true,
           "optional": false
@@ -683,15 +687,19 @@
       ],
       "guards": [],
       "feasibility": [
-        "Only while I am in the broken-disguise form named by the setting above, so fog never breaks an intact disguise",
         "Which form I return to comes from the species' own form-change table",
         "Nothing happens during a simulated check"
       ],
+      "gateParams": [
+        {
+          "param": "bustedFormIndex",
+          "block": "mon.in-form-number",
+          "field": "formIndex"
+        }
+      ],
       "effect": {
-        "id": "effect.package",
-        "params": [
-          "bustedFormIndex"
-        ]
+        "id": "effect.trigger-ability-form-change",
+        "params": []
       },
       "reusableAlone": {
         "when": true,
@@ -704,7 +712,7 @@
       "id": "block.frisk",
       "className": "FriskAbAttr",
       "label": "Reveal the foes' held items",
-      "summary": "When I enter, I look at what every foe is holding and list the items in the battle log. Example: Garchomp is holding Leftovers.",
+      "summary": "When I enter, I look at what every foe is holding and list the items in the battle log. Example: the log says \"Garchomp frisked Blissey and found: Leftovers!\"",
       "tier": "C",
       "kind": "event-effect",
       "status": "decomposed",
@@ -889,14 +897,12 @@
           "min": 0,
           "max": 30,
           "step": 1,
-          "integer": true,
-          "gateIndependent": true
+          "integer": true
         }
       ],
       "conditions": [
         {
           "slot": "gate",
-          "lib": "field.weather",
           "removable": true,
           "editable": true,
           "optional": false
@@ -904,15 +910,19 @@
       ],
       "guards": [],
       "feasibility": [
-        "Only while I am in the broken-face form named by the setting above",
         "Which form I return to comes from the species' own form-change table",
         "Nothing happens during a simulated check"
       ],
+      "gateParams": [
+        {
+          "param": "formIndex",
+          "block": "mon.in-form-number",
+          "field": "formIndex"
+        }
+      ],
       "effect": {
-        "id": "effect.package",
-        "params": [
-          "formIndex"
-        ]
+        "id": "effect.trigger-ability-form-change",
+        "params": []
       },
       "reusableAlone": {
         "when": true,
@@ -1263,14 +1273,12 @@
           "min": 0,
           "max": 30,
           "step": 1,
-          "integer": true,
-          "gateIndependent": true
+          "integer": true
         }
       ],
       "conditions": [
         {
           "slot": "gate",
-          "lib": "field.weather",
           "removable": true,
           "editable": true,
           "optional": false
@@ -1278,16 +1286,20 @@
       ],
       "guards": [],
       "feasibility": [
-        "Only while I am in the broken-disguise form named by the setting above",
         "It does not run again when I change form during the battle, so a disguise that just broke is not restored at once",
         "Which form I return to comes from the species' own form-change table",
         "Nothing happens during a simulated check"
       ],
+      "gateParams": [
+        {
+          "param": "bustedFormIndex",
+          "block": "mon.in-form-number",
+          "field": "formIndex"
+        }
+      ],
       "effect": {
-        "id": "effect.package",
-        "params": [
-          "bustedFormIndex"
-        ]
+        "id": "effect.trigger-ability-form-change",
+        "params": []
       },
       "reusableAlone": {
         "when": true,
@@ -1359,6 +1371,256 @@
         "do": true
       },
       "uses": 7
+    },
+    {
+      "id": "block.post-terrain-change-add-battler-tag-attr",
+      "className": "PostTerrainChangeAddBattlerTagAttr",
+      "label": "Gain a battle effect when a chosen terrain starts",
+      "summary": "When the terrain changes to one of: Electric, I gain the effect Quark drive. Example: Quark Drive starts when Electric Terrain is set.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.terrain-changed",
+      "whenLabel": "When the terrain changes",
+      "synonyms": [
+        "quark drive",
+        "terrain boost start",
+        "gain effect in electric terrain",
+        "start boost when terrain changes",
+        "terrain boost",
+        "electric terrain boost"
+      ],
+      "examples": [
+        "Start my terrain boost when Electric Terrain is set, like Quark Drive"
+      ],
+      "params": [
+        {
+          "id": "tag",
+          "label": "Battle effect I gain",
+          "control": "select",
+          "default": "QUARK_DRIVE",
+          "editable": true,
+          "options": [
+            "RECHARGING",
+            "FLINCHED",
+            "INTERRUPTED",
+            "SKY_DROP",
+            "CONFUSED",
+            "INFATUATED",
+            "SEEDED",
+            "NIGHTMARE",
+            "FRENZY",
+            "CHARGING",
+            "ENCORE",
+            "HELPING_HAND",
+            "INGRAIN",
+            "OCTOLOCK",
+            "AQUA_RING",
+            "DROWSY",
+            "TRAPPED",
+            "BIND",
+            "WRAP",
+            "FIRE_SPIN",
+            "WHIRLPOOL",
+            "CLAMP",
+            "SAND_TOMB",
+            "MAGMA_STORM",
+            "SNAP_TRAP",
+            "THUNDER_CAGE",
+            "INFESTATION",
+            "PROTECTED",
+            "SPIKY_SHIELD",
+            "KINGS_SHIELD",
+            "OBSTRUCT",
+            "SILK_TRAP",
+            "MIND_READER",
+            "BANEFUL_BUNKER",
+            "BURNING_BULWARK",
+            "ER_PARALYZING_SHIELD",
+            "ER_TANGLING_HUSK",
+            "ENDURING",
+            "STURDY",
+            "PERISH_SONG",
+            "TRUANT",
+            "SLOW_START",
+            "PROTOSYNTHESIS",
+            "QUARK_DRIVE",
+            "FLYING",
+            "UNDERGROUND",
+            "UNDERWATER",
+            "HIDDEN",
+            "FIRE_BOOST",
+            "CRIT_BOOST",
+            "ALWAYS_CRIT",
+            "IGNORE_ACCURACY",
+            "IGNORE_FLYING",
+            "SALT_CURED",
+            "CURSED",
+            "ER_SLAB_CURSE",
+            "CHARGED",
+            "ROOSTED",
+            "FLOATING",
+            "MINIMIZED",
+            "DESTINY_BOND",
+            "CENTER_OF_ATTENTION",
+            "STOCKPILING",
+            "RECEIVE_DOUBLE_DAMAGE",
+            "ALWAYS_GET_HIT",
+            "DISABLED",
+            "SUBSTITUTE",
+            "IGNORE_GHOST",
+            "IGNORE_DARK",
+            "GULP_MISSILE_ARROKUDA",
+            "GULP_MISSILE_PIKACHU",
+            "BEAK_BLAST_CHARGING",
+            "SHELL_TRAP",
+            "DRAGON_CHEER",
+            "NO_RETREAT",
+            "GORILLA_TACTICS",
+            "UNBURDEN",
+            "THROAT_CHOPPED",
+            "TAR_SHOT",
+            "BURNED_UP",
+            "DOUBLE_SHOCKED",
+            "AUTOTOMIZED",
+            "MYSTERY_ENCOUNTER_POST_SUMMON",
+            "POWER_TRICK",
+            "HEAL_BLOCK",
+            "TORMENT",
+            "TAUNT",
+            "IMPRISON",
+            "SYRUP_BOMB",
+            "ELECTRIFIED",
+            "TELEKINESIS",
+            "COMMANDED",
+            "GRUDGE",
+            "PSYCHO_SHIFT",
+            "ENDURE_TOKEN",
+            "POWDER",
+            "MAGIC_COAT",
+            "SUPREME_OVERLORD",
+            "BYPASS_SPEED",
+            "SNATCH",
+            "ME_FIRST",
+            "ER_BLEED",
+            "ER_FROSTBITE",
+            "ER_FEAR",
+            "ER_ITEM_DISABLED",
+            "ER_SILKEN_DECREE",
+            "ER_ICE_STATUE",
+            "ER_PARASITIC_SPORES",
+            "ER_DESPAIR",
+            "ER_DRENCHED",
+            "ER_ENRAGE",
+            "ER_QUASHED",
+            "ER_EMPOWERED_SWITCH_IN",
+            "ER_COMMANDED",
+            "ER_SAFE_PASSAGE",
+            "ER_SAGE_POWER_LOCK",
+            "ER_BLIND_JUSTICE",
+            "ER_CONFECTED",
+            "ER_IRRADIATED_TOXIC",
+            "ER_IRRADIATED_LOCK",
+            "ER_BREACHED",
+            "ER_EMBEDDED",
+            "ER_DECAY_POISON"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "turns",
+          "label": "Turns the effect lasts (0 = until something removes it)",
+          "control": "number",
+          "default": 0,
+          "editable": true,
+          "min": 0,
+          "max": 99,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "terrains",
+          "label": "Terrains that start it (comma separated names)",
+          "control": "text",
+          "default": "ELECTRIC",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "I must be able to take that battle effect (for example I do not already have it)",
+        "Nothing happens during a simulated check"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "tag",
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.post-turn-random-berry-effect",
+      "className": "PostTurnRandomBerryEffectAbAttr",
+      "label": "Trigger a random berry's effect every turn",
+      "summary": "At the end of every turn I get the effect of one berry picked at random from this list: Sitrus, Liechi, Ganlon, Salac, Petaya, Apicot, Lansat, Starf. No berry is needed and none is used up.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "craving",
+        "random berry",
+        "free berry",
+        "eat a berry every turn",
+        "berry effect each turn",
+        "berry roulette"
+      ],
+      "examples": [
+        "Get a random berry effect at the end of every turn, like Craving"
+      ],
+      "params": [
+        {
+          "id": "berries",
+          "label": "Berries it can pick from (comma separated names, empty = every berry)",
+          "control": "text",
+          "default": "SITRUS,LIECHI,GANLON,SALAC,PETAYA,APICOT,LANSAT,STARF",
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens during a simulated check"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "berries"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.post-weather-change-add-battler-tag",
@@ -1568,8 +1830,8 @@
       "className": "PostWeatherChangeFormChangeAbAttr",
       "label": "Change form with the weather (like Forecast)",
       "summary": "When the weather changes, my form follows it, and goes back to my normal form in: None, Sandstorm, Strong winds. Works only for Castform and Cherrim.",
-      "tier": "C",
-      "kind": "package",
+      "tier": "B",
+      "kind": "event-effect",
       "status": "decomposed",
       "when": "event.weather-changed",
       "whenLabel": "When the weather changes",
@@ -1598,21 +1860,115 @@
           "label": "Weathers that send me back to my normal form (comma separated names)",
           "control": "text",
           "default": "NONE,SANDSTORM,STRONG_WINDS",
-          "editable": true
+          "editable": false
         }
       ],
-      "conditions": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "field.weather",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [
+        "weather-form-species-only"
+      ],
+      "feasibility": [
+        "The target form comes from the species' own form-change table, not from this block",
+        "Nothing happens during a simulated check"
+      ],
+      "branches": [
+        {
+          "label": "Follow the weather",
+          "conditions": [
+            "not the gate: field.weather is none of the reverting weathers"
+          ],
+          "effect": {
+            "id": "effect.follow-weather-form",
+            "params": []
+          }
+        },
+        {
+          "label": "Go back to my normal form",
+          "conditions": [
+            "the gate: any of field.weather over the reverting weathers"
+          ],
+          "effect": {
+            "id": "effect.weather-forms-to-normal",
+            "params": []
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.post-weather-lapse-damage",
+      "className": "PostWeatherLapseDamageAbAttr",
+      "label": "Lose a share of max HP each turn in a chosen weather",
+      "summary": "Each turn in Sun, Extremely harsh sunlight I lose 2/16 of my max HP, rounded down, unless indirect damage is blocked. Example: 2 = 1/8, like Dry Skin in harsh sun.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.weather-each-turn",
+      "whenLabel": "Each turn while weather is active",
+      "synonyms": [
+        "dry skin",
+        "sun damage",
+        "hurt in sun",
+        "lose hp in sun",
+        "weather damage",
+        "weather chip damage",
+        "sunburn"
+      ],
+      "examples": [
+        "Lose 1/8 of max HP every turn in harsh sunlight, like Dry Skin",
+        "Lose 1/16 of max HP every turn in a sandstorm"
+      ],
+      "params": [
+        {
+          "id": "sixteenths",
+          "label": "Sixteenths of max HP lost each turn (1 = 1/16, 2 = 1/8, 16 = everything)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 16,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "weathers",
+          "label": "Weathers that hurt me (comma separated names)",
+          "control": "text",
+          "default": "SUNNY,HARSH_SUN",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
       "guards": [],
       "feasibility": [
-        "Only Castform with Forecast and Cherrim with Flower Gift do anything; any other Pokemon is skipped",
-        "The target form comes from the species' own form-change table, not from this block",
+        "Does nothing while I am protected from indirect damage (like Magic Guard)",
         "Nothing happens during a simulated check"
       ],
       "effect": {
         "id": "effect.package",
         "params": [
-          "ability",
-          "revertWeathers"
+          "sixteenths"
         ]
       },
       "reusableAlone": {
@@ -1620,8 +1976,79 @@
         "if": true,
         "do": true
       },
-      "packageReason": "Package, justified: canApply is an identity test (Castform with Forecast, Cherrim with Flower Gift) and apply does not use the weather of the call but asks the arena to re-run every form change on the field, so it cannot be split into a rule and a change without inventing behaviour. Typed params: the ability (not editable, it names the species) and the weather list. Users: Forecast (59 attr 2, revert list NONE, SANDSTORM, STRONG_WINDS) and Flower Gift (122 attr 2, revert list NONE, SANDSTORM, STRONG_WINDS, FOG, HAIL, HEAVY_RAIN, SNOW, RAIN). Nothing to bind (no closure). Oddity, not fixed: apply reads `globalScene.arena.weather` instead of the weather it was given (the class carries a TODO for it). The arena methods it calls (triggerWeatherBasedFormChanges and triggerWeatherBasedFormChangesToNormal, arena.ts:555 and :574) look for the Pokemon by ability IDENTITY with abilityQuery(FORECAST_FORM / FLOWER_GIFT_FORM), so a staff-made ability built from this block changes form only if it is Forecast or Flower Gift itself (an engine-query dependency owned by the foundation, R-B05-23). The species check also means a staff-made ability that uses this block on another species does nothing. The shared L2 holder is not Castform, so the whole-battle twin only proves the attr is skipped; the real form changes are driven in test/tests/elite-redux/decomp/B05/chunk3-sites.test.ts.",
-      "uses": 2
+      "uses": 1
+    },
+    {
+      "id": "block.post-weather-lapse-heal",
+      "className": "PostWeatherLapseHealAbAttr",
+      "label": "Heal a share of max HP each turn in a chosen weather",
+      "summary": "Each turn while one of these weathers is active (Rain, Heavy rain), I heal 2/16 of my max HP, rounded down. Example: 2 heals 1/8 of max HP, like Rain Dish in rain.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.weather-each-turn",
+      "whenLabel": "Each turn while weather is active",
+      "synonyms": [
+        "rain dish",
+        "ice body",
+        "dry skin",
+        "heal in rain",
+        "heal in hail",
+        "heal in snow",
+        "weather healing",
+        "weather regeneration",
+        "recover in weather"
+      ],
+      "examples": [
+        "Heal 1/8 of max HP every turn in rain, like Rain Dish",
+        "Heal 1/8 of max HP every turn in hail or snow, like Ice Body"
+      ],
+      "params": [
+        {
+          "id": "sixteenths",
+          "label": "Sixteenths of max HP healed each turn (1 = 1/16, 2 = 1/8, 16 = everything)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 16,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "weathers",
+          "label": "Weathers that heal me (comma separated names)",
+          "control": "text",
+          "default": "RAIN,HEAVY_RAIN",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when I am already at full HP (so the ability does not flash for nothing)",
+        "Nothing happens during a simulated check"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "sixteenths"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 5
     },
     {
       "id": "block.received-move-damage-multiplier",

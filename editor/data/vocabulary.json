@@ -2533,7 +2533,7 @@
       "pure": true,
       "formula": {
         "expr": "arena.weatherType === WeatherType[weather]",
-        "source": "src/field/arena.ts:219 (weatherType, suppression aware)"
+        "source": "src/field/arena.ts:219 (weatherType, the raw weather: NOT changed by Cloud Nine or Air Lock)"
       },
       "synonyms": [
         "rain",
@@ -3685,6 +3685,51 @@
       ]
     },
     {
+      "id": "mon.in-form-number",
+      "group": "Pokemon",
+      "label": "{who} is in form number {formIndex}",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "holder",
+          "options": [
+            "holder",
+            "other",
+            "ally"
+          ]
+        },
+        {
+          "id": "formIndex",
+          "label": "Form number (0 = first form, 1 = second form)",
+          "control": "number",
+          "default": 1,
+          "min": 0,
+          "max": 30,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "pokemon.formIndex === formIndex",
+        "source": "src/field/pokemon.ts formIndex"
+      },
+      "synonyms": [
+        "form number",
+        "which form",
+        "broken form",
+        "busted form",
+        "second form"
+      ],
+      "examples": [
+        "Only while my disguise is broken (second form)"
+      ]
+    },
+    {
       "id": "mon.can-change-form",
       "group": "Pokemon",
       "label": "{who} can change to the {key} form",
@@ -4791,6 +4836,59 @@
       ]
     },
     {
+      "id": "effect.trigger-ability-form-change",
+      "kind": "event",
+      "label": "Change to the form my species lists for this ability",
+      "requires": [],
+      "params": [],
+      "implemented": false,
+      "synonyms": [
+        "ability form change",
+        "restore form",
+        "repair form",
+        "face back",
+        "disguise back"
+      ],
+      "examples": [
+        "Get my ice face back, like Ice Face",
+        "Put my disguise back when fog is set"
+      ]
+    },
+    {
+      "id": "effect.follow-weather-form",
+      "kind": "event",
+      "label": "Change every weather form on the field to match the weather",
+      "requires": [],
+      "params": [],
+      "implemented": false,
+      "synonyms": [
+        "weather form",
+        "forecast form",
+        "castform form",
+        "cherrim form"
+      ],
+      "examples": [
+        "Castform turns into its Sunny, Rainy or Snowy form, like Forecast"
+      ]
+    },
+    {
+      "id": "effect.weather-forms-to-normal",
+      "kind": "event",
+      "label": "Send every weather form on the field back to its normal form",
+      "requires": [],
+      "params": [],
+      "implemented": false,
+      "synonyms": [
+        "normal form",
+        "plain form",
+        "forecast reset",
+        "cherrim overcast"
+      ],
+      "examples": [
+        "Castform goes back to its normal form in a sandstorm"
+      ]
+    },
+    {
       "id": "effect.remove-item",
       "kind": "event",
       "label": "Remove {target}'s item",
@@ -5020,7 +5118,23 @@
         "knocked out",
         "alive"
       ]
+    },
+    {
+      "id": "weather-form-species-only",
+      "label": "Only works for Castform with Forecast and Cherrim with Flower Gift",
+      "why": "The weather forms exist only on those two species; on any other Pokemon there is no form to change to.",
+      "requires": [],
+      "formula": {
+        "expr": "(species === CASTFORM && ability === FORECAST) || (species === CHERRIM && ability === FLOWER_GIFT)",
+        "source": "src/data/abilities/ab-attrs.ts PostWeatherChangeFormChangeAbAttr.guards"
+      },
+      "synonyms": [
+        "castform",
+        "cherrim",
+        "forecast",
+        "flower gift"
+      ]
     }
   ],
-  "hash": "1264fa83dbcdc7"
+  "hash": "15910d442a0006"
 }
