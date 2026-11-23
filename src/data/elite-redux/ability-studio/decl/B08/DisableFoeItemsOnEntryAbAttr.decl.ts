@@ -24,7 +24,7 @@ export default defineDecl(DisableFoeItemsOnEntryAbAttr, {
   when: "event.on-entry",
   label: "Switch off the foes' held items for a few turns",
   summary: params =>
-    `When I enter the battle, every foe's held item stops working for a few turns (tag count ${params.turns}; 3 blocks the items for 2 full turns). Mega stones keep working.`,
+    `When I enter the battle, every foe's held item stops working for ${params.turns} turns (3 = the items stop working for 2 full turns). Mega stones keep working.`,
   synonyms: [
     "frisk",
     "gleam eyes",
@@ -45,7 +45,7 @@ export default defineDecl(DisableFoeItemsOnEntryAbAttr, {
       max: 10,
       step: 1,
       integer: true,
-      label: "Turn count of the item block (3 = the items stop working for 2 full turns)",
+      label: "Number of turns the items stay switched off (3 = the items stop working for 2 full turns)",
       editable: true,
       default: 3,
     },

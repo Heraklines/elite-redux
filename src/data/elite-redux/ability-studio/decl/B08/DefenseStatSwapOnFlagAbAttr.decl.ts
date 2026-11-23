@@ -36,7 +36,7 @@ export default defineDecl(DefenseStatSwapOnFlagAbAttr, {
   label: "Make my moves hit a different defense stat of the foe",
   summary: params => {
     const mode = String(params.swap);
-    return `${String(params.flag)} I use are changed so that ${mode.charAt(0).toLowerCase()}${mode.slice(1)}. The move's power is scaled by the ratio of the foe's two defenses.`;
+    return `${String(params.flag)} I use are changed so that ${mode.charAt(0).toLowerCase()}${mode.slice(1)}. Example: a foe with 100 Defense and 50 Sp. Def takes double damage from a move that hits the 50.`;
   },
   synonyms: [
     "power fists",

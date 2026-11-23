@@ -28,7 +28,7 @@ export default defineDecl(DisableTargetItemOnContactAbAttr, {
   when: "event.after-my-hit",
   label: "Switch off the held item of a foe I touch for a few turns",
   summary: params =>
-    `When my attacking move makes contact with a foe, that foe's held item stops working for a few turns (turn count ${params.turns}; 3 blocks the item for 2 full turns).`,
+    `When my attacking move makes contact with a foe, that foe's held item stops working for ${params.turns} turns (3 = the item stops working for 2 full turns).`,
   synonyms: [
     "supersweet syrup",
     "embargo on contact",
@@ -48,7 +48,7 @@ export default defineDecl(DisableTargetItemOnContactAbAttr, {
       max: 10,
       step: 1,
       integer: true,
-      label: "Turn count of the item block (3 = the item stops working for 2 full turns)",
+      label: "Number of turns the item stays switched off (3 = the item stops working for 2 full turns)",
       editable: true,
       gateIndependent: true,
       default: 3,

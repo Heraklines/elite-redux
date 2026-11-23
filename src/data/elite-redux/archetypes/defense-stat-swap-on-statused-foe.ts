@@ -21,6 +21,36 @@
 //   - 284 Exploit Weakness — "Targets lowest defense vs statused foes."
 // =============================================================================
 
-import { LowerDefensiveStatVsStatusedFoeAbAttr } from "#abilities/ab-attrs";
+import {
+  LowerDefensiveStatVsStatusedFoeAbAttr,
+  type LowerDefensiveStatVsStatusedFoeAbAttrParams,
+} from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
+import { StatusEffect } from "#enums/status-effect";
 
-export class DefenseStatSwapOnStatusedFoeAbAttr extends LowerDefensiveStatVsStatusedFoeAbAttr {}
+export class DefenseStatSwapOnStatusedFoeAbAttr
+  extends LowerDefensiveStatVsStatusedFoeAbAttr
+  implements GatedAttr<LowerDefensiveStatVsStatusedFoeAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: LowerDefensiveStatVsStatusedFoeAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1). The engine call site (Pokemon.getBaseDamage) used to test "the foe has a
+   * status condition" itself before asking the attr. That test is the gate now and the call site asks whenever there is
+   * a defender, so the condition is a block staff can see, remove or combine. Pure reads, no random draw.
+   */
+  override canApply(params: LowerDefensiveStatVsStatusedFoeAbAttrParams): boolean {
+    return gatedCanApply<LowerDefensiveStatVsStatusedFoeAbAttrParams>(this, params);
+  }
+
+  /** Safety rule that stays in the class: there must be a foe to compare. */
+  public guards({ defender }: LowerDefensiveStatVsStatusedFoeAbAttrParams): boolean {
+    return !!defender;
+  }
+
+  /** The replaceable condition: the foe has a status condition (the engine test, verbatim). */
+  public gate({ defender }: LowerDefensiveStatVsStatusedFoeAbAttrParams): boolean {
+    return defender.status != null && defender.status.effect !== StatusEffect.NONE;
+  }
+}

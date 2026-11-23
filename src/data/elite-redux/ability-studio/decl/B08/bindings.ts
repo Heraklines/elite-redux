@@ -861,3 +861,14 @@ bindCondition(140, 2, { id: "time.once-per", scope: "battle", key: "anticipation
 // ---------------------------------------------------------------------------------------------
 bindCondition(5112, 1, { id: "move.inherent-flag", flag: "PUNCHING_MOVE" }, "gate"); // Precise Fist
 bindCondition(5383, 4, { id: "move.inherent-flag", flag: "PUNCHING_MOVE" }, "gate"); // Way of Precision
+
+// =============================================================================================
+// DefenseStatSwapOnStatusedFoeAbAttr (Tier B, 2 attrs). Slot "gate": the foe has a status condition. The class now asks it itself (the engine
+// call site used to test it); the guard (there is a defender) stays in the class. The test is `status != null && status.effect !== NONE`. The atom
+// status.has ANY would read `status != null` only (a Status object whose effect is NONE would pass), and the frame of this WHEN does not map the
+// defender to the other slot yet, so the gate is a legacy closure with a reason (request R-B08-40).
+// =============================================================================================
+const STATUSED_FOE_REASON =
+  "The foe-has-a-status test also requires the effect to be something other than none, which the atom status.has ANY does not check, and the frame of this WHEN does not yet map the defender to the other Pokemon (request R-B08-40).";
+bindLegacyClosure(5022, 0, STATUSED_FOE_REASON, "gate"); // Exploit Weakness
+bindLegacyClosure(5473, 0, STATUSED_FOE_REASON, "gate"); // Relentless

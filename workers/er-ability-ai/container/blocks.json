@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "00364cc4280fe3",
-  "hash": "0368bbb5d468d0",
+  "hash": "0cf4ebd30cba99",
   "blocks": [
     {
       "id": "block.absorbant",
@@ -6620,7 +6620,7 @@
       "id": "block.defense-stat-swap-on-flag",
       "className": "DefenseStatSwapOnFlagAbAttr",
       "label": "Make my moves hit a different defense stat of the foe",
-      "summary": "Punching moves I use are changed so that physical moves hit Sp. Def instead of Defense. The move's power is scaled by the ratio of the foe's two defenses.",
+      "summary": "Punching moves I use are changed so that physical moves hit Sp. Def instead of Defense. Example: a foe with 100 Defense and 50 Sp. Def takes double damage from a move that hits the 50.",
       "tier": "B",
       "kind": "calc-modifier",
       "status": "decomposed",
@@ -6719,7 +6719,7 @@
       "className": "DefenseStatSwapOnStatusedFoeAbAttr",
       "label": "Hit the foe's weaker defense when it has a status condition",
       "summary": "When I attack a foe that has a status condition, my damage uses whichever of its Defense and Sp. Def is lower (stat stages count). Example: 80 Defense against 100 Sp. Def, the 80 is used.",
-      "tier": "A",
+      "tier": "B",
       "kind": "calc-modifier",
       "status": "decomposed",
       "when": "calc.defensive-stat-pick",
@@ -6736,11 +6736,18 @@
         "Attacks against a poisoned or burned foe use its weaker defense stat"
       ],
       "params": [],
-      "conditions": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
       "guards": [],
       "feasibility": [
-        "The game only asks when the foe has a status condition and my ability is not being ignored",
-        "There must be a foe to compare"
+        "There must be a foe to compare",
+        "The game does not ask while my ability is being ignored"
       ],
       "effect": {
         "id": "effect.package",
@@ -6757,7 +6764,7 @@
       "id": "block.disable-foe-items-on-entry",
       "className": "DisableFoeItemsOnEntryAbAttr",
       "label": "Switch off the foes' held items for a few turns",
-      "summary": "When I enter the battle, every foe's held item stops working for a few turns (tag count 3; 3 blocks the items for 2 full turns). Mega stones keep working.",
+      "summary": "When I enter the battle, every foe's held item stops working for 3 turns (3 = the items stop working for 2 full turns). Mega stones keep working.",
       "tier": "A",
       "kind": "event-effect",
       "status": "decomposed",
@@ -6778,7 +6785,7 @@
       "params": [
         {
           "id": "turns",
-          "label": "Turn count of the item block (3 = the items stop working for 2 full turns)",
+          "label": "Number of turns the items stay switched off (3 = the items stop working for 2 full turns)",
           "control": "number",
           "default": 3,
           "editable": true,
@@ -6808,7 +6815,7 @@
       "id": "block.disable-target-item-on-contact",
       "className": "DisableTargetItemOnContactAbAttr",
       "label": "Switch off the held item of a foe I touch for a few turns",
-      "summary": "When my attacking move makes contact with a foe, that foe's held item stops working for a few turns (turn count 3; 3 blocks the item for 2 full turns).",
+      "summary": "When my attacking move makes contact with a foe, that foe's held item stops working for 3 turns (3 = the item stops working for 2 full turns).",
       "tier": "B",
       "kind": "event-effect",
       "status": "decomposed",
@@ -6828,7 +6835,7 @@
       "params": [
         {
           "id": "turns",
-          "label": "Turn count of the item block (3 = the item stops working for 2 full turns)",
+          "label": "Number of turns the item stays switched off (3 = the item stops working for 2 full turns)",
           "control": "number",
           "default": 3,
           "editable": true,

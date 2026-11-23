@@ -5691,8 +5691,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
     // Elite Redux: Exploit Weakness (284) retargets the defender's WEAKER
     // defensive stat when the defender is statused. Source-side; gated on the
-    // cheap status check so the hot path only fires the dispatch vs statused foes.
-    if (this.status != null && this.status.effect !== StatusEffect.NONE && !ignoreSourceAbility) {
+    // the class itself asks whether the defender is statused (its gate), so the call site only keeps the ability-ignore rule.
+    if (!ignoreSourceAbility) {
       applyAbAttrs("LowerDefensiveStatVsStatusedFoeAbAttr", {
         pokemon: source,
         simulated,
