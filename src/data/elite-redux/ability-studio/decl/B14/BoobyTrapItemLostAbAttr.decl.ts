@@ -27,9 +27,8 @@ export default defineDecl(BoobyTrapItemLostAbAttr, {
   tier: "B",
   kind: "event-effect",
   when: "event.item-lost",
-  label: "Curse the foe that takes or knocks off my item",
-  summary: params =>
-    `When a foe takes or knocks off my held item, that foe gets ${params.tag}. While it lasts, I heal half of any damage that foe takes.`,
+  label: "Curse a foe and feed on its pain",
+  summary: params => `The foe gets ${params.tag}. While it lasts, I heal half of any damage that foe takes.`,
   synonyms: [
     "booby trap",
     "curse item thief",

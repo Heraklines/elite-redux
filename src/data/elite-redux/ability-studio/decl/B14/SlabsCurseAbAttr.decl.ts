@@ -33,9 +33,9 @@ export default defineDecl(SlabsCurseAbAttr, {
   tier: "B",
   kind: "event-effect",
   when: "event.faint",
-  label: "Lay a PP-draining curse on the foe that knocked me out",
+  label: "Drain PP from a foe's moves every turn",
   summary: params =>
-    `Each turn, every move of the foe that knocked me out loses ${params.ppLoss} PP, and each move of its neighbouring allies loses ${params.allyPpLoss} PP. It ends when one of those moves has no PP left.`,
+    `Every move of the chosen foe loses ${params.ppLoss} PP each turn, and each move of its neighbouring allies loses ${params.allyPpLoss} PP. It ends when one of those moves has no PP left.`,
   synonyms: ["slab's curse", "pp drain", "pp curse", "revenge curse", "spite", "last words", "drain pp"],
   examples: ["When a foe knocks me out, its moves lose 2 PP every turn"],
   params: [

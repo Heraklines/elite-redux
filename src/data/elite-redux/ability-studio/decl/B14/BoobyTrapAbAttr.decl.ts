@@ -36,9 +36,9 @@ export default defineDecl(BoobyTrapAbAttr, {
   tier: "B",
   kind: "event-effect",
   when: "event.after-hit",
-  label: "Curse the first foe that hurts me and heal off its pain",
+  label: "Curse a foe and feed on its pain",
   summary: params =>
-    `The first foe that damages me after I enter gets ${params.tag}. While it lasts, I heal half of any damage that foe takes. Only one foe per entry.`,
+    `The foe gets ${params.tag}. While it lasts, I heal half of any damage that foe takes. Only one foe per entry.`,
   synonyms: [
     "booby trap",
     "curse attacker",

@@ -28,9 +28,9 @@ export default defineDecl(OfudaAbAttr, {
   tier: "B",
   kind: "event-effect",
   when: "event.after-hit",
-  label: "Sometimes curse the attacker when I am hit",
+  label: "Curse a foe",
   summary: params =>
-    `${params.chance}% chance, each time a move hits me, that its user gets ${params.tag}. Contact is not needed. Example: 30% chance to curse the attacker.`,
+    `The foe gets ${params.tag}. Whether it happens, and how often, is set by the chance and trigger blocks around it.`,
   synonyms: [
     "ofuda",
     "curse the attacker",
