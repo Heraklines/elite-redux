@@ -407,7 +407,9 @@ describe("B13 chunk 3", () => {
       const { game, holder, foe } = await startWorld(phaserGame);
       const [entry, trap] = liveAbility(RING_GENERAL).attrs as [RingGeneralEntryAbAttr, RingGeneralTrapAbAttr];
       expect(entry).toBeInstanceOf(RingGeneralEntryAbAttr);
-      const rebuilt = recomposeAttr(module("RingGeneralTrapAbAttr"), trap, RING_GENERAL, 1) as AbAttr;
+      const rebuilt = recomposeAttr(module("RingGeneralTrapAbAttr"), trap, RING_GENERAL, 1, {
+        conds: { gate: p => (trap as never as { gate(q: unknown): boolean }).gate(p) },
+      }) as AbAttr;
       const both = (): [boolean, boolean] => [
         trap.canApply(params(holder, foe)),
         rebuilt.canApply(params(holder, foe)),
@@ -439,20 +441,22 @@ describe("B13 chunk 3", () => {
       game.scene.currentBattle.turn += 1;
       expect(both()).toEqual([true, true]);
 
-      // The gate (the foe is not a Ghost) is swappable; the engine's own rules stay in the residual.
+      // The gate (HP above half, not freshly arrived, foe not a Ghost) is swappable; the engine's own rules stay in the residual.
       const never = buildAttr(module("RingGeneralTrapAbAttr"), {}, { gate: () => false }) as AbAttr;
       expect(never.canApply(params(holder, foe))).toBe(false);
       const always = buildAttr(module("RingGeneralTrapAbAttr"), {}, { gate: () => true }) as AbAttr;
       expect(always.canApply(params(holder, foe))).toBe(true);
-      // ...and a swapped gate does not drop the clauses kept in the class: low HP still frees the foe.
+      // The HP and entry rules are part of the gate now, so a swapped gate replaces them too: low HP no longer frees the foe.
       holder.hp = 1;
-      expect(always.canApply(params(holder, foe))).toBe(false);
+      expect(always.canApply(params(holder, foe))).toBe(true);
     });
 
     it("a Ghost foe is never held", async () => {
       const { holder, foe } = await startWorld(phaserGame, { foe: SpeciesId.GASTLY });
       const [, trap] = liveAbility(RING_GENERAL).attrs as [RingGeneralEntryAbAttr, RingGeneralTrapAbAttr];
-      const rebuilt = recomposeAttr(module("RingGeneralTrapAbAttr"), trap, RING_GENERAL, 1) as AbAttr;
+      const rebuilt = recomposeAttr(module("RingGeneralTrapAbAttr"), trap, RING_GENERAL, 1, {
+        conds: { gate: p => (trap as never as { gate(q: unknown): boolean }).gate(p) },
+      }) as AbAttr;
       holder.hp = holder.getMaxHp();
       expect([trap.canApply(params(holder, foe)), rebuilt.canApply(params(holder, foe))]).toEqual([false, false]);
       // Even with the gate swapped to always true, the engine's own Ghost rule in the residual still frees it.

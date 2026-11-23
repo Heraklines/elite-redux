@@ -25,7 +25,7 @@ export default defineDecl(TwoFacedRecoilAbAttr, {
   tier: "B",
   kind: "package",
   when: "event.after-my-hit",
-  label: "Lose some max HP after my hit while my other face is out",
+  label: "Take damage equal to a share of my max HP",
   summary: params =>
     `While my other face is out, each damaging move I land costs me ${params.recoilPercent}% of my max HP, once per move. It never takes me below 1 HP.`,
   synonyms: [
@@ -78,5 +78,5 @@ export default defineDecl(TwoFacedRecoilAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "PACKAGE for the EFFECT only; the trigger (after my hit), the damaging-move condition (ctor:0) and the 'other face is out' condition (gate, legacy-closure until R-B13-22) are separate blocks. Why the effect cannot be split with today's blocks: effect.recoil takes a share of the DAMAGE DEALT, while this takes a share of my MAX HP, never leaves me below 1 HP, and also stores the counted move record that the residual reads in the same apply; requested as R-B13-24 (`effect.lose-max-hp-percent`) plus R-B13-5 for the memory. The recoil percent was the literal 0.15, now trailing constructor argument 2 with default 15. Users: Two-Faced Unleashed (5977, attr 1; attr 0 is TwoFacedPowerAbAttr). ODDITIES (not fixed): (1) apply stores the counted move record BEFORE its simulated check, so a simulated call spends the once-per-move memory; no engine path simulates PostAttack today. (2) The unleash memory is written by prepareTwoFacedMove and cleared by finishTwoFacedMove in move-effect-phase.ts (found by class name), so the gate depends on engine call sites the declaration cannot show. (3) finishTwoFacedMove clears the face after the move, so the recoil only fires for hits inside the unleashed move itself.",
+    "PACKAGE for the EFFECT only; the trigger (after my hit), the damaging-move condition (ctor:0) and the 'other face is out' condition (gate, legacy-closure until R-B13-22) are separate blocks. Why the effect cannot be split with today's blocks: effect.recoil takes a share of the DAMAGE DEALT, while this takes a share of my MAX HP, never leaves me below 1 HP, and also stores the counted move record that the residual reads in the same apply; requested as R-B13-24 (`effect.take-max-hp-percent-damage`) plus R-B13-5 for the memory. The recoil percent was the literal 0.15, now trailing constructor argument 2 with default 15. Users: Two-Faced Unleashed (5977, attr 1; attr 0 is TwoFacedPowerAbAttr). ODDITIES (not fixed): (1) apply stores the counted move record BEFORE its simulated check, so a simulated call spends the once-per-move memory; no engine path simulates PostAttack today. (2) The unleash memory is written by prepareTwoFacedMove and cleared by finishTwoFacedMove in move-effect-phase.ts (found by class name), so the gate depends on engine call sites the declaration cannot show. (3) finishTwoFacedMove clears the face after the move, so the recoil only fires for hits inside the unleashed move itself.",
 });

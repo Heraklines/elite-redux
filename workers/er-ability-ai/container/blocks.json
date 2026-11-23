@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "10742527cbb1df",
-  "hash": "1f0cded1407f6a",
+  "hash": "1d112be5f01e18",
   "blocks": [
     {
       "id": "block.anneal",
@@ -1734,7 +1734,7 @@
     {
       "id": "block.ring-general-trap",
       "className": "RingGeneralTrapAbAttr",
-      "label": "Trap foes while I am above half HP and not freshly arrived",
+      "label": "Stop foes from switching out or running away",
       "summary": "While my HP is above half and I did not come in this turn, foes cannot switch out or run away. Ghost types and Pokemon with Run Away still get away.",
       "tier": "B",
       "kind": "package",
@@ -1764,8 +1764,6 @@
       ],
       "guards": [],
       "feasibility": [
-        "My HP must be above half, counted in whole percents (checked inside the class until the librarian adds a condition for it, R-B13-31)",
-        "I must not have come in this turn (a private memory inside the class, written by the entry part, R-B13-30)",
         "Ghost types and Pokemon with Run Away can never be trapped (a fixed engine rule)"
       ],
       "effect": {
@@ -1777,7 +1775,7 @@
         "if": true,
         "do": true
       },
-      "packageReason": "PACKAGE for the EFFECT only (`trapped = true`); the trigger (the game checks if a foe can escape) and the Ghost condition are separate blocks. Why the effect cannot be split with today's blocks: there is no 'trap the foe' effect in the library; requested as R-B13-32 (`effect.trap-foes`). The class's constructor closure was split into guards and gate (a pure move of code, the base class now gets an always-true closure so its residual does not test the gate again). Two clauses stay in the class until the librarian adds atoms: the HP rule (R-B13-31, getHpRatio rounds to 2 decimals, so the existing hp.at-least cannot reproduce it) and 'I did not come in this turn' (R-B13-30). Users: Ring General (5987, attr 1; attr 0 is RingGeneralEntryAbAttr). ODDITIES (not fixed): (1) the Ghost test is written twice in the original, once plain in the closure and once with Tera and defend flags in ArenaTrapAbAttr.canApply; both are kept. (2) the ability text also says the trap ignores a Shed Shell holder, but the class does not test any item, so any Shed Shell handling is outside this class (not checked here). (3) 'came in this turn' compares the wave and turn number at entry, not how long the Pokemon has been out.",
+      "packageReason": "PACKAGE for the EFFECT only (`trapped = true`); the trigger (the game checks if a foe can escape) and the Ghost condition are separate blocks. Why the effect cannot be split with today's blocks: there is no 'trap the foe' effect in the library; requested as R-B13-32 (`effect.trap-foes`). The class's constructor closure moved into the editable gate (a legacy-closure binding, because the library has no atom yet for the HP rule, R-B13-31, getHpRatio rounds to 2 decimals so the existing hp.at-least cannot reproduce it, and none for 'I did not come in this turn', R-B13-30); the base class now gets an always-true closure so its residual does not test the gate again. The first review pass had left the HP and entry rules in non-editable guards; they are conditions, not correctness rules. ODDITIES (not fixed): (1) the Ghost test is written twice in the original, once plain in the closure and once with Tera and defend flags in ArenaTrapAbAttr.canApply; both are kept. (2) the ability text also says the trap ignores a Shed Shell holder, but the class does not test any item, so any Shed Shell handling is outside this class (not checked here). (3) 'came in this turn' compares the wave and turn number at entry, not how long the Pokemon has been out.",
       "uses": 1
     },
     {
@@ -2129,7 +2127,7 @@
     {
       "id": "block.two-faced-recoil",
       "className": "TwoFacedRecoilAbAttr",
-      "label": "Lose some max HP after my hit while my other face is out",
+      "label": "Take damage equal to a share of my max HP",
       "summary": "While my other face is out, each damaging move I land costs me 15% of my max HP, once per move. It never takes me below 1 HP.",
       "tier": "B",
       "kind": "package",
@@ -2192,7 +2190,7 @@
         "if": true,
         "do": true
       },
-      "packageReason": "PACKAGE for the EFFECT only; the trigger (after my hit), the damaging-move condition (ctor:0) and the 'other face is out' condition (gate, legacy-closure until R-B13-22) are separate blocks. Why the effect cannot be split with today's blocks: effect.recoil takes a share of the DAMAGE DEALT, while this takes a share of my MAX HP, never leaves me below 1 HP, and also stores the counted move record that the residual reads in the same apply; requested as R-B13-24 (`effect.lose-max-hp-percent`) plus R-B13-5 for the memory. The recoil percent was the literal 0.15, now trailing constructor argument 2 with default 15. Users: Two-Faced Unleashed (5977, attr 1; attr 0 is TwoFacedPowerAbAttr). ODDITIES (not fixed): (1) apply stores the counted move record BEFORE its simulated check, so a simulated call spends the once-per-move memory; no engine path simulates PostAttack today. (2) The unleash memory is written by prepareTwoFacedMove and cleared by finishTwoFacedMove in move-effect-phase.ts (found by class name), so the gate depends on engine call sites the declaration cannot show. (3) finishTwoFacedMove clears the face after the move, so the recoil only fires for hits inside the unleashed move itself.",
+      "packageReason": "PACKAGE for the EFFECT only; the trigger (after my hit), the damaging-move condition (ctor:0) and the 'other face is out' condition (gate, legacy-closure until R-B13-22) are separate blocks. Why the effect cannot be split with today's blocks: effect.recoil takes a share of the DAMAGE DEALT, while this takes a share of my MAX HP, never leaves me below 1 HP, and also stores the counted move record that the residual reads in the same apply; requested as R-B13-24 (`effect.take-max-hp-percent-damage`) plus R-B13-5 for the memory. The recoil percent was the literal 0.15, now trailing constructor argument 2 with default 15. Users: Two-Faced Unleashed (5977, attr 1; attr 0 is TwoFacedPowerAbAttr). ODDITIES (not fixed): (1) apply stores the counted move record BEFORE its simulated check, so a simulated call spends the once-per-move memory; no engine path simulates PostAttack today. (2) The unleash memory is written by prepareTwoFacedMove and cleared by finishTwoFacedMove in move-effect-phase.ts (found by class name), so the gate depends on engine call sites the declaration cannot show. (3) finishTwoFacedMove clears the face after the move, so the recoil only fires for hits inside the unleashed move itself.",
       "uses": 1
     },
     {

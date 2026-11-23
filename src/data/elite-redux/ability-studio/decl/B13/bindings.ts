@@ -179,10 +179,15 @@ bindLegacyClosure(
   "gate",
 );
 
-// RingGeneralTrapAbAttr (Ring General attr 1), gate = clause 3 of the original closure: `!target.isOfType(GHOST)`.
-// Clauses 1 and 2 (my HP is above half in whole percents, I did not come in this turn) are the class's `guards`,
-// clause 4 (the engine's own trapping rules) its `residual`; see its declaration.
-bindCondition(5987, 1, { not: { id: "mon.has-type", who: "other", type: "GHOST" } }, "gate");
+// RingGeneralTrapAbAttr (Ring General attr 1), gate = the whole original closure, in order: `holder.getHpRatio() > 0.5`
+// (whole percents, R-B13-31), `RING_ENTRY_TURN.get(holder) !== turnKey()` (I did not come in this turn, R-B13-30) and
+// `!target.isOfType(GHOST)`. Clause 4 (the engine's own trapping rules, which repeat the Ghost test) is the class's `residual`.
+bindLegacyClosure(
+  5987,
+  1,
+  "Ring General trap: my HP is above half (rounded whole percents) and I did not come in this turn (a private per-Pokemon memory) and the foe is not a Ghost; needs the atoms hp.above-rounded (R-B13-31) and time.entered-this-turn (R-B13-30), the Ghost part is mon.has-type",
+  "gate",
+);
 
 // SetlistPowerAbAttr (Setlist attr 1), gate = the whole original closure: `setlistNextLevel(holder, move) > 0`
 //   (the pattern holds two moves and the move being used is the one expected next).

@@ -1180,29 +1180,29 @@ export class RingGeneralTrapAbAttr extends ArenaTrapAbAttr implements GatedAttr<
 
   /**
    * The old constructor closure was `holder.getHpRatio() > 0.5 && RING_ENTRY_TURN.get(holder) !== turnKey()
-   * && !target.isOfType(GHOST)`. Its three clauses now live in `guards` and `gate`, so the base class gets an
-   * always-true closure and `residual` (`super.canApply`) only adds the engine's own trapping rules.
+   * && !target.isOfType(GHOST)`. All three clauses are design conditions a player may want to change, so they now
+   * live in the editable `gate`; the base class gets an always-true closure and `residual` (`super.canApply`) only
+   * adds the engine's own trapping rules.
    */
   constructor() {
     super(() => true);
   }
 
   /**
-   * Tier B (ability studio spec 3.1), original clause order: `guards` = my HP is above half and I did not come in
-   * this turn (no library conditions yet), `gate` = the foe is not a Ghost type (a library condition), `residual` =
-   * the engine's own trapping rules (Ghosts and Run Away are never trapped), which are the base class's `canApply`.
+   * Tier B (ability studio spec 3.1), original clause order: no `guards` (nothing here is a pure correctness rule),
+   * `gate` = my HP is above half (whole percents), I did not come in this turn, the foe is not a Ghost type (a
+   * legacy-closure binding until the library has atoms for the first two, R-B13-31 and R-B13-30), `residual` = the
+   * engine's own trapping rules (Ghosts and Run Away are never trapped), which are the base class's `canApply`.
    * All clauses are pure, no RNG.
    */
   override canApply(params: CheckTrappedAbAttrParams): boolean {
     return gatedCanApply<CheckTrappedAbAttrParams>(this, params);
   }
 
-  public guards({ pokemon }: CheckTrappedAbAttrParams): boolean {
-    return pokemon.getHpRatio() > 0.5 && RING_ENTRY_TURN.get(pokemon) !== turnKey();
-  }
-
-  public gate({ opponent }: CheckTrappedAbAttrParams): boolean {
-    return !opponent.isOfType(PokemonType.GHOST);
+  public gate({ pokemon, opponent }: CheckTrappedAbAttrParams): boolean {
+    return (
+      pokemon.getHpRatio() > 0.5 && RING_ENTRY_TURN.get(pokemon) !== turnKey() && !opponent.isOfType(PokemonType.GHOST)
+    );
   }
 
   public residual(params: CheckTrappedAbAttrParams): boolean {
