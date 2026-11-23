@@ -370,6 +370,8 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
   // their question with the holder and the move; this is the same frame the Tier B gate of those classes reads.
   "calc.attack-stat": ctx => ({ pokemon: ctx.holder, move: ctx.move }),
   "calc.my-attack-matchup": ctx => ({ pokemon: ctx.holder, move: ctx.move }),
+  // The accuracy-bypass scan (MoveEffectPhase.checkBypassAccAndInvuln) asks the user attr matches(move, user, target); the user is the holder.
+  "calc.always-hit-check": ctx => ({ pokemon: ctx.holder, opponent: ctx.foe, move: ctx.move }),
   // The legacy PreDefend hook: what the (undispatched) dodge class would receive.
   "calc.incoming-move": ctx => ({
     pokemon: ctx.holder,
