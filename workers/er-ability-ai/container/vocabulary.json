@@ -1724,6 +1724,7 @@
         "BlockRedirectAbAttr",
         "BugPowderImmunityAbAttr",
         "CenterOfAttentionAbAttr",
+        "CrackedVesselMarkerAbAttr",
         "DeadeyeMarkerAbAttr",
         "DoubleSelfInflictedDamageAbAttr",
         "DrenchImmunityAbAttr",
@@ -1733,10 +1734,12 @@
         "IgnoreGenderInfatuationAbAttr",
         "IgnoreProtectByFlagAbAttr",
         "IgnoreProtectOnContactAbAttr",
+        "LivingChromeMarkerAbAttr",
         "OverruleCritAbAttr",
         "SedimentBloomMarkerAbAttr",
         "SpreadTargetByFlagAbAttr",
         "StealthRockImmunityAbAttr",
+        "SuperegoMarkerAbAttr",
         "SuppressFieldAbilitiesWhenEnragedAbAttr",
         "SuppressFieldEffectsAbAttr",
         "SwitchWhileRampagingAbAttr",
@@ -5027,5 +5030,5 @@
       ]
     }
   ],
-  "hash": "11bb398eec9da8"
+  "hash": "1696873ee0a3c2"
 }

@@ -103,9 +103,12 @@ describe("L0 dispatch keys (Step 0 worklist)", () => {
  */
 const ER_MARKER_FLAG_KEYS: ReadonlySet<string> = new Set([
   "CenterOfAttentionAbAttr",
+  "CrackedVesselMarkerAbAttr",
   "DeadeyeMarkerAbAttr",
   "EclipseWingMarkerAbAttr",
+  "LivingChromeMarkerAbAttr",
   "SedimentBloomMarkerAbAttr",
+  "SuperegoMarkerAbAttr",
   "VaporBodyAccuracyAbAttr",
 ]);
 

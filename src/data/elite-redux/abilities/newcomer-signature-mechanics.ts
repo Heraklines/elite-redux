@@ -98,6 +98,11 @@ function hasAttr(pokemon: Pokemon, name: string): boolean {
   return pokemon.getAllActiveAbilityAttrs().some(attr => attr?.constructor?.name === name);
 }
 
+/** The first active ability attr of this class name on the Pokemon (the engine finds marker attrs by name), if any. */
+function findAttr<T extends AbAttr>(pokemon: Pokemon, name: string): T | undefined {
+  return pokemon.getAllActiveAbilityAttrs().find(attr => attr?.constructor?.name === name) as T | undefined;
+}
+
 function turnKey(): string {
   return `${globalScene.currentBattle?.waveIndex ?? 0}:${globalScene.currentBattle?.turn ?? 0}`;
 }
@@ -1828,19 +1833,21 @@ const CRACKED_USED_WAVE = new WeakMap<Pokemon, number>();
 const CRACKED_TYPES = new WeakMap<Pokemon, PokemonType[]>();
 export function tryCrackedVessel(defender: Pokemon, source: Pokemon | undefined): boolean {
   const wave = globalScene.currentBattle?.waveIndex ?? 0;
-  if (!source || !hasAttr(defender, "CrackedVesselMarkerAbAttr") || CRACKED_USED_WAVE.get(defender) === wave) {
+  const marker = findAttr<CrackedVesselMarkerAbAttr>(defender, "CrackedVesselMarkerAbAttr");
+  if (!source || !marker || CRACKED_USED_WAVE.get(defender) === wave) {
     return false;
   }
   CRACKED_USED_WAVE.set(defender, wave);
-  const kept = defender.getTypes().slice(0, -1);
+  const heldTypes = defender.getTypes();
+  const kept = heldTypes.slice(0, Math.max(0, heldTypes.length - marker.typesLost));
   const liveTypes = kept.length > 0 ? kept : [PokemonType.UNKNOWN];
   CRACKED_TYPES.set(defender, liveTypes);
   defender.summonData.types = [...liveTypes];
   defender.updateInfo();
   globalScene.phaseManager.queueMessage(`${defender.getNameToRender()}'s Cracked Vessel shattered!`);
-  globalScene.arena.trySetWeather(WeatherType.EERIE_FOG, defender, 4);
+  globalScene.arena.trySetWeather(marker.fogWeather, defender, marker.fogTurns);
   for (const adjacent of [...defender.getAdjacentAllies(), ...defender.getAdjacentOpponents()]) {
-    adjacent.trySetStatus(StatusEffect.TOXIC, defender, undefined, null, false, false);
+    adjacent.trySetStatus(marker.adjacentStatus, defender, undefined, null, false, false);
   }
   return true;
 }
@@ -1867,13 +1874,14 @@ export function recordLivingChromeTransformation(
   previousTypes: PokemonType[],
   previousFormIndex: number,
 ): void {
-  if (!hasAttr(pokemon, "LivingChromeMarkerAbAttr")) {
+  const marker = findAttr<LivingChromeMarkerAbAttr>(pokemon, "LivingChromeMarkerAbAttr");
+  if (!marker) {
     return;
   }
   const wave = globalScene.currentBattle?.waveIndex ?? 0;
   const prior = SHAPE_MEMORY.get(pokemon);
   const count = prior?.wave === wave ? prior.count : 0;
-  if (count >= 3) {
+  if (count >= marker.maxMemoriesPerWave) {
     return;
   }
   SHAPE_MEMORY.set(pokemon, {
@@ -2230,9 +2238,39 @@ export class EclipseWingMarkerAbAttr extends AbAttr {
   override apply(): void {}
 }
 export class LivingChromeMarkerAbAttr extends AbAttr {
+  /** How many shape memories I can make in one wave (ability studio param; the default is the original 3). */
+  public readonly maxMemoriesPerWave: number;
+
+  constructor(maxMemoriesPerWave = 3) {
+    super();
+    this.maxMemoriesPerWave = maxMemoriesPerWave;
+  }
+
   override apply(): void {}
 }
 export class CrackedVesselMarkerAbAttr extends AbAttr {
+  /** How many of my last types I lose when the vessel cracks (ability studio param; the default is the original 1). */
+  public readonly typesLost: number;
+  /** The weather the crack sets (ability studio param; the default is the original Eerie Fog). */
+  public readonly fogWeather: WeatherType;
+  /** How many turns that weather lasts (ability studio param; the default is the original 4). */
+  public readonly fogTurns: number;
+  /** The status put on every adjacent Pokemon (ability studio param; the default is the original badly poisoned). */
+  public readonly adjacentStatus: StatusEffect;
+
+  constructor(
+    typesLost = 1,
+    fogWeather: WeatherType = WeatherType.EERIE_FOG,
+    fogTurns = 4,
+    adjacentStatus: StatusEffect = StatusEffect.TOXIC,
+  ) {
+    super();
+    this.typesLost = typesLost;
+    this.fogWeather = fogWeather;
+    this.fogTurns = fogTurns;
+    this.adjacentStatus = adjacentStatus;
+  }
+
   override apply(): void {}
 }
 export class SuperegoMarkerAbAttr extends AbAttr {

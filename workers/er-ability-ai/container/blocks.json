@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "11bb398eec9da8",
-  "hash": "09d159f293de83",
+  "vocabularyHash": "1696873ee0a3c2",
+  "hash": "13c9ffec5c34d3",
   "blocks": [
     {
       "id": "block.anneal",
@@ -478,6 +478,108 @@
       "reusableAlone": {
         "when": true,
         "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.cracked-vessel-marker",
+      "className": "CrackedVesselMarkerAbAttr",
+      "label": "Survive a knock-out once a wave, then crack",
+      "summary": "Once a wave, a hit that would knock me out leaves me at 1 HP. I lose my last 1 type(s), Eerie Fog lasts 4 turns and every Pokemon next to me becomes Badly poisoned.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "survive at 1 hp",
+        "endure a knock-out",
+        "lose a type",
+        "shatter",
+        "poison everyone nearby",
+        "cracked vessel",
+        "focus sash with a price"
+      ],
+      "examples": [
+        "Once per wave I survive a knock-out at 1 HP, lose my last type, summon fog and badly poison the neighbours, like Cracked Vessel"
+      ],
+      "params": [
+        {
+          "id": "typesLost",
+          "label": "Types I lose when the vessel cracks (types)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 3,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "fogWeather",
+          "label": "Weather it calls",
+          "control": "select",
+          "default": "Eerie Fog",
+          "editable": true,
+          "options": [
+            "Eerie Fog",
+            "Sun",
+            "Rain",
+            "Sandstorm",
+            "Hail",
+            "Snow",
+            "Plain fog",
+            "Heavy rain",
+            "Harsh sun",
+            "Strong winds",
+            "Tempest storm",
+            "Snowy wrath"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "fogTurns",
+          "label": "Turns the weather lasts",
+          "control": "number",
+          "default": 4,
+          "editable": true,
+          "min": 1,
+          "max": 20,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "adjacentStatus",
+          "label": "Status given to every Pokemon next to me",
+          "control": "select",
+          "default": "Badly poisoned",
+          "editable": true,
+          "options": [
+            "Poisoned",
+            "Badly poisoned",
+            "Paralyzed",
+            "Asleep",
+            "Frozen",
+            "Burned"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only a direct hit that would knock me out; damage from poison, weather and the like never cracks the vessel",
+        "Only once per wave",
+        "The weather may be refused by the field (a strong weather cannot be replaced), and a neighbour's own ability or type may stop the status",
+        "If I have fewer types than I lose I end up with the Unknown type",
+        "My shortened type list is also what I come back with after switching out (the second part of this ability)"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
         "do": true
       },
       "uses": 1
@@ -1840,6 +1942,56 @@
       "uses": 1
     },
     {
+      "id": "block.living-chrome-marker",
+      "className": "LivingChromeMarkerAbAttr",
+      "label": "Remember the types I leave behind when I change shape",
+      "summary": "While I have this, each time I change shape I remember the types I just left, up to 3 times per wave, so my other part of this ability can cut damage from them.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "remember old types",
+        "shape memory",
+        "keep my old typing",
+        "change form and remember",
+        "adaptive memory",
+        "living chrome"
+      ],
+      "examples": [
+        "Each time I change form I remember the types I just left, like Living Chrome"
+      ],
+      "params": [
+        {
+          "id": "maxMemoriesPerWave",
+          "label": "Most shape memories I can make in one wave (times)",
+          "control": "number",
+          "default": 3,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only a real change of shape counts (a form change of this Pokemon); nothing is remembered otherwise",
+        "The memory lasts only for the turn it was made and only counts in the same wave",
+        "Only my first two previous types are remembered, and an Eevee leaving its base form remembers every type instead",
+        "On its own this part does not reduce any damage; the damage cut is the second part of this ability"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.living-chrome-reduction",
       "className": "LivingChromeReductionAbAttr",
       "label": "Take less damage from the types I just changed away from",
@@ -3035,6 +3187,44 @@
         "do": true
       },
       "packageReason": "PACKAGE for the EFFECT only. The trigger (after my hit) and the conditions that can be expressed are separate and bound to library atoms: the attack condition (ctor:0, move.damaging) and the punching rule (gate, move.flag). Why the effect cannot be split with today's blocks: it queues a SCRIPTED follow-up of the SAME move I just used at a share of ITS power (and the move's own category), with flags (always hits, ignores defence boosts, cannot crit, suppresses on-KO) held in module WeakSets; effect.scripted-move takes a fixed move id and a fixed power, so it cannot echo 'the move I used'. Requested: R-B13-40 `effect.echo-move` (echo the move I used at {percent}% power as a {type} hit, with the four fixed flags). Several conditions stay inside the class as guards/residual and are listed as 'also requires' with requests: damage dealt (R-B13-3), hit not blocked (R-B13-4), once per move (R-B13-5), a single-hit move (R-B13-36) and not-one-of-my-own-follow-ups (R-B13-37, a correctness rule that should become a guard). Review of the numbers: the 30% / 50% powers and the two types were literals; they are now trailing constructor arguments 2 to 5 (defaults reproduce the old values: 30/100 and 50/100 are the very doubles 0.3 and 0.5). Users: Spirit Punch (5983, attr 0). ODDITIES (not fixed): (1) apply stores the move record BEFORE its simulated and fainted-target checks, so a simulated call or a KO still spends the once-per-move memory; (2) a move with variable power (power -1) or 0 echoes at power max(1, floor(...)) because the helper clamps it; (3) the 'cannot crit' and 'no on-KO effects' of the ability text are enforced by the scripted move outside this class.",
+      "uses": 1
+    },
+    {
+      "id": "block.superego-marker",
+      "className": "SuperegoMarkerAbAttr",
+      "label": "Steal a foe's stat boost for myself, once per stat each turn",
+      "summary": "While I have this, when a foe raises a stat above my own level of that stat, I take that level and the foe goes back to my old level. This works once per stat each turn.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "steal stat boosts",
+        "take the boost",
+        "stat theft",
+        "boost thief",
+        "opportunist",
+        "superego",
+        "swap boosts with the foe"
+      ],
+      "examples": [
+        "When a foe raises its Attack above mine I take the boost instead, like Superego"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only a boost that is not a copy of another boost (boosts copied by Opportunist-style abilities do not trigger it)",
+        "Only works when the foe ends above my own level of that stat",
+        "Only once per stat each turn for me",
+        "It only reacts to boosts of foes; my own boosts and my allies' boosts are left alone"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
       "uses": 1
     },
     {
