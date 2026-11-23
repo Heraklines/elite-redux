@@ -280,7 +280,12 @@ bindLegacyClosure(
 // ---------------------------------------------------------------------------------------------------------------
 // SelfHighestStatMultiplierAbAttr, slot ctor:1, an AbAttrCondition (holder): the weather list test `weather?.weatherType` is in the
 // list, which equals an OR of field.weather (`arena.weatherType` is `weather?.weatherType ?? NONE`). All users: Attack and Sp. Atk, 1.5.
-const SUN = { any: [{ id: "field.weather", weather: "SUNNY" }, { id: "field.weather", weather: "HARSH_SUN" }] };
+const SUN = {
+  any: [
+    { id: "field.weather", weather: "SUNNY" },
+    { id: "field.weather", weather: "HARSH_SUN" },
+  ],
+};
 //   Sun or Extremely harsh sunlight: Solar Power (94), Big Leaves (5111 attrs 4 and 5), Rite Of Spring (5503), Photovoltaic (6030).
 //   Attr 4 of Big Leaves also carries an attr-level condition (addCondition) that the rebuild copies.
 bindCondition(94, 0, SUN, "ctor:1");
@@ -297,19 +302,34 @@ bindCondition(5601, 1, SAND, "ctor:1");
 bindCondition(
   5007,
   0,
-  { any: [{ id: "field.weather", weather: "HAIL" }, { id: "field.weather", weather: "SNOW" }] },
+  {
+    any: [
+      { id: "field.weather", weather: "HAIL" },
+      { id: "field.weather", weather: "SNOW" },
+    ],
+  },
   "ctor:1",
 );
 bindCondition(
   5325,
   0,
-  { any: [{ id: "field.weather", weather: "FOG" }, { id: "field.weather", weather: "EERIE_FOG" }] },
+  {
+    any: [
+      { id: "field.weather", weather: "FOG" },
+      { id: "field.weather", weather: "EERIE_FOG" },
+    ],
+  },
   "ctor:1",
 );
 bindCondition(
   5636,
   0,
-  { any: [{ id: "field.weather", weather: "RAIN" }, { id: "field.weather", weather: "HEAVY_RAIN" }] },
+  {
+    any: [
+      { id: "field.weather", weather: "RAIN" },
+      { id: "field.weather", weather: "HEAVY_RAIN" },
+    ],
+  },
   "ctor:1",
 );
 
@@ -321,12 +341,7 @@ bindCondition(5377, 1, { not: { id: "tag.has", who: "holder", tag: "ER_BLEED" } 
 // SelfSwitchOnMoveTypeAbAttr, slot gate: `super.canApply` (the default attack condition: `move.category !== STATUS`) and
 // `pokemon.getMoveType(move) === moveType` (move.type with effective true, the same call). gateParams writes the live `type`.
 //   Hollow Ice Zone (5680, attr 1): Ice.
-bindCondition(
-  5680,
-  1,
-  { all: [{ id: "move.damaging" }, { id: "move.type", type: "ICE", effective: true }] },
-  "gate",
-);
+bindCondition(5680, 1, { all: [{ id: "move.damaging" }, { id: "move.type", type: "ICE", effective: true }] }, "gate");
 
 // ---------------------------------------------------------------------------------------------------------------
 // SelfSwitchOnStatLowerAbAttr, slot gate, in the class order: the once-per-battle memory (the per-wave Set under the key the class
@@ -411,5 +426,158 @@ for (const [abilityId, attrIndexes] of [
 ] as const) {
   for (const attrIndex of attrIndexes) {
     bindLegacyClosure(abilityId, attrIndex, RAW_CONTACT_REASON, "ctor:1");
+  }
+}
+
+// ===============================================================================================================
+// Chunk 5 of 5: StabAddAbAttr, StabSuppressAuraAbAttr, StatBlendAbAttr and StatChangeOnAttackAbAttr.
+// Same rule as above: every line was read by hand from the live attr dump and mapped to the atom that calls the SAME engine predicate,
+// or marked as a legacy closure with the reason.
+
+// ---------------------------------------------------------------------------------------------------------------
+// StabAddAbAttr, slot ctor:1 (which moves) and slot ctor:2 (the move's type is not one of my own types), both PokemonAttackConditions
+// called as (holder, target, move).
+//   ctor:1 is `pokemon.getMoveType(move) === targetType` (no target type: always true) = move.type with effective true
+//   (`moveUser.getMoveType(move)`). ctor:2 is `!pokemon.getTypes(false, false).includes(pokemon.getMoveType(move))`: the library has no
+//   atom for "the move's type is one of my own types" (and mon.has-type asks isOfType, which counts a Tera type), so every ctor:2 is a
+//   legacy closure (request R-B11-C5-01).
+const STAB_OFF_TYPE_REASON =
+  "The test is 'the move's resolved type is NOT one of my own types, Tera type left out' (!getTypes(false, false).includes(getMoveType(move))). The library has no atom 'the move's type is one of my own types' (mon.has-type needs a fixed type and counts a Tera type). Needs request R-B11-C5-01.";
+// [abilityId, attrIndex, type or "ANY"]; every user has the multiplier 1.5.
+for (const [abilityId, attrIndex, type] of [
+  [5017, 1, "FIRE"], // Immolate
+  [5025, 0, "ANY"], // Mystic Power
+  [5029, 0, "ICE"], // Aurora Borealis
+  [5035, 0, "WATER"], // Amphibious
+  [5038, 1, "FIGHTING"], // Fighting Spirit
+  [5046, 1, "GROUND"], // Tectonize
+  [5053, 1, "WATER"], // Hydrate
+  [5063, 1, "POISON"], // Intoxicate
+  [5103, 0, "FAIRY"], // Lunar Eclipse
+  [5103, 1, "DARK"],
+  [5104, 2, "FIRE"], // Solar Flare
+  [5118, 1, "BUG"], // Pollinate
+  [5123, 1, "GHOST"], // Spectralize
+  [5140, 1, "ROCK"], // Mineralize
+  [5149, 1, "DRAGON"], // Draconize
+  [5190, 1, "PSYCHIC"], // Emanate
+  [5209, 0, "FAIRY"], // Moon Spirit
+  [5209, 1, "DARK"],
+  [5219, 1, "PSYCHIC"], // Enlightened
+  [5224, 0, "ANY"], // Arcane Force
+  [5237, 1, "GRASS"], // Fertilize
+  [5324, 2, "WATER"], // Old Mariner
+  [5351, 3, "FAIRY"], // Unicorn
+  [5403, 2, "ANY"], // Color Spectrum
+  [5404, 3, "BUG"], // Steel Beetle
+  [5428, 1, "POISON"], // Sludgy Mix
+  [5457, 2, "FAIRY"], // Twinkle Toes
+  [5461, 2, "POISON"], // Acidic Slime
+  [5463, 3, "FIGHTING"], // Qigong
+  [5477, 0, "ANY"], // Unown Power
+  [5486, 11, "DARK"], // Two-Faced (attr-level condition: hangry form)
+  [5501, 1, "DARK"], // Deviate
+  [5527, 2, "FAIRY"], // Tender Affection
+  [5530, 5, "STEEL"], // Stainless Steel
+  [5542, 1, "DRAGON"], // Draconic Might
+  [5552, 1, "DRAGON"], // Komodo
+  [5557, 1, "ROCK"], // Molten Coat
+  [5619, 1, "DRAGON"], // Dragonfruit
+  [5621, 2, "ROCK"], // Lead Claws
+  [5668, 1, "WATER"], // Hand Barnacles
+  [5688, 1, "ELECTRIC"], // Storm Cloud
+  [5689, 1, "WATER"], // Waterborne
+  [5714, 2, "DARK"], // Mob Boss
+  [5730, 2, "FIGHTING"], // Warrior's Spear
+  [5936, 0, "ANY"], // Brain Food
+  [5940, 1, "PSYCHIC"], // Brainpower
+  [5955, 1, "WATER"], // Waterborne (second id)
+  [5956, 1, "DRAGON"], // Dragonfruit (second id)
+  [5957, 1, "DRAGON"], // Komodo (second id)
+  [6003, 5, "STEEL"], // Stainless Steel (second id)
+  [6036, 3, "PSYCHIC"], // Nucleus
+  [6053, 1, "STELLAR"], // Stellarize
+  [6074, 1, "FAIRY"], // Moonarch
+  [6074, 2, "DARK"],
+  [6076, 1, "WATER"], // Bodhisattva
+  [6108, 1, "FIRE"], // Blaze Release
+  [6111, 3, "STELLAR"], // Bejeweled
+  [20000, 0, "ANY"], // Psychic Supremacy
+  [20008, 4, "FIGHTING"], // Heartless Style
+] as const) {
+  bindCondition(
+    abilityId,
+    attrIndex,
+    type === "ANY" ? { all: [] } : { block: "move.type", params: { type, effective: true } },
+    "ctor:1",
+  );
+  bindLegacyClosure(abilityId, attrIndex, STAB_OFF_TYPE_REASON, "ctor:2");
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// StabSuppressAuraAbAttr, slot ctor:0 (another battler on the field has my ability) and slot ctor:1 (the move's type is one of my own
+// types, Tera type counted). Users: Relic Stone (5567 attr 0) and Titan (5934 attr 1). Neither test has a library atom.
+const STAB_AURA_REASON =
+  "The test is 'another battler on the field (not fainted, not me) has my ability as its ability or its passive' (field.some(p => p !== pokemon && (p.hasAbility(id) || p.getPassiveAbility().id === id))). The library has no atom for it (party.ally-ability only looks at the ally). Needs request R-B11-C5-02.";
+const STAB_OWN_TYPE_REASON =
+  "The test is 'the move's resolved type is one of my own types, Tera type counted' (getTypes(true).includes(getMoveType(move))). The library has no atom 'the move's type is one of my own types' (mon.has-type needs a fixed type). Needs request R-B11-C5-01.";
+for (const [abilityId, attrIndex] of [
+  [5567, 0],
+  [5934, 1],
+] as const) {
+  bindLegacyClosure(abilityId, attrIndex, STAB_AURA_REASON, "ctor:0");
+  bindLegacyClosure(abilityId, attrIndex, STAB_OWN_TYPE_REASON, "ctor:1");
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// StatBlendAbAttr, slot gate: `appliesTo.includes(stat)` with Attack and Sp. Atk. The library has no atom for "the stat being worked
+// out is one of these" (request R-B11-C5-03), so both users keep the class's own gate as a legacy closure.
+const STAT_BLEND_GATE_REASON =
+  "The gate is 'the stat being worked out is Attack or Sp. Atk' (appliesTo.includes(stat)). The library has no atom for the stat being calculated. Needs request R-B11-C5-03.";
+bindLegacyClosure(5545, 1, STAT_BLEND_GATE_REASON, "gate");
+bindLegacyClosure(5547, 1, STAT_BLEND_GATE_REASON, "gate");
+
+// ---------------------------------------------------------------------------------------------------------------
+// StatChangeOnAttackAbAttr, slot gate: [damaging move (the parent test `move.category !== STATUS`), the flag or the type test, the chance
+// roll], in the class's own order. The type test is the RAW `move.type !== moveType`, so move.type with effective false; the flag test
+// is `move.doesFlagEffectApply({ flag, user: holder, target })`, the same call as move.flag; the chance roll is
+// `chance !== 100 && randBattleSeedInt(100) >= chance`, the same draw as rng.chance (which draws nothing at 100 or when simulated).
+//   Sinister Claws (5712 attr 2): SLICING_MOVE, chance 100.
+bindCondition(
+  5712,
+  2,
+  {
+    all: [
+      { block: "move.damaging" },
+      { block: "move.flag", params: { flag: "SLICING_MOVE" } },
+      { block: "rng.chance", params: { pct: 100 } },
+    ],
+  },
+  "gate",
+);
+//   Archmage (5186 attrs 8 to 11) and Familiar (5941 attrs 9 to 12): a move type each, chance 30.
+for (const [abilityId, attrIndexes] of [
+  [5186, [8, 9, 10, 11]],
+  [5941, [9, 10, 11, 12]],
+] as const) {
+  // Fighting, Flying, Steel, Dragon, in this order.
+  for (const [offset, type] of [
+    [0, "FIGHTING"],
+    [1, "FLYING"],
+    [2, "STEEL"],
+    [3, "DRAGON"],
+  ] as const) {
+    bindCondition(
+      abilityId,
+      attrIndexes[offset],
+      {
+        all: [
+          { block: "move.damaging" },
+          { block: "move.type", params: { type, effective: false } },
+          { block: "rng.chance", params: { pct: 30 } },
+        ],
+      },
+      "gate",
+    );
   }
 }

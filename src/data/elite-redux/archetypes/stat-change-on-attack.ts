@@ -19,6 +19,7 @@
 
 import { PostAttackAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { MoveFlags } from "#enums/move-flags";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { BattleStat } from "#enums/stat";
@@ -93,12 +94,27 @@ export class StatChangeOnAttackAbAttr extends PostAttackAbAttr {
     return this.flag;
   }
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1): `guards` (there is somebody to change), then `gate` (a damaging move, of the
+   * configured flag and type, and the chance roll). The original tested the damaging-move clause before the target clause;
+   * both are pure reads, so only the order of the chance roll (always last) matters, and it is kept.
+   */
   public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Stays in front of the gate: a change aimed at the target needs a target that is not the holder itself. */
+  public guards({ pokemon, opponent: target }: PostMoveInteractionAbAttrParams): boolean {
+    return this.selfTarget || !(target == null || pokemon === target);
+  }
+
+  /** The replaceable conditions, in the original order: damaging move, flag, type, then the chance roll (the only draw). */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
     const { pokemon, move, opponent: target } = params;
     if (!super.canApply(params)) {
-      return false;
-    }
-    if (!this.selfTarget && (target == null || pokemon === target)) {
       return false;
     }
     if (

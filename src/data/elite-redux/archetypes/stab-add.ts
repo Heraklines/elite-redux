@@ -52,6 +52,7 @@
 
 import { MovePowerBoostAbAttr } from "#abilities/ab-attrs";
 import type { PokemonType } from "#enums/pokemon-type";
+import type { PokemonAttackCondition } from "#types/ability-types";
 
 /** Construction options for {@linkcode StabAddAbAttr}. */
 export interface StabAddOptions {
@@ -94,8 +95,22 @@ export interface StabAddOptions {
 export class StabAddAbAttr extends MovePowerBoostAbAttr {
   private readonly targetType: PokemonType | null;
   private readonly multiplier: number;
+  /**
+   * Which moves are meant: the move's resolved type is the configured `targetType` (any type when none is set).
+   * Constructor argument 1 (ability studio slot ctor:1); its default is the test built from `opts.targetType`.
+   */
+  private readonly typeCondition: PokemonAttackCondition;
+  /**
+   * The off-type test: the move's resolved type is NOT one of the user's current types (no Tera type), so a move that
+   * already gets real STAB is not boosted twice. Constructor argument 2 (ability studio slot ctor:2).
+   */
+  private readonly offTypeCondition: PokemonAttackCondition;
 
-  constructor(opts: StabAddOptions = {}) {
+  constructor(
+    opts: StabAddOptions = {},
+    typeCondition?: PokemonAttackCondition,
+    offTypeCondition?: PokemonAttackCondition,
+  ) {
     const multiplier = opts.multiplier ?? 1.5;
     if (!(multiplier > 0)) {
       throw new Error(`[StabAddAbAttr] multiplier must be > 0; got ${multiplier}`);
@@ -104,24 +119,35 @@ export class StabAddAbAttr extends MovePowerBoostAbAttr {
     // Condition: (no targetType OR move type matches targetType) AND
     // move type is NOT one of the user's current types. The second check
     // prevents double-stab on real-STAB moves (the natural STAB already gives
-    // +0.5 in `calculateStabMultiplier`).
-    super(
-      (pokemon, _defender, move) => {
+    // +0.5 in `calculateStabMultiplier`). The two halves are separate closures
+    // (ability studio, Tier A) and are combined in this order.
+    const matchesType: PokemonAttackCondition =
+      typeCondition
+      ?? ((pokemon, _defender, move) => {
+        if (pokemon === null) {
+          return false;
+        }
+        return targetType === null || pokemon.getMoveType(move) === targetType;
+      });
+    const isOffType: PokemonAttackCondition =
+      offTypeCondition
+      ?? ((pokemon, _defender, move) => {
         if (pokemon === null) {
           return false;
         }
         const moveType = pokemon.getMoveType(move);
-        if (targetType !== null && moveType !== targetType) {
-          return false;
-        }
         const sourceTypes = pokemon.getTypes(false, false);
         return !sourceTypes.includes(moveType);
-      },
+      });
+    super(
+      (pokemon, defender, move) => matchesType(pokemon, defender, move) && isOffType(pokemon, defender, move),
       multiplier,
       false,
     );
     this.targetType = targetType;
     this.multiplier = multiplier;
+    this.typeCondition = matchesType;
+    this.offTypeCondition = isOffType;
   }
 
   /** Read-only accessor for the configured target type, or `null` if all off-types apply. */

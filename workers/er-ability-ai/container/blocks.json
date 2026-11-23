@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "04130ca78ceaf7",
-  "hash": "105492eb062d3e",
+  "hash": "15e9b6c1d0287a",
   "blocks": [
     {
       "id": "block.ally-faint-power-boost",
@@ -2529,7 +2529,7 @@
         },
         {
           "id": "turns",
-          "label": "How many turns the weather lasts (5 is the usual length)",
+          "label": "How many turns the weather lasts (8 is the usual length)",
           "control": "number",
           "default": 8,
           "editable": true,
@@ -2793,6 +2793,490 @@
         "do": true
       },
       "uses": 28
+    },
+    {
+      "id": "block.stab-add",
+      "className": "StabAddAbAttr",
+      "label": "Give moves of a type the same-type attack bonus",
+      "summary": "Every move whose type I do not share get the same-type bonus: their power is multiplied by 1.5. Not when the move already is one of my own types. Example: Water moves for a Normal Pokemon.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "stab",
+        "same type attack bonus",
+        "extra stab",
+        "gain stab",
+        "all moves get stab",
+        "aurora borealis",
+        "mystic power",
+        "pixilate bonus",
+        "type bonus"
+      ],
+      "examples": [
+        "Water moves get the same-type bonus even if I am not a Water type",
+        "Every move of mine gets a 1.5x STAB-style bonus"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.5 = the usual same-type bonus, 2 = double)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05
+        },
+        {
+          "id": "targetType",
+          "label": "Move type this was built for (Any type = all moves); change the move type in the first condition",
+          "control": "select",
+          "default": "Any type",
+          "editable": false,
+          "options": [
+            "Any type",
+            "Normal",
+            "Fighting",
+            "Flying",
+            "Poison",
+            "Ground",
+            "Rock",
+            "Bug",
+            "Ghost",
+            "Steel",
+            "Fire",
+            "Water",
+            "Grass",
+            "Electric",
+            "Psychic",
+            "Ice",
+            "Dragon",
+            "Dark",
+            "Fairy",
+            "Stellar"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:1",
+          "lib": "move.type",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "ctor:2",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The type is the move's type after abilities such as Aerilate have changed it",
+        "My own types are counted without a Tera type, so a Terastallized Pokemon still counts as its normal types here"
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 59
+    },
+    {
+      "id": "block.stab-suppress-aura",
+      "className": "StabSuppressAuraAbAttr",
+      "label": "Cut the power of my same-type moves to cancel their bonus",
+      "summary": "While another Pokemon on the field has my ability, my same-type moves have their power multiplied by 0.67 (cancels the usual 1.5 bonus). Example: a field with no STAB.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "no stab",
+        "cancel stab",
+        "remove same type bonus",
+        "stab suppression",
+        "relic stone",
+        "titan",
+        "other battlers lose stab"
+      ],
+      "examples": [
+        "Same-type moves lose their 1.5 bonus while another holder is on the field",
+        "Cancel STAB for everyone"
+      ],
+      "params": [
+        {
+          "id": "suppression",
+          "label": "Power multiplier for my same-type moves (0.67 = two thirds, cancels the 1.5 bonus)",
+          "control": "number",
+          "default": 0.6666666666666666,
+          "editable": true,
+          "min": 0.1,
+          "max": 1,
+          "step": 0.01
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "ctor:1",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The other Pokemon must be on the field and not fainted, and have the same ability as its normal or passive ability",
+        "The type is the move's type after abilities such as Aerilate have changed it"
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "suppression"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.stat-blend",
+      "className": "StatBlendAbAttr",
+      "label": "Add a share of one of my stats to the stat being worked out",
+      "summary": "While my Attack, Sp. Atk are worked out, 0.2 times my Sp. Def is added on top (rounded down). Example: 0.2 of my Sp. Def added to my attacking stat.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "use defense for attack",
+        "add stat to attack",
+        "stat blend",
+        "best offense",
+        "magus blades",
+        "extra attack from defense",
+        "borrow another stat"
+      ],
+      "examples": [
+        "Add 20% of my Sp. Def to my Attack and Sp. Atk while I use moves",
+        "Use a share of my Speed as extra Defense"
+      ],
+      "params": [
+        {
+          "id": "appliesTo",
+          "label": "Which of my stats get the bonus (set by the first condition; locked here)",
+          "control": "select",
+          "default": "Attack, Sp. Atk",
+          "editable": false,
+          "options": [
+            "Attack, Defense, Sp. Atk, Sp. Def, Speed",
+            "Attack, Defense, Sp. Atk, Sp. Def",
+            "Attack, Defense, Sp. Atk, Speed",
+            "Attack, Defense, Sp. Def, Speed",
+            "Attack, Sp. Atk, Sp. Def, Speed",
+            "Defense, Sp. Atk, Sp. Def, Speed",
+            "Attack, Defense, Sp. Atk",
+            "Attack, Defense, Sp. Def",
+            "Attack, Sp. Atk, Sp. Def",
+            "Defense, Sp. Atk, Sp. Def",
+            "Attack, Defense, Speed",
+            "Attack, Sp. Atk, Speed",
+            "Defense, Sp. Atk, Speed",
+            "Attack, Sp. Def, Speed",
+            "Defense, Sp. Def, Speed",
+            "Sp. Atk, Sp. Def, Speed",
+            "Attack, Defense",
+            "Attack, Sp. Atk",
+            "Defense, Sp. Atk",
+            "Attack, Sp. Def",
+            "Defense, Sp. Def",
+            "Sp. Atk, Sp. Def",
+            "Attack, Speed",
+            "Defense, Speed",
+            "Sp. Atk, Speed",
+            "Sp. Def, Speed",
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Sp. Def",
+            "Speed"
+          ]
+        },
+        {
+          "id": "source",
+          "label": "Which of my stats the bonus is taken from",
+          "control": "select",
+          "default": "Sp. Def",
+          "editable": true,
+          "options": [
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Sp. Def",
+            "Speed"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "fraction",
+          "label": "Share of that stat (0.2 = 20%, 1 = all of it)",
+          "control": "number",
+          "default": 0.2,
+          "editable": true,
+          "min": 0.05,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The bonus is read from the stat as it is in battle right now, before stat stages and before a Choice Scarf",
+        "The share is rounded down to a whole number"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "source",
+          "fraction"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.stat-change-on-attack",
+      "className": "StatChangeOnAttackAbAttr",
+      "label": "Change a stat after my attack hits",
+      "summary": "After my damaging move hits, the target's Sp. Def change by -1 stages (100% chance). Example: Sinister Claws lowers Sp. Def by 1.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "lower stat on hit",
+        "raise stat after attacking",
+        "secondary stat drop",
+        "sinister claws",
+        "archmage",
+        "familiar",
+        "keen edge lowers defense",
+        "stat change on attack"
+      ],
+      "examples": [
+        "Slicing moves lower the foe's Sp. Def by one stage",
+        "30% chance to raise my Sp. Atk by one stage after a Fighting move hits"
+      ],
+      "params": [
+        {
+          "id": "stats",
+          "label": "Which stats change",
+          "control": "select",
+          "default": "Sp. Def",
+          "editable": true,
+          "options": [
+            "Attack, Defense, Sp. Atk, Sp. Def, Speed",
+            "Attack, Defense, Sp. Atk, Sp. Def",
+            "Attack, Defense, Sp. Atk, Speed",
+            "Attack, Defense, Sp. Def, Speed",
+            "Attack, Sp. Atk, Sp. Def, Speed",
+            "Defense, Sp. Atk, Sp. Def, Speed",
+            "Attack, Defense, Sp. Atk",
+            "Attack, Defense, Sp. Def",
+            "Attack, Sp. Atk, Sp. Def",
+            "Defense, Sp. Atk, Sp. Def",
+            "Attack, Defense, Speed",
+            "Attack, Sp. Atk, Speed",
+            "Defense, Sp. Atk, Speed",
+            "Attack, Sp. Def, Speed",
+            "Defense, Sp. Def, Speed",
+            "Sp. Atk, Sp. Def, Speed",
+            "Attack, Defense",
+            "Attack, Sp. Atk",
+            "Defense, Sp. Atk",
+            "Attack, Sp. Def",
+            "Defense, Sp. Def",
+            "Sp. Atk, Sp. Def",
+            "Attack, Speed",
+            "Defense, Speed",
+            "Sp. Atk, Speed",
+            "Sp. Def, Speed",
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Sp. Def",
+            "Speed"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "stages",
+          "label": "Number of stages (-1 = one stage lower, 1 = one stage higher)",
+          "control": "number",
+          "default": -1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "recipient",
+          "label": "Whose stat changes",
+          "control": "select",
+          "default": "The Pokemon I hit",
+          "editable": true,
+          "options": [
+            "The Pokemon I hit",
+            "Myself"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "chance",
+          "label": "Chance (%)",
+          "control": "slider",
+          "default": 100,
+          "editable": true,
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "flag",
+          "label": "Move property this was built for (Any move = all moves); change it in the gate condition",
+          "control": "select",
+          "default": "ANY",
+          "editable": false,
+          "options": [
+            "ANY",
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        },
+        {
+          "id": "type",
+          "label": "Move type this was built for (Any type = all moves); change it in the gate condition",
+          "control": "select",
+          "default": "Any type",
+          "editable": false,
+          "options": [
+            "Any type",
+            "Normal",
+            "Fighting",
+            "Flying",
+            "Poison",
+            "Ground",
+            "Rock",
+            "Bug",
+            "Ghost",
+            "Steel",
+            "Fire",
+            "Water",
+            "Grass",
+            "Electric",
+            "Psychic",
+            "Ice",
+            "Dragon",
+            "Dark",
+            "Fairy",
+            "Stellar"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "There must be a Pokemon to change: a change aimed at the target needs a target that is not me",
+        "Nothing happens in a preview",
+        "The stat change can still be blocked or stopped at its limit by the usual rules (a stat already at its limit, Clear Body and so on)"
+      ],
+      "gateParams": [
+        {
+          "param": "chance",
+          "block": "rng.chance",
+          "field": "pct"
+        }
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stats",
+          "stages",
+          "recipient"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 9
     }
   ]
 }
