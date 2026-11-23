@@ -34,7 +34,7 @@ export default defineDecl(ConsumeFirstFlaggedMovePriorityAbAttr, {
   when: "event.after-my-hit",
   label: "Spend my first-move bonus after a matching hit",
   summary: params =>
-    `After my attack lands with a move of the kind "${params.flags}", my +1 priority bonus is used up${params.regainOnKo === true ? ", and knocking the target out gives it back" : ""}.`,
+    `After my attack lands with a move of the kind "${params.flags}", my first-move priority bonus is used up${params.regainOnKo === true ? ", and knocking the target out gives it back" : ""}.`,
   synonyms: [
     "use up the bonus",
     "spend priority",

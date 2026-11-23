@@ -32,7 +32,7 @@ export default defineDecl(ConsumeFirstFlaggedMoveOnUseAbAttr, {
   when: "event.my-move-starts",
   label: "Spend my first-move bonus when I use a matching move",
   summary: params =>
-    `As soon as I use a move of the kind "${params.flag}", even if it misses or fails, my +1 priority bonus is used up.`,
+    `As soon as I use a move of the kind "${params.flag}", even if it misses or fails, my first-move priority bonus is used up.`,
   synonyms: [
     "use up the bonus",
     "spend priority on use",

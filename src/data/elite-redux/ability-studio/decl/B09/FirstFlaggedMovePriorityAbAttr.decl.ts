@@ -33,9 +33,9 @@ export default defineDecl(FirstFlaggedMovePriorityAbAttr, {
   tier: "B",
   kind: "calc-modifier",
   when: "calc.priority",
-  label: "Give +1 priority to my first move of one kind",
+  label: "Give my first move of one kind a priority boost",
   summary: params =>
-    `Until my first-move bonus is spent, my moves of the kind "${params.flags}" get +1 priority and go before normal moves. Other blocks spend and restore the bonus.`,
+    `Until my first-move bonus is spent, my moves of the kind "${params.flags}" get ${params.amount ?? 1} priority and go before normal moves. Other blocks spend and restore the bonus.`,
   synonyms: [
     "first bite goes first",
     "first slash goes first",
@@ -49,7 +49,7 @@ export default defineDecl(FirstFlaggedMovePriorityAbAttr, {
     "act before the foe",
   ],
   examples: [
-    "My first slicing move after I enter gets +1 priority, like Cutthroat",
+    "My first slicing move after I enter gets a priority boost, like Cutthroat",
     "My first biting move goes first, like Sidewinder",
   ],
   params: [

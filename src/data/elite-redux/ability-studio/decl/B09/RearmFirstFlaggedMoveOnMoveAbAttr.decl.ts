@@ -26,7 +26,7 @@ export default defineDecl(RearmFirstFlaggedMoveOnMoveAbAttr, {
   when: "event.my-move-starts",
   label: "Give back my first-move bonus when I use a chosen move",
   summary: params =>
-    `Whenever I use "${params.moveId}", my +1 priority bonus is back, so my next matching move goes first again.`,
+    `Whenever I use "${params.moveId}", my first-move priority bonus is back, so my next matching move goes first again.`,
   synonyms: [
     "reset priority",
     "refresh the bonus",
