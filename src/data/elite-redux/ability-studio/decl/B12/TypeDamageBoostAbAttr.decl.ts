@@ -31,8 +31,15 @@ export default defineDecl(TypeDamageBoostAbAttr, {
   kind: "calc-modifier",
   when: "calc.move-power",
   label: "Make my moves of one type stronger",
-  summary: params =>
-    `My ${params.type} moves get ${params.multiplier} times their power, and ${params.lowHpMultiplier} times while my HP is at or below ${params.lowHpLine}% (0 = no extra boost). Example: Fire 1.3, then 1.8 at one third HP, like Hellblaze.`,
+  summary: params => {
+    const base = `My ${params.type} moves get ${params.multiplier} times their power`;
+    if (!Number(params.lowHpMultiplier)) {
+      return `${base}. Example: Electric 1.25, like Electrocytes.`;
+    }
+    const line = Number(params.lowHpLine);
+    const lineWords = Math.abs(line - 100 / 3) < 0.01 ? "one third" : `${Number(line.toFixed(2))}%`;
+    return `${base}, and ${params.lowHpMultiplier} times while my HP is at or below ${lineWords} of my max HP. Example: Fire 1.3, then 1.8 at one third HP, like Hellblaze.`;
+  },
   synonyms: [
     "type boost",
     "fire moves stronger",
@@ -102,7 +109,7 @@ export default defineDecl(TypeDamageBoostAbAttr, {
       min: 1,
       max: 99,
       step: 0.01,
-      label: "HP line for the extra boost (% of max HP, 33.33 = one third)",
+      label: "HP line for the extra boost (% of max HP; 33.33 means one third)",
       editable: true,
       gateIndependent: true,
       default: 33.3333333333,

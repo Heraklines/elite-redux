@@ -44,7 +44,7 @@ export const hpLineCodec: ParamCodec = {
   toCtor: value => {
     const ratio = Number(value) / 100;
     const n = Math.round(1 / ratio);
-    return n >= 2 && Math.abs(ratio - 1 / n) < 1e-9 ? 1 / n : ratio;
+    return n >= 2 && Math.abs(ratio - 1 / n) < 5e-5 ? 1 / n : ratio;
   },
   fromInstance: raw => (typeof raw === "number" ? cleanPercent(raw) : undefined),
 };
