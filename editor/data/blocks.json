@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "12f8ed7d4d7254",
+  "hash": "1df99bebd671f4",
   "blocks": [
     {
       "id": "block.activate-once-per-battle-entry-window",
@@ -1992,7 +1992,7 @@
     {
       "id": "block.type-conversion-power-boost",
       "className": "TypeConversionPowerBoostAbAttr",
-      "label": "Make my moves of one type or kind stronger (ate-ability power)",
+      "label": "Make my moves of one type or kind stronger (ate power)",
       "summary": "My Normal moves get 1.1 times their power. Example: Sound moves get 1.2 times their power, like Sand Song.",
       "tier": "B",
       "kind": "calc-modifier",

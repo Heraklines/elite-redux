@@ -24,7 +24,7 @@ export default defineDecl(TypeConversionPowerBoostAbAttr, {
   tier: "B",
   kind: "calc-modifier",
   when: "calc.move-power",
-  label: "Make my moves of one type or kind stronger (ate-ability power)",
+  label: "Make my moves of one type or kind stronger (ate power)",
   summary: params => {
     const source = String(params.source);
     const moves = /moves/i.test(source) ? source : `${source} moves`;
