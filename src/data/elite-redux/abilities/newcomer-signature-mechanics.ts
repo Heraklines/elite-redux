@@ -25,6 +25,7 @@ import {
 import { globalScene } from "#app/global-scene";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { primeDualTypeMove } from "#data/elite-redux/abilities/dual-type-move";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 // biome-ignore lint/suspicious/noImportCycles: Scripted follow-ups must construct real Move instances.
 import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
 import type { PokemonMove } from "#data/moves/pokemon-move";
@@ -119,8 +120,17 @@ export function markGenuineVoluntaryEntry(pokemon: Pokemon): void {
   VOLUNTARY_ENTRY.add(pokemon);
 }
 
-export class FinalSeasonEntryAbAttr extends PostSummonAbAttr {
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+export class FinalSeasonEntryAbAttr extends PostSummonAbAttr implements GatedAttr<AbAttrBaseParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** Tier B (ability studio spec 3.1): the one clause of the rule lives in `gate`; there is no residual. */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The replaceable condition: this Pokemon came in through a deliberate switch (see markGenuineVoluntaryEntry). */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     return VOLUNTARY_ENTRY.has(pokemon);
   }
 
@@ -137,8 +147,17 @@ export class FinalSeasonEntryAbAttr extends PostSummonAbAttr {
   }
 }
 
-export class FinalSeasonFogAbAttr extends PostTurnAbAttr {
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+export class FinalSeasonFogAbAttr extends PostTurnAbAttr implements GatedAttr<AbAttrBaseParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** Tier B (ability studio spec 3.1): the one clause of the rule lives in `gate`; there is no residual. */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The replaceable condition: the entry effect armed the fog for this turn's end. */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     return FINAL_SEASON_PENDING_FOG.has(pokemon);
   }
 
@@ -151,16 +170,45 @@ export class FinalSeasonFogAbAttr extends PostTurnAbAttr {
   }
 }
 
-export class FinalSeasonPowerAbAttr extends MovePowerBoostAbAttr {
+/** The Eerie Fog on the field is the very one this Pokemon's Final Season set (not another source's fog). */
+function finalSeasonFogIsMine(pokemon: Pokemon): boolean {
+  return finalSeasonFogOwner === pokemon && finalSeasonFogInstance === globalScene.arena.weather;
+}
+
+/** Eerie Fog is the active weather and the move is Dark or Flying. */
+function finalSeasonBoostedMoveInFog(pokemon: Pokemon, move: Move): boolean {
+  return (
+    globalScene.arena.weatherType === WeatherType.EERIE_FOG
+    && [PokemonType.DARK, PokemonType.FLYING].includes(pokemon.getMoveType(move))
+  );
+}
+
+export class FinalSeasonPowerAbAttr
+  extends MovePowerBoostAbAttr
+  implements GatedAttr<PreAttackModifyPowerAbAttrParams>
+{
   constructor() {
-    super(
-      (pokemon, _target, move) =>
-        finalSeasonFogOwner === pokemon
-        && finalSeasonFogInstance === globalScene.arena.weather
-        && globalScene.arena.weatherType === WeatherType.EERIE_FOG
-        && [PokemonType.DARK, PokemonType.FLYING].includes(pokemon.getMoveType(move)),
-      1.3,
-    );
+    super((pokemon, _target, move) => finalSeasonFogIsMine(pokemon) && finalSeasonBoostedMoveInFog(pokemon, move), 1.3);
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreAttackModifyPowerAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B (ability studio spec 3.1): the clause order of the original closure is kept. `guards` holds the first two
+   * clauses (the fog is my own: private memory, no library condition yet), `gate` the last two (the weather and the
+   * move types, both library conditions).
+   */
+  override canApply(params: PreAttackModifyPowerAbAttrParams): boolean {
+    return gatedCanApply<PreAttackModifyPowerAbAttrParams>(this, params);
+  }
+
+  public guards({ pokemon }: PreAttackModifyPowerAbAttrParams): boolean {
+    return finalSeasonFogIsMine(pokemon);
+  }
+
+  public gate({ pokemon, move }: PreAttackModifyPowerAbAttrParams): boolean {
+    return finalSeasonBoostedMoveInFog(pokemon, move);
   }
 }
 
@@ -190,9 +238,26 @@ function foulState(pokemon: Pokemon): FoulHarvestState {
   return state;
 }
 
-export class FoulHarvestAbAttr extends PostAttackAbAttr {
+export class FoulHarvestAbAttr extends PostAttackAbAttr implements GatedAttr<PostMoveInteractionAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B (ability studio spec 3.1): attack condition first (`guards`), then the replaceable `gate`. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    if (!super.canApply(params) || params.damage <= 0 || params.hitResult >= HitResult.NO_EFFECT) {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /**
+   * The first clause of the original: the base class's attack condition (constructor argument 0, a library condition
+   * through the "ctor:0" binding). It stays first, as before.
+   */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    return super.canApply(params);
+  }
+
+  /** The remaining clauses, in the original order: damage was dealt, the hit was not blocked, a new move of mine. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    if (params.damage <= 0 || params.hitResult >= HitResult.NO_EFFECT) {
       return false;
     }
     const record = params.pokemon.getLastXMoves(1)[0] as object | undefined;
@@ -268,14 +333,43 @@ export class PorousResetAbAttr extends PostSummonAbAttr {
   }
 }
 
-export class PorousSoundReductionAbAttr extends ReceivedMoveDamageMultiplierAbAttr {
+/** The incoming move is sound-based (from the attacker's point of view). */
+function porousIsSoundMove(attacker: Pokemon, move: Move): boolean {
+  return move.doesFlagEffectApply({ flag: MoveFlags.SOUND_BASED, user: attacker });
+}
+
+export class PorousSoundReductionAbAttr
+  extends ReceivedMoveDamageMultiplierAbAttr
+  implements GatedAttr<PreDefendModifyDamageAbAttrParams>
+{
   constructor() {
-    super((_holder, attacker, move) => move.doesFlagEffectApply({ flag: MoveFlags.SOUND_BASED, user: attacker }), 0.5);
+    super((_holder, attacker, move) => porousIsSoundMove(attacker, move), 0.5);
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreDefendModifyDamageAbAttrParams) => boolean) | undefined;
+
+  /** Tier B (ability studio spec 3.1): the one clause of the rule lives in `gate`; there is no residual. */
+  override canApply(params: PreDefendModifyDamageAbAttrParams): boolean {
+    return gatedCanApply<PreDefendModifyDamageAbAttrParams>(this, params);
+  }
+
+  public gate({ opponent, move }: PreDefendModifyDamageAbAttrParams): boolean {
+    return porousIsSoundMove(opponent, move);
   }
 }
 
-export class PorousChargeAbAttr extends PostDefendAbAttr {
-  override canApply({ pokemon, opponent, damage, hitResult }: PostMoveInteractionAbAttrParams): boolean {
+export class PorousChargeAbAttr extends PostDefendAbAttr implements GatedAttr<PostMoveInteractionAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B (ability studio spec 3.1): the whole rule lives in `gate`; there is no residual. */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** In the original order: damage was dealt, the hit was not blocked, and it is a move not yet counted. */
+  public gate({ pokemon, opponent, damage, hitResult }: PostMoveInteractionAbAttrParams): boolean {
     const record = opponent.getLastXMoves(1)[0] as object | undefined;
     return damage > 0 && hitResult < HitResult.NO_EFFECT && porousState(pokemon).lastMoveRecord !== record;
   }
@@ -287,13 +381,40 @@ export class PorousChargeAbAttr extends PostDefendAbAttr {
   }
 }
 
-export class PorousPowerAbAttr extends MovePowerBoostAbAttr {
+/** The move this Pokemon uses is a Ground move. */
+function porousIsGroundMove(pokemon: Pokemon, move: Move): boolean {
+  return pokemon.getMoveType(move) === PokemonType.GROUND;
+}
+
+/** This Pokemon has at least one stored Porous charge. */
+function porousHasCharge(pokemon: Pokemon): boolean {
+  return porousState(pokemon).stacks > 0;
+}
+
+export class PorousPowerAbAttr extends MovePowerBoostAbAttr implements GatedAttr<PreAttackModifyPowerAbAttrParams> {
   constructor() {
-    super(
-      (pokemon, _target, move) => pokemon.getMoveType(move) === PokemonType.GROUND && porousState(pokemon).stacks > 0,
-      1,
-    );
+    super((pokemon, _target, move) => porousIsGroundMove(pokemon, move) && porousHasCharge(pokemon), 1);
   }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreAttackModifyPowerAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B (ability studio spec 3.1), original clause order: `gate` is the move type (a library condition), `residual`
+   * is "has a stored charge" (private memory, no library condition yet), which must stay second.
+   */
+  override canApply(params: PreAttackModifyPowerAbAttrParams): boolean {
+    return gatedCanApply<PreAttackModifyPowerAbAttrParams>(this, params);
+  }
+
+  public gate({ pokemon, move }: PreAttackModifyPowerAbAttrParams): boolean {
+    return porousIsGroundMove(pokemon, move);
+  }
+
+  public residual({ pokemon }: PreAttackModifyPowerAbAttrParams): boolean {
+    return porousHasCharge(pokemon);
+  }
+
   override apply({ pokemon, power, simulated }: PreAttackModifyPowerAbAttrParams): void {
     const state = porousState(pokemon);
     power.value *= 1 + 0.25 * state.stacks;

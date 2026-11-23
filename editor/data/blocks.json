@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "096ef32b703c2f",
+  "hash": "0e2504035af90f",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -126,6 +126,138 @@
       "uses": 3
     },
     {
+      "id": "block.final-season-entry",
+      "className": "FinalSeasonEntryAbAttr",
+      "label": "Make foes move last when I switch in on purpose",
+      "summary": "When I switch in on purpose, every foe moves last in its priority bracket for 2 turns, and the end-of-turn fog is readied.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "quash",
+        "move last",
+        "slow the foes",
+        "delay the opponent",
+        "switch in debuff",
+        "final season"
+      ],
+      "examples": [
+        "Foes move last for 2 turns when I am switched in by choice"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.final-season-fog",
+      "className": "FinalSeasonFogAbAttr",
+      "label": "Set Eerie Fog for 5 turns at turn end once armed",
+      "summary": "At the end of a turn, if my switch-in effect readied it, Eerie Fog covers the field for 5 turns and I remember it as my own fog.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "delayed weather",
+        "fog",
+        "eerie fog",
+        "end of turn weather",
+        "set weather later",
+        "final season"
+      ],
+      "examples": [
+        "Set Eerie Fog at the end of the turn after my special switch-in"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The field must accept Eerie Fog (a primal weather such as Heavy Rain or Harsh Sun cannot be overwritten)"
+      ],
+      "effect": {
+        "id": "effect.set-weather",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.final-season-power",
+      "className": "FinalSeasonPowerAbAttr",
+      "label": "Boost Dark and Flying moves by 1.3x in my own Eerie Fog",
+      "summary": "While the Eerie Fog on the field is the one I set, my Dark and Flying moves have 1.3x power. Example: a 100 power Dark move becomes 130.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "weather power boost",
+        "fog boost",
+        "dark and flying boost",
+        "own weather bonus",
+        "final season"
+      ],
+      "examples": [
+        "Dark and Flying moves are 30% stronger while my own Eerie Fog is up"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The Eerie Fog on the field must be the one I set myself and still the same fog (checked inside the class until a library condition exists)"
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.float",
       "className": "FloatAbAttr",
       "label": "I float above the ground",
@@ -158,6 +290,59 @@
         "do": true
       },
       "uses": 5
+    },
+    {
+      "id": "block.foul-harvest",
+      "className": "FoulHarvestAbAttr",
+      "label": "Drain a foe move's PP and store a charge when I hit",
+      "summary": "When my damaging move hits, the foe's last-used move (or a random one) loses 1 PP and I store a charge, up to 3. Stored charges power up my draining moves.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "pp drain",
+        "pp steal",
+        "spite",
+        "store charge",
+        "drain bonus",
+        "foul harvest"
+      ],
+      "examples": [
+        "Each time I land a hit, take 1 PP from the move the foe used last"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "lib": "move.damaging",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The foe must have a move with PP left to drain"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE for the EFFECT only. The trigger (after my hit) and every condition are separate: the attack condition is a real constructor slot bound to move.damaging, the other three clauses are the gate (legacy-closure, requests in requests/B13.md). Why the effect cannot be split with today's blocks: it drains one PP from a foe move that is chosen by a remembered per-foe name or by a random draw, adds to a private charge counter capped at 3, and remembers the last move record so a multi-hit move counts once. There is no 'drain PP' effect and no 'charge counter' memory block in the library (both requested), and the counter is read by a different place (HitHealAttr), so splitting would re-implement the class. Users: Foul Harvest (5973, attr 0). ODDITIES (not fixed): (1) apply stores lastMoveRecord BEFORE its simulated and empty-moveset checks, so a simulated call or a foe without usable moves still spends the once-per-move memory; (2) the random pick (the only draw) happens before the 'no PP left' check, so a foe whose moves are all out of PP still consumes one draw; (3) the heal bonus lives in HitHealAttr by class name, an engine coupling the decomposition does not see; (4) the ability text says a 'direct hit', but canApply has no direct-hit test beyond the PostAttack dispatch.",
+      "uses": 1
     },
     {
       "id": "block.hp-threshold-form-change",
@@ -304,6 +489,178 @@
       "reusableAlone": {
         "when": true,
         "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.porous-charge",
+      "className": "PorousChargeAbAttr",
+      "label": "Store an impact charge when a foe's hit damages me",
+      "summary": "When a foe's move damages me, I store 1 impact charge, up to 3. A multi-hit move counts once. My next Ground move spends the charges for extra power.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "store power",
+        "absorb impact",
+        "charge up when hit",
+        "stack on damage",
+        "counter on hit",
+        "porous"
+      ],
+      "examples": [
+        "Gain 1 stored charge each time a foe's attack damages me, up to 3"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE for the EFFECT only; the trigger (after I am hit) and the gate are separate. Justified: the effect adds 1 to a private per-Pokemon counter capped at 3 and records which foe move was counted, both read and spent by a different attr (PorousPowerAbAttr). The library has no 'charge counter' memory block (requested in requests/B13.md as `effect.store-charge` / `time.charges`), and `effect.arm-effect` has no stack count or cap, so the effect cannot be split without re-implementing the counter. Users: Porous (5974, attr 2). ODDITY (not fixed): apply has no `simulated` check, so a simulated PostDefend call would add a charge and queue the message; the L1/L2 harness never simulates PostDefend. The ability text says 'direct hit', but canApply tests only damage > 0 and a landed hit.",
+      "uses": 1
+    },
+    {
+      "id": "block.porous-power",
+      "className": "PorousPowerAbAttr",
+      "label": "Spend impact charges to boost my Ground moves",
+      "summary": "My Ground move gains 25% power per stored charge (up to +75% with 3) and all charges are spent. Example: 2 charges turn 100 power into 150.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "release stored power",
+        "ground boost",
+        "spend stacks",
+        "stored charge bonus",
+        "earthquake boost",
+        "porous"
+      ],
+      "examples": [
+        "My next Ground move is 25% stronger for every charge I stored"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.type",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "I must have at least one stored impact charge (a private counter, checked inside the class)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE for the EFFECT only; the trigger (move power) and the move-type condition are separate and bound to a library atom. Justified: the multiplier is derived from a private counter (1 + 0.25 x charges, not a constant the multiply-power block can hold) and the same effect spends the counter and queues a message; splitting would re-implement the counter. The library has no 'multiply by an amount per stored charge' effect, no 'stored charges' condition and no 'spend charges' effect (requested in requests/B13.md). The 'has a charge' clause stays in the class as the residual (listed under 'also requires') and keeps its original second position. Users: Porous (5974, attr 3). ODDITIES (not fixed): (1) apply multiplies power even when simulated but only spends the charges when not simulated (correct for a preview); (2) the base class's multiplier argument (1) is dead because apply is overridden; (3) the boost is computed from the counter AT the time the power is calculated, so a power calculation that is not followed by the real move (a preview that is not marked simulated) would spend charges early.",
+      "uses": 1
+    },
+    {
+      "id": "block.porous-reset",
+      "className": "PorousResetAbAttr",
+      "label": "Clear my stored impact charges when I enter",
+      "summary": "When I enter the battle, any impact charges I had stored are lost and my counter starts again from 0.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "reset charges",
+        "reset counter",
+        "forget stored power",
+        "clear stacks",
+        "fresh start on switch in",
+        "porous"
+      ],
+      "examples": [
+        "Start every switch-in with no stored impact charges"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified: the effect is the reset of a private per-Pokemon record (stacks and the last counted foe move) that only the Porous attrs read; the library has no 'charge counter' memory block to express a reset of (requested as `effect.reset-charges` together with the counter in requests/B13.md). It is a single assignment, so there is nothing further to split. The trigger is a normal switch-in WHEN and the class has no condition. Users: Porous (5974, attr 0). ODDITY (not fixed): apply ignores `simulated`, so a simulated PostSummon call would reset the counter; no engine path simulates PostSummon today.",
+      "uses": 1
+    },
+    {
+      "id": "block.porous-sound-reduction",
+      "className": "PorousSoundReductionAbAttr",
+      "label": "Halve damage from sound-based moves",
+      "summary": "Sound-based moves do half damage to me. Example: a sound move that would deal 100 damage deals 50.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.damage-taken",
+      "whenLabel": "While the game calculates damage I take",
+      "synonyms": [
+        "soundproof",
+        "sound resist",
+        "resist sound moves",
+        "half damage from sound",
+        "bulletproof style",
+        "porous"
+      ],
+      "examples": [
+        "Take half damage from sound-based moves"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.flag",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-damage-taken",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
         "do": true
       },
       "uses": 1
