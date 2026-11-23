@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "11bb398eec9da8",
-  "hash": "16e96654566fcb",
+  "hash": "056e70dc1008b4",
   "blocks": [
     {
       "id": "block.anneal",
@@ -308,10 +308,10 @@
       ],
       "guards": [],
       "feasibility": [
-        "The hit must really deal damage (checked inside the class until the librarian adds that condition, R-B13-3)",
-        "The move must not be one of the ability's own follow-up moves (checked inside the class, R-B13-37)",
+        "The hit must deal damage",
+        "The move must not itself be a follow-up move of this ability",
         "Markers do not stack: a second knock-out only changes who owns the one marker on that side",
-        "The marker is spent by the next foe that enters, who takes 1/8 of its max HP and loses 1 Speed (fixed in a separate function)"
+        "The marker is used up by the next foe that enters, who loses 1/8 of its max HP and 1 Speed stage; this cannot be changed here"
       ],
       "effect": {
         "id": "effect.package",
@@ -479,7 +479,7 @@
       "conditions": [],
       "guards": [],
       "feasibility": [
-        "Only a Pokemon whose vessel already cracked earlier in the battle has a type list to restore; otherwise nothing happens (a private memory inside the class, R-B13-52)",
+        "Only a Pokemon whose vessel already cracked earlier in the battle has types to get back; otherwise nothing happens",
         "The restored list is exactly the one remembered when the vessel cracked (the types except the last one, or Unknown when none are left); it cannot be changed from here"
       ],
       "effect": {
@@ -657,10 +657,10 @@
       "conditions": [],
       "guards": [],
       "feasibility": [
-        "Only a direct hit that would knock me out, only while I am at full HP, and only if my max HP is above 1 (tested inside the damage code, not by this ability: R-B13-53 asks for a moment and conditions)",
-        "Once per wave (a private memory kept by that function)",
-        "The counter is a scripted 120 power Dark special move that always hits (fixed in that function)",
-        "At the end of the turn the faint part (the turn-end block of this ability) may knock me out if the counter knocked its target out"
+        "Only a direct hit that would knock me out, only while I am at full HP, and only if my max HP is above 1",
+        "Only once per wave",
+        "The counter is a 120 power Dark special move that always hits; this cannot be changed here",
+        "At the end of the turn I may faint if my counter knocked its target out (the turn-end part of this ability)"
       ],
       "reusableAlone": {
         "when": true,
@@ -714,7 +714,7 @@
       ],
       "guards": [],
       "feasibility": [
-        "My HP, rounded to a whole percent, must be below a third of my max HP (checked inside the class until the librarian adds a matching condition, R-B13-47)"
+        "My HP, rounded to a whole percent, must be below a third of my max HP"
       ],
       "effect": {
         "id": "effect.multiply-power",
@@ -823,11 +823,11 @@
       ],
       "guards": [],
       "feasibility": [
-        "The hit must really deal damage (checked inside the class until the librarian adds that condition, R-B13-3)",
-        "The move must not be one of the ability's own follow-up moves, so an echo never starts another echo (R-B13-37)",
-        "Each move I use is counted once: a private record of the last counted move stops a move from being counted twice",
+        "The hit must deal damage",
+        "The move must not itself be an echo, so an echo never starts another echo",
+        "Each move I use is remembered only once, so one move never replays itself",
         "Nothing is replayed the first time, when the previous move is the same move, or when the target has already fainted",
-        "The echo is the previous move with its own type and category; it always hits (fixed in the class)"
+        "The echo is my previous move with its own type and category, and it always hits; this cannot be changed here"
       ],
       "effect": {
         "id": "effect.package",
@@ -1826,7 +1826,7 @@
       ],
       "guards": [],
       "feasibility": [
-        "The shape memory is written when I genuinely change form: at most 3 times per wave, and it lasts only for the turn it was made (a private memory kept by the form-change code, not by this block)",
+        "The game only remembers my old shape when I really change form: at most 3 times per wave, and only for the turn it happened",
         "The damage is rounded DOWN (a hit of 1 damage can become 0), unlike the library damage multiplier, which rounds and never goes below 1"
       ],
       "effect": {
@@ -2384,7 +2384,7 @@
       "id": "block.reduction-power",
       "className": "ReductionPowerAbAttr",
       "label": "Boost a move that just used up the weather or terrain",
-      "summary": "While the game calculates a move's power, the move that just consumed the field has 1.5 times its power. Example: 100 power becomes 150.",
+      "summary": "While the game calculates a move's power, the move that just used up the weather or terrain has 1.5 times its power. Example: 100 power becomes 150.",
       "tier": "B",
       "kind": "calc-modifier",
       "status": "decomposed",
@@ -2425,8 +2425,8 @@
       ],
       "guards": [],
       "feasibility": [
-        "The field is consumed by a separate step before the move (it needs an active terrain or non-primal weather and a damaging move), not by this block (checked by the game, R-B13-48)",
-        "Only the very move that consumed the field gets the boost, and only on that turn (a private memory inside the class)"
+        "The weather or terrain is used up by the game just before the move (it needs an active terrain or a normal weather and a damaging move), not by this block",
+        "Only the very move that used up the weather or terrain gets the boost, and only on that turn"
       ],
       "effect": {
         "id": "effect.multiply-power",
@@ -2794,9 +2794,9 @@
       ],
       "guards": [],
       "feasibility": [
-        "The hit must really deal damage and must be the final hit of a multi-hit move (checked inside the class until the librarian adds those conditions, R-B13-3 and R-B13-42)",
-        "A switch must be possible against every opponent: nothing traps me or blocks the switch (checked inside the class)",
-        "The Speed boost is given when the next Pokemon enters on my side, once; it is spent even if nobody enters before the battle ends (fixed in the class)"
+        "The hit must deal damage and must be the last hit of a multi-hit move",
+        "I must be able to switch out: nothing may trap me or block my switch",
+        "The Speed boost goes to the next Pokemon that enters on my side, only once; it is lost if nobody enters before the battle ends"
       ],
       "effect": {
         "id": "effect.package",

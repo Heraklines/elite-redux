@@ -66,9 +66,9 @@ export default defineDecl(SkyhookAbAttr, {
   ],
   guards: [],
   feasibility: [
-    "The hit must really deal damage and must be the final hit of a multi-hit move (checked inside the class until the librarian adds those conditions, R-B13-3 and R-B13-42)",
-    "A switch must be possible against every opponent: nothing traps me or blocks the switch (checked inside the class)",
-    "The Speed boost is given when the next Pokemon enters on my side, once; it is spent even if nobody enters before the battle ends (fixed in the class)",
+    "The hit must deal damage and must be the last hit of a multi-hit move",
+    "I must be able to switch out: nothing may trap me or block my switch",
+    "The Speed boost goes to the next Pokemon that enters on my side, only once; it is lost if nobody enters before the battle ends",
   ],
   effect: { id: "effect.package", params: ["speedBoostChancePercent"] },
   reusableAlone: { when: true, if: true, do: true },

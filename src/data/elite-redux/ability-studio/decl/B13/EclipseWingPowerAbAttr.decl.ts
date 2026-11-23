@@ -56,7 +56,7 @@ export default defineDecl(EclipseWingPowerAbAttr, {
   ],
   guards: [],
   feasibility: [
-    "My HP, rounded to a whole percent, must be below a third of my max HP (checked inside the class until the librarian adds a matching condition, R-B13-47)",
+    "My HP, rounded to a whole percent, must be below a third of my max HP",
   ],
   effect: { id: "effect.multiply-power", params: ["multiplier"] },
   reusableAlone: { when: true, if: true, do: true },

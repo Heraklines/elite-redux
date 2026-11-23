@@ -33,11 +33,11 @@ export default defineDecl(CrackedVesselRestoreTypesAbAttr, {
   examples: ["If I lost my last type earlier, I come back with the reduced types, like Cracked Vessel"],
   params: [],
   noParamsReason:
-    "The class has no constructor arguments and no number: it copies one private per-Pokemon list of types (written when the vessel cracked) back onto the Pokemon. There is nothing to tune.",
+    "The class has no constructor arguments and no number: it gives the Pokemon back the shorter list of types it remembered when the vessel cracked. There is nothing to tune.",
   conditions: [],
   guards: [],
   feasibility: [
-    "Only a Pokemon whose vessel already cracked earlier in the battle has a type list to restore; otherwise nothing happens (a private memory inside the class, R-B13-52)",
+    "Only a Pokemon whose vessel already cracked earlier in the battle has types to get back; otherwise nothing happens",
     "The restored list is exactly the one remembered when the vessel cracked (the types except the last one, or Unknown when none are left); it cannot be changed from here",
   ],
   effect: { id: "effect.package", params: [] },

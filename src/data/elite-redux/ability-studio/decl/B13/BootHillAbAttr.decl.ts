@@ -49,10 +49,10 @@ export default defineDecl(BootHillAbAttr, {
   ],
   guards: [],
   feasibility: [
-    "The hit must really deal damage (checked inside the class until the librarian adds that condition, R-B13-3)",
-    "The move must not be one of the ability's own follow-up moves (checked inside the class, R-B13-37)",
+    "The hit must deal damage",
+    "The move must not itself be a follow-up move of this ability",
     "Markers do not stack: a second knock-out only changes who owns the one marker on that side",
-    "The marker is spent by the next foe that enters, who takes 1/8 of its max HP and loses 1 Speed (fixed in a separate function)",
+    "The marker is used up by the next foe that enters, who loses 1/8 of its max HP and 1 Speed stage; this cannot be changed here",
   ],
   effect: { id: "effect.package", params: [] },
   reusableAlone: { when: true, if: true, do: true },

@@ -24,7 +24,7 @@ export default defineDecl(ReductionPowerAbAttr, {
   when: "calc.move-power",
   label: "Boost a move that just used up the weather or terrain",
   summary: params =>
-    `While the game calculates a move's power, the move that just consumed the field has ${params.multiplier} times its power. Example: 100 power becomes ${Math.round(100 * Number(params.multiplier))}.`,
+    `While the game calculates a move's power, the move that just used up the weather or terrain has ${params.multiplier} times its power. Example: 100 power becomes ${Math.round(100 * Number(params.multiplier))}.`,
   synonyms: [
     "consume the weather",
     "use up the terrain",
@@ -56,8 +56,8 @@ export default defineDecl(ReductionPowerAbAttr, {
   ],
   guards: [],
   feasibility: [
-    "The field is consumed by a separate step before the move (it needs an active terrain or non-primal weather and a damaging move), not by this block (checked by the game, R-B13-48)",
-    "Only the very move that consumed the field gets the boost, and only on that turn (a private memory inside the class)",
+    "The weather or terrain is used up by the game just before the move (it needs an active terrain or a normal weather and a damaging move), not by this block",
+    "Only the very move that used up the weather or terrain gets the boost, and only on that turn",
   ],
   effect: { id: "effect.multiply-power", params: ["multiplier"] },
   reusableAlone: { when: true, if: true, do: true },

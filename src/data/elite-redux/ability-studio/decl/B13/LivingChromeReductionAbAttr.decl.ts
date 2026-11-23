@@ -70,7 +70,7 @@ export default defineDecl(LivingChromeReductionAbAttr, {
   ],
   guards: [],
   feasibility: [
-    "The shape memory is written when I genuinely change form: at most 3 times per wave, and it lasts only for the turn it was made (a private memory kept by the form-change code, not by this block)",
+    "The game only remembers my old shape when I really change form: at most 3 times per wave, and only for the turn it happened",
     "The damage is rounded DOWN (a hit of 1 damage can become 0), unlike the library damage multiplier, which rounds and never goes below 1",
   ],
   effect: { id: "effect.package", params: ["typeMultiplier", "flatMultiplier"] },
