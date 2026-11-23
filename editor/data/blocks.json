@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "1f362cfea14084",
+  "hash": "096b792169c20c",
   "blocks": [
     {
       "id": "block.always-hit",
@@ -1659,7 +1659,7 @@
       "id": "block.terrain-event-type-change",
       "className": "TerrainEventTypeChangeAbAttr",
       "label": "Change my type to match the terrain",
-      "summary": "When I enter or the terrain changes, I take the terrain's type: Electric, Fairy (Misty), Grass or Psychic. With no terrain I go back to my own types.",
+      "summary": "On entry or a terrain change I become Electric (Electric Terrain), Fairy (Misty), Grass (Grassy), Psychic (Psychic); no terrain: my own types.",
       "tier": "C",
       "kind": "event-effect",
       "status": "decomposed",
@@ -1676,16 +1676,135 @@
       "examples": [
         "Become a Grass type on Grassy Terrain, like Mimicry"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "electricType",
+          "label": "Type I become on Electric Terrain",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "mistyType",
+          "label": "Type I become on Misty Terrain",
+          "control": "select",
+          "default": "FAIRY",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "grassyType",
+          "label": "Type I become on Grassy Terrain",
+          "control": "select",
+          "default": "GRASS",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "psychicType",
+          "label": "Type I become on Psychic Terrain",
+          "control": "select",
+          "default": "PSYCHIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
       "conditions": [],
       "guards": [],
       "feasibility": [
+        "Also reacts when I enter the battle, not only when the terrain changes later (same block, no extra setting)",
         "Does nothing while I am Terastallized: a Terastallized Pokemon keeps its type",
         "On a terrain with no matching type (no terrain, or the Toxic terrain) I go back to the types I was born with, which also drops a type that Soak-like moves gave me"
       ],
       "effect": {
         "id": "effect.package",
-        "params": []
+        "params": [
+          "electricType",
+          "mistyType",
+          "grassyType",
+          "psychicType"
+        ]
       },
       "reusableAlone": {
         "when": true,

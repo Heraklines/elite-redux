@@ -7163,8 +7163,26 @@ export class PreventBypassSpeedChanceAbAttr extends AbAttr {
  * @sealed
  */
 export class TerrainEventTypeChangeAbAttr extends PostSummonAbAttr {
-  constructor() {
+  /** Type given on Electric Terrain (public so the ability studio can read it back). */
+  public readonly electricTerrainType: PokemonType;
+  /** Type given on Misty Terrain. */
+  public readonly mistyTerrainType: PokemonType;
+  /** Type given on Grassy Terrain. */
+  public readonly grassyTerrainType: PokemonType;
+  /** Type given on Psychic Terrain. */
+  public readonly psychicTerrainType: PokemonType;
+
+  constructor(
+    electricTerrainType: PokemonType = PokemonType.ELECTRIC,
+    mistyTerrainType: PokemonType = PokemonType.FAIRY,
+    grassyTerrainType: PokemonType = PokemonType.GRASS,
+    psychicTerrainType: PokemonType = PokemonType.PSYCHIC,
+  ) {
     super(true);
+    this.electricTerrainType = electricTerrainType;
+    this.mistyTerrainType = mistyTerrainType;
+    this.grassyTerrainType = grassyTerrainType;
+    this.psychicTerrainType = psychicTerrainType;
   }
 
   override canApply({ pokemon }: AbAttrBaseParams): boolean {
@@ -7190,16 +7208,16 @@ export class TerrainEventTypeChangeAbAttr extends PostSummonAbAttr {
     const typeChange: PokemonType[] = [];
     switch (currentTerrain) {
       case TerrainType.ELECTRIC:
-        typeChange.push(PokemonType.ELECTRIC);
+        typeChange.push(this.electricTerrainType);
         break;
       case TerrainType.MISTY:
-        typeChange.push(PokemonType.FAIRY);
+        typeChange.push(this.mistyTerrainType);
         break;
       case TerrainType.GRASSY:
-        typeChange.push(PokemonType.GRASS);
+        typeChange.push(this.grassyTerrainType);
         break;
       case TerrainType.PSYCHIC:
-        typeChange.push(PokemonType.PSYCHIC);
+        typeChange.push(this.psychicTerrainType);
         break;
       default:
         pokemon.getTypes(false, false, true).forEach(t => {
