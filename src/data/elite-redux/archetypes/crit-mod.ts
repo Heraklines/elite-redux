@@ -60,6 +60,7 @@
 // =============================================================================
 
 import { BlockCritAbAttr, BonusCritAbAttr, MultCritAbAttr } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
 import type { PokemonType } from "#enums/pokemon-type";
@@ -143,7 +144,13 @@ export interface CritStageBonusOptions {
  * `AbAttr` base), and its `constructor()` takes no arguments. We pass through
  * via `super()` and then validate and store our typed options.
  */
-export class CritStageBonusAbAttr extends BonusCritAbAttr {
+export class CritStageBonusAbAttr
+  extends BonusCritAbAttr
+  implements GatedAttr<Parameters<BonusCritAbAttr["canApply"]>[0]>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: Parameters<BonusCritAbAttr["canApply"]>[0]) => boolean) | undefined;
+
   private readonly bonusAmount: number;
   private readonly bonusFilter: CritModFilter;
 
@@ -177,9 +184,20 @@ export class CritStageBonusAbAttr extends BonusCritAbAttr {
    * additional contextual fields in real dispatches.
    */
   public override canApply(params: Parameters<BonusCritAbAttr["canApply"]>[0]): boolean {
-    if (!super.canApply(params)) {
-      return false;
-    }
+    return gatedCanApply<Parameters<BonusCritAbAttr["canApply"]>[0]>(this, params);
+  }
+
+  /** Tier B split (ability studio spec 3.1): the parent's own check comes first and stays in the class. */
+  public guards(params: Parameters<BonusCritAbAttr["canApply"]>[0]): boolean {
+    return super.canApply(params);
+  }
+
+  /**
+   * The replaceable condition: the move filter. Empty filter passes for any move. The engine asks this question
+   * without a move today (`getCritStage` passes only the attacker and the crit stage), so the filter is never
+   * reached in a real battle (see the declaration's notes).
+   */
+  public gate(params: Parameters<BonusCritAbAttr["canApply"]>[0]): boolean {
     const ctx = params as unknown as { pokemon?: Pokemon; move?: Move };
     if (ctx.pokemon === undefined || ctx.move === undefined) {
       // Defensive: if the dispatcher didn't include pokemon/move, default to

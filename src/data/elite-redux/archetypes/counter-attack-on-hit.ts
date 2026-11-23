@@ -25,6 +25,7 @@
 
 import { PostDefendAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 // biome-ignore lint/suspicious/noImportCycles: the established scripted-move helper cycle predates this filter-only extension.
 import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
 import type { MoveCategory } from "#enums/move-category";
@@ -79,7 +80,10 @@ export interface CounterAttackOnHitOptions {
  * the opponent with the configured moveId in INDIRECT mode (ignores PP,
  * not in move history).
  */
-export class CounterAttackOnHitAbAttr extends PostDefendAbAttr {
+export class CounterAttackOnHitAbAttr extends PostDefendAbAttr implements GatedAttr<PostMoveInteractionAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
   private readonly moveId: MoveId;
   private readonly power: number | undefined;
   private readonly chance: number;
@@ -119,7 +123,16 @@ export class CounterAttackOnHitAbAttr extends PostDefendAbAttr {
     return this.power;
   }
 
+  /**
+   * Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `guards` (both standing, a real opponent, an
+   * attacking move, not an indirect move), then the replaceable `gate` (contact settings, move property, chance roll).
+   */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Safety rules that stay in the class, checked first. They read nothing random. */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
     const { pokemon, opponent, move, useMode = MoveUseMode.NORMAL } = params;
     if (!opponent || opponent.isFainted() || pokemon.isFainted()) {
       return false;
@@ -132,6 +145,15 @@ export class CounterAttackOnHitAbAttr extends PostDefendAbAttr {
     if (opponent === pokemon || !move.is("AttackMove") || useMode === MoveUseMode.INDIRECT) {
       return false;
     }
+    return true;
+  }
+
+  /**
+   * The replaceable condition, in the original clause order: the contact settings, the move property, the move
+   * category, then the chance roll LAST (the one random draw, only reached when everything before it passed).
+   */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    const { pokemon, move } = params;
     if (this.filter.contactRequired && !move.hasFlag(1 /* MoveFlags.MAKES_CONTACT */)) {
       return false;
     }

@@ -12,7 +12,7 @@
 // state grid and fails on any difference.
 //
 // Class without a binding here: AllyAttackPowerBoostAbAttr (Tier C, no constructor closure and nothing to gate).
-import { bindCondition } from "#data/elite-redux/ability-studio/bindings";
+import { bindCondition, bindLegacyClosure } from "#data/elite-redux/ability-studio/bindings";
 
 // =============================================================================================
 // AddTypeToAttackerOnContactAbAttr (Tier B). Slot "gate": doesFlagEffectApply(MAKES_CONTACT, user: attacker, target: holder).
@@ -611,3 +611,93 @@ bindCondition(
   },
   "gate",
 ); // Ole!: 20% chance to dodge a single-target attack
+
+// =============================================================================================
+// B08 chunk 3. Every line was written by hand after reading the class and the live instance of each user (move,
+// chance, contact and property settings printed from the running game).
+// =============================================================================================
+
+// ---------------------------------------------------------------------------------------------
+// CopyMoveByFilterAbAttr (Tier B). Slot "gate", in the ORIGINAL clause order: flag, then anyFlags, then moveIds. The class
+// reads the move's OWN flags (hasFlag), so the atom is move.inherent-flag. The guards (not my own move, not semi-invulnerable)
+// stay in the class.
+// =============================================================================================
+bindCondition(5272, 0, { id: "move.inherent-flag", flag: "SOUND_BASED" }, "gate"); // Parroting: sound moves
+bindCondition(
+  237,
+  1,
+  {
+    any: [
+      { id: "move.inherent-flag", flag: "BALLBOMB_MOVE" },
+      { id: "move.inherent-flag", flag: "THROW_BASED" },
+    ],
+  },
+  "gate",
+); // Ball Fetch: ball and bomb moves, or throwing moves
+
+// Lunar Affinity: a list of 15 moves (every move whose name has star, moon or lunar in it, built at start-up). Four of them
+// are Elite Redux custom moves (Starburst, Star Crash, Blue Moon, Five-Star Fury), and the atom move.is-move can only name
+// the vanilla moves (it looks the name up in MoveId; the custom ones live in ErMoveId), so the gate cannot be written as
+// atoms yet: legacy closure with a reason (request R-B08-33).
+bindLegacyClosure(
+  5414,
+  0,
+  "The move list holds 4 Elite Redux custom moves (Starburst, Star Crash, Blue Moon, Five-Star Fury) and the atom move.is-move cannot name custom moves yet (request R-B08-33).",
+  "gate",
+); // Lunar Affinity
+
+// ---------------------------------------------------------------------------------------------
+// CounterAttackOnHitAbAttr (Tier B). Slot "gate", in the ORIGINAL clause order: the move property (the class reads the move's
+// OWN flag with hasFlag), then the chance roll LAST. The roll is skipped at 100 (no draw), like the class.
+// =============================================================================================
+const counterGate = (pct: number, ...before: unknown[]): unknown => ({
+  all: [...before, { id: "rng.chance", pct }],
+});
+const contact = { id: "move.inherent-flag", flag: "MAKES_CONTACT" };
+
+bindCondition(275, 2, counterGate(100), "gate"); // Guard Dog: every hit, Bite at 30 power
+bindCondition(5120, 0, counterGate(100, contact), "gate"); // Cold Rebound: contact, Icy Wind
+bindCondition(5136, 1, counterGate(100, contact), "gate"); // Parry: contact, Mach Punch at 20 power
+bindCondition(5260, 0, counterGate(100, contact), "gate"); // Clap Trap: contact, Snap Trap at 50 power
+bindCondition(5337, 0, counterGate(100, contact), "gate"); // Ice Downfall: contact, Icicle Crash at 60 power
+bindCondition(5364, 0, counterGate(100, contact), "gate"); // Ultra Instinct: contact, Vacuum Wave at 20 power
+bindCondition(5460, 2, counterGate(100, contact), "gate"); // Faraday Cage: contact, Thunder Cage at 50 power
+bindCondition(5509, 0, counterGate(100, contact), "gate"); // Malodor: contact, Poison Gas at 20 power, Special
+bindCondition(5580, 0, counterGate(100, contact), "gate"); // Chilling Pellets: contact, Icicle Spear at 13 power
+bindCondition(5656, 1, counterGate(50), "gate"); // Brain Mass: every hit, 50%, Drain Brain with half healing
+bindCondition(5673, 1, counterGate(100, { id: "move.inherent-flag", flag: "SOUND_BASED" }), "gate"); // Break it Down: sound moves, Rapid Spin at 20 power
+bindCondition(5699, 0, counterGate(100), "gate"); // Acid Reflux: every hit, Acid at 20 power
+bindCondition(5720, 2, counterGate(100), "gate"); // Wind Chimes: every hit, Hyper Voice at 30 power
+bindCondition(5723, 1, counterGate(100), "gate"); // Deflect: every hit, Vacuum Wave at 20 power
+bindCondition(6008, 0, counterGate(100, contact), "gate"); // Bribery: contact, Make It Rain at 20 power
+bindCondition(6026, 0, counterGate(100, contact), "gate"); // Snowball Fight: contact, Ice Ball at 40 power
+bindCondition(6113, 0, counterGate(100, { not: contact }), "gate"); // Failed Check: moves that do NOT make contact, Make It Rain at 30 power
+
+// ---------------------------------------------------------------------------------------------
+// CowardOnceProtectAbAttr (Tier B). Slot "gate": the one-time memory of this battle. See the declaration's notes for the
+// one case where the class's own field and the library memory differ.
+// =============================================================================================
+bindCondition(5165, 0, { id: "time.once-per", scope: "battle", key: "coward-protect" }, "gate"); // Coward
+
+// ---------------------------------------------------------------------------------------------
+// CritStageBonusAbAttr (Tier B). Slot "gate". The engine asks this question WITHOUT a move (field/pokemon.ts getCritStage), so
+// the class answers true for every move and the move filter is never reached. Two users have no filter: their gate is the
+// empty, always-true group. The six filtered gates stay legacy closures: a gate that really tested the move would change the
+// game, and the moment provides no move slot (see the declaration).
+// =============================================================================================
+bindCondition(5230, 0, { all: [] }, "gate"); // Heaven Asunder: +1 crit stage, no filter
+bindCondition(5515, 0, { all: [] }, "gate"); // Strategic Pause: +2 crit stages, no filter
+
+const NO_MOVE_REASON =
+  "The engine calls this moment without a move, so the class's move filter never runs and the bonus applies to every move (suspected game bug). A rebuilt gate that tested the move would change the game, and calc.crit-stage provides no move slot yet (request R-B08-29).";
+bindLegacyClosure(52, 2, NO_MOVE_REASON, "gate"); // Hyper Cutter: contact moves
+bindLegacyClosure(5026, 0, NO_MOVE_REASON, "gate"); // Perfectionist: power 50 or less
+bindLegacyClosure(5112, 0, NO_MOVE_REASON, "gate"); // Precise Fist: punching moves
+bindLegacyClosure(5383, 3, NO_MOVE_REASON, "gate"); // Way of Precision: punching moves
+bindLegacyClosure(5659, 1, NO_MOVE_REASON, "gate"); // Giant Shuriken: Water Shuriken only
+bindLegacyClosure(6015, 3, NO_MOVE_REASON, "gate"); // Penta-Punch: Five-Star Fury only
+
+// ---------------------------------------------------------------------------------------------
+// CurseAttackerOnFormBlockDamageAbAttr (Tier A). Slot ctor:3, the fourth constructor argument: the default `() => true`.
+// =============================================================================================
+bindCondition(5396, 2, { all: [] }, "ctor:3"); // Patchwork: no extra rule

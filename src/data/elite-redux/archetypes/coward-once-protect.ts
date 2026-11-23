@@ -21,14 +21,24 @@
 // =============================================================================
 
 import { type AbAttrBaseParams, PostSummonAbAttr } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { BattlerTagType } from "#enums/battler-tag-type";
 
-export class CowardOnceProtectAbAttr extends PostSummonAbAttr {
+export class CowardOnceProtectAbAttr extends PostSummonAbAttr implements GatedAttr<AbAttrBaseParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
   constructor() {
     super(true);
   }
 
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+  /** Tier B split (ability studio spec 3.1): the whole rule is the replaceable `gate`. */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The replaceable condition: the one-time protection of this battle has not been used up yet. */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     return !pokemon.battleData.cowardProtectUsed;
   }
 

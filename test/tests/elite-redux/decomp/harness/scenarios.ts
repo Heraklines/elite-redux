@@ -166,6 +166,17 @@ export const TEMPLATES: Readonly<Record<string, ScenarioSpec>> = {
     foeMoves: [MoveId.CELEBRATE],
     turns: [use(MoveId.TACKLE), use(MoveId.DOUBLE_SLAP)],
   },
+  /** The holder attacks and every hit is critical (the crit damage multiplier of the ATTACKER is asked). */
+  "holder-crits-foe": {
+    ...BASE,
+    id: "holder-crits-foe",
+    label: "The holder lands critical hits on the enemy",
+    foe: SpeciesId.SNORLAX,
+    foeLevel: 100,
+    foeMoves: [MoveId.CELEBRATE],
+    crits: true,
+    turns: [use(MoveId.TACKLE), use(MoveId.DOUBLE_SLAP)],
+  },
   /** The holder uses a status move on itself and the enemy attacks in return. */
   "holder-uses-status-move": {
     ...BASE,
@@ -308,6 +319,7 @@ const t = {
   hit: "foe-hits-holder",
   crit: "foe-crits-holder",
   attack: "holder-hits-foe",
+  attackCrit: "holder-crits-foe",
   statusMove: "holder-uses-status-move",
   ko: "holder-kos-foe",
   faint: "holder-faints",
@@ -376,7 +388,7 @@ const WHEN_TEMPLATE: Readonly<Record<string, string>> = {
   "calc.damage-taken": t.hit,
   "calc.stab": t.attack,
   "calc.crit-stage": t.attack,
-  "calc.crit-multiplier": t.crit,
+  "calc.crit-multiplier": t.attackCrit,
   "calc.crit-roll": t.attack,
   "calc.hit-count": t.attack,
   "calc.max-multi-hit": t.attack,
@@ -444,7 +456,7 @@ export function mappedWhenIds(): string[] {
 // Axes
 
 /** The axis names a declaration's probes may use. */
-export const KNOWN_AXES = ["hp", "foeHp", "foeMove", "foeType", "weather", "status", "stage"] as const;
+export const KNOWN_AXES = ["hp", "foeHp", "foeLevel", "foeMove", "foeType", "weather", "status", "stage"] as const;
 
 export function describeAxes(axes: Axes): string {
   const entries = Object.entries(axes);
@@ -472,6 +484,13 @@ export function applyAxes(ctx: ScenarioContext, axes: Axes): void {
         break;
       case "foeHp":
         foe.hp = resolveHp(value, foe.getMaxHp());
+        break;
+      case "foeLevel":
+        // A sturdier enemy: an ability that answers a hit with its own attack (counter-attack classes) would otherwise
+        // knock out the default level 30 enemy and end the battle in the middle of the scenario.
+        foe.level = Number(value);
+        foe.calculateStats();
+        foe.hp = foe.getMaxHp();
         break;
       case "foeMove":
         game.move.changeMoveset(foe, enumValue(MoveId as never, value, "foeMove") as MoveId);

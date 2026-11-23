@@ -15,6 +15,7 @@
 
 import { allMoves } from "#data/data-lists";
 import { Gender } from "#data/gender";
+import { PokemonMove } from "#data/moves/pokemon-move";
 import { Status } from "#data/status-effect";
 import { Terrain, TerrainType } from "#data/terrain";
 import { Weather } from "#data/weather";
@@ -372,6 +373,20 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
   "calc.my-attack-matchup": ctx => ({ pokemon: ctx.holder, move: ctx.move }),
   // The accuracy-bypass scan (MoveEffectPhase.checkBypassAccAndInvuln) asks the user attr matches(move, user, target); the user is the holder.
   "calc.always-hit-check": ctx => ({ pokemon: ctx.holder, opponent: ctx.foe, move: ctx.move }),
+  // B08 chunk 3. The three crit hooks are dispatched with the holder and ONE holder object each and NO move
+  // (Pokemon.getCritStage passes { pokemon, critStage }, getBaseDamage { pokemon, simulated, critMult }, isCriticalHit
+  // { pokemon, blockCrit }), so the builders pass no move either.
+  "calc.crit-stage": ({ holder }) => ({ pokemon: holder, critStage: new NumberHolder(0) }),
+  "calc.crit-multiplier": ({ holder }) => ({ pokemon: holder, critMult: new NumberHolder(1.5), simulated: false }),
+  "cancel.crit": ({ holder }) => ({ pokemon: holder, blockCrit: new BooleanHolder(false) }),
+  // PostMoveUsed: the foe used the move (a PokemonMove, like MovePhase hands it over) and aimed it at the holder.
+  "event.after-any-move": ({ holder, foe, move }) => ({
+    pokemon: holder,
+    source: foe,
+    move: new PokemonMove(move.id),
+    targets: [holder.getBattlerIndex()],
+    simulated: false,
+  }),
   // The legacy PreDefend hook: what the (undispatched) dodge class would receive.
   "calc.incoming-move": ctx => ({
     pokemon: ctx.holder,
