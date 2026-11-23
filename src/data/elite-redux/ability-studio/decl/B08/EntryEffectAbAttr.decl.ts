@@ -56,6 +56,11 @@ const turnsWords = (turns: unknown): string => (Number(turns) > 0 ? `${turns} tu
 const trapWords = (hazard: unknown): string =>
   hazard == null || String(hazard) === "Not used" ? "a trap" : String(hazard);
 
+const plain = (value: unknown, fallback: string): string => {
+  const text = value == null ? "" : String(value);
+  return text === "" || text.toLowerCase() === "not used" ? fallback : text;
+};
+
 const sideWords = (side: unknown): string => {
   const text = side == null ? "" : String(side).toLowerCase();
   if (text === "" || text === "not used") {
@@ -73,21 +78,21 @@ export default defineDecl(EntryEffectAbAttr, {
     const once = params.once === true ? " Only the first time in a battle." : "";
     switch (String(params.kind)) {
       case "Set the weather":
-        return `When I enter the battle, set the weather to ${String(params.weather).toLowerCase()} for ${turnsWords(params.turns)}. Example: rain for 8 turns.${once}`;
+        return `When I enter the battle, set the weather to ${plain(params.weather, "the chosen weather").toLowerCase()} for ${turnsWords(params.turns)}. Example: rain for 8 turns.${once}`;
       case "Set a terrain":
-        return `When I enter the battle, set ${String(params.terrain)} terrain for ${turnsWords(params.turns)}. Example: Electric terrain for 8 turns.${once}`;
+        return `When I enter the battle, set ${plain(params.terrain, "a")} terrain for ${turnsWords(params.turns)}. Example: Electric terrain for 8 turns.${once}`;
       case "Set one terrain picked at random":
-        return `When I enter the battle, set one terrain from the list at random (a held terrain seed of a listed terrain decides it): ${String(params.terrains)}.${once}`;
+        return `When I enter the battle, set one terrain from the list at random (a held terrain seed of a listed terrain decides it): ${plain(params.terrains, "the listed terrains")}.${once}`;
       case "Lay a trap on the field":
         return `When I enter the battle, lay ${Number(params.layers) > 0 ? params.layers : 1} layer(s) of ${trapWords(params.hazard)} on ${sideWords(params.hazardSide)}. Example: 2 layers of Spikes.${once}`;
       case "Set a screen, room or other field effect":
-        return `When I enter the battle, set ${String(params.tag)} on my side (field-wide effects reach everyone) for ${turnsWords(params.turns)}. Example: Tailwind for 3 turns.${once}`;
+        return `When I enter the battle, set ${plain(params.tag, "a field effect")} on my side (field-wide effects reach everyone) for ${turnsWords(params.turns)}. Example: Tailwind for 3 turns.${once}`;
       case "Add a type to myself":
-        return `When I enter the battle, I gain the ${String(params.type)} type and keep my other types. Example: Water type added.${once}`;
+        return `When I enter the battle, I gain ${plain(params.type, "an extra")} type and keep my other types. Example: Water type added.${once}`;
       case "Change one of my own stats":
-        return `When I enter the battle, my ${String(params.stat)} changes by ${params.stages} stage(s) (negative = lower). Example: +1 Sp. Def.${once}`;
+        return `When I enter the battle, my ${plain(params.stat, "chosen stat")} changes by ${params.stages} stage(s) (negative = lower). Example: +1 Sp. Def.${once}`;
       default:
-        return `When I enter the battle, I use ${String(params.move)} right away, aimed at the first foe still standing. Example: Glare.${once}`;
+        return `When I enter the battle, I use ${plain(params.move, "a move")} right away, aimed at the first foe still standing. Example: Glare.${once}`;
     }
   },
   synonyms: [

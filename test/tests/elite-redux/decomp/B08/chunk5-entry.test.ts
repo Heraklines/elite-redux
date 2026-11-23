@@ -33,6 +33,44 @@ describe("B08 chunk 5: entry-effect classes", () => {
 
   const configOf = (attr: Any): unknown => attr.effect ?? { tag: attr.tag, turns: attr.turns, side: attr.side };
 
+  it("every kind renders plain player words even when its own settings are still 'Not used'", () => {
+    const decl: Any = declRegistry.get("EntryEffectAbAttr")!.decl;
+    const kinds = [
+      "Set the weather",
+      "Set a terrain",
+      "Set one terrain picked at random",
+      "Lay a trap on the field",
+      "Set a screen, room or other field effect",
+      "Add a type to myself",
+      "Change one of my own stats",
+      "Use a move",
+    ];
+    for (const kind of kinds) {
+      for (const once of [false, true]) {
+        const text = String(
+          decl.summary({
+            kind,
+            weather: NOT_USED,
+            terrain: NOT_USED,
+            terrains: NOT_USED,
+            hazard: NOT_USED,
+            hazardSide: NOT_USED,
+            tag: NOT_USED,
+            type: NOT_USED,
+            stat: NOT_USED,
+            move: NOT_USED,
+            turns: 8,
+            layers: 1,
+            stages: 1,
+            once,
+          }),
+        );
+        expect(text.toLowerCase(), kind).not.toContain("not used");
+        expect(text, kind).not.toContain("undefined");
+      }
+    }
+  });
+
   it("the choice list names the Forewarn-only Future Sight copy by its real id", () => {
     expect(FOREWARN_FUTURE_SIGHT_ID).toBe(9500);
   });
