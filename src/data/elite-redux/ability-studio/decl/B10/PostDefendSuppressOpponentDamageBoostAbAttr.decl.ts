@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// B10 chunk 4 / engine-query (Tier C, a presence flag read by name). Status legacy-closure-pending-request.
+// B10 chunk 4 / engine-query (Tier C, a presence flag read by name). Status decomposed.
 //
 // Read by hand from archetypes/post-defend-suppress-opponent-damage-boost.ts. Despite the name the class extends only AbAttr: it has no
 // canApply, no apply and is never dispatched. Constructor takes nothing, `super(false)` (no banner). The engine looks for it BY NAME:
@@ -60,5 +60,5 @@ export default defineDecl(PostDefendSuppressOpponentDamageBoostAbAttr, {
   probes: [{ name: "a foe hits the holder", axes: { foeMove: ["TACKLE", "WATER_GUN"] } }],
   status: "decomposed",
   notes:
-    "Engine-query (counted apart; the foundation owns the abilityQuery routing). Users (7 attrs, 6 abilities, Stainless Steel exists under two ids): Wonder Skin attr 0, Fort Knox attr 0, Prim and Proper attr 0, Wonder Scale attr 1, Stainless Steel attr 0 (ids 5530 and 6003) and Mystic Fortification attr 1 (saved editor ability 20014, after BlockNonDirectDamageAbAttr). None carries a constructor argument or a closure, nothing to bind. The declaration is parked in decl/B10/pending until the librarian adds the class name to the flagKeys of the WHEN while.active (request R-B10-c4-10): without it L0 refuses the trigger because the class is neither a dispatch key nor listed as a flag. The reader checks the CLASS NAME (`attr.constructor.name`), so the class must keep its name. Oddities, NOT fixed: the class name says PostDefend but it extends AbAttr and is never dispatched; the class comment says the damage is divided by 1.3 and multi-hit damage halved, but the engine code caps the damage at the no-ability value and skips the extra-hit abilities (the comment is stale).",
+    "Engine-query (counted apart; the foundation owns the abilityQuery routing). Users (7 attrs, 6 abilities, Stainless Steel exists under two ids): Wonder Skin attr 0, Fort Knox attr 0, Prim and Proper attr 0, Wonder Scale attr 1, Stainless Steel attr 0 (ids 5530 and 6003) and Mystic Fortification attr 1 (saved editor ability 20014, after BlockNonDirectDamageAbAttr). None carries a constructor argument or a closure, nothing to bind. The class name is listed in the flagKeys of the WHEN while.active (request R-B10-c4-10, done). The reader checks the CLASS NAME (`attr.constructor.name`), so the class must keep its name. Oddities, NOT fixed: the class name says PostDefend but it extends AbAttr and is never dispatched; the class comment says the damage is divided by 1.3 and multi-hit damage halved, but the engine code caps the damage at the no-ability value and skips the extra-hit abilities (the comment is stale).",
 });

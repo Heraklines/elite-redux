@@ -44,7 +44,7 @@ export default defineDecl(PostSummonClearTerrainAbAttr, {
   when: "event.on-entry",
   label: "Clear the terrain when I enter and gain a bonus",
   summary: params =>
-    `When I enter and a terrain is active, it is removed${params.clearedStat === "None" ? "" : `, and I raise ${params.clearedStat} by ${params.clearedStages}`}${Number(params.healPercent) > 0 ? ` and heal ${params.healPercent}% of my max HP` : ""}. Can raise a different stat for each terrain.`,
+    `When I enter and a terrain is active, it is removed${params.clearedStat === NO_STAT || params.clearedStat === "None" ? "" : `, and I raise ${params.clearedStat} by ${params.clearedStages}`}${Number(params.healPercent) > 0 ? ` and heal ${params.healPercent}% of my max HP` : ""}. Can raise a different stat for each terrain.`,
   synonyms: [
     "remove the terrain",
     "eat the terrain",
