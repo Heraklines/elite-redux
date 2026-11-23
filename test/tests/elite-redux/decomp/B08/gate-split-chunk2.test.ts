@@ -9,6 +9,10 @@
 // stat stages, who is asleep, a target that is about to switch, the holder's first turn, what the foe did this turn,
 // Shield Dust, a roll that passes and a roll that fails).
 //
+// Review round 3 changed two things the frozen copies below account for: the parent's attack check of the two offensive
+// classes is now the first clause of the gate (the oracle still asks it FIRST, from the original closure), and the one-time
+// shield of Drakelp Head lives under the key "firstDefendConsumed" in waveData.entryEffectsFired instead of a plain field.
+//
 //   1. ORACLE: the original `canApply` bodies of ChanceBattlerTagOnHitAbAttr, ChanceStatusOnAttackAbAttr,
 //      ChanceBattlerTagOnAttackAbAttr, ConditionalDamageAbAttr, FirstDefendDamageReductionAbAttr,
 //      FirstDefendAttackerAtkDropAbAttr and ContactQuashAbAttr are copied below VERBATIM from the commit before the split
@@ -30,6 +34,7 @@ import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { Command } from "#enums/command";
 import { HitResult } from "#enums/hit-result";
+import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
 import { Stat } from "#enums/stat";
@@ -137,7 +142,10 @@ function legacyStatusOnAttack(attr: Fields, params: Params): boolean {
 
 function legacyTagOnAttack(attr: Fields, params: Params): boolean {
   const { pokemon, move, opponent: target } = params;
-  if (!PostAttackAbAttr.prototype.canApply.call(attr, params as never)) {
+  // The ORIGINAL parent closure: a damaging move, or (a user with a list of moves) one of the listed moves.
+  const parentAccepts =
+    attr.moveIds === undefined ? move.category !== MoveCategory.STATUS : attr.moveIds.includes(move.id);
+  if (!parentAccepts) {
     return false;
   }
   if (target.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr") || pokemon === target) {
@@ -160,17 +168,20 @@ function legacyConditionalDamage(attr: Fields, params: Params): boolean {
   return MovePowerBoostAbAttr.prototype.canApply.call(attr, params as never);
 }
 
+/** The one-time shield: it used to be the plain field waveData.firstDefendConsumed, it is now this key of the per-wave memory. */
+const SHIELD_KEY = "firstDefendConsumed";
+
 function legacyFirstDefendReduction(attr: Fields, params: Params): boolean {
   return (
     ReceivedMoveDamageMultiplierAbAttr.prototype.canApply.call(attr, params as never)
-    && !params.pokemon.waveData.firstDefendConsumed
+    && !params.pokemon.waveData.entryEffectsFired.has(SHIELD_KEY)
   );
 }
 
 function legacyFirstDefendDrop(attr: Fields, params: Params): boolean {
   return (
     PostDefendStatStageChangeAbAttr.prototype.canApply.call(attr, params as never)
-    && !params.pokemon.waveData.firstDefendConsumed
+    && !params.pokemon.waveData.entryEffectsFired.has(SHIELD_KEY)
   );
 }
 
@@ -314,7 +325,7 @@ function observe(world: World, state: State, kind: string, run: (params: Params)
     acted: foeAny.turnData.acted,
     attacksReceived: foeAny.turnData.attacksReceived,
     waveTurnCount: holderAny.tempSummonData.waveTurnCount,
-    consumed: holderAny.waveData.firstDefendConsumed,
+    consumed: holderAny.waveData.entryEffectsFired.has(SHIELD_KEY),
   };
   const realGetTag = foeAny.getTag.bind(foe);
   foeAny.getTag = ((tag: unknown) =>
@@ -329,7 +340,11 @@ function observe(world: World, state: State, kind: string, run: (params: Params)
     state.foeActed === 0 ? [] : [{ move: state.foeActed === 1 ? MoveId.HYPER_VOICE : MoveId.TACKLE }]) as never;
   foeAny.turnData.attacksReceived = state.crit ? [{ critical: true }] : [];
   holderAny.tempSummonData.waveTurnCount = state.firstTurn ? 1 : 2;
-  holderAny.waveData.firstDefendConsumed = state.consumed;
+  if (state.consumed) {
+    holderAny.waveData.entryEffectsFired.add(SHIELD_KEY);
+  } else {
+    holderAny.waveData.entryEffectsFired.delete(SHIELD_KEY);
+  }
   const draws: number[] = [];
   const spy = vi.spyOn(game.scene, "randBattleSeedInt").mockImplementation((range: number, min = 0) => {
     draws.push(range);
@@ -347,7 +362,11 @@ function observe(world: World, state: State, kind: string, run: (params: Params)
     foeAny.turnData.acted = saved.acted;
     foeAny.turnData.attacksReceived = saved.attacksReceived;
     holderAny.tempSummonData.waveTurnCount = saved.waveTurnCount;
-    holderAny.waveData.firstDefendConsumed = saved.consumed;
+    if (saved.consumed) {
+      holderAny.waveData.entryEffectsFired.add(SHIELD_KEY);
+    } else {
+      holderAny.waveData.entryEffectsFired.delete(SHIELD_KEY);
+    }
   }
 }
 

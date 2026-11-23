@@ -10,6 +10,7 @@
 
 import { hpCrossedBelow, isComatoseLike } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { TrappedTag } from "#data/battler-tags";
 import { allMoves } from "#data/data-lists";
 import { DAMAGING_HIT_RESULTS } from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { ConditionalDamageAbAttr } from "#data/elite-redux/archetypes/conditional-damage";
@@ -289,6 +290,11 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
     };
   },
 
+  "tag.trapped": p => frame => {
+    const target = holderLikeOf(frame, String(p.who));
+    return target !== undefined && !!target.getTag(TrappedTag);
+  },
+
   // Stat stages
   "stage.compare": p => {
     const stats = p.stat === "ANY" ? STATS_ALL : [String(p.stat)];
@@ -356,6 +362,16 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
       deferMemoryWrite(frame, () => memory.set(key, marker));
       return true;
     };
+  },
+  "time.once-per-unused": p => {
+    const scope = String(p.scope);
+    // Read only: the same memory as time.once-per, without ever spending it.
+    if (scope === "wave") {
+      const waveKey = String(p.key);
+      return frame => !frame.holder.waveData.entryEffectsFired.has(waveKey);
+    }
+    const key = `once:${scope}:${String(p.key)}`;
+    return frame => memoryOf(frame.holder).get(key) !== scopeMarker(frame.holder, scope);
   },
   "time.acted": p => frame => holderLikeOf(frame, String(p.who))?.turnData?.acted ?? false,
   "time.nth-use": p => {

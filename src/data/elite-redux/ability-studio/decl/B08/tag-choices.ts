@@ -7,12 +7,15 @@
 // Shared by the B08 chunk 2 declarations (the chance-on-hit and chance-on-attack classes): the player-facing words
 // for the lasting effects and move filters, and the codecs that turn them into what the constructors want.
 // This is not a declaration (the registry only collects `*.decl.ts` and `bindings.ts`).
+import { playerName } from "#data/elite-redux/ability-studio/decl-naming";
 import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
 import { MOVE_FLAG_OPTIONS, TYPE_OPTIONS } from "#data/elite-redux/ability-studio/vocabulary/enums";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveFlags } from "#enums/move-flags";
+import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { StatusEffect } from "#enums/status-effect";
+import { WeatherType } from "#enums/weather-type";
 
 /** The lasting effects the live users hand out (and a few siblings), in the words a player uses. */
 export const TAG_CHOICES: readonly (readonly [name: string, tag: BattlerTagType])[] = [
@@ -89,19 +92,51 @@ export const optionalTagCodec: ParamCodec = {
   fromInstance: raw => (raw === undefined || raw === null ? "None" : nameOfTag(raw)),
 };
 
+/** The status conditions a player knows, in the words a player uses (never the enum names POISON, TOXIC, PARALYSIS ...). */
+export const STATUS_CHOICES: readonly (readonly [name: string, status: StatusEffect])[] = [
+  ["Poisoned", StatusEffect.POISON],
+  ["Badly poisoned", StatusEffect.TOXIC],
+  ["Paralyzed", StatusEffect.PARALYSIS],
+  ["Asleep", StatusEffect.SLEEP],
+  ["Frozen", StatusEffect.FREEZE],
+  ["Burned", StatusEffect.BURN],
+];
+
+export const STATUS_NAMES: readonly string[] = STATUS_CHOICES.map(([name]) => name);
+
+function statusOf(name: string): StatusEffect {
+  const entry = STATUS_CHOICES.find(([candidate]) => candidate.toLowerCase() === name.trim().toLowerCase());
+  if (entry === undefined) {
+    throw new Error(`"${name}" is not a known status condition`);
+  }
+  return entry[1];
+}
+
+function nameOfStatus(status: unknown): string | undefined {
+  return STATUS_CHOICES.find(([, candidate]) => candidate === status)?.[0];
+}
+
+/** "Poisoned, Burned" <-> [POISON, BURN]. */
+export const statusNamesCodec: ParamCodec = {
+  toCtor: value =>
+    String(value)
+      .split(",")
+      .map(part => part.trim())
+      .filter(part => part.length > 0)
+      .map(statusOf),
+  fromInstance: raw => {
+    if (!Array.isArray(raw)) {
+      return;
+    }
+    const names = raw.map(nameOfStatus);
+    return names.every((name): name is string => name !== undefined) ? names.join(", ") : undefined;
+  },
+};
+
 /** One status condition, or "None" for no requirement. */
 export const optionalStatusCodec: ParamCodec = {
-  toCtor: value =>
-    value === "None" ? undefined : (StatusEffect as unknown as Record<string, number>)[String(value).toUpperCase()],
-  fromInstance: raw => {
-    if (raw === undefined || raw === null) {
-      return "None";
-    }
-    const name = Object.keys(StatusEffect).find(
-      key => Number.isNaN(Number(key)) && (StatusEffect as unknown as Record<string, number>)[key] === raw,
-    );
-    return name === undefined ? undefined : name.charAt(0) + name.slice(1).toLowerCase();
-  },
+  toCtor: value => (value === "None" ? undefined : statusOf(String(value))),
+  fromInstance: raw => (raw === undefined || raw === null ? "None" : nameOfStatus(raw)),
 };
 
 /** 0 means "leave it to the game" (the constructor option is then left out). */
@@ -134,7 +169,7 @@ export const turnRangeCodec: ParamCodec = {
 // ---------------------------------------------------------------------------------------------------------------
 // The "only for these moves" filter of the offensive classes: a move property or a move type.
 
-const FLAG_WORDS: Readonly<Record<string, string>> = {
+export const FLAG_WORDS: Readonly<Record<string, string>> = {
   MAKES_CONTACT: "Contact moves",
   SOUND_BASED: "Sound moves",
   BITING_MOVE: "Biting moves",
@@ -209,5 +244,108 @@ export const moveFilterCodec: ParamCodec = {
       return type === undefined ? undefined : typeWords(type);
     }
     return;
+  },
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// Moves, weather and one move property, in player words (shared by the always-hit and the tag-on-attack declarations).
+
+/** "FOCUS_BLAST" -> "Focus blast": spaces instead of underscores, only the first letter is a capital. */
+function words(constant: string): string {
+  const text = constant.toLowerCase().split("_").join(" ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+interface NameTable {
+  readonly names: readonly string[];
+  readonly byName: ReadonlyMap<string, number>;
+  readonly byValue: ReadonlyMap<number, string>;
+}
+
+/**
+ * Display names for a numeric enum. A name that two members would share gets the member's own constant words in
+ * brackets, so every name stays unique and reads back to exactly one member.
+ */
+function nameTable(table: Readonly<Record<string, string | number>>, name: (constant: string) => string): NameTable {
+  const byName = new Map<string, number>();
+  const byValue = new Map<number, string>();
+  for (const constant of Object.keys(table)) {
+    const value = table[constant];
+    if (typeof value !== "number" || !Number.isNaN(Number(constant))) {
+      continue; // the reverse mapping of a numeric enum
+    }
+    if (byValue.has(value)) {
+      continue; // an alias of a member that is already listed
+    }
+    let shown = name(constant);
+    if (byName.has(shown.toLowerCase())) {
+      shown = `${shown} (${constant.toLowerCase().split("_").join(" ")})`;
+    }
+    byName.set(shown.toLowerCase(), value);
+    byValue.set(value, shown);
+  }
+  return { names: [...byValue.values()], byName, byValue };
+}
+
+function listCodec(what: string, names: NameTable, constants: Readonly<Record<string, string | number>>): ParamCodec {
+  return {
+    toCtor: value =>
+      String(value)
+        .split(",")
+        .map(part => part.trim())
+        .filter(part => part.length > 0)
+        .map(part => {
+          // The player's name first; the constant ("FOCUS_BLAST") is accepted too so older saved rules keep loading.
+          const resolved = names.byName.get(part.toLowerCase()) ?? constants[part.toUpperCase().split(" ").join("_")];
+          if (typeof resolved !== "number") {
+            throw new Error(`"${part}" is not a known ${what}`);
+          }
+          return resolved;
+        }),
+    fromInstance: raw => {
+      if (!Array.isArray(raw)) {
+        return;
+      }
+      const shown = raw.map(item => names.byValue.get(item as number));
+      return shown.every((entry): entry is string => entry !== undefined) ? shown.join(", ") : undefined;
+    },
+  };
+}
+
+const MOVE_TABLE = nameTable(MoveId, words);
+const WEATHER_TABLE = nameTable(WeatherType, playerName);
+
+/** Every move, by the name a player knows ("Focus blast"). */
+export const MOVE_NAMES: readonly string[] = MOVE_TABLE.names;
+/** Every weather, by the name a player knows ("Heavy rain"). */
+export const WEATHER_NAMES: readonly string[] = WEATHER_TABLE.names;
+
+/** "Focus blast, Hypnosis" <-> [FOCUS_BLAST, HYPNOSIS]. */
+export const moveNamesCodec: ParamCodec = listCodec("move", MOVE_TABLE, MoveId);
+/** "Fog, Eerie fog" <-> [FOG, EERIE_FOG]. */
+export const weatherNamesCodec: ParamCodec = listCodec("weather", WEATHER_TABLE, WeatherType);
+
+export const NO_PROPERTY = "None";
+/** Every move property staff may pick, in words ("Biting moves"); "None" is no requirement. */
+export const PROPERTY_CHOICES: readonly string[] = [NO_PROPERTY, ...MOVE_FLAG_OPTIONS.map(flag => FLAG_WORDS[flag])];
+
+/** One move property by its words, or "None". */
+export const propertyCodec: ParamCodec = {
+  toCtor: value => {
+    if (value === NO_PROPERTY) {
+      return;
+    }
+    const flag = MOVE_FLAG_OPTIONS.find(candidate => FLAG_WORDS[candidate] === value);
+    if (flag === undefined) {
+      throw new Error(`"${String(value)}" is not a known move property`);
+    }
+    return (MoveFlags as unknown as Record<string, number>)[flag];
+  },
+  fromInstance: raw => {
+    if (raw === undefined || raw === null) {
+      return NO_PROPERTY;
+    }
+    const flag = MOVE_FLAG_OPTIONS.find(name => (MoveFlags as unknown as Record<string, number>)[name] === raw);
+    return flag === undefined ? undefined : FLAG_WORDS[flag];
   },
 };

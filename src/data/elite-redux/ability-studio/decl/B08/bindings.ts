@@ -181,34 +181,33 @@ bindCondition(
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // ChanceStatusOnAttackAbAttr (Tier B, 43 attrs, offensive: the holder hits). The parent's damaging-move test, the simulated
-// shortcut and the guards (Shield Dust, the holder itself) stay in the class. Original gate order:
-//   contactExcluded (inherent contact false) -> contactRequired (user-aware contact) -> filter (flag: inherent, type: the
-//   move's OWN type) -> critRequired -> chance roll. There is NO hit-result test in this class.
+// shortcut and the guards (Shield Dust, the holder itself) stay in the class. The parent's "the move deals damage" check is
+// the FIRST atom of every gate (move.damaging, removable), so it is visible and staff can change it. Original gate order:
+//   the move deals damage (the parent's attackCondition) -> contactExcluded (inherent contact false) -> contactRequired
+//   (user-aware contact) -> filter (flag: inherent, type: the move's OWN type) -> critRequired -> chance roll.
+// There is NO hit-result test in this class.
 // ---------------------------------------------------------------------------------------------------------------------------
 const statusAttackContactGate = (pct: number): unknown => ({
-  all: [
-    { id: "move.flag", flag: "MAKES_CONTACT" },
-    { id: "rng.chance", pct },
-  ],
+  all: [{ id: "move.damaging" }, { id: "move.flag", flag: "MAKES_CONTACT" }, { id: "rng.chance", pct }],
 });
 const statusAttackNonContactGate = (pct: number): unknown => ({
-  all: [{ not: { id: "move.inherent-flag", flag: "MAKES_CONTACT" } }, { id: "rng.chance", pct }],
+  all: [
+    { id: "move.damaging" },
+    { not: { id: "move.inherent-flag", flag: "MAKES_CONTACT" } },
+    { id: "rng.chance", pct },
+  ],
 });
 const statusAttackFlagGate = (flag: string, pct: number): unknown => ({
-  all: [
-    { id: "move.inherent-flag", flag },
-    { id: "rng.chance", pct },
-  ],
+  all: [{ id: "move.damaging" }, { id: "move.inherent-flag", flag }, { id: "rng.chance", pct }],
 });
 const statusAttackTypeGate = (type: string, pct: number): unknown => ({
-  all: [
-    { id: "move.type", type, effective: false },
-    { id: "rng.chance", pct },
-  ],
+  all: [{ id: "move.damaging" }, { id: "move.type", type, effective: false }, { id: "rng.chance", pct }],
 });
-const statusAttackAnyMoveGate = (pct: number): unknown => ({ all: [{ id: "rng.chance", pct }] });
+const statusAttackAnyMoveGate = (pct: number): unknown => ({
+  all: [{ id: "move.damaging" }, { id: "rng.chance", pct }],
+});
 const statusAttackCritGate = (pct: number): unknown => ({
-  all: [{ id: "hit.critical" }, { id: "rng.chance", pct }],
+  all: [{ id: "move.damaging" }, { id: "hit.critical" }, { id: "rng.chance", pct }],
 });
 
 bindCondition(9, 3, statusAttackNonContactGate(10), "gate"); // Static: paralysis, 10% on non-contact
@@ -256,41 +255,36 @@ bindCondition(20005, 5, statusAttackTypeGate("ELECTRIC", 10), "gate"); // Thunde
 bindCondition(20006, 5, statusAttackTypeGate("ELECTRIC", 10), "gate"); // Malicious Empathy: paralysis, 10% on Electric moves
 
 // ---------------------------------------------------------------------------------------------------------------------------
-// ChanceBattlerTagOnAttackAbAttr (Tier B, 66 attrs, offensive). The parent's attack check and the guards (Shield Dust, the
-// holder itself) stay in the class. Original gate order (matchesMove, matchesTarget, passesChance):
-//   listed move ids -> contactExcluded (inherent) -> contactRequired (user-aware) -> filter (flag: inherent, type: the move's
-//   OWN type) -> the target already has a tag -> the target has a status -> critical hit -> chance (roll LAST).
+// ChanceBattlerTagOnAttackAbAttr (Tier B, 66 attrs, offensive). Only the guards (Shield Dust, the holder itself) stay in the
+// class. The parent's attack check is now the FIRST atom of every gate, so it is visible and staff can change it: a user
+// without a list of moves starts with move.damaging; the one user with a list (Hypnotic Trance) starts with move.is-move
+// instead (a status move may trigger it). Original gate order (matchesMove, matchesTarget, passesChance):
+//   damaging move, or the listed move ids -> contactExcluded (inherent) -> contactRequired (user-aware) -> filter (flag:
+//   inherent, type: the move's OWN type) -> the target already has a tag -> the target has a status -> critical hit ->
+//   chance (roll LAST).
 // ---------------------------------------------------------------------------------------------------------------------------
 const tagAttackContactGate = (pct: number): unknown => ({
-  all: [
-    { id: "move.flag", flag: "MAKES_CONTACT" },
-    { id: "rng.chance", pct },
-  ],
+  all: [{ id: "move.damaging" }, { id: "move.flag", flag: "MAKES_CONTACT" }, { id: "rng.chance", pct }],
 });
 const tagAttackNonContactGate = (pct: number): unknown => ({
-  all: [{ not: { id: "move.inherent-flag", flag: "MAKES_CONTACT" } }, { id: "rng.chance", pct }],
+  all: [
+    { id: "move.damaging" },
+    { not: { id: "move.inherent-flag", flag: "MAKES_CONTACT" } },
+    { id: "rng.chance", pct },
+  ],
 });
 const tagAttackFlagGate = (flag: string, pct: number): unknown => ({
-  all: [
-    { id: "move.inherent-flag", flag },
-    { id: "rng.chance", pct },
-  ],
+  all: [{ id: "move.damaging" }, { id: "move.inherent-flag", flag }, { id: "rng.chance", pct }],
 });
 const tagAttackTypeGate = (type: string, pct: number): unknown => ({
-  all: [
-    { id: "move.type", type, effective: false },
-    { id: "rng.chance", pct },
-  ],
+  all: [{ id: "move.damaging" }, { id: "move.type", type, effective: false }, { id: "rng.chance", pct }],
 });
-const tagAttackAnyMoveGate = (pct: number): unknown => ({ all: [{ id: "rng.chance", pct }] });
+const tagAttackAnyMoveGate = (pct: number): unknown => ({ all: [{ id: "move.damaging" }, { id: "rng.chance", pct }] });
 const tagAttackTargetHasTagGate = (tag: string, pct: number): unknown => ({
-  all: [
-    { id: "tag.has", who: "other", tag },
-    { id: "rng.chance", pct },
-  ],
+  all: [{ id: "move.damaging" }, { id: "tag.has", who: "other", tag }, { id: "rng.chance", pct }],
 });
 const tagAttackCritGate = (pct: number): unknown => ({
-  all: [{ id: "hit.critical" }, { id: "rng.chance", pct }],
+  all: [{ id: "move.damaging" }, { id: "hit.critical" }, { id: "rng.chance", pct }],
 });
 
 bindCondition(174, 3, tagAttackTypeGate("ICE", 10), "gate"); // Refrigerate: frostbite, 10% on Ice moves
@@ -337,10 +331,7 @@ bindCondition(
   5441,
   0,
   {
-    all: [
-      { id: "status.has", who: "other", status: "BURN" },
-      { id: "rng.chance", pct: 100 },
-    ],
+    all: [{ id: "move.damaging" }, { id: "status.has", who: "other", status: "BURN" }, { id: "rng.chance", pct: 100 }],
   },
   "gate",
 ); // Set Ablaze: fear, 100% when the target is burned
@@ -384,6 +375,7 @@ bindCondition(
   1,
   {
     all: [
+      { id: "move.damaging" },
       { id: "move.flag", flag: "MAKES_CONTACT" },
       { any: [{ id: "time.first-turn" }, { id: "rng.chance", pct: 50 }] },
     ],
@@ -400,6 +392,7 @@ bindCondition(
   0,
   {
     all: [
+      { id: "move.damaging" },
       { id: "move.inherent-flag", flag: "SOUND_BASED" },
       {
         any: [
@@ -445,11 +438,24 @@ bindCondition(5640, 1, confusedOrEnragedGate(), "gate"); // Cosmic Dust: x2 powe
 bindCondition(5378, 1, { id: "tag.has", who: "other", tag: "ER_BLEED" }, "gate"); // Blood Stigma: x2 power against a bleeding target
 
 // ---------------------------------------------------------------------------------------------------------------------------
-// FirstDefendDamageReductionAbAttr and FirstDefendAttackerAtkDropAbAttr (Tier B, one user: Drakelp Head). Slot "gate" = the
-// parent's fixed closure `move.category !== STATUS`. The unspent one-time shield stays in the class as the residual.
+// FirstDefendDamageReductionAbAttr and FirstDefendAttackerAtkDropAbAttr (Tier B, one user: Drakelp Head). Slot "gate", in the
+// ORIGINAL clause order: the parent's closure `move.category !== STATUS`, then "the one-time shield is not spent yet". The shield
+// is the key "firstDefendConsumed" in waveData.entryEffectsFired, the per-wave memory the library atoms read:
+//   - the damage half only READS it (time.once-per-unused, it never spends the shield),
+//   - the Attack-drop half reads it AND spends it when the rule applies (time.once-per, the write waits for the effect).
 // ---------------------------------------------------------------------------------------------------------------------------
-bindCondition(5690, 0, { id: "move.damaging" }, "gate"); // Drakelp Head: halve the first damaging hit
-bindCondition(5690, 1, { id: "move.damaging" }, "gate"); // Drakelp Head: lower the attacker's Attack after the first damaging hit
+bindCondition(
+  5690,
+  0,
+  { all: [{ id: "move.damaging" }, { id: "time.once-per-unused", scope: "wave", key: "firstDefendConsumed" }] },
+  "gate",
+); // Drakelp Head: halve the first damaging hit (the shield is read, not spent)
+bindCondition(
+  5690,
+  1,
+  { all: [{ id: "move.damaging" }, { id: "time.once-per", scope: "wave", key: "firstDefendConsumed" }] },
+  "gate",
+); // Drakelp Head: lower the attacker's Attack after the first damaging hit (the shield is spent)
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // ContactQuashAbAttr (Tier B, 2 users). Slot "gate" = doesFlagEffectApply(MAKES_CONTACT, user: attacker, target: holder).
@@ -457,3 +463,80 @@ bindCondition(5690, 1, { id: "move.damaging" }, "gate"); // Drakelp Head: lower 
 // ---------------------------------------------------------------------------------------------------------------------------
 bindCondition(5437, 0, { id: "move.flag", flag: "MAKES_CONTACT" }, "gate"); // Know Your Place: the attacker moves last for 5 turns
 bindCondition(5649, 0, { id: "move.flag", flag: "MAKES_CONTACT" }, "gate"); // Tangled Tails: the attacker moves last for 5 turns
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// ConditionalAlwaysHitAbAttr (Tier B, 38 attrs). Slot "gate" = the class's `matches(move, user, target)`, which is now
+// `gate`: the move (property, kind, listed moves), the weather, then the target (super effective, lasting effect, trapped).
+// Each setting of the live instance is one atom, written by hand from the dump of the live options, in the ORIGINAL order:
+//   flag -> move.flag                    categories -> move.category              moveIds -> move.is-move (any[...] for a list)
+//   weather -> field.weather (any[...])  superEffective -> move.effectiveness gt 1 (the class refuses <= 1)
+//   targetHasTag -> tag.has other        targetTrapped -> tag.trapped other (the class test getTag(TrappedTag))
+// No setting at all is { all: [] }, always true. The flag atom also hands the target to doesFlagEffectApply while the class does not:
+// that only matters for the contact property against a Substitute, and no live user uses it (see the declaration notes).
+// ---------------------------------------------------------------------------------------------------------------------------
+const alwaysHitFlag = (flag: string): unknown => ({ id: "move.flag", flag });
+const alwaysHitMove = (moveId: string): unknown => ({ id: "move.is-move", moveId });
+const alwaysHitSuperEffective = (): unknown => ({ id: "move.effectiveness", cmp: "gt", n: 1 });
+const alwaysHitTrapped = (): unknown => ({ id: "tag.trapped", who: "other" });
+
+// moveIds
+bindCondition(39, 2, alwaysHitMove("FOCUS_BLAST"), "gate"); // Inner Focus
+bindCondition(5029, 1, alwaysHitMove("BLIZZARD"), "gate"); // Aurora Borealis
+bindCondition(5175, 1, { any: ["TACKLE", "POISON_STING", "ELECTROWEB", "BUG_BITE"].map(alwaysHitMove) }, "gate"); // Angel's Wrath: four moves
+bindCondition(5219, 5, alwaysHitMove("FOCUS_BLAST"), "gate"); // Enlightened
+bindCondition(5335, 1, alwaysHitMove("THUNDER"), "gate"); // Shiny Lightning
+bindCondition(5365, 2, alwaysHitMove("FOCUS_BLAST"), "gate"); // Unlocked Potential
+bindCondition(5383, 2, alwaysHitMove("FOCUS_BLAST"), "gate"); // Way of Precision
+bindCondition(5654, 0, alwaysHitMove("HYPNOSIS"), "gate"); // Hypnotic Trance
+bindCondition(6083, 2, alwaysHitMove("FOCUS_BLAST"), "gate"); // Monk
+bindCondition(20008, 2, alwaysHitMove("FOCUS_BLAST"), "gate"); // Heartless Style
+
+// super effective
+bindCondition(5078, 0, alwaysHitSuperEffective(), "gate"); // Fatal Precision
+bindCondition(5078, 2, alwaysHitSuperEffective(), "gate"); // Fatal Precision (second copy)
+bindCondition(5388, 1, alwaysHitSuperEffective(), "gate"); // Final Blow
+bindCondition(5495, 0, alwaysHitSuperEffective(), "gate"); // Deadly Precision
+bindCondition(5622, 0, alwaysHitSuperEffective(), "gate"); // Flawless Precision
+bindCondition(5635, 0, alwaysHitSuperEffective(), "gate"); // Mach 3
+bindCondition(20008, 7, alwaysHitSuperEffective(), "gate"); // Heartless Style
+bindCondition(20008, 9, alwaysHitSuperEffective(), "gate"); // Heartless Style (second copy)
+
+// target trapped
+bindCondition(5110, 2, alwaysHitTrapped(), "gate"); // Grip Pincer
+bindCondition(5354, 4, alwaysHitTrapped(), "gate"); // Venoblaze Pincers
+
+// move property
+bindCondition(5113, 0, alwaysHitFlag("ARROW_BASED"), "gate"); // Deadeye: arrow moves
+bindCondition(5113, 1, alwaysHitFlag("BALLBOMB_MOVE"), "gate"); // Deadeye: ball and bomb moves
+bindCondition(5114, 0, alwaysHitFlag("PULSE_MOVE"), "gate"); // Artillery
+bindCondition(5139, 0, alwaysHitFlag("KICKING_MOVE"), "gate"); // Roundhouse
+bindCondition(5157, 0, alwaysHitFlag("SLICING_MOVE"), "gate"); // Sweeping Edge
+bindCondition(5297, 0, alwaysHitFlag("SLICING_MOVE"), "gate"); // Blademaster
+bindCondition(5401, 0, alwaysHitFlag("SLICING_MOVE"), "gate"); // Pinnacle Blade
+bindCondition(5478, 1, alwaysHitFlag("PULSE_MOVE"), "gate"); // Super Scope
+bindCondition(5482, 1, alwaysHitFlag("ARROW_BASED"), "gate"); // Hunter's Mark: arrow moves
+bindCondition(5482, 2, alwaysHitFlag("BALLBOMB_MOVE"), "gate"); // Hunter's Mark: ball and bomb moves
+bindCondition(5942, 1, alwaysHitFlag("SLICING_MOVE"), "gate"); // Puncture
+bindCondition(6089, 0, alwaysHitFlag("KICKING_MOVE"), "gate"); // Kyokushin
+bindCondition(20011, 4, alwaysHitFlag("ARROW_BASED"), "gate"); // Celestial Bow: arrow moves
+bindCondition(20011, 5, alwaysHitFlag("BALLBOMB_MOVE"), "gate"); // Celestial Bow: ball and bomb moves
+
+// move kind: status moves
+bindCondition(5158, 3, { id: "move.category", category: "STATUS" }, "gate"); // Gifted Mind
+bindCondition(20020, 5, { id: "move.category", category: "STATUS" }, "gate"); // Unintentional Genius
+
+// weather: fog or eerie fog
+bindCondition(
+  5646,
+  1,
+  {
+    any: [
+      { id: "field.weather", weather: "FOG" },
+      { id: "field.weather", weather: "EERIE_FOG" },
+    ],
+  },
+  "gate",
+); // Echolocation
+
+// no setting: every move never misses
+bindCondition(5485, 2, { all: [] }, "gate"); // Poseidon's Dominion

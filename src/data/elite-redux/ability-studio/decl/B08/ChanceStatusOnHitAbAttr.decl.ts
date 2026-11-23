@@ -22,40 +22,14 @@
 // The two contact SETTINGS (contactRequired, contactExcluded) and the TAGS list change the SHAPE of the gate, so they
 // are not editable: each user's gate binding spells out its own shape (bindings.ts). The chance is repeated in the
 // gate's `rng.chance` atom and is kept equal through gateParams.
-import { defineDecl, type ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
-import { enumListCodec, enumOptions } from "#data/elite-redux/ability-studio/param-codecs";
+import {
+  STATUS_NAMES,
+  statusNamesCodec,
+  TAG_NAMES,
+  tagOutcomesCodec,
+} from "#data/elite-redux/ability-studio/decl/B08/tag-choices";
+import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 import { ChanceStatusOnHitAbAttr } from "#data/elite-redux/archetypes/chance-status-on-hit";
-import { BattlerTagType } from "#enums/battler-tag-type";
-import { StatusEffect } from "#enums/status-effect";
-
-const TAG_NAMES = Object.keys(BattlerTagType);
-
-/**
- * The extra outcomes that are battler tags (confusion, bleeding, frostbite) shown as comma separated names. They are
- * read back from `outcomes` ([...statuses, ...tags], each { kind, value }), because the class keeps no list of its own.
- */
-const tagListCodec: ParamCodec = {
-  toCtor: value =>
-    String(value)
-      .split(",")
-      .map(part => part.trim())
-      .filter(part => part.length > 0)
-      .map(part => {
-        if (!TAG_NAMES.includes(part)) {
-          throw new Error(`"${part}" is not a known tag`);
-        }
-        return (BattlerTagType as Record<string, string>)[part];
-      }),
-  fromInstance: raw => {
-    if (!Array.isArray(raw)) {
-      return;
-    }
-    const names = raw
-      .filter((item): item is { kind: "tag"; value: string } => item?.kind === "tag")
-      .map(item => TAG_NAMES.find(name => (BattlerTagType as Record<string, string>)[name] === item.value));
-    return names.every((name): name is string => name !== undefined) ? names.join(",") : undefined;
-  },
-};
 
 export default defineDecl(ChanceStatusOnHitAbAttr, {
   tier: "B",
@@ -70,7 +44,7 @@ export default defineDecl(ChanceStatusOnHitAbAttr, {
           ? "a move that makes contact"
           : "a move";
     const extra = String(params.tags ?? "") === "" ? "" : ` (or ${params.tags})`;
-    return `When ${how} hits me, there is a ${params.chance}% chance the attacker gets ${params.statuses}${extra}. If several are listed, one is picked at random.`;
+    return `When ${how} hits me, there is a ${params.chance}% chance the attacker becomes ${params.statuses}${extra}. If several are listed, one is picked at random.`;
   },
   synonyms: [
     "static",
@@ -110,9 +84,9 @@ export default defineDecl(ChanceStatusOnHitAbAttr, {
       label: "Statuses (comma separated; one is picked at random when there are several)",
       editable: true,
       gateIndependent: true,
-      default: "POISON",
-      options: enumOptions(StatusEffect),
-      codec: enumListCodec(StatusEffect, "status"),
+      default: "Poisoned",
+      options: STATUS_NAMES,
+      codec: statusNamesCodec,
     },
     {
       id: "tags",
@@ -120,11 +94,12 @@ export default defineDecl(ChanceStatusOnHitAbAttr, {
       ctorOption: "tags",
       path: "outcomes",
       control: "text",
-      label: "Extra lasting effects in the same random pick (comma separated, may be empty)",
+      label: "Extra lasting effects in the same random pick (comma separated, may be empty) (set by the conditions)",
       // A tag outcome removes the "attacker has no status" check from the gate, so this changes the gate's SHAPE.
       editable: false,
       default: "",
-      codec: tagListCodec,
+      options: TAG_NAMES,
+      codec: tagOutcomesCodec,
     },
     {
       id: "contactRequired",
@@ -132,7 +107,7 @@ export default defineDecl(ChanceStatusOnHitAbAttr, {
       ctorOption: "contactRequired",
       path: "contactRequired",
       control: "boolean",
-      label: "The move must make contact",
+      label: "The move must make contact (set by the conditions)",
       // Decides the SHAPE of the gate (each user's binding spells it out).
       editable: false,
       default: true,
@@ -143,7 +118,7 @@ export default defineDecl(ChanceStatusOnHitAbAttr, {
       ctorOption: "contactExcluded",
       path: "contactExcluded",
       control: "boolean",
-      label: "Only moves that do not make contact (and only damaging hits)",
+      label: "Only moves that do not make contact (and only damaging hits) (set by the conditions)",
       editable: false,
       default: false,
     },

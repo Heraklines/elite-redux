@@ -24,7 +24,10 @@ import {
 //   apply    re-picks (RANDOM DRAW 3, independent of draw 2), then addTag(tag, turns); the turns are rolled with
 //            randBattleSeedIntRange for confusion (2 to 5) and for a turn range (Grip Pincer style); skipped when simulated.
 //
-// The class ignores `simulated` in canApply (it draws even for a simulated call), exactly like ChanceStatusOnHitAbAttr.
+// The class ignores `simulated` in canApply (it draws even for a simulated call), exactly like ChanceStatusOnHitAbAttr. The
+// compiled gate differs there: the library atom rng.chance answers true without a draw when `simulated`, so a compiled rule
+// does not roll on a simulated call. PostDefend is only dispatched with simulated false (move-effect-phase.ts), so no live
+// difference exists.
 //
 // The two contact SETTINGS (contactRequired, contactExcluded) and firstTurnChance change the SHAPE of the gate, so they are
 // not editable: each user's gate binding spells out its own shape (bindings.ts). The chance is repeated in the gate's
@@ -101,7 +104,7 @@ export default defineDecl(ChanceBattlerTagOnHitAbAttr, {
       ctorOption: "contactRequired",
       path: "contactRequired",
       control: "boolean",
-      label: "The move must make contact",
+      label: "The move must make contact (set by the conditions)",
       // Decides the SHAPE of the gate (each user's binding spells it out).
       editable: false,
       default: true,
@@ -112,7 +115,7 @@ export default defineDecl(ChanceBattlerTagOnHitAbAttr, {
       ctorOption: "contactExcluded",
       path: "contactExcluded",
       control: "boolean",
-      label: "Only moves that do not make contact (and only damaging hits)",
+      label: "Only moves that do not make contact (and only damaging hits) (set by the conditions)",
       editable: false,
       default: false,
     },
@@ -170,7 +173,7 @@ export default defineDecl(ChanceBattlerTagOnHitAbAttr, {
       max: 100,
       step: 1,
       integer: true,
-      label: "Chance (%) on my first turn after entering (0 = the same chance as always)",
+      label: "Chance (%) on my first turn after entering (0 = the same chance as always) (set by the conditions)",
       // Decides the SHAPE of the gate (an "on my first turn" alternative in front of the roll).
       editable: false,
       default: 0,

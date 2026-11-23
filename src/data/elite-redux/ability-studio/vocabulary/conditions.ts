@@ -505,6 +505,22 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     examples: ["React when the foe is taunted"],
   },
 
+  {
+    id: "tag.trapped",
+    group: "Status",
+    label: "{who} is trapped and cannot switch out",
+    requires: [],
+    whoParam: "who",
+    params: [WHO("other")],
+    pure: true,
+    formula: {
+      expr: "pokemon.getTag(TrappedTag) !== undefined  (the class test: every trapping effect such as Bind or Wrap counts, not only the plain Trapped one)",
+      source: "src/data/elite-redux/archetypes/conditional-always-hit.ts matchesTarget (targetTrapped)",
+    },
+    synonyms: ["cannot switch", "cannot escape", "bound", "wrapped", "trapping move", "stuck"],
+    examples: ["Never miss a target that cannot switch out"],
+  },
+
   // ---- Stat stages ---------------------------------------------------------------------
   {
     id: "stage.compare",
@@ -626,6 +642,21 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     },
     synonyms: ["once", "one time", "once per battle", "once per turn", "single use"],
     examples: ["Only the first time per battle"],
+  },
+  {
+    id: "time.once-per-unused",
+    group: "Time",
+    label: "The one-time effect {key} has not been used up yet this {scope}",
+    requires: [],
+    params: [selectParam("scope", "Scope", ONCE_PER_SCOPES, "wave"), textParam("key", "Memory key", "once")],
+    pure: true,
+    formula: {
+      expr: "wave: !holder.waveData.entryEffectsFired.has(key) ; other scopes: WeakMap<battleData>(key) !== scope marker. Only READS the memory, never writes it (time.once-per is the one that spends it)",
+      source:
+        "src/data/elite-redux/archetypes/consume-on-first-defend.ts FirstDefendDamageReductionAbAttr.gate (the damage half only reads the shield that the Attack-drop half spends)",
+    },
+    synonyms: ["still unused", "not used yet", "shield still up", "one time effect available", "first hit only"],
+    examples: ["Halve the first hit only, while the shield that the other half spends is still up"],
   },
   {
     id: "time.nth-use",

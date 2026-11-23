@@ -59,7 +59,7 @@ import { allMoves } from "#data/data-lists";
 import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
-import type { MoveCategory } from "#enums/move-category";
+import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
 import type { PokemonType } from "#enums/pokemon-type";
@@ -748,17 +748,16 @@ export class ChanceStatusOnAttackAbAttr extends PostAttackAbAttr implements Gate
   }
 
   /**
-   * Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: the parent's damaging-move check, the
-   * `simulated` shortcut (a simulated call passes at once, without any roll), then `guards` (the target is another
-   * Pokemon and is not protected from added effects), `gate` (contact tiers, move filter, critical hit, chance roll)
-   * and `residual` (the outcome pick and the feasibility check).
+   * Tier B split (ability studio spec 3.1). The parent's "the move deals damage" check (the default attackCondition) is
+   * now the FIRST clause of the replaceable `gate`, so staff can see and change it (the library atom move.damaging). A
+   * simulated call still asks the parent's question and then passes without any roll, exactly as before. Real calls run
+   * `guards` (the target is another Pokemon and is not protected from added effects), `gate` (the move deals damage,
+   * contact tiers, move filter, critical hit, chance roll) and `residual` (the outcome pick and the feasibility check).
+   * The guards read nothing random, so asking the damage question after them changes no answer and no draw.
    */
   public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    if (!super.canApply(params)) {
-      return false;
-    }
     if (params.simulated) {
-      return true;
+      return super.canApply(params);
     }
     return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
   }
@@ -769,9 +768,13 @@ export class ChanceStatusOnAttackAbAttr extends PostAttackAbAttr implements Gate
     return !(target.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr") || pokemon === target);
   }
 
-  /** The replaceable condition: contact tiers, move filter, critical hit, then the chance roll (the roll is the LAST clause). */
+  /** The replaceable condition: the move deals damage, contact tiers, move filter, critical hit, then the chance roll (the roll is the LAST clause). */
   public gate(params: PostMoveInteractionAbAttrParams): boolean {
     const { pokemon, move, opponent: target } = params;
+    // The parent's attack check (the default attackCondition), moved here so it is a visible, removable condition.
+    if (move.category === MoveCategory.STATUS) {
+      return false;
+    }
     const makesContact = move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: pokemon, target });
     // Inherent contact flag (ignores the holder's contact-suppression). The
     // non-contact tier (`contactExcluded`) must key off whether the move is
@@ -880,10 +883,10 @@ export class ChanceBattlerTagOnAttackAbAttr
     if (opts.turns !== undefined && opts.turnRange !== undefined) {
       throw new Error("[ChanceBattlerTagOnAttackAbAttr] turns and turnRange are mutually exclusive");
     }
-    // When gated to specific move ids, override the default PostAttack
-    // attackCondition (which excludes status moves) so by-name riders on a
-    // status move (e.g. Hypnosis) can trigger.
-    super(opts.moveIds === undefined ? undefined : (_u, _t, move) => opts.moveIds!.includes(move.id), false);
+    // The parent's attackCondition is neutral here: the question "is it a damaging move" (or "is it one of the listed moves",
+    // which lets by-name riders on a status move such as Hypnosis trigger) is asked by `gate` / `matchesMove`, where staff
+    // can see and change it, instead of inside the parent's closure.
+    super(() => true, false);
     this.chance = opts.chance;
     this.tags = opts.tags;
     this.critRequired = opts.critRequired ?? false;
@@ -948,7 +951,12 @@ export class ChanceBattlerTagOnAttackAbAttr
   }
 
   private matchesMove(move: Move, pokemon: Pokemon, target: Pokemon): boolean {
-    if (this.moveIds !== undefined && !this.moveIds.includes(move.id)) {
+    if (this.moveIds === undefined) {
+      // The default attack check of the parent (a damaging move); a list of moves replaces it.
+      if (move.category === MoveCategory.STATUS) {
+        return false;
+      }
+    } else if (!this.moveIds.includes(move.id)) {
       return false;
     }
     if (this.contactExcluded && move.hasFlag(MoveFlags.MAKES_CONTACT)) {
@@ -980,14 +988,12 @@ export class ChanceBattlerTagOnAttackAbAttr
   }
 
   /**
-   * Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: the parent's attack check (a damaging move,
-   * or one of the listed moves), then `guards` (the target is another Pokemon and is not protected from added effects),
-   * `gate` (the move, the target's state, then the chance roll) and `residual` (the tag pick and the feasibility check).
+   * Tier B split (ability studio spec 3.1). The parent's attack check (a damaging move, or one of the listed moves) is now
+   * the first clause of the replaceable `gate`, so staff can see and change it. Order: `guards` (the target is another
+   * Pokemon and is not protected from added effects; they read nothing random), `gate` (the move, the target's state, then
+   * the chance roll) and `residual` (the tag pick and the feasibility check).
    */
   public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    if (!super.canApply(params)) {
-      return false;
-    }
     return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
   }
 
@@ -997,7 +1003,7 @@ export class ChanceBattlerTagOnAttackAbAttr
     return !(target.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr") || pokemon === target);
   }
 
-  /** The replaceable condition: the move (listed ids, contact tiers, filter), the target's state, then the chance roll (the roll is the LAST clause). */
+  /** The replaceable condition: the move (damaging or a listed one, contact tiers, filter), the target's state, then the chance roll (the roll is the LAST clause). */
   public gate(params: PostMoveInteractionAbAttrParams): boolean {
     const { pokemon, move, opponent: target } = params;
     if (!this.matchesMove(move, pokemon, target)) {

@@ -5,19 +5,19 @@
  */
 
 // B08 chunk 2 / calc-modifier, Tier B. Read from the source (archetypes/consume-on-first-defend.ts) and from the one live user
-// (Drakelp Head, 5690, attr 0). The class extends ReceivedMoveDamageMultiplierAbAttr with a fixed closure and a fixed multiplier:
-//   super((_target, _user, move) => move.category !== MoveCategory.STATUS, 0.5)
-// and adds a one-shot: canApply = `super.canApply(params) && !holder.waveData.firstDefendConsumed`. It is now
-// `gate && residual`, in the original order:
+// (Drakelp Head, 5690, attr 0). The class extends ReceivedMoveDamageMultiplierAbAttr with a damaging-move closure and a
+// multiplier. After review round 3 the multiplier is a constructor argument (default 0.5, what Drakelp Head uses) and the
+// one-time shield is no longer a hidden residual. canApply is now only the replaceable gate, in the original order:
 //
-//   gate     1. the move is not a status move (the parent's closure)
-//   residual 2. the first-hit shield is not spent yet (waveData.firstDefendConsumed is false)         (feasibility, a memory)
-//   apply    damage = toDmgValue(damage * 0.5), by the parent; this half never SETS the flag
+//   gate     1. the move is not a status move (the parent's closure)                         -> atom move.damaging
+//            2. the first-hit shield is not spent yet                                        -> atom time.once-per-unused (wave, key
+//               "firstDefendConsumed": it only READS the memory)
+//   apply    damage = toDmgValue(damage * multiplier), by the parent; this half never SETS the memory
 //
-// The flag is set by the other half of the same ability (FirstDefendAttackerAtkDropAbAttr, after the first damaging hit
-// resolves), so the two classes share one memory on `waveData`. It is a plain field, not the `entryEffectsFired` set that the
-// library atom time.once-per reads, so the shield stays in the class as a residual (a request is in requests/B08.md).
-// The constructor takes no argument: the multiplier and the closure are fixed, so there is nothing to expose as a param.
+// The memory is the key "firstDefendConsumed" in waveData.entryEffectsFired, the per-wave Set that every ER once-per-wave rule
+// and the library atoms time.once-per and time.once-per-unused already read (before: a plain field waveData.firstDefendConsumed
+// with the same lifetime; moving it is a pure change of storage). The other half of the same ability
+// (FirstDefendAttackerAtkDropAbAttr) spends it. No random draw.
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 import { FirstDefendDamageReductionAbAttr } from "#data/elite-redux/archetypes/consume-on-first-defend";
 
@@ -25,9 +25,9 @@ export default defineDecl(FirstDefendDamageReductionAbAttr, {
   tier: "B",
   kind: "calc-modifier",
   when: "calc.damage-taken",
-  label: "Halve the first damaging hit I take in a battle",
-  summary: () =>
-    "The first damaging hit I take in a battle does half damage. Later hits are not reduced. It uses the same one-time shield as the Attack drop.",
+  label: "Take less damage from the first damaging hit of a battle",
+  summary: params =>
+    `The first damaging hit I take in a battle does ${params.multiplier} times its damage (0.5 = half). Later hits are not changed. It reads the same one-time shield that the Attack drop spends.`,
   synonyms: [
     "drakelp head",
     "first hit shield",
@@ -37,18 +37,28 @@ export default defineDecl(FirstDefendDamageReductionAbAttr, {
     "half damage once",
   ],
   examples: ["Take half damage from the first attack of the battle only"],
-  params: [],
-  noParamsReason:
-    "The class has no constructor argument: it always halves (x0.5) the first damaging hit, so the amount cannot be set. Staff who want another number or a different trigger combine the library blocks instead (damage taken multiplier plus a once-per-battle condition).",
+  params: [
+    {
+      id: "multiplier",
+      ctorIndex: 0,
+      path: "damageMultiplier",
+      control: "number",
+      min: 0,
+      max: 4,
+      step: 0.05,
+      label: "Damage multiplier (0.5 = half)",
+      editable: true,
+      gateIndependent: true,
+      default: 0.5,
+    },
+  ],
   conditions: [
-    // The gate is the parent's closure: [move.damaging] (bindings.ts).
+    // The gate is [move.damaging, time.once-per-unused wave "firstDefendConsumed"] (bindings.ts).
     { slot: "gate", ctx: "params", removable: true, editable: true },
   ],
   guards: [],
-  feasibility: [
-    "The first-hit shield must not be used up yet (it is used up by the first damaging hit, by the Attack drop half of the same ability)",
-  ],
-  effect: { id: "effect.multiply-damage-taken", params: [] },
+  feasibility: [],
+  effect: { id: "effect.multiply-damage-taken", params: ["multiplier"] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "battle", simulated: "respects" },
   probes: [
@@ -60,5 +70,5 @@ export default defineDecl(FirstDefendDamageReductionAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "Tier B split by hand: canApply = gate (move is not a status move) && residual (shield unspent). One user, Drakelp Head (5690, attr 0), gate bound to move.damaging. SHARED STATE: the one-shot lives in pokemon.waveData.firstDefendConsumed (reset every wave, per Pokemon), written only by FirstDefendAttackerAtkDropAbAttr.apply (when not simulated). The two halves must be used together; this half alone would reduce every hit forever. The multiplier 0.5 is fixed in the class (no constructor argument) and `affectsFixedDamage` stays false, which is the parent's default; both are therefore not exposed. No random draw. `simulated`: canApply reads the flag, never writes it. Possible oddity, NOT VERIFIED and NOT FIXED: both halves are independent dispatches, so a hit after which the Attack drop does not run (for example one that knocks the holder out) may still have been reduced.",
+    "Tier B, review round 3: the multiplier is a constructor argument (default 0.5) and an editable param, the one-time shield is the library memory (key firstDefendConsumed in waveData.entryEffectsFired) read by the atom time.once-per-unused, so nothing hides in a residual any more. One user, Drakelp Head (5690, attr 0), gate [move.damaging, time.once-per-unused]. SHARED MEMORY: this half only reads it; it is spent by FirstDefendAttackerAtkDropAbAttr.apply (when not simulated), so the two halves must be used together (this half alone would reduce every hit forever). `affectsFixedDamage` stays false (the parent's default) and is not exposed. No random draw. The memory moved from the plain field waveData.firstDefendConsumed to the key in entryEffectsFired (same lifetime, reset every wave, per Pokemon, never saved); the AI snapshot (combat-engine-adapter) now sees it as an entry-fired token. ODDITY, read from the code and NOT confirmed in a live battle, NOT FIXED: the halves are independent dispatches (PreDefend, then PostDefend). This half never spends the shield, so the earlier worry that the damage half already used the shield was wrong. If the first damaging hit knocks the holder out, the ability of a fainted holder does not run for the PostDefend dispatch (pokemon.ts canApplyAbilitySource has a `!holder.isFainted()` branch), so the Attack drop is skipped and the shield stays unspent; that only matters if the holder is revived in the same wave. A quick battle check (knock the holder out with its first hit, revive it, hit it again) is still a good merge-captain step.",
 });

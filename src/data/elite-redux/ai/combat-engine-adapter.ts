@@ -370,7 +370,7 @@ function snapshotMechanics(
       mon.battleData,
       ["hitCount", "hasEatenBerry", "anticipationDodgeUsed", "rudeAwakeningTriggered", "cowardProtectUsed"],
     ],
-    ["wave", mon.waveData, ["endured", "firstDefendConsumed"]],
+    ["wave", mon.waveData, ["endured"]],
     [
       "turn",
       mon.turnData,
