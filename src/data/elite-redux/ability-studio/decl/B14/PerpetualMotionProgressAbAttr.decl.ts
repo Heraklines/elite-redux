@@ -33,7 +33,7 @@ export default defineDecl(PerpetualMotionProgressAbAttr, {
   when: "event.after-my-hit",
   label: "Count free follow-up hits that land in a row",
   summary: () =>
-    "After my free follow-up move, I count one more hit in a row if it hurt the target, or reset the count to zero if it did not.",
+    "I count one more hit in a row if the follow-up hurt the target, or reset the count to zero if it did not.",
   synonyms: ["hit streak", "combo counter", "in a row", "consecutive hits", "streak", "perpetual motion"],
   examples: ["Count each free Rollout that lands in a row so the next one hits harder"],
   params: [],

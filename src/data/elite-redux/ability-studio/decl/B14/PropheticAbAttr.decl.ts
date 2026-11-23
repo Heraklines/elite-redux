@@ -55,7 +55,7 @@ export default defineDecl(PropheticAbAttr, {
   when: "event.on-entry",
   label: "Set up a delayed attack on a foe",
   summary: params =>
-    `When I enter, I set a delayed attack on the first foe still standing. It hits ${params.turns} turns later using the stronger of: ${params.moves}.`,
+    `I set a delayed attack on the first foe still standing. It hits ${params.turns} turns later using the stronger of: ${params.moves}.`,
   synonyms: [
     "future sight",
     "doom desire",

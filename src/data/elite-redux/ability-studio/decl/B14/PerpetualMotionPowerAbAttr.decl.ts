@@ -25,7 +25,7 @@ export default defineDecl(PerpetualMotionPowerAbAttr, {
   when: "calc.move-power",
   label: "Raise power for each free follow-up hit in a row",
   summary: params =>
-    `While my free follow-up move is queued, its power is multiplied by 1 plus ${params.step} for each hit in a row. Example: after 3 hits in a row, power x${Number((1 + 3 * Number(params.step)).toFixed(2))}.`,
+    `Multiply the free follow-up move's power by 1 plus ${params.step} for each hit in a row. Example: after 3 hits in a row, power x${Number((1 + 3 * Number(params.step)).toFixed(2))}.`,
   synonyms: ["combo power", "power per hit", "streak bonus", "escalating power", "rollout", "perpetual motion"],
   examples: ["Each free Rollout that lands in a row hits 10% harder"],
   params: [

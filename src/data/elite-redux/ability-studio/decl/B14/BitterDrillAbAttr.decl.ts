@@ -60,11 +60,11 @@ export default defineDecl(BitterDrillAbAttr, {
   tier: "B",
   kind: "event-effect",
   when: "event.after-my-hit",
-  label: "Lay a field effect on a side after my hit",
+  label: "Lay a field effect on a side",
   summary: params =>
-    `After my move hits, I lay ${params.tag} on ${String(params.side).toLowerCase()}${
+    `I lay ${params.tag} on ${String(params.side).toLowerCase()}${
       Number(params.duration) > 0 ? `, lasting ${params.duration} turns` : ", until it is removed"
-    }. Example: Drill Bits on the foes' side after a drill move.`,
+    }. Example: Drill Bits on the foes' side.`,
   synonyms: ["bitter drill", "drill bits", "entry hazard", "set a hazard", "drill hazard", "spikes", "field effect after hit"],
   examples: ["After a drill move hits, leave Drill Bits (a hazard) on the opposing side"],
   params: [
