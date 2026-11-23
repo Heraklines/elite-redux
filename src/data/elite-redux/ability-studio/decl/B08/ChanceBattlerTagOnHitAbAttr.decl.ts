@@ -40,7 +40,7 @@ export default defineDecl(ChanceBattlerTagOnHitAbAttr, {
   tier: "B",
   kind: "event-effect",
   when: "event.after-hit",
-  label: "Chance to confuse, bleed or trap an attacker that hits me",
+  label: "Sometimes put a lasting effect on who hits me",
   summary: params => {
     const how =
       params.contactExcluded === true

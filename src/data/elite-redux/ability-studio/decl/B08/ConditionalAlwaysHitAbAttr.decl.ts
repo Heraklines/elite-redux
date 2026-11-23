@@ -95,7 +95,7 @@ export default defineDecl(ConditionalAlwaysHitAbAttr, {
   tier: "B",
   kind: "calc-modifier",
   when: "calc.always-hit-check",
-  label: "Never miss with the moves I choose",
+  label: "Make my moves never miss",
   summary: params => {
     const rules: string[] = [];
     if (params.flag !== "None") {

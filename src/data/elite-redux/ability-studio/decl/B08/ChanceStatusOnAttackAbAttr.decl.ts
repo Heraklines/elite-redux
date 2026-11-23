@@ -40,7 +40,7 @@ export default defineDecl(ChanceStatusOnAttackAbAttr, {
   tier: "B",
   kind: "event-effect",
   when: "event.after-my-hit",
-  label: "Chance to burn, poison or paralyze the target of my attack",
+  label: "Sometimes inflict a status on the target of my attack",
   summary: params => {
     const which =
       params.filter === NO_FILTER

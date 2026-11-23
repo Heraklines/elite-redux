@@ -67,7 +67,7 @@ export default defineDecl(ChanceBattlerTagOnAttackAbAttr, {
   tier: "B",
   kind: "event-effect",
   when: "event.after-my-hit",
-  label: "Chance to confuse, bleed or flinch the target of my attack",
+  label: "Sometimes put a lasting effect on my target",
   summary: params => {
     const which =
       String(params.moveIds) === ""

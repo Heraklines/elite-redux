@@ -47,10 +47,10 @@ export default defineDecl(ConditionalDamageAbAttr, {
   tier: "B",
   kind: "calc-modifier",
   when: "calc.move-power",
-  label: "Boost my attack power while a situation is true",
+  label: "Raise the power of my moves",
   summary: params => {
     const situation = String(params.situation);
-    return `The power of my moves is multiplied by ${params.multiplier} when this is true: ${situation.charAt(0).toLowerCase()}${situation.slice(1)}. Example: 2 means double power.`;
+    return `The power of my moves is multiplied by ${params.multiplier} when this is the case: ${situation.charAt(0).toLowerCase()}${situation.slice(1)}. Example: 2 means double power.`;
   },
   synonyms: [
     "dreamcatcher",
@@ -87,7 +87,7 @@ export default defineDecl(ConditionalDamageAbAttr, {
       ctorOption: "condition",
       path: "damageCondition",
       control: "select",
-      label: "Situation that turns the boost on",
+      label: "Yes/no fact that turns the boost on (target asleep, bleeding, lowered stat)",
       // The situation IS the gate (each user's binding spells it out with library atoms), so changing it here would not
       // change the compiled rule; staff change the IF block instead.
       editable: false,
@@ -113,7 +113,7 @@ export default defineDecl(ConditionalDamageAbAttr, {
     },
   ],
   l2StaticReason:
-    "The shared L2 harness cannot show the move-power hook evaluated (decomp-l2-reach.json lists calc.move-power as unreached: the engine reads the power attrs inside the damage formula in a way the trace hook does not record). The B08 test (test/tests/elite-redux/decomp/B08/gate-split-chunk2.test.ts) compares the frozen original canApply, the refactored canApply and the rebuilt library gate for every live user over who is asleep, who is switching, the target's lasting effects and stat stages (900 states per user), and checks that apply multiplies the power by the same number in both.",
+    "The shared L2 harness cannot show the move-power hook evaluated (decomp-l2-reach.json lists calc.move-power as unreached: the engine never evaluated a MovePowerBoostAbAttr attr of the holder during the trace). The B08 test (test/tests/elite-redux/decomp/B08/gate-split-chunk2.test.ts) compares the frozen original canApply, the refactored canApply and the rebuilt library gate for every live user over who is asleep, who is switching, the target's lasting effects and stat stages (900 states per user), and checks that apply multiplies the power by the same number in both.",
   status: "decomposed",
   notes:
     "Tier B split by hand: canApply = guards (the target exists) && gate (the parent's closure, which is evaluateCondition). The parent's own closure is still built by the constructor and is the class's original gate (gate() calls super.canApply). Users (6, all bound): Dreamcatcher (5043) and Dreamscape (5560, attr 2) any-active-asleep, library form all[ not(mon.switching-out other), field.anyone-asleep ] (the class returns false when the target is mid-switch, then looks for a SLEEP status on any active Pokemon or the holder's own Comatose); Pretty Princess (5150) target-has-lowered-stat, library form stage.compare on the target, stat ANY, below 0 (the class reads BATTLE_STATS, which is all seven stats with stages including Accuracy and Evasion, the same set as stat ANY); Cosmic Daze (5263) and Cosmic Dust (5640, attr 1) target-has-any-tag CONFUSED or ER_ENRAGE, library form any[ tag.has other CONFUSED, tag.has other ER_ENRAGE ]; Blood Stigma (5378, attr 1) target-has-tag ER_BLEED. The four unused situations (target at most half HP, holder at most half HP, target confused, target statused) are reachable with the library atoms. SUSPECTED ODDITY, NOT FIXED: the HP situations compare the float ratio (getHpRatio) to 0.5, which is not the integer rounding of hp.at-most; nobody uses them, so nothing to bind. The ability-level `condition`/closure name is 'condition' on the parent; this class stores its own data in damageCondition and damageMultiplier. showAbility is false (passed by the class).",
