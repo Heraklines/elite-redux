@@ -1731,11 +1731,13 @@
         "IgnoreProtectByFlagAbAttr",
         "IgnoreProtectOnContactAbAttr",
         "OverruleCritAbAttr",
+        "SedimentBloomMarkerAbAttr",
         "SpreadTargetByFlagAbAttr",
         "StealthRockImmunityAbAttr",
         "SuppressFieldAbilitiesWhenEnragedAbAttr",
         "SuppressFieldEffectsAbAttr",
-        "SwitchWhileRampagingAbAttr"
+        "SwitchWhileRampagingAbAttr",
+        "VaporBodyAccuracyAbAttr"
       ],
       "provides": [
         "holder"
@@ -5022,5 +5024,5 @@
       ]
     }
   ],
-  "hash": "1264fa83dbcdc7"
+  "hash": "10742527cbb1df"
 }

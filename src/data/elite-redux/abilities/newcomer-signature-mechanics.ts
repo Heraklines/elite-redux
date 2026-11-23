@@ -708,11 +708,16 @@ export class GlamRockAbAttr extends PostTurnAbAttr implements GatedAttr<AbAttrBa
   public readonly layersRemoved: number;
   /** Stages gained by Defense and Sp. Def (ability studio param; the default is the original 1). */
   public readonly stages: number;
+  /** The two stats that are raised (ability studio params; the defaults are the original Defense and Sp. Def). */
+  public readonly firstStat: Stat;
+  public readonly secondStat: Stat;
 
-  constructor(layersRemoved = 1, stages = 1) {
+  constructor(layersRemoved = 1, stages = 1, firstStat: Stat = Stat.DEF, secondStat: Stat = Stat.SPDEF) {
     super();
     this.layersRemoved = layersRemoved;
     this.stages = stages;
+    this.firstStat = firstStat;
+    this.secondStat = secondStat;
   }
 
   /** Tier B (ability studio spec 3.1): the one clause of the rule lives in `gate`; there is no residual. */
@@ -745,7 +750,7 @@ export class GlamRockAbAttr extends PostTurnAbAttr implements GatedAttr<AbAttrBa
       "StatStageChangePhase",
       pokemon.getBattlerIndex(),
       true,
-      [Stat.DEF, Stat.SPDEF],
+      [this.firstStat, this.secondStat],
       this.stages,
     );
   }

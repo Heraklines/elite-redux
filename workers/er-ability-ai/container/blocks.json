@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "025437bd47908c",
+  "vocabularyHash": "10742527cbb1df",
+  "hash": "0f0db482b152a8",
   "blocks": [
     {
       "id": "block.anneal",
@@ -632,7 +632,7 @@
         },
         {
           "id": "stages",
-          "label": "Stages gained by Defense and Sp. Def (1-6)",
+          "label": "Stages gained by each of the two stats (1-6)",
           "control": "number",
           "default": 1,
           "editable": true,
@@ -641,13 +641,43 @@
           "step": 1,
           "integer": true,
           "gateIndependent": true
+        },
+        {
+          "id": "firstStat",
+          "label": "First stat that is raised",
+          "control": "select",
+          "default": "Defense",
+          "editable": true,
+          "options": [
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Sp. Def",
+            "Speed"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "secondStat",
+          "label": "Second stat that is raised",
+          "control": "select",
+          "default": "Sp. Def",
+          "editable": true,
+          "options": [
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Sp. Def",
+            "Speed"
+          ],
+          "gateIndependent": true
         }
       ],
       "conditions": [
         {
           "slot": "gate",
-          "removable": true,
-          "editable": true,
+          "removable": false,
+          "editable": false,
           "optional": false
         }
       ],
@@ -660,7 +690,9 @@
         "id": "effect.package",
         "params": [
           "layersRemoved",
-          "stages"
+          "stages",
+          "firstStat",
+          "secondStat"
         ]
       },
       "reusableAlone": {
@@ -668,7 +700,7 @@
         "if": true,
         "do": true
       },
-      "packageReason": "PACKAGE for the EFFECT only; the trigger (end of turn) and the hazard-on-my-side condition are separate and bound to eight library atoms. Why the effect cannot be split with today's blocks: it removes ONE layer from the first hazard of a fixed list (a field edit with layers), tells Sediment Bloom about it, and raises TWO stats in a single queued change; the library has no 'remove hazard layers' effect (requested as R-B13-18, which also asks effect.stat-stage to accept a list of stats). Review of the numbers: the layers (1) and the stages (1) were literals, now trailing constructor arguments with the old values as defaults; the layers semantic 'layers > n ? layers -= n : remove' equals the old 'layers > 1 ? layers-- : remove' for n = 1. Users: Glam Rock (5975, attr 1; attr 0 is ForceSwitchOutImmunityAbAttr, the 'cannot be forced out' half, which is another batch's class). ODDITIES (not fixed): (1) the gate and the effect each list the hazards separately; a staff gate that names only one hazard still lets apply eat the first hazard on the field, which may be another one. (2) The effect does nothing when simulated and has no other clause. (3) The Infestation trap is an ER hazard tag, not a vanilla one.",
+      "packageReason": "PACKAGE for the EFFECT only; the trigger (end of turn) and the hazard-on-my-side condition are separate and bound to eight library atoms. Why the effect cannot be split with today's blocks: it removes ONE layer from the first hazard of a fixed list (a field edit with layers), tells Sediment Bloom about it, and raises TWO stats in a single queued change; the library has no 'remove hazard layers' effect (requested as R-B13-18, which also asks effect.stat-stage to accept a list of stats). Review of the numbers: the layers (1) and the stages (1) were literals, now trailing constructor arguments with the old values as defaults; the layers semantic 'layers > n ? layers -= n : remove' equals the old 'layers > 1 ? layers-- : remove' for n = 1. Users: Glam Rock (5975, attr 1; attr 0 is ForceSwitchOutImmunityAbAttr, the 'cannot be forced out' half, which is another batch's class). ODDITIES (not fixed): (1) the gate and the effect each list the hazards separately; FIXED by making the gate non-editable and non-removable, so it cannot disagree with the effect. (2) The effect does nothing when simulated and has no other clause. (3) The Infestation trap is an ER hazard tag, not a vanilla one.",
       "uses": 1
     },
     {
@@ -739,7 +771,8 @@
       "guards": [],
       "feasibility": [
         "The hit must really deal damage (checked inside the class until the librarian adds that condition)",
-        "It works only once per turn for each Pokemon (a private memory inside the class)"
+        "It works only once per turn for each Pokemon (a private memory inside the class)",
+        "The change always goes to the target I hit, never to me (fixed in the class)"
       ],
       "effect": {
         "id": "effect.stat-stage",
@@ -1537,7 +1570,7 @@
       "params": [
         {
           "id": "drainDivisor",
-          "label": "Share of max HP drained each turn (1 / this number)",
+          "label": "Drain one Nth of each foe's max HP every turn (N)",
           "control": "number",
           "default": 16,
           "editable": true,
@@ -1565,7 +1598,7 @@
         "if": true,
         "do": true
       },
-      "packageReason": "PACKAGE, justified: the mechanic is spread over three places (the marker, notifyHazardRemovedBy that plants a field effect, processSedimentBlooms that drains and heals at turn end) and has no moment of its own; splitting it would re-implement the field effect. Honest limits: (1) the trigger is not a library WHEN, so the declaration uses the always-on placeholder and the label says what really happens (R-B13-19 asks for 'When I remove an entry hazard from my side'); (2) the trigger has NO conditions of its own; (3) LIBRARY GAP, L0 will report it: the class extends AbAttr directly, so no WHEN dispatch key is an ancestor of it (while.active lists its flag classes explicitly); R-B13-19 asks the librarian to add the marker classes there. Edit made outside the class (same file): processSedimentBlooms now reads the planter's marker for the divisor (1/16 when the planter is gone or has no marker, which is the old constant). Users: Sediment Bloom (5976, attr 0). ODDITIES (not fixed): (1) the planter is found by the tag's source id; if the planter leaves the field its marker is no longer 'active' and the drain falls back to 1/16. (2) The heal goes to EVERY Pokemon on the planter's side for the FULL total (not split). (3) drained counts the HP actually lost, so a foe at 1 HP adds 1.",
+      "packageReason": "PACKAGE, justified: the mechanic is spread over three places (the marker, notifyHazardRemovedBy that plants a field effect, processSedimentBlooms that drains and heals at turn end) and has no moment of its own; splitting it would re-implement the field effect. Honest limits: (0) the always-on placeholder is tracked under R-B13-19 (the label says 'when I remove a hazard', the declared WHEN is the placeholder; the marker classes are now listed as while.active flag keys so L0 passes); (1) the trigger is not a library WHEN, so the declaration uses the always-on placeholder and the label says what really happens (R-B13-19 asks for 'When I remove an entry hazard from my side'); (2) the trigger has NO conditions of its own; (3) LIBRARY GAP, L0 will report it: the class extends AbAttr directly, so no WHEN dispatch key is an ancestor of it (while.active lists its flag classes explicitly); R-B13-19 asks the librarian to add the marker classes there. Edit made outside the class (same file): processSedimentBlooms now reads the planter's marker for the divisor (1/16 when the planter is gone or has no marker, which is the old constant). Users: Sediment Bloom (5976, attr 0). ODDITIES (not fixed): (1) the planter is found by the tag's source id; if the planter leaves the field its marker is no longer 'active' and the drain falls back to 1/16. (2) The heal goes to EVERY Pokemon on the planter's side for the FULL total (not split). (3) drained counts the HP actually lost, so a foe at 1 HP adds 1.",
       "uses": 1
     },
     {
