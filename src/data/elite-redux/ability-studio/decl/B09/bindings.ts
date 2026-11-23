@@ -280,3 +280,17 @@ const notEngulfedAndFire = () => ({
 });
 bindCondition(5373, 0, notEngulfedAndFire(), "gate"); // Flammable Coat, using a Fire move
 bindCondition(5373, 1, notEngulfedAndFire(), "gate"); // Flammable Coat, hit by a Fire move
+
+// =============================================================================================
+// B09 chunk 5. Only MovingFirstTrapFlinchAbAttr has a condition slot (the Tier B gate). MoveFlagInjectionAbAttr,
+// ErMultiHeadedAbAttr and OverrideMultiHitCountAbAttr take no closure, so they have nothing to bind. Written by hand after reading
+// archetypes/moving-first-trap-flinch.ts and the live attr of its only user (a throwaway dump of allAttrSites()).
+// =============================================================================================
+
+// ---------------------------------------------------------------------------------------------
+// MovingFirstTrapFlinchAbAttr. Slot gate = clause 4 of the old canApply: `!target.turnData.acted` (I moved first).
+// The parent test (damaging move), the not-negated test and the target test are guards() of the class and run before it.
+// time.acted on `other` evaluates `frame.other.turnData?.acted ?? false`, the same field; for this WHEN `other` is the
+// opponent of my hit, the `opponent` of the engine parameters, which the class reads as `target`.
+// ---------------------------------------------------------------------------------------------
+bindCondition(5405, 0, { not: { id: "time.acted", who: "other" } }, "gate"); // From the Shadows

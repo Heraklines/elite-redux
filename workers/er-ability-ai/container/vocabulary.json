@@ -1734,6 +1734,9 @@
         "IgnoreGenderInfatuationAbAttr",
         "IgnoreProtectByFlagAbAttr",
         "IgnoreProtectOnContactAbAttr",
+        "MoveCategoryOverrideAbAttr",
+        "MoveFlagInjectionAbAttr",
+        "OverrideMultiHitCountAbAttr",
         "OverruleCritAbAttr",
         "SpreadTargetByFlagAbAttr",
         "StealthRockImmunityAbAttr",
@@ -5081,5 +5084,5 @@
       ]
     }
   ],
-  "hash": "0693a0370e051f"
+  "hash": "0e6e87d9bcb7fa"
 }

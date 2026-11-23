@@ -22,6 +22,7 @@
 // =============================================================================
 
 import { PostAttackAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
 
@@ -35,12 +36,30 @@ export class MovingFirstTrapFlinchAbAttr extends PostAttackAbAttr {
     this.trapTurns = trapTurns;
   }
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1): `guards` (the parent's damaging-move test, the hit was not negated, a target
+   * exists), then `gate` (the target has not acted yet this turn), in the order of the clauses of the old `canApply`. No
+   * residual and no random draw (the flinch roll is in `apply`).
+   */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Moved verbatim from the old `canApply`: the parent test, the hit was not negated, and a target exists. */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
     const { opponent: target, hitResult } = params;
-    // "Moving first" is read from the target's per-turn `acted` flag — NOT from
-    // the multi-hit counter. The trap applies on every moving-first hit; the
-    // flinch roll is additionally gated to the FIRST hit (handled in apply).
-    return super.canApply(params) && hitResult < HitResult.NO_EFFECT && !!target && !target.turnData.acted;
+    return super.canApply(params) && hitResult < HitResult.NO_EFFECT && !!target;
+  }
+
+  /**
+   * The replaceable condition. "Moving first" is read from the target's per-turn `acted` flag, NOT from the multi-hit
+   * counter. The trap applies on every moving-first hit; the flinch roll is additionally gated to the FIRST hit (apply).
+   */
+  public gate({ opponent: target }: PostMoveInteractionAbAttrParams): boolean {
+    return !target.turnData.acted;
   }
 
   override apply(params: PostMoveInteractionAbAttrParams): void {
