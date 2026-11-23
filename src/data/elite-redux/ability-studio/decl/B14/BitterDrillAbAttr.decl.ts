@@ -25,9 +25,36 @@
 // The gate binding is LEGACY: clause 4 uses `move.hasFlag`, which differs from the library atom `move.flag`
 // (doesFlagEffectApply also counts flags that abilities inject). An atom `move.has-own-flag` is requested.
 import { BitterDrillAbAttr } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
+import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
-import { ARENA_SIDE_OPTIONS } from "#data/elite-redux/ability-studio/vocabulary/enums";
 import { ArenaTagType } from "#enums/arena-tag-type";
+
+// Staff pick player words; the class wants the engine ids. A codec is the only place the two meet.
+function wordsCodec(table: Readonly<Record<string, unknown>>, what: string): ParamCodec {
+  return {
+    toCtor: value => {
+      if (!Object.hasOwn(table, String(value))) {
+        throw new Error(`"${String(value)}" is not a known ${what}`);
+      }
+      return table[String(value)];
+    },
+    fromInstance: raw => Object.keys(table).find(key => table[key] === raw),
+  };
+}
+
+const FIELD_EFFECT_WORDS = {
+  "Drill Bits": ArenaTagType.ER_DRILL_BITS,
+  Spikes: ArenaTagType.SPIKES,
+  "Toxic Spikes": ArenaTagType.TOXIC_SPIKES,
+  "Stealth Rock": ArenaTagType.STEALTH_ROCK,
+  "Sticky Web": ArenaTagType.STICKY_WEB,
+} as const;
+
+const SIDE_WORDS = {
+  "The foes' side": "opposing-side",
+  "My side": "holder-side",
+  "Both sides": "both",
+} as const;
 
 export default defineDecl(BitterDrillAbAttr, {
   tier: "B",
@@ -35,7 +62,9 @@ export default defineDecl(BitterDrillAbAttr, {
   when: "event.after-my-hit",
   label: "Lay Drill Bits on the foes' side after my drill move",
   summary: params =>
-    `After a drill move of mine hits, I lay ${params.tag} (side: ${params.side}, lasts ${params.duration} turns, 0 = until removed). Example: Drill Bits on the foes' side.`,
+    `After a drill move of mine hits, I lay ${params.tag} on ${String(params.side).toLowerCase()}${
+      Number(params.duration) > 0 ? `, lasting ${params.duration} turns` : ", until it is removed"
+    }. Example: Drill Bits on the foes' side.`,
   synonyms: ["bitter drill", "entry hazard", "set a hazard", "drill hazard", "spikes", "field effect after hit"],
   examples: ["After a drill move hits, leave a hazard on the opposing side"],
   params: [
@@ -46,8 +75,9 @@ export default defineDecl(BitterDrillAbAttr, {
       control: "select",
       label: "Field effect to lay",
       editable: true,
-      default: "ER_DRILL_BITS",
-      options: Object.values(ArenaTagType),
+      default: "Drill Bits",
+      options: Object.keys(FIELD_EFFECT_WORDS),
+      codec: wordsCodec(FIELD_EFFECT_WORDS, "field effect"),
       gateIndependent: true,
     },
     {
@@ -57,8 +87,9 @@ export default defineDecl(BitterDrillAbAttr, {
       control: "select",
       label: "Which side gets it",
       editable: true,
-      default: "opposing-side",
-      options: ARENA_SIDE_OPTIONS,
+      default: "The foes' side",
+      options: Object.keys(SIDE_WORDS),
+      codec: wordsCodec(SIDE_WORDS, "side"),
       gateIndependent: true,
     },
     {
