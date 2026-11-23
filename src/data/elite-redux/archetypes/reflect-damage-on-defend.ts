@@ -24,6 +24,7 @@ import { globalScene } from "#app/global-scene";
 import type { AbilityId } from "#enums/ability-id";
 import { HitResult } from "#enums/hit-result";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import type { PokemonDefendCondition } from "#types/ability-types";
 
 export interface ReflectDamageOnDefendOptions {
   /**
@@ -35,15 +36,26 @@ export interface ReflectDamageOnDefendOptions {
 }
 
 export class ReflectDamageOnDefendAbAttr extends PostDefendAbAttr {
-  private readonly cancelIfAttackerHasAbility: AbilityId | undefined;
+  /** Whether the reflect may happen against this attacker; read by the ability studio. */
+  public readonly condition: PokemonDefendCondition;
 
-  constructor(options: ReflectDamageOnDefendOptions = {}) {
+  /**
+   * @param options - the exception ability of the default condition
+   * @param condition - When the reflect may happen, called with the holder, the attacker and the move. The default is
+   *   "the attacker does not have `options.cancelIfAttackerHasAbility`" (always true without one), so
+   *   `new ReflectDamageOnDefendAbAttr({ ... })` behaves exactly as before; the ability studio hands in a replacement.
+   */
+  constructor(options: ReflectDamageOnDefendOptions = {}, condition?: PokemonDefendCondition) {
     super();
-    this.cancelIfAttackerHasAbility = options.cancelIfAttackerHasAbility;
+    const cancelIfAttackerHasAbility = options.cancelIfAttackerHasAbility;
+    this.condition =
+      condition
+      ?? ((_target, attacker) =>
+        !(cancelIfAttackerHasAbility != null && attacker?.hasAbility(cancelIfAttackerHasAbility)));
   }
 
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { simulated, damage, opponent: attacker, pokemon } = params;
+    const { simulated, damage, opponent: attacker, pokemon, move } = params;
     // Soul Linker (this attr is Soul-Linker-only) is suppressed inside the Fun and
     // Games (Wobbuffet) minigame so the player can tap the Wobbuffet down freely.
     if (globalScene.currentBattle?.mysteryEncounter?.encounterType === MysteryEncounterType.FUN_AND_GAMES) {
@@ -55,7 +67,7 @@ export class ReflectDamageOnDefendAbAttr extends PostDefendAbAttr {
       return false;
     }
     // Dex: does not activate against ANOTHER Soul Linker.
-    if (this.cancelIfAttackerHasAbility != null && attacker?.hasAbility(this.cancelIfAttackerHasAbility)) {
+    if (!this.condition(pokemon, attacker, move)) {
       return false;
     }
     // Only on a direct damaging hit from a distinct attacker.

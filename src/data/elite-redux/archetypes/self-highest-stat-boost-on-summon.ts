@@ -21,11 +21,11 @@
 // =============================================================================
 
 import { PostSummonAbAttr } from "#abilities/ab-attrs";
-import type { AbAttrBaseParams } from "#types/ability-types";
 import { globalScene } from "#app/global-scene";
 import type { EffectiveStat } from "#enums/stat";
-import type { WeatherType } from "#enums/weather-type";
 import type { TerrainType } from "#enums/terrain-type";
+import type { WeatherType } from "#enums/weather-type";
+import type { AbAttrBaseParams, AbAttrCondition } from "#types/ability-types";
 
 export interface SelfHighestStatBoostOnSummonOptions {
   /** Candidate stats — whichever has the highest current value gets the boost. */
@@ -41,10 +41,16 @@ export interface SelfHighestStatBoostOnSummonOptions {
 export class SelfHighestStatBoostOnSummonAbAttr extends PostSummonAbAttr {
   private readonly candidates: readonly EffectiveStat[];
   private readonly stages: number;
-  private readonly weathers?: readonly WeatherType[];
-  private readonly terrains?: readonly TerrainType[];
+  /** Whether the boost may happen; read by the ability studio. */
+  public readonly condition: AbAttrCondition;
 
-  constructor(opts: SelfHighestStatBoostOnSummonOptions) {
+  /**
+   * @param opts - the stats, the stages and the weather / terrain lists of the default condition
+   * @param condition - When the boost may happen, called with the holder. The default is "the active weather is one of
+   *   `opts.weathers` and the active terrain is one of `opts.terrains`" (a list that is left out is not tested), so
+   *   `new SelfHighestStatBoostOnSummonAbAttr({ ... })` behaves exactly as before; the ability studio hands in a replacement.
+   */
+  constructor(opts: SelfHighestStatBoostOnSummonOptions, condition?: AbAttrCondition) {
     super(true);
     if (opts.candidates.length === 0) {
       throw new Error("[SelfHighestStatBoostOnSummonAbAttr] candidates must be non-empty");
@@ -54,29 +60,35 @@ export class SelfHighestStatBoostOnSummonAbAttr extends PostSummonAbAttr {
     }
     this.candidates = opts.candidates;
     this.stages = opts.stages;
-    this.weathers = opts.weathers;
-    this.terrains = opts.terrains;
+    const { weathers, terrains } = opts;
+    this.condition =
+      condition
+      ?? (() => {
+        if (weathers !== undefined) {
+          const active = globalScene.arena.weather?.weatherType;
+          if (active === undefined || !weathers.includes(active)) {
+            return false;
+          }
+        }
+        if (terrains !== undefined) {
+          const active = globalScene.arena.terrain?.terrainType;
+          if (active === undefined || !terrains.includes(active)) {
+            return false;
+          }
+        }
+        return true;
+      });
   }
 
-  override canApply(_params: AbAttrBaseParams): boolean {
-    if (this.weathers !== undefined) {
-      const active = globalScene.arena.weather?.weatherType;
-      if (active === undefined || !this.weathers.includes(active)) {
-        return false;
-      }
-    }
-    if (this.terrains !== undefined) {
-      const active = globalScene.arena.terrain?.terrainType;
-      if (active === undefined || !this.terrains.includes(active)) {
-        return false;
-      }
-    }
-    return true;
+  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+    return this.condition(pokemon);
   }
 
   override apply(params: AbAttrBaseParams): void {
     const { pokemon, simulated } = params;
-    if (simulated) return;
+    if (simulated) {
+      return;
+    }
     let bestStat: EffectiveStat = this.candidates[0];
     let bestValue = -1;
     for (const stat of this.candidates) {

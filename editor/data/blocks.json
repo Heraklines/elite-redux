@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "158341fdccc6c3",
+  "hash": "064860fcb25c91",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -633,8 +633,8 @@
       "id": "block.reflect-damage-on-defend",
       "className": "ReflectDamageOnDefendAbAttr",
       "label": "Hit the attacker back with the damage I took",
-      "summary": "When a move damages me, the attacker takes the same amount of damage back. Example: I lose 40 HP, the attacker loses 40 HP too. Not when either of us has fainted.",
-      "tier": "C",
+      "summary": "When a move damages me, the attacker takes the same amount of damage back, unless the condition says otherwise. Example: I lose 40 HP, the attacker loses 40 HP too. Not when either of us has fainted.",
+      "tier": "A",
       "kind": "event-effect",
       "status": "decomposed",
       "when": "event.after-hit",
@@ -651,33 +651,27 @@
         "Whoever hits me takes the same damage back",
         "Share every hit I take with the Pokemon that attacked me"
       ],
-      "params": [
+      "params": [],
+      "conditions": [
         {
-          "id": "exceptAbility",
-          "label": "Do nothing against attackers with this ability (ability number, 0 = no exception)",
-          "control": "number",
-          "default": 0,
+          "slot": "ctor:1",
+          "lib": "mon.has-ability",
+          "removable": true,
           "editable": true,
-          "min": 0,
-          "max": 29999,
-          "step": 1,
-          "integer": true
+          "optional": false
         }
       ],
-      "conditions": [],
-      "guards": [],
+      "guards": [
+        "not-fainted"
+      ],
       "feasibility": [
         "Never works during the Fun and Games (Wobbuffet) minigame",
-        "Does nothing once I have fainted",
-        "Does nothing when the attacker has the ability you chose above (Soul Linker does not link with another Soul Linker)",
         "Needs a real attacker that is not me and has not fainted, and the hit must have done damage; it never happens in a preview",
         "The attacker takes the damage as indirect damage, so it ignores boss health segments"
       ],
       "effect": {
         "id": "effect.package",
-        "params": [
-          "exceptAbility"
-        ]
+        "params": []
       },
       "reusableAlone": {
         "when": true,
@@ -690,8 +684,8 @@
       "id": "block.remove-screens-on-typed-attack",
       "className": "RemoveScreensOnTypedAttackAbAttr",
       "label": "Break the target's screens when my move is of one type",
-      "summary": "After my damaging Fighting move hits, the target's side loses Reflect, Light Screen and Aurora Veil. Example: a Fighting move smashes the screens.",
-      "tier": "C",
+      "summary": "After my damaging Fighting-type move hits, the target's side loses Reflect, Light Screen and Aurora Veil. Example: a Fighting move smashes the screens.",
+      "tier": "B",
       "kind": "event-effect",
       "status": "decomposed",
       "when": "event.after-my-hit",
@@ -738,12 +732,27 @@
           ]
         }
       ],
-      "conditions": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.type",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
       "guards": [],
       "feasibility": [
         "The move must be a damaging move (status moves never break screens)",
         "Needs a target; the screens are removed from the TARGET's side, not from mine",
         "The type is the one my move really has when it is used (after any type change), and it never happens in a preview"
+      ],
+      "gateParams": [
+        {
+          "param": "type",
+          "block": "move.type",
+          "field": "type"
+        }
       ],
       "effect": {
         "id": "effect.package",
@@ -763,7 +772,7 @@
       "className": "RepeatMovePowerBoostAbAttr",
       "label": "Raise move power each time I repeat the same move",
       "summary": "Each time in a row I use the same move successfully, its power goes up by 0.1 of its normal power (0.1 = 10%), up to the limit you set. Example: 3 repeats at 0.1 = power x1.3.",
-      "tier": "C",
+      "tier": "A",
       "kind": "calc-modifier",
       "status": "decomposed",
       "when": "calc.move-power",
@@ -803,10 +812,10 @@
         },
         {
           "id": "flag",
-          "label": "Only moves with this trait (Any move = all moves)",
+          "label": "Move trait this was built for (Any move = all moves); change the move filter in the condition",
           "control": "select",
           "default": "ANY",
-          "editable": true,
+          "editable": false,
           "options": [
             "ANY",
             "MAKES_CONTACT",
@@ -835,14 +844,20 @@
           ]
         }
       ],
-      "conditions": [],
+      "conditions": [
+        {
+          "slot": "ctor:1",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
       "guards": [],
       "feasibility": [
-        "Only counts uses of the same move that succeeded, one right after the other; any other move or a failed use starts the count again",
-        "If a trait is chosen, a move without that trait gets no bonus"
+        "Only counts uses of the same move that succeeded, one right after the other; any other move or a failed use starts the count again"
       ],
       "effect": {
-        "id": "effect.multiply-power",
+        "id": "effect.package",
         "params": [
           "bonus",
           "cap"
@@ -858,9 +873,9 @@
     {
       "id": "block.sand-secondary-effect-immunity",
       "className": "SandSecondaryEffectImmunityAbAttr",
-      "label": "Stop extra effects of moves on my side in a sandstorm",
-      "summary": "While a sandstorm is active, moves that hit me or my allies lose their chance of an extra effect (the way a Shield Dust Pokemon is safe). Example: Flamethrower can no longer burn.",
-      "tier": "C",
+      "label": "Block the extra effects of moves on my whole side",
+      "summary": "While the condition holds (a sandstorm for the shipped abilities), moves that hit me or my allies lose their chance of an extra effect. Example: Flamethrower can no longer burn.",
+      "tier": "B",
       "kind": "calc-modifier",
       "status": "decomposed",
       "when": "calc.incoming-effect-chance",
@@ -877,10 +892,16 @@
         "My whole side ignores the extra effects of moves while the sandstorm rages"
       ],
       "params": [],
-      "conditions": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
       "guards": [],
       "feasibility": [
-        "Only while the weather is a sandstorm and nothing is suppressing the weather",
         "Only changes moves that had a chance of an extra effect",
         "Works for me and for my allies, not for the foes"
       ],
@@ -898,9 +919,9 @@
     {
       "id": "block.sand-status-immunity",
       "className": "SandStatusImmunityAbAttr",
-      "label": "Block every status condition on my side during a sandstorm",
-      "summary": "While a sandstorm is active, neither I nor my allies can get any status condition (burn, poison, sleep and so on). A suppressed weather does not count. Example: a foe's Will-O-Wisp fails in sand.",
-      "tier": "C",
+      "label": "Block status conditions on my whole side",
+      "summary": "While the condition holds (a sandstorm for the shipped abilities), neither I nor my allies can get the all status. Example: a foe's Will-O-Wisp fails in sand.",
+      "tier": "A",
       "kind": "calc-modifier",
       "status": "decomposed",
       "when": "cancel.status-immunity-field",
@@ -911,16 +932,40 @@
         "dune veil",
         "status immunity in sand",
         "safe in a sandstorm",
-        "team status guard"
+        "team status guard",
+        "flower veil"
       ],
       "examples": [
         "My whole side is immune to status conditions while the sandstorm rages"
       ],
-      "params": [],
-      "conditions": [],
+      "params": [
+        {
+          "id": "blockedStatus",
+          "label": "Which status condition to block (All = every one except fainting)",
+          "control": "select",
+          "default": "ALL",
+          "editable": true,
+          "options": [
+            "ALL",
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
       "guards": [],
       "feasibility": [
-        "Only while the weather is a sandstorm and nothing is suppressing the weather",
         "Fainting is never blocked",
         "Works for me and for my allies, not for the foes"
       ],
@@ -938,9 +983,9 @@
     {
       "id": "block.se-priority-bonus",
       "className": "SePriorityBonusAbAttr",
-      "label": "Move first with super effective moves",
-      "summary": "My super effective moves get 1 extra priority, so they usually go before slower or ordinary moves. Example: +1 = like a Quick Attack.",
-      "tier": "C",
+      "label": "Give my moves extra priority (go first)",
+      "summary": "My moves that pass the condition get 1 extra priority, so they usually go before slower or ordinary moves (the shipped one: super effective moves). Example: +1 = like a Quick Attack.",
+      "tier": "A",
       "kind": "calc-modifier",
       "status": "decomposed",
       "when": "calc.priority",
@@ -969,11 +1014,18 @@
           "integer": true
         }
       ],
-      "conditions": [],
+      "conditions": [
+        {
+          "slot": "ctor:1",
+          "lib": "move.effectiveness",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
       "guards": [],
       "feasibility": [
-        "Only when the move is super effective (2x or more) against the first Pokemon on the other side",
-        "With no foe to judge, or when the game cannot work out the matchup, there is no bonus"
+        "The test is made against the first Pokemon on the other side (the game does not know the real target yet); with no foe, or when the game cannot work out the matchup, there is no bonus"
       ],
       "effect": {
         "id": "effect.change-priority",
@@ -986,6 +1038,12 @@
         "if": true,
         "do": true
       },
+      "provides": [
+        "holder",
+        "move",
+        "moveUser",
+        "other"
+      ],
       "uses": 1
     },
     {
@@ -993,7 +1051,7 @@
       "className": "SelfDamageOnAttackAbAttr",
       "label": "Hurt myself after my attack",
       "summary": "After my damaging move hits, I lose 0.25 of the damage I just dealt (0.25 = a quarter). Example: 100 damage at 0.25 = 25 HP lost.",
-      "tier": "C",
+      "tier": "A",
       "kind": "event-effect",
       "status": "decomposed",
       "when": "event.after-my-hit",
@@ -1034,33 +1092,28 @@
         },
         {
           "id": "soulLink",
-          "label": "Use the soul-link safety rules",
+          "label": "Stay off during the Fun and Games (Wobbuffet) minigame",
           "control": "boolean",
           "default": false,
           "editable": true
-        },
-        {
-          "id": "exceptAbility",
-          "label": "Soul-link only: do nothing against targets with this ability (ability number, 0 = none)",
-          "control": "number",
-          "default": 0,
-          "editable": true,
-          "min": 0,
-          "max": 29999,
-          "step": 1,
-          "integer": true
         }
       ],
-      "conditions": [],
+      "conditions": [
+        {
+          "slot": "ctor:1",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
       "guards": [],
       "feasibility": [
         "The move must be a damaging move that really did damage on this hit, and it never happens in a preview",
         "When the loss is a share of my max HP, only the last hit of a multi-hit move costs HP",
-        "I always lose at least 1 HP, and the loss is indirect damage that ignores boss health segments",
-        "With the soul-link rules on: never in the Fun and Games (Wobbuffet) minigame, never when this hit knocked the target out, and never against a target with the chosen ability"
+        "I always lose at least 1 HP, and the loss is indirect damage that ignores boss health segments"
       ],
       "effect": {
-        "id": "effect.recoil",
+        "id": "effect.package",
         "params": [
           "basis",
           "fraction"
@@ -1077,8 +1130,8 @@
       "id": "block.self-highest-stat-boost-on-summon",
       "className": "SelfHighestStatBoostOnSummonAbAttr",
       "label": "Raise my best stat when I enter",
-      "summary": "When I enter the battle, my highest stat among the ones you list changes by 1 stage(s). Weather and terrain lists can limit it. Example: +1 to the best stat in sun.",
-      "tier": "C",
+      "summary": "When I enter, the highest of Attack, Defense, Sp. Atk, Sp. Def, Speed changes by 1 stage(s), if the condition holds (a weather for the shipped ones). Example: +1 to the best stat in sun.",
+      "tier": "A",
       "kind": "event-effect",
       "status": "decomposed",
       "when": "event.on-entry",
@@ -1098,10 +1151,43 @@
       "params": [
         {
           "id": "candidates",
-          "label": "Stats to compare (for example Attack, Sp. Atk)",
-          "control": "text",
+          "label": "Which stats to compare (the highest of them is raised)",
+          "control": "select",
           "default": "Attack, Defense, Sp. Atk, Sp. Def, Speed",
-          "editable": true
+          "editable": true,
+          "options": [
+            "Attack, Defense, Sp. Atk, Sp. Def, Speed",
+            "Attack, Defense, Sp. Atk, Sp. Def",
+            "Attack, Defense, Sp. Atk, Speed",
+            "Attack, Defense, Sp. Def, Speed",
+            "Attack, Sp. Atk, Sp. Def, Speed",
+            "Defense, Sp. Atk, Sp. Def, Speed",
+            "Attack, Defense, Sp. Atk",
+            "Attack, Defense, Sp. Def",
+            "Attack, Sp. Atk, Sp. Def",
+            "Defense, Sp. Atk, Sp. Def",
+            "Attack, Defense, Speed",
+            "Attack, Sp. Atk, Speed",
+            "Defense, Sp. Atk, Speed",
+            "Attack, Sp. Def, Speed",
+            "Defense, Sp. Def, Speed",
+            "Sp. Atk, Sp. Def, Speed",
+            "Attack, Defense",
+            "Attack, Sp. Atk",
+            "Defense, Sp. Atk",
+            "Attack, Sp. Def",
+            "Defense, Sp. Def",
+            "Sp. Atk, Sp. Def",
+            "Attack, Speed",
+            "Defense, Speed",
+            "Sp. Atk, Speed",
+            "Sp. Def, Speed",
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Sp. Def",
+            "Speed"
+          ]
         },
         {
           "id": "stages",
@@ -1113,31 +1199,24 @@
           "max": 6,
           "step": 1,
           "integer": true
-        },
-        {
-          "id": "weathers",
-          "label": "Only in these weathers (leave empty for any weather)",
-          "control": "text",
-          "default": "",
-          "editable": true
-        },
-        {
-          "id": "terrains",
-          "label": "Only on these terrains (leave empty for any terrain)",
-          "control": "text",
-          "default": "",
-          "editable": true
         }
       ],
-      "conditions": [],
+      "conditions": [
+        {
+          "slot": "ctor:1",
+          "lib": "field.weather",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
       "guards": [],
       "feasibility": [
         "The highest stat is picked by the real stat value right now, and a tie goes to the stat listed first",
-        "If you list weathers or terrains, one of them must be active when I enter (a suppressed weather still counts as active)",
         "Never in a preview"
       ],
       "effect": {
-        "id": "effect.stat-stage",
+        "id": "effect.package",
         "params": [
           "candidates",
           "stages"

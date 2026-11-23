@@ -31,7 +31,10 @@ import {
   UserFieldIgnoreMoveEffectsAbAttr,
 } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
+import type { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
+import type { Pokemon } from "#field/pokemon";
 
 /** True while a non-suppressed sandstorm is active. */
 const sandActive = (): boolean => {
@@ -40,14 +43,35 @@ const sandActive = (): boolean => {
 };
 
 export class SandStatusImmunityAbAttr extends ConditionalUserFieldStatusEffectImmunityAbAttr {
-  constructor() {
-    // No effect list → immune to ALL status effects while the condition holds.
-    super(() => sandActive());
+  /**
+   * @param condition - When the immunity holds. The default is the sandstorm test, so `new SandStatusImmunityAbAttr()`
+   *   (what the archetype dispatcher calls) behaves exactly as before; the ability studio hands in a replacement.
+   * @param immuneEffects - The statuses to block. No effect list → immune to ALL status effects while the condition holds.
+   */
+  constructor(
+    condition: (target: Pokemon, source: Pokemon | null) => boolean = () => sandActive(),
+    ...immuneEffects: StatusEffect[]
+  ) {
+    super(condition, ...immuneEffects);
   }
 }
 
 export class SandSecondaryEffectImmunityAbAttr extends UserFieldIgnoreMoveEffectsAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: ModifyMoveEffectChanceAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the original clause order: the sandstorm gate, then the residual. */
   override canApply(params: ModifyMoveEffectChanceAbAttrParams): boolean {
-    return sandActive() && super.canApply(params);
+    return gatedCanApply<ModifyMoveEffectChanceAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: a non-suppressed sandstorm is active. */
+  public gate(_params?: ModifyMoveEffectChanceAbAttrParams): boolean {
+    return sandActive();
+  }
+
+  /** Stays in the class: the move has a chance of an extra effect (the parent's own test). */
+  public residual(params: ModifyMoveEffectChanceAbAttrParams): boolean {
+    return super.canApply(params);
   }
 }

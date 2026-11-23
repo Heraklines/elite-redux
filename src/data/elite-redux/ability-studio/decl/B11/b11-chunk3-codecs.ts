@@ -5,94 +5,18 @@
  */
 
 import { playerName } from "#data/elite-redux/ability-studio/decl-naming";
-// Hand-written codecs for the B11 chunk 3 declarations. Staff see and type player words ("Sun, Rain", "Attack, Speed",
-// "Any move", "My max HP"); the classes want enum numbers, an options object value that may be absent, or a keyword.
-// Every parser throws a plain-language error for text it does not understand, so a typo never builds a half-formed attr.
 import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
+import { Stat } from "#enums/stat";
+// Hand-written codecs for the B11 chunk 3 declarations. Staff see and pick player words ("Attack, Sp. Atk", "Any move",
+// "My max HP", "All"); the classes want enum numbers, an options object value that may be absent, a keyword or a rest list.
+// Every parser throws a plain-language error for text it does not understand, so a typo never builds a half-formed attr.
+// Nothing here is typed free: every choice is a pick from a fixed list.
+import { StatusEffect } from "#enums/status-effect";
 
 type EnumTable = Readonly<Record<string, string | number>>;
 
-/** Member names of an enum (the numeric reverse keys of a TypeScript numeric enum are dropped). */
-function memberNames(table: EnumTable): string[] {
-  return Object.keys(table).filter(key => Number.isNaN(Number(key)));
-}
-
-function normalise(text: string): string {
-  return text
-    .trim()
-    .toLowerCase()
-    .replace(/[\s_]+/g, " ");
-}
-
-/** The member name a typed word stands for ("sp. atk", "Sp. Atk" and "SPATK" all mean SPATK). */
-function nameFromWord(table: EnumTable, word: string, what: string): string {
-  const wanted = normalise(word);
-  for (const name of memberNames(table)) {
-    if (normalise(name) === wanted || normalise(playerName(name)) === wanted) {
-      return name;
-    }
-  }
-  throw new Error(`"${word.trim()}" is not a known ${what}`);
-}
-
 function memberNameOf(table: EnumTable, raw: unknown): string | undefined {
-  return memberNames(table).find(name => table[name] === raw);
-}
-
-/**
- * An ability number where 0 means "no ability": the class takes `undefined` for "no exception" and an AbilityId otherwise.
- * Written as a codec so a staff rule that leaves the number at 0 builds the same attr as a user that passed nothing.
- */
-export const optionalAbilityNumberCodec: ParamCodec = {
-  toCtor: value => (Number(value) === 0 ? undefined : Number(value)),
-  fromInstance: raw => (typeof raw === "number" ? raw : 0),
-};
-
-/**
- * A list of enum members written as player words, "Sun, Extremely harsh sunlight". Empty text means "no list at all"
- * (`undefined`), which is NOT the same as an empty list: a class that tests `list !== undefined` treats an empty list as
- * "never", so the empty text must reach the constructor as a missing value.
- */
-export function optionalWordListCodec(table: EnumTable, what: string): ParamCodec {
-  return {
-    toCtor: value => {
-      const parts = String(value)
-        .split(",")
-        .map(part => part.trim())
-        .filter(part => part.length > 0);
-      if (parts.length === 0) {
-        return;
-      }
-      return parts.map(part => table[nameFromWord(table, part, what)]);
-    },
-    fromInstance: raw => {
-      if (raw === undefined || raw === null) {
-        return "";
-      }
-      if (!Array.isArray(raw)) {
-        return;
-      }
-      const names = raw.map(item => memberNameOf(table, item));
-      return names.every((name): name is string => name !== undefined)
-        ? names.map(name => playerName(name)).join(", ")
-        : undefined;
-    },
-  };
-}
-
-/** A list that must have at least one member (the class refuses an empty one). */
-export function requiredWordListCodec(table: EnumTable, what: string): ParamCodec {
-  const optional = optionalWordListCodec(table, what);
-  return {
-    toCtor: value => {
-      const list = optional.toCtor(value);
-      if (list === undefined) {
-        throw new Error(`Pick at least one ${what}`);
-      }
-      return list;
-    },
-    fromInstance: raw => (Array.isArray(raw) ? optional.fromInstance(raw) : undefined),
-  };
+  return Object.keys(table).find(name => Number.isNaN(Number(name)) && table[name] === raw);
 }
 
 /** One enum member or a keyword for "none": the keyword (for example "ANY") means the constructor gets `undefined`. */
@@ -104,7 +28,7 @@ export function optionalEnumCodec(table: EnumTable, keyword: string): ParamCodec
       }
       const resolved = table[String(value)];
       if (typeof resolved !== "number") {
-        throw new Error(`"${String(value)}" is not a known move flag`);
+        throw new Error(`"${String(value)}" is not a known move property`);
       }
       return resolved;
     },
@@ -141,5 +65,89 @@ export const selfDamageBasisCodec: ParamCodec = {
       return SELF_DAMAGE_BASIS_WORDS[1];
     }
     return;
+  },
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// Which stats to compare (SelfHighestStatBoostOnSummonAbAttr).
+//
+// The class compares the stats in the order it is given and the FIRST listed wins a tie, so every choice keeps the fixed
+// order Attack, Defense, Sp. Atk, Sp. Def, Speed (the order every shipped user already has). A pick list of every
+// non-empty subset replaces typed text, so there is nothing to misspell.
+
+const COMPARABLE_STATS = [
+  { word: playerName("ATK"), stat: Stat.ATK },
+  { word: playerName("DEF"), stat: Stat.DEF },
+  { word: playerName("SPATK"), stat: Stat.SPATK },
+  { word: playerName("SPDEF"), stat: Stat.SPDEF },
+  { word: playerName("SPD"), stat: Stat.SPD },
+] as const;
+
+interface StatChoice {
+  readonly words: string;
+  readonly stats: readonly number[];
+}
+
+const STAT_CHOICES: readonly StatChoice[] = Array.from({ length: 31 }, (_unused, index) => index + 1)
+  .map(mask => COMPARABLE_STATS.filter((_stat, bit) => (mask & (1 << bit)) !== 0))
+  .map(members => ({ words: members.map(member => member.word).join(", "), stats: members.map(member => member.stat) }))
+  // The set of all five first (the common choice), then smaller sets.
+  .sort((a, b) => b.stats.length - a.stats.length);
+
+/** Every choice of "which stats to compare", as the words staff pick. */
+export const STAT_SET_OPTIONS: readonly string[] = STAT_CHOICES.map(choice => choice.words);
+
+export const statSetCodec: ParamCodec = {
+  toCtor: value => {
+    const choice = STAT_CHOICES.find(candidate => candidate.words === value);
+    if (choice === undefined) {
+      throw new Error(`"${String(value)}" is not one of the stat choices`);
+    }
+    return [...choice.stats];
+  },
+  fromInstance: raw => {
+    if (!Array.isArray(raw)) {
+      return;
+    }
+    return STAT_CHOICES.find(
+      choice => choice.stats.length === raw.length && choice.stats.every((stat, index) => stat === raw[index]),
+    )?.words;
+  },
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// Which status condition to block (SandStatusImmunityAbAttr). The class takes the statuses as rest arguments: none at
+// all means every status except fainting, one means just that one.
+
+export const BLOCKED_STATUS_ALL = "ALL";
+export const BLOCKED_STATUS_OPTIONS = [
+  BLOCKED_STATUS_ALL,
+  "POISON",
+  "TOXIC",
+  "PARALYSIS",
+  "SLEEP",
+  "FREEZE",
+  "BURN",
+] as const;
+
+export const blockedStatusCodec: ParamCodec = {
+  toCtor: value => {
+    if (String(value) === BLOCKED_STATUS_ALL) {
+      return [];
+    }
+    const resolved = (StatusEffect as unknown as EnumTable)[String(value)];
+    if (typeof resolved !== "number") {
+      throw new Error(`"${String(value)}" is not a status condition`);
+    }
+    return [resolved];
+  },
+  fromInstance: raw => {
+    if (!Array.isArray(raw)) {
+      return;
+    }
+    if (raw.length === 0) {
+      return BLOCKED_STATUS_ALL;
+    }
+    return raw.length === 1 ? memberNameOf(StatusEffect as unknown as EnumTable, raw[0]) : undefined;
   },
 };

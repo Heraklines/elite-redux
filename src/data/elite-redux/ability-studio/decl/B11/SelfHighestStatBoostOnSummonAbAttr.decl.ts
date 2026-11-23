@@ -4,35 +4,33 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// B11 chunk 3 / event-effect (Tier C).
+// B11 chunk 3 / event-effect (Tier A: the weather and terrain gates are one constructor closure).
 //
 // Read by hand from archetypes/self-highest-stat-boost-on-summon.ts. PostSummon hook (WHEN "when I enter the battle"),
-// constructor `{ candidates, stages, weathers?, terrains? }`, one private field each; `super(true)` (shows the ability banner).
-// The constructor THROWS for an empty candidate list and for `stages === 0`.
-//   canApply, in the ORIGINAL order:
+// constructor `(opts = { candidates, stages, weathers?, terrains? }, condition?)`; `super(true)` (shows the ability banner).
+// The constructor THROWS for an empty candidate list and for `stages === 0`. `condition(holder)` is handed in at constructor
+// argument 1 (slot ctor:1, field `condition`); its DEFAULT is the two list tests below, built from `opts.weathers` and
+// `opts.terrains` (which the class no longer keeps as fields).
+//   canApply = `condition(holder)`, whose default is, in the ORIGINAL order:
 //     1. `weathers` set AND (no weather OR the active weather is not in the list)  -> false   (raw `arena.weather?.weatherType`)
 //     2. `terrains` set AND (no terrain OR the active terrain is not in the list)  -> false   (raw `arena.terrain?.terrainType`)
 //   apply: simulated -> nothing. Else pick the candidate with the highest `pokemon.getStat(stat, false)` (strict `>`, so a tie goes
 //     to the one listed first) and queue ONE StatStageChangePhase on the holder for `stages`. No random draw.
 //
-// Why Tier C and not Tier B: the two gates are real conditions, but the library atom field.weather does not read the weather
-// the way this class does when a weather ends or is suppressed (request R-B11-05 in requests/B11.md), the list of weathers
-// is a list (an OR of atoms) that a gate param cannot scale, and the library has no effect "raise my highest stat among these"
-// (request R-B11-10). The two lists are params, so staff can still tune the weather and terrain gate by hand.
+// The two gates are real conditions and are now one condition block (slot ctor:1) that staff can swap or extend (any weather,
+// any terrain, HP and so on). The effect "raise the highest of these stats" has no library block (request R-B11-10 in
+// requests/B11.md), so it is declared as one piece; the stats to compare are a pick list, not typed text.
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 import { SelfHighestStatBoostOnSummonAbAttr } from "#data/elite-redux/archetypes/self-highest-stat-boost-on-summon";
-import { TerrainType } from "#data/terrain";
-import { Stat } from "#enums/stat";
-import { WeatherType } from "#enums/weather-type";
-import { optionalWordListCodec, requiredWordListCodec } from "./b11-chunk3-codecs";
+import { STAT_SET_OPTIONS, statSetCodec } from "./b11-chunk3-codecs";
 
 export default defineDecl(SelfHighestStatBoostOnSummonAbAttr, {
-  tier: "C",
+  tier: "A",
   kind: "event-effect",
   when: "event.on-entry",
   label: "Raise my best stat when I enter",
   summary: params =>
-    `When I enter the battle, my highest stat among the ones you list changes by ${params.stages} stage(s). Weather and terrain lists can limit it. Example: +1 to the best stat in sun.`,
+    `When I enter, the highest of ${params.candidates} changes by ${params.stages} stage(s), if the condition holds (a weather for the shipped ones). Example: +1 to the best stat in sun.`,
   synonyms: ["highest stat", "best stat boost", "beast boost", "sun worship", "majestic moth", "boost on entry"],
   examples: ["Raise my highest stat by one stage when I enter", "Raise my best attacking stat by 2 when I enter"],
   params: [
@@ -41,11 +39,12 @@ export default defineDecl(SelfHighestStatBoostOnSummonAbAttr, {
       ctorIndex: 0,
       ctorOption: "candidates",
       path: "candidates",
-      control: "text",
-      label: "Stats to compare (for example Attack, Sp. Atk)",
+      control: "select",
+      label: "Which stats to compare (the highest of them is raised)",
       editable: true,
-      default: "Attack, Defense, Sp. Atk, Sp. Def, Speed",
-      codec: requiredWordListCodec(Stat, "stat"),
+      default: STAT_SET_OPTIONS[0],
+      options: STAT_SET_OPTIONS,
+      codec: statSetCodec,
     },
     {
       id: "stages",
@@ -61,37 +60,17 @@ export default defineDecl(SelfHighestStatBoostOnSummonAbAttr, {
       editable: true,
       default: 1,
     },
-    {
-      id: "weathers",
-      ctorIndex: 0,
-      ctorOption: "weathers",
-      path: "weathers",
-      control: "text",
-      label: "Only in these weathers (leave empty for any weather)",
-      editable: true,
-      default: "",
-      codec: optionalWordListCodec(WeatherType, "weather"),
-    },
-    {
-      id: "terrains",
-      ctorIndex: 0,
-      ctorOption: "terrains",
-      path: "terrains",
-      control: "text",
-      label: "Only on these terrains (leave empty for any terrain)",
-      editable: true,
-      default: "",
-      codec: optionalWordListCodec(TerrainType, "terrain"),
-    },
   ],
-  conditions: [],
+  conditions: [
+    // Sun Worship / Sea Guardian / Greater Spirit: the weather is one of two (an OR of field.weather); the others: always.
+    { slot: "ctor:1", ctx: "holder", lib: "field.weather", path: "condition", removable: true, editable: true },
+  ],
   guards: [],
   feasibility: [
     "The highest stat is picked by the real stat value right now, and a tie goes to the stat listed first",
-    "If you list weathers or terrains, one of them must be active when I enter (a suppressed weather still counts as active)",
     "Never in a preview",
   ],
-  effect: { id: "effect.stat-stage", params: ["candidates", "stages"] },
+  effect: { id: "effect.package", params: ["candidates", "stages"] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "none", simulated: "respects" },
   probes: [
@@ -102,5 +81,5 @@ export default defineDecl(SelfHighestStatBoostOnSummonAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "Tier C, justified in the header. Users: Berserk DNA (Attack and Sp. Atk, +2, no gate), Greater Spirit (all five, +1, Fog or Eerie fog), Majestic Moth (all five, +1, no gate), Sea Guardian (Rain or Heavy rain), Sun Worship (Sun or Extremely harsh sunlight), Turf War (all five, +1, no gate). The values are read from the live instances. Nothing to bind. The stat comparison reads live stats, which the L2 twin covers by letting both versions enter a real battle. Remark, NOT fixed: `weathers` is compared with the raw weather type (`arena.weather?.weatherType`); unlike the sandstorm classes it has no suppression test.",
+    "Tier A, justified in the header. Users: Berserk DNA (5258, Attack and Sp. Atk, +2, no gate), Greater Spirit (5329, all five, +1, Fog or Eerie fog), Majestic Moth (5068, all five, +1, no gate), Sea Guardian (5094, Rain or Heavy rain), Sun Worship (5117, Sun or Extremely harsh sunlight), Turf War (5608 attr 1, all five, +1, no gate). The gates are bound to `any` of field.weather (raw weather type: `arena.weatherType` is `weather?.weatherType ?? NONE`, the class reads `weather?.weatherType`, the same for every non-NONE weather) or `{ all: [] }`. No shipped user has a terrain list; a terrain atom (`arena.terrainType`) would differ from the class's raw `arena.terrain?.terrainType` only while Clueless negates field effects. The stat comparison reads live stats, which the L2 twin covers by letting both versions enter a real battle. Remark, NOT fixed: the weather list is compared with the raw weather type; unlike the sandstorm classes it has no suppression test.",
 });

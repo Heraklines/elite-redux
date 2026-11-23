@@ -9,10 +9,14 @@ import { globalScene } from "#app/global-scene";
 // SandSecondaryEffectImmunityAbAttr, SePriorityBonusAbAttr, SelfDamageOnAttackAbAttr, SelfHighestStatBoostOnSummonAbAttr.
 // The shared L1 grid and the L2 twin cannot reach everything these classes read (the move history, the Fun and Games minigame,
 // a multi-hit turn, a weather the world does not set, a hit that KO'd the target), so each rule is driven here on the ORIGINAL
-// attr and on its REBUILD with stand-ins, and both must answer the same. Every class is Tier C with nothing to bind, so what a
-// rebuild can get wrong is the codecs (the settings it reads back and feeds the constructor); the first test pins those.
+// attr and on its REBUILD with stand-ins, and both must answer the same. A rebuild can get three things wrong: the codecs (the
+// settings it reads back and feeds the constructor), the bound condition (a library atom that is not the same predicate as the
+// closure) and the pieces that stay in the class. The first test pins the codecs and the identity; the next ones drive the rest.
+// Where a condition is bound as a legacy closure (no library atom yet), the rebuild gets the SHIPPED closure handed in, which is
+// exactly what a staff rule that keeps the built-in condition does.
 import { allMoves } from "#data/data-lists";
-import { readDeclParams, recomposeAttr } from "#data/elite-redux/ability-studio/build-attr";
+import { getBinding } from "#data/elite-redux/ability-studio/bindings";
+import { type CondInput, readDeclParams, recomposeAttr } from "#data/elite-redux/ability-studio/build-attr";
 import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
 import type { DeclModule } from "#data/elite-redux/ability-studio/define-decl";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -46,14 +50,29 @@ const CLASSES = [
 
 const sitesOf = (className: string): AttrSite[] => allAttrSites().filter(site => site.className === className);
 
+/**
+ * The rebuild of one shipped attr. A condition slot with a legacy-closure binding cannot come from the library, so the shipped
+ * closure itself is handed in (the parent's `condition` field, or the class's own `gate` method for a Tier B gate).
+ */
+function rebuildSite(site: AttrSite, overrides: { params?: Record<string, string | number | boolean> } = {}): any {
+  const module = declRegistry.get(site.className) as DeclModule;
+  const conds: Record<string, CondInput> = {};
+  for (const slot of module.decl.conditions) {
+    if (getBinding(site.abilityId, site.attrIndex, slot.slot)?.legacyClosure !== undefined) {
+      const attr = site.attr as any;
+      conds[slot.slot] = slot.slot === "gate" ? (params: never) => attr.gate(params) : attr[slot.path ?? "condition"];
+    }
+  }
+  return recomposeAttr(module, site.attr, site.abilityId, site.attrIndex, { ...overrides, conds });
+}
+
 /** The shipped attr of one user and its rebuild from the declaration. */
 function pairFor(className: string, abilityName: string): { original: any; rebuilt: any } {
   const site = sitesOf(className).find(candidate => candidate.abilityName === abilityName);
   if (site === undefined) {
     throw new Error(`${abilityName} has no ${className}`);
   }
-  const module = declRegistry.get(className) as DeclModule;
-  return { original: site.attr, rebuilt: recomposeAttr(module, site.attr, site.abilityId, site.attrIndex) };
+  return { original: site.attr, rebuilt: rebuildSite(site) };
 }
 
 function both<T>(className: string, abilityName: string, check: (attr: any, which: string) => T): [T, T] {
@@ -73,10 +92,9 @@ describe("B11 chunk 3: the eight classes", () => {
   it("every user rebuilds to an identical attr and reads back the shipped settings", async () => {
     await startWorld(phaserGame);
     for (const className of CLASSES) {
-      const module = declRegistry.get(className) as DeclModule;
       expect(sitesOf(className).length, className).toBeGreaterThan(0);
       for (const site of sitesOf(className)) {
-        const rebuilt = recomposeAttr(module, site.attr, site.abilityId, site.attrIndex);
+        const rebuilt = rebuildSite(site);
         expect(attrFingerprint(rebuilt as never), `${site.abilityName} ${className}`).toEqual(
           attrFingerprint(site.attr as never),
         );
@@ -89,45 +107,29 @@ describe("B11 chunk 3: the eight classes", () => {
     expect(read("RepeatMovePowerBoostAbAttr", "Rhythmic")).toEqual({ bonus: 0.2, cap: 0, flag: "SOUND_BASED" });
     expect(read("SePriorityBonusAbAttr", "Overzealous")).toEqual({ priority: 1 });
     expect(read("RemoveScreensOnTypedAttackAbAttr", "Warrior's Spear")).toEqual({ type: "FIGHTING" });
-    expect(read("SelfDamageOnAttackAbAttr", "Blood Price")).toMatchObject({
+    expect(read("SelfDamageOnAttackAbAttr", "Blood Price")).toEqual({
       basis: "My max HP",
       fraction: 0.1,
       soulLink: false,
-      exceptAbility: 0,
     });
-    expect(read("SelfDamageOnAttackAbAttr", "Super Strain")).toMatchObject({
+    expect(read("SelfDamageOnAttackAbAttr", "Super Strain")).toEqual({
       basis: "Damage I just dealt",
       fraction: 0.25,
       soulLink: false,
-      exceptAbility: 0,
     });
-    const soulLinker = read("SelfDamageOnAttackAbAttr", "Soul Linker");
-    expect(soulLinker).toMatchObject({ basis: "Damage I just dealt", fraction: 1, soulLink: true });
-    expect(soulLinker.exceptAbility).toBeGreaterThan(0);
-    expect(read("ReflectDamageOnDefendAbAttr", "Soul Linker").exceptAbility).toBe(soulLinker.exceptAbility);
+    expect(read("SelfDamageOnAttackAbAttr", "Soul Linker")).toEqual({
+      basis: "Damage I just dealt",
+      fraction: 1,
+      soulLink: true,
+    });
+    expect(read("ReflectDamageOnDefendAbAttr", "Soul Linker")).toEqual({});
+    expect(read("SandStatusImmunityAbAttr", "Desert Cloak")).toEqual({ blockedStatus: "ALL" });
     const highest = (name: string) => read("SelfHighestStatBoostOnSummonAbAttr", name);
     const all5 = "Attack, Defense, Sp. Atk, Sp. Def, Speed";
-    expect(highest("Sun Worship")).toEqual({
-      candidates: all5,
-      stages: 1,
-      weathers: "Sun, Extremely harsh sunlight",
-      terrains: "",
-    });
-    expect(highest("Sea Guardian")).toEqual({
-      candidates: all5,
-      stages: 1,
-      weathers: "Rain, Heavy rain",
-      terrains: "",
-    });
-    expect(highest("Greater Spirit")).toEqual({
-      candidates: all5,
-      stages: 1,
-      weathers: "Fog, Eerie fog",
-      terrains: "",
-    });
-    expect(highest("Majestic Moth")).toEqual({ candidates: all5, stages: 1, weathers: "", terrains: "" });
-    expect(highest("Turf War")).toEqual({ candidates: all5, stages: 1, weathers: "", terrains: "" });
-    expect(highest("Berserk DNA")).toEqual({ candidates: "Attack, Sp. Atk", stages: 2, weathers: "", terrains: "" });
+    for (const name of ["Sun Worship", "Sea Guardian", "Greater Spirit", "Majestic Moth", "Turf War"]) {
+      expect(highest(name), name).toEqual({ candidates: all5, stages: 1 });
+    }
+    expect(highest("Berserk DNA")).toEqual({ candidates: "Attack, Sp. Atk", stages: 2 });
     expect(
       sitesOf("SandStatusImmunityAbAttr")
         .map(site => site.abilityName)
@@ -152,10 +154,7 @@ describe("B11 chunk 3: the eight classes", () => {
         simulated: false,
         ...extra,
       }) as never;
-    const exception = readDeclParams(
-      declRegistry.get("ReflectDamageOnDefendAbAttr") as DeclModule,
-      pairFor("ReflectDamageOnDefendAbAttr", "Soul Linker").original,
-    ).exceptAbility as number;
+    const exception = sitesOf("ReflectDamageOnDefendAbAttr")[0].abilityId; // Soul Linker's own ability number
     const battle = globalScene.currentBattle;
     const encounter = battle.mysteryEncounter;
     const results = both("ReflectDamageOnDefendAbAttr", "Soul Linker", (attr, which) => {
@@ -212,10 +211,7 @@ describe("B11 chunk 3: the eight classes", () => {
         simulated: false,
         ...extra,
       }) as never;
-    const exception = readDeclParams(
-      declRegistry.get("SelfDamageOnAttackAbAttr") as DeclModule,
-      pairFor("SelfDamageOnAttackAbAttr", "Soul Linker").original,
-    ).exceptAbility as number;
+    const exception = sitesOf("SelfDamageOnAttackAbAttr").find(site => site.abilityName === "Soul Linker")!.abilityId;
     const battle = globalScene.currentBattle;
     const encounter = battle.mysteryEncounter;
     const hitsLeft = holder.turnData.hitsLeft;
@@ -362,10 +358,12 @@ describe("B11 chunk 3: the eight classes", () => {
       expect(rebuilt).toEqual(original);
     }
     // the cap and the no-trait form, driven through the declaration with settings Rhythmic does not use
+    // ... and the sound-move filter is swapped for "any move" (an always-true condition), which is what a staff rule does.
     const module = declRegistry.get("RepeatMovePowerBoostAbAttr") as DeclModule;
     const site = sitesOf("RepeatMovePowerBoostAbAttr")[0];
     const capped = recomposeAttr(module, site.attr, site.abilityId, site.attrIndex, {
       params: { bonus: 0.5, cap: 1.5, flag: "ANY" },
+      conds: { "ctor:1": { all: [] } },
     }) as any;
     history(
       [MoveId.TACKLE, MoveResult.SUCCESS],
@@ -450,6 +448,59 @@ describe("B11 chunk 3: the eight classes", () => {
         });
         expect(chance[1], name).toEqual(chance[0]);
       }
+    } finally {
+      arena.weather = weather;
+    }
+  });
+
+  it("Staff can swap the weather condition of the sand immunities for another one", async () => {
+    const { holder, foe } = await startWorld(phaserGame);
+    const arena = globalScene.arena;
+    const weather = arena.weather;
+    const setWeather = (type: WeatherType) => {
+      arena.weather = { weatherType: type, isEffectSuppressed: () => false } as never;
+    };
+    const site = (className: string) => sitesOf(className).find(candidate => candidate.abilityName === "Desert Cloak")!;
+    const hailOnly = { block: "field.weather", params: { weather: "HAIL" } };
+    const status = recomposeAttr(
+      declRegistry.get("SandStatusImmunityAbAttr") as DeclModule,
+      site("SandStatusImmunityAbAttr").attr,
+      site("SandStatusImmunityAbAttr").abilityId,
+      site("SandStatusImmunityAbAttr").attrIndex,
+      { conds: { "ctor:0": hailOnly }, params: { blockedStatus: "BURN" } },
+    ) as any;
+    const chance = recomposeAttr(
+      declRegistry.get("SandSecondaryEffectImmunityAbAttr") as DeclModule,
+      site("SandSecondaryEffectImmunityAbAttr").attr,
+      site("SandSecondaryEffectImmunityAbAttr").abilityId,
+      site("SandSecondaryEffectImmunityAbAttr").attrIndex,
+      { conds: { gate: hailOnly } },
+    ) as any;
+    const statusParams = (effect: StatusEffect) =>
+      ({
+        pokemon: holder,
+        target: holder,
+        source: foe,
+        effect,
+        cancelled: new BooleanHolder(false),
+        simulated: false,
+      }) as never;
+    const chanceParams = () =>
+      ({
+        pokemon: holder,
+        opponent: foe,
+        move: allMoves[MoveId.FLAMETHROWER],
+        chance: new NumberHolder(30),
+        simulated: false,
+      }) as never;
+    try {
+      setWeather(WeatherType.HAIL);
+      expect(status.canApply(statusParams(StatusEffect.BURN))).toBe(true);
+      expect(status.canApply(statusParams(StatusEffect.POISON))).toBe(false); // only the chosen status is blocked
+      expect(chance.canApply(chanceParams())).toBe(true);
+      setWeather(WeatherType.SANDSTORM);
+      expect(status.canApply(statusParams(StatusEffect.BURN))).toBe(false);
+      expect(chance.canApply(chanceParams())).toBe(false);
     } finally {
       arena.weather = weather;
     }

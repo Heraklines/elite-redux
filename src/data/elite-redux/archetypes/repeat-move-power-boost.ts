@@ -19,6 +19,7 @@
 import { MovePowerBoostAbAttr } from "#abilities/ab-attrs";
 import type { MoveFlags } from "#enums/move-flags";
 import { MoveResult } from "#enums/move-result";
+import type { PokemonAttackCondition } from "#types/ability-types";
 
 export interface RepeatMovePowerBoostOptions {
   /** Per-repeat additive multiplier (e.g. 0.1 = +10% per repeat). */
@@ -34,8 +35,13 @@ export class RepeatMovePowerBoostAbAttr extends MovePowerBoostAbAttr {
   private readonly cap: number;
   private readonly flag: MoveFlags | undefined;
 
-  constructor(options: RepeatMovePowerBoostOptions) {
-    super((_pokemon, _target, move) => options.flag === undefined || move.hasFlag(options.flag), 1);
+  /**
+   * @param options - the per-repeat bonus, the cap and the (default) move trait
+   * @param condition - Which moves get the boost. The default is the `options.flag` test (any move without a flag), so
+   *   `new RepeatMovePowerBoostAbAttr({ bonus })` behaves exactly as before; the ability studio hands in a replacement.
+   */
+  constructor(options: RepeatMovePowerBoostOptions, condition?: PokemonAttackCondition) {
+    super(condition ?? ((_pokemon, _target, move) => options.flag === undefined || move.hasFlag(options.flag)), 1);
     this.bonus = options.bonus;
     this.cap = options.cap ?? Number.POSITIVE_INFINITY;
     this.flag = options.flag;
