@@ -24,21 +24,49 @@
 
 import { TypeImmunityAbAttr, type TypeMultiplierAbAttrParams } from "#abilities/ab-attrs";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import i18next from "i18next";
 
-export class DodgeFirstSuperEffectiveAbAttr extends TypeImmunityAbAttr {
-  constructor() {
+export class DodgeFirstSuperEffectiveAbAttr
+  extends TypeImmunityAbAttr
+  implements GatedAttr<TypeMultiplierAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: TypeMultiplierAbAttrParams) => boolean) | undefined;
+
+  /** The type-chart multiplier from which a hit counts as super effective (the original fixed value is 2). */
+  private readonly minMultiplier: number;
+
+  constructor(minMultiplier = 2) {
     // `null` immune type + custom canApply, mirroring NonSuperEffectiveImmunityAbAttr.
     super(null);
+    this.minMultiplier = minMultiplier;
   }
 
-  override canApply({ move, typeMultiplier, pokemon, opponent: attacker }: TypeMultiplierAbAttrParams): boolean {
-    return (
-      move.is("AttackMove") // Super-effective: the type-chart multiplier is >= 2x.
-      && typeMultiplier.value >= 2 // Foe-sourced damage only (don't burn the charge on self/ally hits).
-      && attacker !== pokemon // Once-per-battle charge still available.
-      && !pokemon.battleData.anticipationDodgeUsed
-    );
+  /**
+   * Tier B split (ability studio spec 3.1). The original was one `&&` chain of pure reads: an attacking move, the
+   * type-chart multiplier is high enough, the damage comes from another Pokemon, the once-per-battle charge is still
+   * there. The order of pure reads cannot change the answer and nothing here draws a random number, so they are sorted
+   * by kind: `guards` (attacking move, comes from another Pokemon), the replaceable `gate` (the charge is still there) and
+   * the `residual` (the multiplier test, which has no library condition yet: it needs the matchup of the frame).
+   */
+  override canApply(params: TypeMultiplierAbAttrParams): boolean {
+    return gatedCanApply<TypeMultiplierAbAttrParams>(this, params);
+  }
+
+  /** Safety rules that stay in the class: an attacking move, from another Pokemon (do not burn the charge on self or ally hits). */
+  public guards({ move, pokemon, opponent: attacker }: TypeMultiplierAbAttrParams): boolean {
+    return move.is("AttackMove") && attacker !== pokemon;
+  }
+
+  /** The replaceable condition: the once-per-battle charge is still available. */
+  public gate({ pokemon }: TypeMultiplierAbAttrParams): boolean {
+    return !pokemon.battleData.anticipationDodgeUsed;
+  }
+
+  /** Feasibility that stays in the class until the library can read the matchup: the hit is super effective. */
+  public residual({ typeMultiplier }: TypeMultiplierAbAttrParams): boolean {
+    return typeMultiplier.value >= this.minMultiplier;
   }
 
   override apply(params: TypeMultiplierAbAttrParams): void {

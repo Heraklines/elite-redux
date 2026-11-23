@@ -701,3 +701,163 @@ bindLegacyClosure(6015, 3, NO_MOVE_REASON, "gate"); // Penta-Punch: Five-Star Fu
 // CurseAttackerOnFormBlockDamageAbAttr (Tier A). Slot ctor:3, the fourth constructor argument: the default `() => true`.
 // =============================================================================================
 bindCondition(5396, 2, { all: [] }, "ctor:3"); // Patchwork: no extra rule
+
+// =============================================================================================
+// B08 chunk 4. Every line below was written by hand after reading the class and the live instance of each user (filter, weather,
+// type, property). "attr N" is the position in `ability.attrs`.
+// =============================================================================================
+
+// ---------------------------------------------------------------------------------------------
+// DamageCapOnResistAbAttr (Tier B, 1 attr). Slot "gate": the move is resisted, holder.getMoveEffectiveness(attacker, move) < 1. The two other
+// clauses stay in the class: the guard (an attacking move) and the residual (the hit would faint the holder).
+// ---------------------------------------------------------------------------------------------
+bindCondition(5701, 0, { id: "move.effectiveness", cmp: "lt", n: 1 }, "gate"); // Survivor Bias
+
+// ---------------------------------------------------------------------------------------------
+// DamageReductionAbAttr (Tier B, 66 attrs). Slot "gate" = the parent's closure = matchesFilter(filter, target, attacker, move). One tree per kind of
+// filter; the holder of the frame is the TARGET and the move user is the attacker. The three kinds that have no library atom are legacy.
+// ---------------------------------------------------------------------------------------------
+const damaging = { id: "move.damaging" };
+
+// kind "all": move.category !== STATUS
+for (const [abilityId, attrIndex] of [
+  [241, 2], // Gulp Missile (also reduces fixed damage)
+  [5130, 0], // Arctic Fur
+  [5136, 0], // Parry
+  [5364, 1], // Ultra Instinct
+  [5408, 0], // Terastal Treasure
+  [5412, 1], // Dream State
+  [5454, 1], // Crust Coat
+  [5460, 3], // Faraday Cage
+  [5645, 1], // Dead Bark (first reduction)
+  [5685, 1], // Mucus Membrane
+  [5705, 0], // Feathercoat (first reduction)
+  [5722, 0], // Aura Armor
+  [5723, 0], // Deflect
+  [5732, 1], // Rock Armor
+  [5967, 1], // Prickly Armor
+] as const) {
+  bindCondition(abilityId, attrIndex, damaging, "gate");
+}
+
+// kind "category" PHYSICAL: move.category === PHYSICAL
+for (const [abilityId, attrIndex] of [
+  [5034, 0], // Lead Coat
+  [5194, 3], // Jungle's Guard (also carries an attr-level grassy terrain condition, copied by recompose)
+  [5539, 0], // Guardian Coat
+] as const) {
+  bindCondition(abilityId, attrIndex, { id: "move.category", category: "PHYSICAL" }, "gate");
+}
+
+// kind "category" SPECIAL: move.category === SPECIAL
+for (const [abilityId, attrIndex] of [
+  [5010, 0], // Prism Scales
+  [5267, 0], // Chrome Coat
+  [5286, 0], // Fire Scales
+  [5574, 0], // Aurora's Gale
+  [5627, 0], // Rainbow Scales
+  [5662, 0], // Angelic Wings
+] as const) {
+  bindCondition(abilityId, attrIndex, { id: "move.category", category: "SPECIAL" }, "gate");
+}
+
+// kind "contact": move.hasFlag(MAKES_CONTACT), the move's OWN flag (Long Reach style abilities do not change it)
+for (const [abilityId, attrIndex] of [
+  [5049, 0], // Liquified
+  [5382, 0], // Fluffiest
+  [5455, 0], // Puffy
+  [6036, 0], // Nucleus
+] as const) {
+  bindCondition(abilityId, attrIndex, { id: "move.inherent-flag", flag: "MAKES_CONTACT" }, "gate");
+}
+
+// kind "full-hp": target.isFullHp() && category !== STATUS, in that order
+bindCondition(5656, 0, { all: [{ id: "hp.full", who: "holder" }, damaging] }, "gate"); // Brain Mass
+
+// kind "category-in-weather": move.category === C && arena.weather?.weatherType === W, in that order
+const inWeather = (category: string, weather: string): unknown => ({
+  all: [
+    { id: "move.category", category },
+    { id: "field.weather", weather },
+  ],
+});
+bindCondition(5213, 0, inWeather("SPECIAL", "SANDSTORM"), "gate"); // Sand Guard: special moves in a sandstorm
+bindCondition(5293, 0, inWeather("PHYSICAL", "SUNNY"), "gate"); // Sun Basking: physical moves in sun
+bindCondition(5506, 1, inWeather("SPECIAL", "SANDSTORM"), "gate"); // Sepia Lens: special moves in a sandstorm
+bindCondition(5660, 0, inWeather("SPECIAL", "RAIN"), "gate"); // Rain Shroud: special moves in rain
+bindCondition(5660, 2, inWeather("SPECIAL", "HEAVY_RAIN"), "gate"); // Rain Shroud: special moves in heavy rain
+bindCondition(5601, 2, inWeather("SPECIAL", "SANDSTORM"), "gate"); // Sand Fiend: special moves in a sandstorm
+
+// kind "move-type": category !== STATUS && attacker.getMoveType(move) === T (the type AFTER ability changes, so effective stays true)
+const ofType = (type: string): unknown => ({ all: [damaging, { id: "move.type", type, effective: true }] });
+bindCondition(5041, 1, ofType("ROCK"), "gate"); // Fossilized
+bindCondition(5582, 1, ofType("ROCK"), "gate"); // Stonecutter
+bindCondition(5075, 1, ofType("GRASS"), "gate"); // Raw Wood
+bindCondition(5733, 1, ofType("GRASS"), "gate"); // Smoldering Wood
+bindCondition(5465, 2, ofType("FIRE"), "gate"); // Deep Freeze
+bindCondition(5590, 0, ofType("FIRE"), "gate"); // Thick Blubber (Fire)
+bindCondition(5590, 1, ofType("ICE"), "gate"); // Thick Blubber (Ice)
+bindCondition(5696, 0, ofType("FIRE"), "gate"); // Elemental Aegis (Fire)
+bindCondition(5696, 1, ofType("ELECTRIC"), "gate"); // Elemental Aegis (Electric)
+bindCondition(5696, 2, ofType("WATER"), "gate"); // Elemental Aegis (Water)
+bindCondition(5523, 1, ofType("GHOST"), "gate"); // Ominous Shroud
+bindCondition(5961, 2, ofType("GHOST"), "gate"); // Ominous Shroud (second id)
+bindCondition(5666, 1, ofType("GHOST"), "gate"); // Foggy Eye
+bindCondition(5697, 0, ofType("DARK"), "gate"); // Aegis Ward (Dark)
+bindCondition(5697, 1, ofType("GHOST"), "gate"); // Aegis Ward (Ghost)
+bindCondition(5697, 2, ofType("PSYCHIC"), "gate"); // Aegis Ward (Psychic)
+bindCondition(6069, 2, ofType("DARK"), "gate"); // Paper Talisman (Dark)
+bindCondition(6069, 3, ofType("GHOST"), "gate"); // Paper Talisman (Ghost)
+bindCondition(6069, 4, ofType("PSYCHIC"), "gate"); // Paper Talisman (Psychic)
+bindCondition(5556, 1, ofType("POISON"), "gate"); // Hyper Cleanse
+bindCondition(5605, 0, ofType("WATER"), "gate"); // Strong Foundation (Water)
+bindCondition(5605, 1, ofType("GROUND"), "gate"); // Strong Foundation (Ground)
+
+// kind "super-effective", "resisted", "crit": no library atom. The chart multiplier of the class is
+// target.getAttackTypeEffectiveness(attacker.getMoveType(move), { source: attacker, move }); the atom move.effectiveness reads
+// getMoveEffectiveness (a cached value, the requested-type rewrite, the status-move rule), which is a different number. The crit kind reads the
+// DEFENDER's own turnData.attacksReceived[0], while hit.critical reads the other Pokemon's record.
+const CHART_REASON =
+  "The class asks target.getAttackTypeEffectiveness(attacker.getMoveType(move), { source, move }); the library atom move.effectiveness reads getMoveEffectiveness, a different number (cache, requested-type rewrite, status moves). Needs the atom `move.type-chart-effectiveness` (request R-B08-37).";
+bindLegacyClosure(5055, 0, CHART_REASON, "gate"); // Permafrost: super effective
+bindLegacyClosure(5056, 0, CHART_REASON, "gate"); // Primal Armor: super effective
+bindLegacyClosure(5291, 0, CHART_REASON, "gate"); // Thick Skin: super effective
+bindLegacyClosure(5415, 0, CHART_REASON, "gate"); // Flame Shield: super effective
+bindLegacyClosure(5645, 2, CHART_REASON, "gate"); // Dead Bark: super effective (second reduction)
+bindLegacyClosure(5664, 2, CHART_REASON, "gate"); // Fire Ruler: super effective
+bindLegacyClosure(6004, 0, CHART_REASON, "gate"); // Cryogenesis: super effective
+bindLegacyClosure(5705, 1, CHART_REASON, "gate"); // Feathercoat: resisted (0 < chart multiplier < 1, a damaging move)
+bindLegacyClosure(
+  5375,
+  0,
+  "The class reads the DEFENDER's own record, target.turnData.attacksReceived[0].critical, plus a damaging move; the library atom hit.critical reads the OTHER Pokemon's record. Needs a `who` setting on hit.critical or the atom `hit.critical-taken` (request R-B08-38).",
+  "gate",
+); // Bad Omen: critical hits
+
+// ---------------------------------------------------------------------------------------------
+// DefenseStatSwapOnFlagAbAttr (Tier B, 5 attrs). Slot "gate": the move has the property, move.hasFlag(flag) (the move's OWN flag).
+// ---------------------------------------------------------------------------------------------
+bindCondition(5011, 1, { id: "move.inherent-flag", flag: "PUNCHING_MOVE" }, "gate"); // Power Fists
+bindCondition(5349, 0, { id: "move.inherent-flag", flag: "HAMMER_BASED" }, "gate"); // Soul Crusher
+bindCondition(5362, 0, { id: "move.inherent-flag", flag: "SLICING_MOVE" }, "gate"); // Power Edge
+bindCondition(5139, 1, { id: "move.inherent-flag", flag: "KICKING_MOVE" }, "gate"); // Roundhouse
+bindCondition(6089, 1, { id: "move.inherent-flag", flag: "KICKING_MOVE" }, "gate"); // Kyokushin
+
+// ---------------------------------------------------------------------------------------------
+// DisableTargetItemOnContactAbAttr (Tier B, 1 attr). Slot "gate", in the original order: the parent's damaging-move test, then the contact test.
+// ---------------------------------------------------------------------------------------------
+bindCondition(300, 1, { all: [{ id: "move.damaging" }, { id: "move.flag", flag: "MAKES_CONTACT" }] }, "gate"); // Supersweet Syrup
+
+// ---------------------------------------------------------------------------------------------
+// DodgeFirstSuperEffectiveAbAttr (Tier B, 2 attrs). Slot "gate": the once-per-battle charge is unspent. The class keeps its charge in
+// battleData.anticipationDodgeUsed; the library memory (key "anticipation-dodge") is a separate store reset at the same moment and written when
+// the rule applies. The matchup test stays in the class (residual, request R-B08-37).
+// ---------------------------------------------------------------------------------------------
+bindCondition(107, 1, { id: "time.once-per", scope: "battle", key: "anticipation-dodge" }, "gate"); // Anticipation
+bindCondition(140, 2, { id: "time.once-per", scope: "battle", key: "anticipation-dodge" }, "gate"); // Telepathy
+
+// ---------------------------------------------------------------------------------------------
+// EffectChanceModifierAbAttr (Tier B, 2 attrs). Slot "gate": the move has the configured property (here punching moves), the move's OWN flag.
+// ---------------------------------------------------------------------------------------------
+bindCondition(5112, 1, { id: "move.inherent-flag", flag: "PUNCHING_MOVE" }, "gate"); // Precise Fist
+bindCondition(5383, 4, { id: "move.inherent-flag", flag: "PUNCHING_MOVE" }, "gate"); // Way of Precision

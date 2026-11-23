@@ -47,6 +47,7 @@
 // =============================================================================
 
 import { type ModifyMoveEffectChanceAbAttrParams, MoveEffectChanceMultiplierAbAttr } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { MoveFlags } from "#enums/move-flags";
 
 /** Construction options for {@linkcode EffectChanceModifierAbAttr}. */
@@ -92,7 +93,13 @@ export interface EffectChanceModifierOptions {
  * negative — broken behavior). Multiplier of `0` is explicitly allowed for
  * the Sheer Force pattern.
  */
-export class EffectChanceModifierAbAttr extends MoveEffectChanceMultiplierAbAttr {
+export class EffectChanceModifierAbAttr
+  extends MoveEffectChanceMultiplierAbAttr
+  implements GatedAttr<ModifyMoveEffectChanceAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: ModifyMoveEffectChanceAbAttrParams) => boolean) | undefined;
+
   private readonly configuredMultiplier: number;
   private readonly flag: MoveFlags | undefined;
 
@@ -117,13 +124,21 @@ export class EffectChanceModifierAbAttr extends MoveEffectChanceMultiplierAbAttr
   }
 
   /**
-   * Gate the multiplier on the optional move flag, then defer to the parent's
-   * positive-chance / except-move checks.
+   * Tier B split (ability studio spec 3.1), in the ORIGINAL order: the optional move-property test is the replaceable `gate`;
+   * the parent's checks (the move has a positive effect chance, and is not Order Up or Electro Shot) are the `residual`.
+   * Every clause is a pure read, no random draw.
    */
   public override canApply(params: ModifyMoveEffectChanceAbAttrParams): boolean {
-    if (this.flag !== undefined && !params.move.hasFlag(this.flag)) {
-      return false;
-    }
+    return gatedCanApply<ModifyMoveEffectChanceAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the move has the configured property (its own flag); always true when no property is set. */
+  public gate(params: ModifyMoveEffectChanceAbAttrParams): boolean {
+    return !(this.flag !== undefined && !params.move.hasFlag(this.flag));
+  }
+
+  /** Feasibility that stays in the class: there is an effect chance above 0 to change, and the move is not Order Up or Electro Shot. */
+  public residual(params: ModifyMoveEffectChanceAbAttrParams): boolean {
     return super.canApply(params);
   }
 

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "00364cc4280fe3",
-  "hash": "10fa70a3f1024b",
+  "hash": "0368bbb5d468d0",
   "blocks": [
     {
       "id": "block.absorbant",
@@ -6422,6 +6422,603 @@
         "do": true
       },
       "uses": 1
+    },
+    {
+      "id": "block.damage-cap-on-resist",
+      "className": "DamageCapOnResistAbAttr",
+      "label": "Survive a resisted hit that would knock me out",
+      "summary": "When an attack I resist would knock me out, I keep 1 HP instead. Example: 1 means I survive with 1 HP. Attacks I do not resist are not changed.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.damage-taken",
+      "whenLabel": "While the game calculates damage I take",
+      "synonyms": [
+        "survivor bias",
+        "sturdy",
+        "endure",
+        "cannot faint from resisted moves",
+        "survive with 1 hp",
+        "not very effective moves cannot knock out"
+      ],
+      "examples": [
+        "Not very effective moves cannot knock me out",
+        "Survive any resisted hit with 1 HP left"
+      ],
+      "params": [
+        {
+          "id": "hpLeft",
+          "label": "HP I keep when the cap applies (1 = survive with 1 HP)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must be an attacking move",
+        "The hit must be strong enough to knock me out (its damage is at least my current HP)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "hpLeft"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.damage-reduction",
+      "className": "DamageReductionAbAttr",
+      "label": "Take less damage from a kind of move",
+      "summary": "Damage from every damaging move is cut by 50%. Example: 0.5 means half damage, 0.35 means 35% less.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.damage-taken",
+      "whenLabel": "While the game calculates damage I take",
+      "synonyms": [
+        "resist",
+        "damage reduction",
+        "take less damage",
+        "half damage",
+        "filter",
+        "solid rock",
+        "thick fat",
+        "fluffy",
+        "tank",
+        "bulky"
+      ],
+      "examples": [
+        "Take 35% less damage from super effective moves like Filter",
+        "Take half damage from special moves",
+        "Take a quarter of the damage from contact moves"
+      ],
+      "params": [
+        {
+          "id": "reduction",
+          "label": "Damage removed (0.5 = half damage, 0.35 = 35% less)",
+          "control": "number",
+          "default": 0.5,
+          "editable": true,
+          "min": 0.01,
+          "max": 0.99,
+          "step": 0.001,
+          "gateIndependent": true
+        },
+        {
+          "id": "affectsFixedDamage",
+          "label": "Also reduces fixed damage (like Seismic Toss)",
+          "control": "boolean",
+          "default": false,
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "situation",
+          "label": "Which moves are reduced (set by the conditions)",
+          "control": "select",
+          "default": "Every damaging move",
+          "editable": false,
+          "options": [
+            "Every damaging move",
+            "Physical moves",
+            "Special moves",
+            "Moves that make contact",
+            "Super effective moves",
+            "Resisted moves",
+            "Any damaging move while I am at full HP",
+            "Critical hits",
+            "Normal-type moves",
+            "Fighting-type moves",
+            "Flying-type moves",
+            "Poison-type moves",
+            "Ground-type moves",
+            "Rock-type moves",
+            "Bug-type moves",
+            "Ghost-type moves",
+            "Steel-type moves",
+            "Fire-type moves",
+            "Water-type moves",
+            "Grass-type moves",
+            "Electric-type moves",
+            "Psychic-type moves",
+            "Ice-type moves",
+            "Dragon-type moves",
+            "Dark-type moves",
+            "Fairy-type moves",
+            "Physical moves while the weather is sun",
+            "Special moves while the weather is sun",
+            "Physical moves while the weather is rain",
+            "Special moves while the weather is rain",
+            "Physical moves while the weather is sandstorm",
+            "Special moves while the weather is sandstorm",
+            "Physical moves while the weather is hail",
+            "Special moves while the weather is hail",
+            "Physical moves while the weather is snow",
+            "Special moves while the weather is snow",
+            "Physical moves while the weather is fog",
+            "Special moves while the weather is fog",
+            "Physical moves while the weather is heavy rain",
+            "Special moves while the weather is heavy rain",
+            "Physical moves while the weather is extremely harsh sunlight",
+            "Special moves while the weather is extremely harsh sunlight",
+            "Physical moves while the weather is strong winds",
+            "Special moves while the weather is strong winds",
+            "Physical moves while the weather is tempest storm",
+            "Special moves while the weather is tempest storm",
+            "Physical moves while the weather is snowy wrath",
+            "Special moves while the weather is snowy wrath",
+            "Physical moves while the weather is eerie fog",
+            "Special moves while the weather is eerie fog"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-damage-taken",
+        "params": [
+          "reduction",
+          "affectsFixedDamage"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 66
+    },
+    {
+      "id": "block.defense-stat-swap-on-flag",
+      "className": "DefenseStatSwapOnFlagAbAttr",
+      "label": "Make my moves hit a different defense stat of the foe",
+      "summary": "Punching moves I use are changed so that physical moves hit Sp. Def instead of Defense. The move's power is scaled by the ratio of the foe's two defenses.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "power fists",
+        "power edge",
+        "roundhouse",
+        "soul crusher",
+        "kyokushin",
+        "hit the weaker defense",
+        "target special defense with physical moves",
+        "psyshock",
+        "defense swap"
+      ],
+      "examples": [
+        "My punching moves hit the foe's Sp. Def instead of Defense like Psyshock",
+        "My kicking moves always hit the foe's weaker defense"
+      ],
+      "params": [
+        {
+          "id": "flag",
+          "label": "Property of the moves that are changed (set by the conditions)",
+          "control": "select",
+          "default": "Punching moves",
+          "editable": false,
+          "options": [
+            "Contact moves",
+            "Sound moves",
+            "Biting moves",
+            "Pulse moves",
+            "Punching moves",
+            "Slicing moves",
+            "Reckless moves",
+            "Ball and bomb moves",
+            "Powder moves",
+            "Dance moves",
+            "Wind moves",
+            "Triage moves",
+            "Air moves",
+            "Arrow moves",
+            "Bone moves",
+            "Drill moves",
+            "Field moves",
+            "Hammer moves",
+            "Horn moves",
+            "Kicking moves",
+            "Lunar moves",
+            "Throwing moves",
+            "Weather moves"
+          ]
+        },
+        {
+          "id": "swap",
+          "label": "Which defense stat the changed moves hit",
+          "control": "select",
+          "default": "Physical moves hit Sp. Def instead of Defense",
+          "editable": true,
+          "options": [
+            "Physical moves hit Sp. Def instead of Defense",
+            "Special moves hit Defense instead of Sp. Def",
+            "Every move hits whichever of Defense and Sp. Def is lower"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "There must be an opponent to compare",
+        "Both of the foe's defense stats must be above 0"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "swap"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 5
+    },
+    {
+      "id": "block.defense-stat-swap-on-statused-foe",
+      "className": "DefenseStatSwapOnStatusedFoeAbAttr",
+      "label": "Hit the foe's weaker defense when it has a status condition",
+      "summary": "When I attack a foe that has a status condition, my damage uses whichever of its Defense and Sp. Def is lower (stat stages count). Example: 80 Defense against 100 Sp. Def, the 80 is used.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.defensive-stat-pick",
+      "whenLabel": "While the game picks the foe's defensive stat",
+      "synonyms": [
+        "exploit weakness",
+        "relentless",
+        "target the weaker defense",
+        "hit statused foes harder",
+        "use the lower defense",
+        "burned foes take more damage"
+      ],
+      "examples": [
+        "Attacks against a poisoned or burned foe use its weaker defense stat"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The game only asks when the foe has a status condition and my ability is not being ignored",
+        "There must be a foe to compare"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.disable-foe-items-on-entry",
+      "className": "DisableFoeItemsOnEntryAbAttr",
+      "label": "Switch off the foes' held items for a few turns",
+      "summary": "When I enter the battle, every foe's held item stops working for a few turns (tag count 3; 3 blocks the items for 2 full turns). Mega stones keep working.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "frisk",
+        "gleam eyes",
+        "embargo",
+        "disable items",
+        "block held items",
+        "foe items stop working",
+        "item lock on entry"
+      ],
+      "examples": [
+        "When I enter, the foe's held items stop working for 2 turns"
+      ],
+      "params": [
+        {
+          "id": "turns",
+          "label": "Turn count of the item block (3 = the items stop working for 2 full turns)",
+          "control": "number",
+          "default": 3,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": [
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.disable-target-item-on-contact",
+      "className": "DisableTargetItemOnContactAbAttr",
+      "label": "Switch off the held item of a foe I touch for a few turns",
+      "summary": "When my attacking move makes contact with a foe, that foe's held item stops working for a few turns (turn count 3; 3 blocks the item for 2 full turns).",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "supersweet syrup",
+        "embargo on contact",
+        "disable the foe's item",
+        "sticky item lock",
+        "block item on touch",
+        "contact item disable"
+      ],
+      "examples": [
+        "When I touch a foe, its held item stops working for 2 turns"
+      ],
+      "params": [
+        {
+          "id": "turns",
+          "label": "Turn count of the item block (3 = the item stops working for 2 full turns)",
+          "control": "number",
+          "default": 3,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must have landed (it did not miss and the target was not immune)",
+        "The target must be another Pokemon, not me"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": [
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.dodge-first-super-effective",
+      "className": "DodgeFirstSuperEffectiveAbAttr",
+      "label": "Dodge the first super effective hit of a battle",
+      "summary": "The first attack that hits me for 2 times damage or more (super effective) does nothing, once per battle. Example: 2 means a normal super effective hit.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-immunity",
+      "whenLabel": "While the game checks whether a move can hit me",
+      "synonyms": [
+        "anticipation",
+        "telepathy",
+        "dodge one super effective hit",
+        "first weakness hit misses",
+        "once per battle dodge",
+        "avoid damage"
+      ],
+      "examples": [
+        "Dodge one super effective hit per battle",
+        "The first hit that would be 2x or more does nothing"
+      ],
+      "params": [
+        {
+          "id": "minMultiplier",
+          "label": "Damage multiplier from which a hit is dodged (2 = super effective)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 16,
+          "step": 0.25,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must be an attacking move",
+        "The hit must come from another Pokemon, not from me",
+        "The hit must be super effective (its type matchup multiplier is at least the number above)"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.effect-chance-modifier",
+      "className": "EffectChanceModifierAbAttr",
+      "label": "Change the chance of my moves' extra effects",
+      "summary": "The chance of the extra effect of my moves is multiplied by 5, at most 100%. Example: 2 doubles it, 0 removes extra effects, 5 makes a 10% chance 50%.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.effect-chance",
+      "whenLabel": "While the game calculates my move's effect chance",
+      "synonyms": [
+        "serene grace",
+        "sheer force",
+        "precise fist",
+        "way of precision",
+        "more flinches",
+        "better secondary effect chance",
+        "effect chance multiplier"
+      ],
+      "examples": [
+        "Punching moves have 5 times the chance of their extra effects",
+        "Double the chance of flinching and status effects"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Chance multiplier (2 = double, 0 = no extra effects, 0.5 = half)",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 0,
+          "max": 10,
+          "step": 0.25,
+          "gateIndependent": true
+        },
+        {
+          "id": "flag",
+          "label": "Only for moves with this property (set by the conditions)",
+          "control": "select",
+          "default": "Punching moves",
+          "editable": false,
+          "options": [
+            "None",
+            "Contact moves",
+            "Sound moves",
+            "Biting moves",
+            "Pulse moves",
+            "Punching moves",
+            "Slicing moves",
+            "Reckless moves",
+            "Ball and bomb moves",
+            "Powder moves",
+            "Dance moves",
+            "Wind moves",
+            "Triage moves",
+            "Air moves",
+            "Arrow moves",
+            "Bone moves",
+            "Drill moves",
+            "Field moves",
+            "Hammer moves",
+            "Horn moves",
+            "Kicking moves",
+            "Lunar moves",
+            "Throwing moves",
+            "Weather moves"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must have an extra effect chance above 0",
+        "Order Up and Electro Shot are never changed"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.first-defend-attacker-atk-drop",

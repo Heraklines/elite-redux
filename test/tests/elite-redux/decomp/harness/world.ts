@@ -403,4 +403,19 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     power: new NumberHolder(ctx.move.power),
     simulated: false,
   }),
+  // B08 chunk 4. The effect-chance hook is dispatched with the user, the move and the chance holder (Move.getMoveChance); the chance is a plain
+  // 30 so the parent's "there is a chance to change" test passes. The defensive-stat pick is dispatched on the ATTACKER (the holder) with the
+  // defender and the holder of the stat the damage formula will read.
+  "calc.effect-chance": ctx => ({
+    pokemon: ctx.holder,
+    move: ctx.move,
+    chance: new NumberHolder(30),
+    simulated: false,
+  }),
+  "calc.defensive-stat-pick": ctx => ({
+    pokemon: ctx.holder,
+    defender: ctx.foe,
+    statHolder: new NumberHolder(Stat.DEF),
+    simulated: false,
+  }),
 };
