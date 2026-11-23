@@ -46,6 +46,7 @@ import {
   ER_VOID_ABILITY_ID,
 } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
 import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-debuff-on-flag-attack";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { AttackStatSubstituteAbAttr } from "#data/elite-redux/archetypes/attack-stat-substitute";
 import {
   ChanceBattlerTagOnAttackAbAttr,
@@ -92,28 +93,118 @@ export class MonkFocusPunchAbAttr extends AbAttr {}
 /** Marker consumed by MoveChargePhase for the first Skull Bash after entry. */
 export class CranisphereSkullBashAbAttr extends AbAttr {}
 
-/** Registration-only marker for Mudball's reactive switch-in strike. */
-export class MudballReactiveAbAttr extends AbAttr {}
+/** What {@linkcode erMudballOnOpponentSummon} asks a holder: the holder and the foe that just entered. */
+export interface MudballEntryParams {
+  /** The Mudball holder. */
+  pokemon: Pokemon;
+  /** The foe that just entered the field. */
+  opponent: Pokemon;
+}
+
+/**
+ * Mudball's reactive switch-in strike. Nothing dispatches it: {@linkcode erMudballOnOpponentSummon} (below, called by
+ * PostSummonPhase for every Pokemon that enters) finds this attr on each living opposing holder and reads the settings here.
+ */
+export class MudballReactiveAbAttr extends AbAttr {
+  /** The move the holder answers with (Mud Bomb for the shipped ability). */
+  public readonly moveId: MoveId;
+  /** The power that move is used with (20 for the shipped ability). */
+  public readonly power: number;
+
+  constructor(moveId: MoveId = MoveId.MUD_BOMB, power = 20) {
+    super();
+    this.moveId = moveId;
+    this.power = power;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: MudballEntryParams) => boolean) | undefined;
+
+  /**
+   * Whether the holder answers the Pokemon that just entered. Tier B split (ability studio spec 3.1): this is only the
+   * `gate` (the entering Pokemon is a Flying type); the two "still standing" checks stay in {@linkcode erMudballOnOpponentSummon}.
+   */
+  public canAnswer(params: MudballEntryParams): boolean {
+    return gatedCanApply<MudballEntryParams>(this, params);
+  }
+
+  /** The replaceable condition: the Pokemon that entered is a Flying type. */
+  public gate({ opponent }: MudballEntryParams): boolean {
+    return opponent.isOfType(PokemonType.FLYING);
+  }
+}
+
+/** Parameters of {@linkcode LowerOffenseMoveCategoryAbAttr.resolveCategory}, the call the damage code makes by name. */
+export interface ResolveCategoryParams {
+  move: Move;
+  user: Pokemon;
+}
 
 /** Category half of Subversion; the offense-stat half uses AttackStatSubstitute. */
 export class LowerOffenseMoveCategoryAbAttr extends AbAttr {
+  /** False: the lower of Attack and Sp. Atk decides (Subversion). True: the higher one decides. */
+  public readonly useHigherStat: boolean;
+
+  constructor(useHigherStat = false) {
+    super();
+    this.useHigherStat = useHigherStat;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: ResolveCategoryParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): `gate`, then the one-piece effect. */
   resolveCategory(move: Move, user: Pokemon): MoveCategory | null {
-    if (move.category === MoveCategory.STATUS) {
+    if (!gatedCanApply<ResolveCategoryParams>(this, { move, user })) {
       return null;
     }
-    return user.getStat(Stat.ATK, false) <= user.getStat(Stat.SPATK, false)
-      ? MoveCategory.PHYSICAL
-      : MoveCategory.SPECIAL;
+    // Original: `user.getStat(ATK) <= user.getStat(SPATK) ? PHYSICAL : SPECIAL` (the lower stat decides).
+    const attack = user.getStat(Stat.ATK, false);
+    const specialAttack = user.getStat(Stat.SPATK, false);
+    const physical = this.useHigherStat ? attack >= specialAttack : attack <= specialAttack;
+    return physical ? MoveCategory.PHYSICAL : MoveCategory.SPECIAL;
   }
+
+  /** The replaceable condition: the move is not a status move (a status move keeps its category). */
+  public gate({ move }: ResolveCategoryParams): boolean {
+    return move.category !== MoveCategory.STATUS;
+  }
+}
+
+/** Parameters of {@linkcode GritAttackStatAbAttr.resolveStat}, the call the damage code makes by name. */
+export interface ResolveStatParams {
+  move: Move;
+  isPhysical: boolean;
+  source: Pokemon;
 }
 
 /** Grit substitutes defenses only while the holder has a non-volatile status. */
 export class GritAttackStatAbAttr extends AbAttr {
-  resolveStat(_move: Move, isPhysical: boolean, source: Pokemon): EffectiveStat | null {
-    if (!source.status || source.status.effect === StatusEffect.NONE || source.status.effect === StatusEffect.FAINT) {
+  /** The stat my physical moves attack with while the condition holds (Defense for the shipped ability). */
+  public readonly physicalStat: EffectiveStat;
+  /** The stat my special moves attack with while the condition holds (Sp. Def for the shipped ability). */
+  public readonly specialStat: EffectiveStat;
+
+  constructor(physicalStat: EffectiveStat = Stat.DEF, specialStat: EffectiveStat = Stat.SPDEF) {
+    super();
+    this.physicalStat = physicalStat;
+    this.specialStat = specialStat;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: ResolveStatParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): `gate`, then the one-piece effect. */
+  resolveStat(move: Move, isPhysical: boolean, source: Pokemon): EffectiveStat | null {
+    if (!gatedCanApply<ResolveStatParams>(this, { move, isPhysical, source })) {
       return null;
     }
-    return isPhysical ? Stat.DEF : Stat.SPDEF;
+    return isPhysical ? this.physicalStat : this.specialStat;
+  }
+
+  /** The replaceable condition: the holder has a non-volatile status (not "none", not the fainted marker). */
+  public gate({ source }: ResolveStatParams): boolean {
+    return !!source.status && source.status.effect !== StatusEffect.NONE && source.status.effect !== StatusEffect.FAINT;
   }
 }
 
@@ -365,21 +456,24 @@ export function wireBernerdRosterAbility(builder: AbBuilder, id: number): void {
 
 /** Fire Mudball's 20-power Mud Bomb when an opposing Flying type enters. */
 export function erMudballOnOpponentSummon(incoming: Pokemon): void {
-  if (!incoming.isOfType(PokemonType.FLYING) || incoming.isFainted()) {
+  if (incoming.isFainted()) {
     return;
   }
   for (const holder of incoming.getOpponents()) {
-    if (
-      holder.isFainted()
-      || !holder.getAllActiveAbilityAttrs().some(attr => attr.constructor.name === "MudballReactiveAbAttr")
-    ) {
+    if (holder.isFainted()) {
+      continue;
+    }
+    const reactive = holder
+      .getAllActiveAbilityAttrs()
+      .find((attr): attr is MudballReactiveAbAttr => attr.constructor.name === "MudballReactiveAbAttr");
+    if (reactive === undefined || !reactive.canAnswer({ pokemon: holder, opponent: incoming })) {
       continue;
     }
     globalScene.phaseManager.unshiftNew(
       "MovePhase",
       holder,
       [incoming.getBattlerIndex()],
-      scriptedPokemonMove(MoveId.MUD_BOMB, 20),
+      scriptedPokemonMove(reactive.moveId, reactive.power),
       MoveUseMode.INDIRECT,
     );
   }

@@ -86,3 +86,24 @@ bindLegacyClosure(
   "The gate is arena.terrain?.terrainType === MISTY (raw, not hidden by Clueless) OR a Rain or Heavy Rain weather that is not suppressed (weather.isEffectSuppressed()). The library atoms field.terrain (reads arena.terrainType, hidden by Clueless) and field.weather (reads arena.weatherType, ignores Cloud Nine style suppression) are not the same predicates; field.terrain-unhidden and field.weather-unsuppressed are requested in requests/B14.md.",
   "gate",
 );
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// Chunk 4. attrIndex read from the live game (a throwaway dump of ability.attrs). Registered classes only: the gates of the parked
+// classes (Subversion, Mudball, Grit) are in pending/bindings.chunk4.pending.ts.
+// ---------------------------------------------------------------------------------------------------------------------------
+
+// Demodulator (6059) and Modulator (6060), attrs 0 and 1 (RaichuTerrainStatMultiplierAbAttr, Attack/Defense and Sp. Atk/Sp. Def).
+// Gate = [the terrain is Electric]. The guard (the stat match) stays in the class. The terrain is repeated from the live `terrain`
+// param through gateParams.
+bindCondition(6059, 0, { id: "field.terrain", terrain: "ELECTRIC" }, "gate");
+bindCondition(6059, 1, { id: "field.terrain", terrain: "ELECTRIC" }, "gate");
+bindCondition(6060, 0, { id: "field.terrain", terrain: "ELECTRIC" }, "gate");
+bindCondition(6060, 1, { id: "field.terrain", terrain: "ELECTRIC" }, "gate");
+
+// Demodulator (6059) and Modulator (6060), attrs 2 and 3 (RaichuAllyStatMultiplierAbAttr, the partner's stats).
+// Gate = [the terrain is Electric]. The guard (the stat match) and the residual (a battle with more than one Pokemon per side)
+// stay in the class.
+bindCondition(6059, 2, { id: "field.terrain", terrain: "ELECTRIC" }, "gate");
+bindCondition(6059, 3, { id: "field.terrain", terrain: "ELECTRIC" }, "gate");
+bindCondition(6060, 2, { id: "field.terrain", terrain: "ELECTRIC" }, "gate");
+bindCondition(6060, 3, { id: "field.terrain", terrain: "ELECTRIC" }, "gate");

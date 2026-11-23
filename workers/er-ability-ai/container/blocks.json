@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "14c964a188eb09",
+  "hash": "132b8e9db70b9b",
   "blocks": [
     {
       "id": "block.astral-project-star-marker",
@@ -497,6 +497,48 @@
         "do": true
       },
       "packageReason": "Tier B + package. Users (1): Celestial Jelly (6078) attr 0 (its only attr). The 0.25 was a literal in apply; it is now constructor argument 0 (a fraction, default 0.25) shown to staff as a percent through a codec. Package, reason: no library effect leaves a Pokemon at X% HP in place of a knockout, and the class pushes its once-per-battle memory (battleData.erAbilityProvenance, key celestial-jelly:spent) and cures status in the same apply, in a fixed order, so splitting it in the declaration would re-implement it; requested as effect.survive-lethal-hit plus the memory in time.once-per. The gate cannot be bound yet: field.weather reads arena.weatherType (not suppression aware) and field.terrain reads arena.terrainType (hidden by Clueless), while the class reads the raw terrain and asks weather.isEffectSuppressed(); requests R-B14-3.2 and R-B14-3.3. Oddities, not fixed: (1) the cure is resetStatus, which refuses to cure an Amaterasu burn; (2) Heavy Rain counts as Rain here; (3) the flyout is shown by the engine around apply, and the preview rewrites the damage without remembering anything; (4) SUSPECTED BUG: the gate reads `weather !== null` and then `weather.isEffectSuppressed()`, but a fresh arena holds `undefined` (a weather that was set and cleared holds `null`), so on a lethal hit with no weather ever set the gate throws a TypeError inside the damage calculation (seen in a battle, and pinned in B14/chunk3.test.ts); `weather != null` would be the fix.",
+      "uses": 1
+    },
+    {
+      "id": "block.electrodynamics-position",
+      "className": "ElectrodynamicsPositionAbAttr",
+      "label": "Mark my battle slot as charged for the rest of the battle",
+      "summary": "When I enter, my slot is marked for the rest of the battle. Whoever stands there is off the ground (Ground moves cannot hit it) and gets Electric Terrain benefits there.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "electrodynamics",
+        "charged slot",
+        "permanent electric terrain on my side",
+        "float my slot",
+        "ground immunity for the slot",
+        "slot effect",
+        "magnetic field",
+        "electric terrain position"
+      ],
+      "examples": [
+        "When I enter, my battle slot becomes charged: Ground moves cannot hit whoever stands there"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing while the game is only previewing the entry",
+        "A slot that is already marked is not marked twice",
+        "The mark stays after I leave: whoever takes the slot keeps its benefits until the battle ends"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
       "uses": 1
     },
     {
@@ -1380,6 +1422,224 @@
       "uses": 1
     },
     {
+      "id": "block.raichu-ally-stat-multiplier",
+      "className": "RaichuAllyStatMultiplierAbAttr",
+      "label": "Boost my partner's stat in a terrain (more if magnetized)",
+      "summary": "In a double battle during Electric Terrain, my partner's Attack is x1.5, or x2 if it is magnetized (Magnet Rise, Magnetic Flux, Plus or Minus).",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "demodulator partner boost",
+        "modulator partner boost",
+        "help my partner in a terrain",
+        "ally stat boost in terrain",
+        "partner attack up",
+        "team terrain boost",
+        "doubles ally boost",
+        "magnet rise ally"
+      ],
+      "examples": [
+        "In Electric Terrain my partner's Attack is 50% higher, or doubled if it is floating from Magnet Rise",
+        "Raise my ally's Sp. Def in Electric Terrain, like Modulator"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat of my partner (Attack, Defense, Sp. Atk, Sp. Def, Speed, Accuracy or Evasion)",
+          "control": "select",
+          "default": "ATK",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "terrain",
+          "label": "Which terrain has to be active",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "MISTY",
+            "ELECTRIC",
+            "GRASSY",
+            "PSYCHIC",
+            "TOXIC"
+          ]
+        },
+        {
+          "id": "normalMultiplier",
+          "label": "Multiplier for my partner (1.5 = 50% higher)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        },
+        {
+          "id": "boostedMultiplier",
+          "label": "Multiplier when my partner is magnetized (2 = double)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "field.terrain",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only the chosen stat of my partner is multiplied",
+        "Only in a battle with more than one Pokemon per side (a single battle does nothing)",
+        "A partner counts as magnetized when it floats from Magnet Rise, was hit by Magnetic Flux this battle, or has the Plus or Minus pairing"
+      ],
+      "gateParams": [
+        {
+          "param": "terrain",
+          "block": "field.terrain",
+          "field": "terrain"
+        }
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "stat",
+          "normalMultiplier",
+          "boostedMultiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 4
+    },
+    {
+      "id": "block.raichu-terrain-stat-multiplier",
+      "className": "RaichuTerrainStatMultiplierAbAttr",
+      "label": "Multiply one of my stats while a terrain is active",
+      "summary": "While Electric Terrain is active, my Attack is multiplied by 1.5. Example: 1.5 = 50% higher, 0.5 = half.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "demodulator",
+        "modulator",
+        "terrain stat boost",
+        "electric terrain attack boost",
+        "grassy terrain defense",
+        "stat boost in terrain",
+        "terrain attack up",
+        "surge surfer"
+      ],
+      "examples": [
+        "Raise my Attack by 50% in Electric Terrain, like Demodulator",
+        "Raise my Sp. Def by 50% in Electric Terrain, like Modulator"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat (Attack, Defense, Sp. Atk, Sp. Def, Speed, Accuracy or Evasion)",
+          "control": "select",
+          "default": "ATK",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "multiplier",
+          "label": "Stat multiplier (1.5 = 50% higher, 0.5 = half)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        },
+        {
+          "id": "terrain",
+          "label": "Which terrain has to be active",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "MISTY",
+            "ELECTRIC",
+            "GRASSY",
+            "PSYCHIC",
+            "TOXIC"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "field.terrain",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only the chosen stat is multiplied; every other stat is left alone"
+      ],
+      "gateParams": [
+        {
+          "param": "terrain",
+          "block": "field.terrain",
+          "field": "terrain"
+        }
+      ],
+      "effect": {
+        "id": "effect.multiply-stat",
+        "params": [
+          "stat",
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 4
+    },
+    {
       "id": "block.received-move-damage-multiplier",
       "className": "ReceivedMoveDamageMultiplierAbAttr",
       "label": "Take less (or more) damage",
@@ -1443,6 +1703,70 @@
         "do": true
       },
       "uses": 64
+    },
+    {
+      "id": "block.sharing-is-scaring",
+      "className": "SharingIsScaringAbAttr",
+      "label": "Pass my own stat drops on to the foes",
+      "summary": "When my own move would lower my stats, I take no drop and every foe still standing is lowered by the same amount. Example: Close Combat lowers each foe's Defense and Sp. Def by 1.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.stat-protect",
+      "whenLabel": "While the game checks if my stat is protected",
+      "synonyms": [
+        "sharing is scaring",
+        "give my stat drops to the foes",
+        "reverse stat drop",
+        "no self drops, foes get them",
+        "share stat drops",
+        "hot potato",
+        "spread my stat drops",
+        "partner gimmighoul"
+      ],
+      "examples": [
+        "My own Close Combat, Overheat and Draco Meteor drops land on the foes instead of me"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat of mine is protected (fixed: the foes always get every drop)",
+          "control": "select",
+          "default": "Every stat",
+          "editable": false,
+          "options": [
+            "Every stat",
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Sp. Def",
+            "Speed",
+            "Accuracy",
+            "Evasion"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only drops I cause myself are handled here (a drop from another Pokemon is the job of the other stat-protection block)",
+        "Only stat drops are blocked and passed on (a boost I give myself always lands)",
+        "A drop that another ability or effect already blocked is left alone and is not passed on",
+        "The drop is passed on only when the game really applies it, not while it only previews (a preview still shows my own drop as blocked)",
+        "Foes that already fainted are skipped"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": [
+          "stat"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.slabs-curse",

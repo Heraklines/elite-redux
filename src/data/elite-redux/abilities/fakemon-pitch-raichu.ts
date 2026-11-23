@@ -15,10 +15,12 @@ import {
   PostSummonAbAttr,
   PostSummonTerrainChangeAbAttr,
   StatMultiplierAbAttr,
+  type StatMultiplierAbAttrParams,
 } from "#abilities/ab-attrs";
 import type { AbBuilder } from "#abilities/ability";
 import type { Battle } from "#app/battle";
 import { globalScene } from "#app/global-scene";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { GroundedEntryHazardImmunityAbAttr } from "#data/elite-redux/archetypes/entry-hazard-immunity";
 import { TerrainType } from "#data/terrain";
@@ -220,30 +222,77 @@ export function getRaichuTerrainMoveMultiplier(pokemon: Pokemon, moveType: Pokem
 
 /** Holder-side Demodulator / Modulator base-stat multiplier during Electric Terrain. */
 export class RaichuTerrainStatMultiplierAbAttr extends StatMultiplierAbAttr {
+  /** The terrain that has to be active (Electric for the shipped abilities). */
+  public readonly terrain: TerrainType;
+
   constructor(stat: BattleStat, multiplier: number, terrain: TerrainType) {
     super(stat, multiplier, () => currentTerrain() === terrain);
+    this.terrain = terrain;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: StatMultiplierAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1), in the ORIGINAL clause order. The original was the inherited
+   * `stat === this.stat && condition()`, and the condition was `currentTerrain() === terrain`.
+   */
+  override canApply(params: StatMultiplierAbAttrParams): boolean {
+    return gatedCanApply<StatMultiplierAbAttrParams>(this, params);
+  }
+
+  /** Clause 1: the stat being worked out is the one this attr multiplies. Not editable. */
+  public guards({ stat }: StatMultiplierAbAttrParams): boolean {
+    return stat === this.stat;
+  }
+
+  /** Clause 2, the replaceable condition: the terrain is the chosen one. */
+  public gate(_params: StatMultiplierAbAttrParams): boolean {
+    return currentTerrain() === this.terrain;
   }
 }
 
 /** Partner-side Demodulator / Modulator multiplier with the exact 1.5x/2x split. */
 export class RaichuAllyStatMultiplierAbAttr extends AllyStatMultiplierAbAttr {
-  private readonly terrain: TerrainType;
+  /** The terrain that has to be active (Electric for the shipped abilities). */
+  public readonly terrain: TerrainType;
+  /** The multiplier for an ordinary partner (1.5 for the shipped abilities). */
+  public readonly normalMultiplier: number;
+  /** The multiplier for a partner that is magnetised (2 for the shipped abilities). */
+  public readonly boostedMultiplier: number;
 
-  constructor(stat: BattleStat, terrain: TerrainType) {
-    super(stat, 1.5, false);
+  constructor(stat: BattleStat, terrain: TerrainType, normalMultiplier = 1.5, boostedMultiplier = 2) {
+    super(stat, normalMultiplier, false);
     this.terrain = terrain;
+    this.normalMultiplier = normalMultiplier;
+    this.boostedMultiplier = boostedMultiplier;
   }
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AllyStatMultiplierAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `guards`, `gate`, `residual`. */
   override canApply(params: AllyStatMultiplierAbAttrParams): boolean {
-    return (
-      super.canApply(params)
-      && currentTerrain() === this.terrain
-      && (globalScene?.currentBattle?.getBattlerCount() ?? 1) > 1
-    );
+    return gatedCanApply<AllyStatMultiplierAbAttrParams>(this, params);
+  }
+
+  /** Clause 1: the inherited check (the stat is the one this attr multiplies; the attr is never ignorable). Not editable. */
+  public guards(params: AllyStatMultiplierAbAttrParams): boolean {
+    return super.canApply(params);
+  }
+
+  /** Clause 2, the replaceable condition: the terrain is the chosen one. */
+  public gate(_params: AllyStatMultiplierAbAttrParams): boolean {
+    return currentTerrain() === this.terrain;
+  }
+
+  /** Clause 3, kept in the class (no library atom reads "more than one battler per side" yet): a multi battle. */
+  public residual(_params: AllyStatMultiplierAbAttrParams): boolean {
+    return (globalScene?.currentBattle?.getBattlerCount() ?? 1) > 1;
   }
 
   override apply({ target, statVal }: AllyStatMultiplierAbAttrParams): void {
-    statVal.value *= partnerHasRaichuBoostCondition(target) ? 2 : 1.5;
+    statVal.value *= partnerHasRaichuBoostCondition(target) ? this.boostedMultiplier : this.normalMultiplier;
   }
 }
 
