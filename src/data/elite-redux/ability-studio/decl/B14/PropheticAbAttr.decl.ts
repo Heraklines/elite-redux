@@ -23,14 +23,16 @@
 // requests/B14.md). The trigger (on entry) is already a separate block, and the class has no IF.
 import { PropheticAbAttr } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
+import { enumListCodec } from "#data/elite-redux/ability-studio/param-codecs";
+import { MoveId } from "#enums/move-id";
 
 export default defineDecl(PropheticAbAttr, {
   tier: "C",
   kind: "package",
   when: "event.on-entry",
   label: "Set up a delayed attack on a foe when I enter",
-  summary: () =>
-    "When I enter, I set a delayed attack on the first foe still standing. It hits 3 turns later with Future Sight or Doom Desire, whichever would hurt more.",
+  summary: params =>
+    `When I enter, I set a delayed attack on the first foe still standing. It hits ${params.turns} turns later using the stronger of: ${params.moves}.`,
   synonyms: [
     "future sight",
     "doom desire",
@@ -41,9 +43,33 @@ export default defineDecl(PropheticAbAttr, {
     "prophecy",
   ],
   examples: ["When I enter, a Future Sight style attack lands on the foe three turns later"],
-  params: [],
-  noParamsReason:
-    "The class takes no constructor argument: the two moves to choose from (Future Sight and Doom Desire) and the 3-turn delay are fixed inside it, so there is no value to tune until it is given parameters (requested in requests/B14.md).",
+  params: [
+    {
+      id: "moves",
+      ctorIndex: 0,
+      path: "moves",
+      control: "text",
+      label: "Attacks to choose from (names, comma separated; the first is the main one)",
+      editable: true,
+      default: "FUTURE_SIGHT,DOOM_DESIRE",
+      codec: enumListCodec(MoveId, "move"),
+      gateIndependent: true,
+    },
+    {
+      id: "turns",
+      ctorIndex: 1,
+      path: "turns",
+      control: "number",
+      min: 1,
+      max: 10,
+      step: 1,
+      integer: true,
+      label: "Turns until it hits",
+      editable: true,
+      default: 3,
+      gateIndependent: true,
+    },
+  ],
   conditions: [],
   guards: [],
   feasibility: [
@@ -51,11 +77,11 @@ export default defineDecl(PropheticAbAttr, {
     "No delayed attack may already be waiting on that foe's position",
     "Nothing is set up while the game is only previewing",
   ],
-  effect: { id: "effect.package", params: [] },
+  effect: { id: "effect.package", params: ["moves", "turns"] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "none", simulated: "respects" },
   probes: [{ name: "enter the field", axes: {} }],
   status: "decomposed",
   notes:
-    "Package, reason: no delayed-attack effect in the library (requested); the class itself is one call to positionalTagManager.addTag with fixed arguments (sourceMoves [Future Sight, Doom Desire], turnCount 3), so it should be re-declared as an event-effect with params {moves, turns} when the effect exists. Users (1): Prophetic (6014) attr 0 (its only attr). Oddities, not fixed: canApply is the inherited true, so the ability flyout can show when no delayed attack is set (no foe, or a delayed attack already waiting on that slot); the tag is aimed at the first living foe only, never at both foes in a double battle.",
+    "The attack list and the delay are constructor arguments (defaults Future Sight and Doom Desire, 3 turns, so the shipped ability is unchanged) and editable params. Package, reason: no delayed-attack effect in the library (requested); the class itself is one call to positionalTagManager.addTag with fixed arguments (sourceMoves [Future Sight, Doom Desire], turnCount 3), so it should be re-declared as an event-effect with params {moves, turns} when the effect exists. Users (1): Prophetic (6014) attr 0 (its only attr). Oddities, not fixed: canApply is the inherited true, so the ability flyout can show when no delayed attack is set (no foe, or a delayed attack already waiting on that slot); the tag is aimed at the first living foe only, never at both foes in a double battle.",
 });

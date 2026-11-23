@@ -26,19 +26,56 @@
 // (doesFlagEffectApply also counts flags that abilities inject). An atom `move.has-own-flag` is requested.
 import { BitterDrillAbAttr } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
+import { ARENA_SIDE_OPTIONS } from "#data/elite-redux/ability-studio/vocabulary/enums";
+import { ArenaTagType } from "#enums/arena-tag-type";
 
 export default defineDecl(BitterDrillAbAttr, {
   tier: "B",
   kind: "event-effect",
   when: "event.after-my-hit",
   label: "Lay Drill Bits on the foes' side after my drill move",
-  summary: () =>
-    "After a drill move of mine hits, Drill Bits are laid on the opposing side. Foes that come in on the ground later are embedded.",
+  summary: params =>
+    `After a drill move of mine hits, I lay ${params.tag} (side: ${params.side}, lasts ${params.duration} turns, 0 = until removed). Example: Drill Bits on the foes' side.`,
   synonyms: ["bitter drill", "entry hazard", "set a hazard", "drill hazard", "spikes", "field effect after hit"],
   examples: ["After a drill move hits, leave a hazard on the opposing side"],
-  params: [],
-  noParamsReason:
-    "The class takes no constructor argument: the field effect (Drill Bits), its side (the opposing side) and its duration (until removed) are fixed inside it, so there is no value to tune until it is given parameters (requested in requests/B14.md).",
+  params: [
+    {
+      id: "tag",
+      ctorIndex: 0,
+      path: "tag",
+      control: "select",
+      label: "Field effect to lay",
+      editable: true,
+      default: "ER_DRILL_BITS",
+      options: Object.values(ArenaTagType),
+      gateIndependent: true,
+    },
+    {
+      id: "side",
+      ctorIndex: 1,
+      path: "side",
+      control: "select",
+      label: "Which side gets it",
+      editable: true,
+      default: "opposing-side",
+      options: ARENA_SIDE_OPTIONS,
+      gateIndependent: true,
+    },
+    {
+      id: "duration",
+      ctorIndex: 2,
+      path: "duration",
+      control: "number",
+      min: 0,
+      max: 20,
+      step: 1,
+      integer: true,
+      label: "Turns it lasts (0 = until removed)",
+      editable: true,
+      default: 0,
+      gateIndependent: true,
+    },
+  ],
   conditions: [
     // Gate = [move has its own DRILL_BASED flag]. Removable: "after any hit" is a valid design.
     { slot: "gate", ctx: "params", removable: true, editable: true },
@@ -48,7 +85,7 @@ export default defineDecl(BitterDrillAbAttr, {
     "The move must really have hurt the target (it dealt damage and was not blocked), and the game must not be only previewing",
     "Only one set of Drill Bits can be on a side at a time",
   ],
-  effect: { id: "effect.arena-tag", params: [] },
+  effect: { id: "effect.arena-tag", params: ["tag", "side"] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "none", simulated: "respects" },
   probes: [{ name: "the holder attacks", axes: {} }],
@@ -56,5 +93,5 @@ export default defineDecl(BitterDrillAbAttr, {
     "The gate binding is a legacy closure (no atom for a move's own flag yet), so the twin has no rebuilt attr to compare; the Tier B split is proven by test/tests/elite-redux/decomp/B14/gate-split.test.ts instead.",
   status: "decomposed",
   notes:
-    "Event-effect, Tier B. Users (1): Bitter Drill (6044) attr 0; attr 1 is BitterDrillDamageAbAttr (doubles drill move power against an Embedded foe), declared in a later chunk. Gate legacy-closure pending move.has-own-flag; guards pending not-simulated and hit-dealt-damage; the effect maps to effect.arena-tag, which the librarian must extend with a duration and a source. The inherited attackCondition (constructor argument 0, default `move.category !== STATUS`) is never read: this canApply does not call super. The tag's side is `holder.isPlayer() ? ENEMY : PLAYER`. Oddity, not fixed: the drill flag test is the move's own flag, so a move that only gains the drill flag from an injecting ability does not trigger it (no shipped ability injects DRILL_BASED).",
+    "Event-effect, Tier B. The field effect, its side and its duration are constructor arguments (defaults Drill Bits, opposing side, 0 = until removed; behaviour identical) and editable params; the drill-flag test is the editable gate slot itself, so it is not repeated as a param. The duration param is not in the library effect.arena-tag yet (requested). Users (1): Bitter Drill (6044) attr 0; attr 1 is BitterDrillDamageAbAttr (doubles drill move power against an Embedded foe), declared in a later chunk. Gate legacy-closure pending move.has-own-flag; guards pending not-simulated and hit-dealt-damage; the effect maps to effect.arena-tag, which the librarian must extend with a duration and a source. The inherited attackCondition (constructor argument 0, default `move.category !== STATUS`) is never read: this canApply does not call super. The tag's side is `holder.isPlayer() ? ENEMY : PLAYER`. Oddity, not fixed: the drill flag test is the move's own flag, so a move that only gains the drill flag from an injecting ability does not trigger it (no shipped ability injects DRILL_BASED).",
 });

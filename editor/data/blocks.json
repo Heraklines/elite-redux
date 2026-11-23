@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "19c915bfa082f0",
+  "hash": "0377ad9267e399",
   "blocks": [
     {
       "id": "block.astral-project-star-marker",
       "className": "AstralProjectStarMarkerAbAttr",
-      "label": "Count all my moves as Star moves",
-      "summary": "While I have this, every move I use counts as a Star move for other abilities. Example: a Star-move double-hit ability makes all my moves hit twice.",
+      "label": "Count all my moves as Starcrossed moves",
+      "summary": "While I have this, every move I use counts as a Starcrossed move, so the Starcrossed ability makes it hit twice at reduced power. Example: all my moves hit twice.",
       "tier": "C",
       "kind": "engine-query",
       "status": "decomposed",
@@ -23,13 +23,13 @@
         "starcrossed"
       ],
       "examples": [
-        "All my moves count as Star moves, so my Star-move abilities always work"
+        "All my moves count as Starcrossed moves, so my Starcrossed double hit always works"
       ],
       "params": [],
       "conditions": [],
       "guards": [],
       "feasibility": [
-        "It changes nothing on its own: an ability that reacts to Star moves (such as the one that makes them hit twice) must also be present"
+        "It changes nothing on its own: an ability that reacts to Starcrossed moves (the Starcrossed double hit) must also be present"
       ],
       "reusableAlone": {
         "when": true,
@@ -164,7 +164,7 @@
       "id": "block.bitter-drill",
       "className": "BitterDrillAbAttr",
       "label": "Lay Drill Bits on the foes' side after my drill move",
-      "summary": "After a drill move of mine hits, Drill Bits are laid on the opposing side. Foes that come in on the ground later are embedded.",
+      "summary": "After a drill move of mine hits, I lay Er drill bits (side: opposing-side, lasts 0 turns, 0 = until removed). Example: Drill Bits on the foes' side.",
       "tier": "B",
       "kind": "event-effect",
       "status": "decomposed",
@@ -181,7 +181,85 @@
       "examples": [
         "After a drill move hits, leave a hazard on the opposing side"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "tag",
+          "label": "Field effect to lay",
+          "control": "select",
+          "default": "ER_DRILL_BITS",
+          "editable": true,
+          "options": [
+            "NONE",
+            "MUD_SPORT",
+            "WATER_SPORT",
+            "SPIKES",
+            "TOXIC_SPIKES",
+            "MIST",
+            "ER_SMOKESCREEN",
+            "STEALTH_ROCK",
+            "STICKY_WEB",
+            "TRICK_ROOM",
+            "INVERSE_ROOM",
+            "MAGIC_ROOM",
+            "WONDER_ROOM",
+            "SWIRLY_ROOM",
+            "GRAVITY",
+            "REFLECT",
+            "LIGHT_SCREEN",
+            "AURORA_VEIL",
+            "QUICK_GUARD",
+            "WIDE_GUARD",
+            "MAT_BLOCK",
+            "CRAFTY_SHIELD",
+            "TAILWIND",
+            "HAPPY_HOUR",
+            "SAFEGUARD",
+            "NO_CRIT",
+            "IMPRISON",
+            "ION_DELUGE",
+            "FIRE_GRASS_PLEDGE",
+            "WATER_FIRE_PLEDGE",
+            "GRASS_WATER_PLEDGE",
+            "FAIRY_LOCK",
+            "NEUTRALIZING_GAS",
+            "PENDING_HEAL",
+            "HOT_COALS",
+            "FOAMY_WEB",
+            "CREEPING_THORNS",
+            "ER_WEATHER_LOCK",
+            "ER_INFESTATION_TRAP",
+            "SEDIMENT_BLOOM",
+            "GRAVE_MARKER",
+            "ER_DRILL_BITS"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "side",
+          "label": "Which side gets it",
+          "control": "select",
+          "default": "opposing-side",
+          "editable": true,
+          "options": [
+            "holder-side",
+            "opposing-side",
+            "both"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "duration",
+          "label": "Turns it lasts (0 = until removed)",
+          "control": "number",
+          "default": 0,
+          "editable": true,
+          "min": 0,
+          "max": 20,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
       "conditions": [
         {
           "slot": "gate",
@@ -197,7 +275,10 @@
       ],
       "effect": {
         "id": "effect.arena-tag",
-        "params": []
+        "params": [
+          "tag",
+          "side"
+        ]
       },
       "reusableAlone": {
         "when": true,
@@ -392,8 +473,8 @@
     {
       "id": "block.penta-punch-marker",
       "className": "PentaPunchMarkerAbAttr",
-      "label": "Let me know a fifth move",
-      "summary": "While I have this, I can know five moves instead of four. Example: a Pokemon that is full at four moves can learn a fifth.",
+      "label": "Allow a fifth move slot",
+      "summary": "While I have this, I have room for five moves instead of four. Example: a Pokemon that is full at four moves can learn a fifth.",
       "tier": "C",
       "kind": "engine-query",
       "status": "decomposed",
@@ -404,6 +485,7 @@
         "extra move slot",
         "5th move",
         "five moves",
+        "learn five moves",
         "more moves",
         "move slot",
         "penta punch"
@@ -445,7 +527,19 @@
       "examples": [
         "Each free Rollout that lands in a row hits 10% harder"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "step",
+          "label": "Extra power per hit in a row (0.1 = 10%)",
+          "control": "number",
+          "default": 0.1,
+          "editable": true,
+          "min": 0,
+          "max": 1,
+          "step": 0.01,
+          "gateIndependent": true
+        }
+      ],
       "conditions": [
         {
           "slot": "gate",
@@ -461,14 +555,16 @@
       ],
       "effect": {
         "id": "effect.package",
-        "params": []
+        "params": [
+          "step"
+        ]
       },
       "reusableAlone": {
         "when": true,
         "if": true,
         "do": true
       },
-      "packageReason": "Package, reason: the multiplier is `1 + streak x 0.1` where the streak is a per-Pokemon counter written by PerpetualMotionProgressAbAttr; effect.multiply-power only takes a fixed number (a counter-based power effect is requested). Users (1): Perpetual Motion (6022) attr 4 of 5. Gate is legacy-closure pending move.scripted-marker. The armed-state check stays a non-editable guard clause in the class (it is state of the ability's own machine, listed under feasibility, not a registered guard). Oddities, not fixed: canApply does not call super.canApply, so skipDuringMovesetGen is ignored (it is false for this class, so no effect); the class applies on simulated power previews too, which is correct for damage previews.",
+      "packageReason": "The 10% step is a constructor argument (default 0.1) and an editable param. The marker name perpetual-motion is deliberately NOT a param: it is the shared key that ties this attr to the follow-up move and to four other attrs of the same ability (three of them in B17); changing it on this attr alone would silently switch the bonus off, and the gate is the editable slot for the condition. Package, reason: the multiplier is `1 + streak x 0.1` where the streak is a per-Pokemon counter written by PerpetualMotionProgressAbAttr; effect.multiply-power only takes a fixed number (a counter-based power effect is requested). Users (1): Perpetual Motion (6022) attr 4 of 5. Gate is legacy-closure pending move.scripted-marker. The armed-state check stays a non-editable guard clause in the class (it is state of the ability's own machine, listed under feasibility, not a registered guard). Oddities, not fixed: canApply does not call super.canApply, so skipDuringMovesetGen is ignored (it is false for this class, so no effect); the class applies on simulated power previews too, which is correct for damage previews.",
       "uses": 1
     },
     {
@@ -521,8 +617,8 @@
     {
       "id": "block.photovoltaic-type",
       "className": "PhotovoltaicTypeAbAttr",
-      "label": "Gain the Electric type when I enter",
-      "summary": "When I enter the battle, I gain the Electric type in addition to my own types. Example: a Water type becomes Water and Electric.",
+      "label": "Gain an extra type when I enter",
+      "summary": "When I enter the battle, I gain the Electric type in addition to my own types. Example: a Water type that gains Electric becomes Water and Electric.",
       "tier": "C",
       "kind": "package",
       "status": "decomposed",
@@ -540,23 +636,55 @@
       "examples": [
         "Gain the Electric type when I enter the battle"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "type",
+          "label": "Type to gain",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ],
+          "gateIndependent": true
+        }
+      ],
       "conditions": [],
       "guards": [],
       "feasibility": [
-        "Does nothing if I am already an Electric type",
+        "Does nothing if I already have that type",
         "The new type lasts until I leave the field"
       ],
       "effect": {
         "id": "effect.package",
-        "params": []
+        "params": [
+          "type"
+        ]
       },
       "reusableAlone": {
         "when": true,
         "if": true,
         "do": true
       },
-      "packageReason": "Package, reason: no effect.add-type in the effect library (requested), not because the effect cannot be split. Users (1): Photovoltaic (6030) attr 1; attr 0 is a SelfHighestStatMultiplierAbAttr (Solar Power half) from another batch. apply writes pokemon.summonData.types, which is reset when the Pokemon leaves the field. It ignores `simulated` (never read), harmless because PostSummon is never dispatched simulated. A Pokemon that already has summonData.types set (a type change before entry) keeps that list and gets Electric appended; with no summon types it starts from getTypes().",
+      "packageReason": "The gained type is a constructor argument (default Electric, so the shipped ability is unchanged) and an editable param. Package, reason: no effect.add-type in the effect library (requested), not because the effect cannot be split. Users (1): Photovoltaic (6030) attr 1; attr 0 is a SelfHighestStatMultiplierAbAttr (Solar Power half) from another batch. apply writes pokemon.summonData.types, which is reset when the Pokemon leaves the field. It ignores `simulated` (never read), harmless because PostSummon is never dispatched simulated. A Pokemon that already has summonData.types set (a type change before entry) keeps that list and gets Electric appended; with no summon types it starts from getTypes().",
       "uses": 1
     },
     {
@@ -819,7 +947,7 @@
       "id": "block.prophetic",
       "className": "PropheticAbAttr",
       "label": "Set up a delayed attack on a foe when I enter",
-      "summary": "When I enter, I set a delayed attack on the first foe still standing. It hits 3 turns later with Future Sight or Doom Desire, whichever would hurt more.",
+      "summary": "When I enter, I set a delayed attack on the first foe still standing. It hits 3 turns later using the stronger of: Future sight, Doom desire.",
       "tier": "C",
       "kind": "package",
       "status": "decomposed",
@@ -837,7 +965,28 @@
       "examples": [
         "When I enter, a Future Sight style attack lands on the foe three turns later"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "moves",
+          "label": "Attacks to choose from (names, comma separated; the first is the main one)",
+          "control": "text",
+          "default": "FUTURE_SIGHT,DOOM_DESIRE",
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "turns",
+          "label": "Turns until it hits",
+          "control": "number",
+          "default": 3,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
       "conditions": [],
       "guards": [],
       "feasibility": [
@@ -847,14 +996,17 @@
       ],
       "effect": {
         "id": "effect.package",
-        "params": []
+        "params": [
+          "moves",
+          "turns"
+        ]
       },
       "reusableAlone": {
         "when": true,
         "if": true,
         "do": true
       },
-      "packageReason": "Package, reason: no delayed-attack effect in the library (requested); the class itself is one call to positionalTagManager.addTag with fixed arguments (sourceMoves [Future Sight, Doom Desire], turnCount 3), so it should be re-declared as an event-effect with params {moves, turns} when the effect exists. Users (1): Prophetic (6014) attr 0 (its only attr). Oddities, not fixed: canApply is the inherited true, so the ability flyout can show when no delayed attack is set (no foe, or a delayed attack already waiting on that slot); the tag is aimed at the first living foe only, never at both foes in a double battle.",
+      "packageReason": "The attack list and the delay are constructor arguments (defaults Future Sight and Doom Desire, 3 turns, so the shipped ability is unchanged) and editable params. Package, reason: no delayed-attack effect in the library (requested); the class itself is one call to positionalTagManager.addTag with fixed arguments (sourceMoves [Future Sight, Doom Desire], turnCount 3), so it should be re-declared as an event-effect with params {moves, turns} when the effect exists. Users (1): Prophetic (6014) attr 0 (its only attr). Oddities, not fixed: canApply is the inherited true, so the ability flyout can show when no delayed attack is set (no foe, or a delayed attack already waiting on that slot); the tag is aimed at the first living foe only, never at both foes in a double battle.",
       "uses": 1
     },
     {

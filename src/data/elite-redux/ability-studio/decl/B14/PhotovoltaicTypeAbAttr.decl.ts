@@ -17,14 +17,17 @@
 // has no IF at all.
 import { PhotovoltaicTypeAbAttr } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
+import { enumCodec } from "#data/elite-redux/ability-studio/param-codecs";
+import { TYPE_OPTIONS } from "#data/elite-redux/ability-studio/vocabulary/enums";
+import { PokemonType } from "#enums/pokemon-type";
 
 export default defineDecl(PhotovoltaicTypeAbAttr, {
   tier: "C",
   kind: "package",
   when: "event.on-entry",
-  label: "Gain the Electric type when I enter",
-  summary: () =>
-    "When I enter the battle, I gain the Electric type in addition to my own types. Example: a Water type becomes Water and Electric.",
+  label: "Gain an extra type when I enter",
+  summary: params =>
+    `When I enter the battle, I gain the ${params.type} type in addition to my own types. Example: a Water type that gains Electric becomes Water and Electric.`,
   synonyms: [
     "add a type",
     "extra type",
@@ -35,17 +38,28 @@ export default defineDecl(PhotovoltaicTypeAbAttr, {
     "photovoltaic",
   ],
   examples: ["Gain the Electric type when I enter the battle"],
-  params: [],
-  noParamsReason:
-    "The added type (Electric) is fixed in the class, which takes no constructor argument, so there is no value to tune until the class is given one (requested in requests/B14.md).",
+  params: [
+    {
+      id: "type",
+      ctorIndex: 0,
+      path: "type",
+      control: "select",
+      label: "Type to gain",
+      editable: true,
+      default: "ELECTRIC",
+      options: TYPE_OPTIONS,
+      codec: enumCodec(PokemonType, "type"),
+      gateIndependent: true,
+    },
+  ],
   conditions: [],
   guards: [],
-  feasibility: ["Does nothing if I am already an Electric type", "The new type lasts until I leave the field"],
-  effect: { id: "effect.package", params: [] },
+  feasibility: ["Does nothing if I already have that type", "The new type lasts until I leave the field"],
+  effect: { id: "effect.package", params: ["type"] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "entry", simulated: "ignores" },
   probes: [{ name: "enter the field", axes: {} }],
   status: "decomposed",
   notes:
-    "Package, reason: no effect.add-type in the effect library (requested), not because the effect cannot be split. Users (1): Photovoltaic (6030) attr 1; attr 0 is a SelfHighestStatMultiplierAbAttr (Solar Power half) from another batch. apply writes pokemon.summonData.types, which is reset when the Pokemon leaves the field. It ignores `simulated` (never read), harmless because PostSummon is never dispatched simulated. A Pokemon that already has summonData.types set (a type change before entry) keeps that list and gets Electric appended; with no summon types it starts from getTypes().",
+    "The gained type is a constructor argument (default Electric, so the shipped ability is unchanged) and an editable param. Package, reason: no effect.add-type in the effect library (requested), not because the effect cannot be split. Users (1): Photovoltaic (6030) attr 1; attr 0 is a SelfHighestStatMultiplierAbAttr (Solar Power half) from another batch. apply writes pokemon.summonData.types, which is reset when the Pokemon leaves the field. It ignores `simulated` (never read), harmless because PostSummon is never dispatched simulated. A Pokemon that already has summonData.types set (a type change before entry) keeps that list and gets Electric appended; with no summon types it starts from getTypes().",
 });

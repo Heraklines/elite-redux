@@ -245,9 +245,17 @@ class BallasterAbAttr extends PostDefendAbAttr {
 }
 
 export class PhotovoltaicTypeAbAttr extends PostSummonAbAttr {
+  /** The type gained on entry (Electric for the shipped ability). */
+  public readonly type: PokemonType;
+
+  constructor(type: PokemonType = PokemonType.ELECTRIC) {
+    super();
+    this.type = type;
+  }
+
   override apply({ pokemon }: AbAttrBaseParams): void {
     const current = pokemon.summonData.types.length > 0 ? pokemon.summonData.types : [...pokemon.getTypes()];
-    pokemon.summonData.types = current.includes(PokemonType.ELECTRIC) ? current : [...current, PokemonType.ELECTRIC];
+    pokemon.summonData.types = current.includes(this.type) ? current : [...current, this.type];
   }
 }
 
@@ -731,6 +739,14 @@ export class PerpetualMotionProgressAbAttr extends PostAttackAbAttr {
 }
 
 export class PerpetualMotionPowerAbAttr extends VariableMovePowerAbAttr {
+  /** Power bonus per hit in a row (0.1 = +10% each). */
+  public readonly step: number;
+
+  constructor(step = 0.1) {
+    super();
+    this.step = step;
+  }
+
   /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
   public declare gateOverride: ((params: PreAttackModifyPowerAbAttrParams) => boolean) | undefined;
 
@@ -750,7 +766,7 @@ export class PerpetualMotionPowerAbAttr extends VariableMovePowerAbAttr {
   }
 
   override apply({ pokemon, power }: PreAttackModifyPowerAbAttrParams): void {
-    power.value *= 1 + pokemon.summonData.erPerpetualMotionStreak * 0.1;
+    power.value *= 1 + pokemon.summonData.erPerpetualMotionStreak * this.step;
   }
 }
 
@@ -1263,6 +1279,17 @@ export function wireFakemonPitchAbility(builder: AbBuilder, id: number): void {
 
 /** Prophetic chooses the stronger effective Future Sight or Doom Desire attack. */
 export class PropheticAbAttr extends PostSummonAbAttr {
+  /** The attacks to choose from when the delayed attack lands; the first one is the named source move. */
+  public readonly moves: MoveId[];
+  /** Turns until the delayed attack lands. */
+  public readonly turns: number;
+
+  constructor(moves: MoveId[] = [MoveId.FUTURE_SIGHT, MoveId.DOOM_DESIRE], turns = 3) {
+    super();
+    this.moves = moves;
+    this.turns = turns;
+  }
+
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
     if (simulated) {
       return;
@@ -1278,9 +1305,9 @@ export class PropheticAbAttr extends PostSummonAbAttr {
       tagType: PositionalTagType.DELAYED_ATTACK,
       sourceId: pokemon.id,
       targetIndex: target.getBattlerIndex(),
-      sourceMove: MoveId.FUTURE_SIGHT,
-      sourceMoves: [MoveId.FUTURE_SIGHT, MoveId.DOOM_DESIRE],
-      turnCount: 3,
+      sourceMove: this.moves[0] ?? MoveId.FUTURE_SIGHT,
+      sourceMoves: [...this.moves],
+      turnCount: this.turns,
     });
   }
 }
@@ -1347,6 +1374,24 @@ export function rotateSouthernCrossPunchTargets(pokemon: Pokemon): void {
 
 /** Bitter Drill lays persistent grounded entry bits after a successful drill hit. */
 export class BitterDrillAbAttr extends PostAttackAbAttr {
+  /** The field effect laid after the hit (Drill Bits for the shipped ability). */
+  public readonly tag: ArenaTagType;
+  /** Which side gets it, seen from the holder. */
+  public readonly side: "holder-side" | "opposing-side" | "both";
+  /** Turns it lasts; 0 means until removed. */
+  public readonly duration: number;
+
+  constructor(
+    tag: ArenaTagType = ArenaTagType.ER_DRILL_BITS,
+    side: "holder-side" | "opposing-side" | "both" = "opposing-side",
+    duration = 0,
+  ) {
+    super();
+    this.tag = tag;
+    this.side = side;
+    this.duration = duration;
+  }
+
   /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
   public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
 
@@ -1368,11 +1413,15 @@ export class BitterDrillAbAttr extends PostAttackAbAttr {
   override apply({ pokemon, move, simulated }: PostMoveInteractionAbAttrParams): void {
     if (!simulated) {
       globalScene.arena.addTag(
-        ArenaTagType.ER_DRILL_BITS,
-        0,
+        this.tag,
+        this.duration,
         move.id,
         pokemon.id,
-        pokemon.isPlayer() ? ArenaTagSide.ENEMY : ArenaTagSide.PLAYER,
+        this.side === "both"
+          ? ArenaTagSide.BOTH
+          : (this.side === "opposing-side") === pokemon.isPlayer()
+            ? ArenaTagSide.ENEMY
+            : ArenaTagSide.PLAYER,
       );
     }
   }

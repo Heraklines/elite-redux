@@ -38,7 +38,7 @@ export default defineDecl(PerpetualMotionProgressAbAttr, {
   examples: ["Count each free Rollout that lands in a row so the next one hits harder"],
   params: [],
   noParamsReason:
-    "The class takes no constructor argument: the marker name of the follow-up move and the count step are fixed inside it, and the count itself is a battle value, not a setting.",
+    "Deliberately no setting: the marker name of the follow-up move is the shared key that ties this attr to the follow-up move and to four other attrs of the same ability (three of them in B17), so changing it here alone would break the ability; the condition (the gate) is the editable slot. The count step is always one and the count itself is a battle value, not a setting.",
   conditions: [
     // Gate = [move.damaging, move.scripted-marker{key: "perpetual-motion"}], in that order. Not removable: without
     // the marker test every hit of every move would reset the streak, which breaks the ability.

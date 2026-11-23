@@ -22,18 +22,18 @@ export default defineDecl(AstralProjectStarMarkerAbAttr, {
   tier: "C",
   kind: "engine-query",
   when: "event.on-entry",
-  label: "Count all my moves as Star moves",
+  label: "Count all my moves as Starcrossed moves",
   summary: () =>
-    "While I have this, every move I use counts as a Star move for other abilities. Example: a Star-move double-hit ability makes all my moves hit twice.",
+    "While I have this, every move I use counts as a Starcrossed move, so the Starcrossed ability makes it hit twice at reduced power. Example: all my moves hit twice.",
   synonyms: ["star move", "lunar move", "moon move", "every move counts as", "all moves are", "astral", "starcrossed"],
-  examples: ["All my moves count as Star moves, so my Star-move abilities always work"],
+  examples: ["All my moves count as Starcrossed moves, so my Starcrossed double hit always works"],
   params: [],
   noParamsReason:
     "A presence marker: the Star-move abilities only check that it exists, and nothing about it can be tuned (every move counts, there is no number).",
   conditions: [],
   guards: [],
   feasibility: [
-    "It changes nothing on its own: an ability that reacts to Star moves (such as the one that makes them hit twice) must also be present",
+    "It changes nothing on its own: an ability that reacts to Starcrossed moves (the Starcrossed double hit) must also be present",
   ],
   reusableAlone: { when: true, if: false, do: true },
   flags: { rng: "none", state: "none", simulated: "respects" },

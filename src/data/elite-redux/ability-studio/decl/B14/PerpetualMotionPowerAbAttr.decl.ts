@@ -28,9 +28,21 @@ export default defineDecl(PerpetualMotionPowerAbAttr, {
     "While my free follow-up move is queued, its power is multiplied by 1 plus 0.1 for each hit in a row. Example: after 3 hits in a row, power x1.3.",
   synonyms: ["combo power", "power per hit", "streak bonus", "escalating power", "rollout", "perpetual motion"],
   examples: ["Each free Rollout that lands in a row hits 10% harder"],
-  params: [],
-  noParamsReason:
-    "The 10% step and the marker name of the follow-up move are fixed inside the class (no constructor argument), and the streak is a battle value, not a setting.",
+  params: [
+    {
+      id: "step",
+      ctorIndex: 0,
+      path: "step",
+      control: "number",
+      min: 0,
+      max: 1,
+      step: 0.01,
+      label: "Extra power per hit in a row (0.1 = 10%)",
+      editable: true,
+      default: 0.1,
+      gateIndependent: true,
+    },
+  ],
   conditions: [
     // Gate = [move.scripted-marker{key: "perpetual-motion"}]. Not removable: without it every move would be boosted
     // while the follow-up is armed.
@@ -41,7 +53,7 @@ export default defineDecl(PerpetualMotionPowerAbAttr, {
     "Only while my free follow-up is waiting to resolve (the streak is armed)",
     "The bonus is 10% of the power for each hit in a row that landed so far",
   ],
-  effect: { id: "effect.package", params: [] },
+  effect: { id: "effect.package", params: ["step"] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "entry", simulated: "ignores" },
   probes: [{ name: "the holder attacks", axes: {} }],
@@ -49,5 +61,5 @@ export default defineDecl(PerpetualMotionPowerAbAttr, {
     "The gate binding is a legacy closure (no atom for the scripted-move marker yet), so the twin has no rebuilt attr to compare; the Tier B split is proven by test/tests/elite-redux/decomp/B14/gate-split.test.ts instead.",
   status: "decomposed",
   notes:
-    "Package, reason: the multiplier is `1 + streak x 0.1` where the streak is a per-Pokemon counter written by PerpetualMotionProgressAbAttr; effect.multiply-power only takes a fixed number (a counter-based power effect is requested). Users (1): Perpetual Motion (6022) attr 4 of 5. Gate is legacy-closure pending move.scripted-marker. The armed-state check stays a non-editable guard clause in the class (it is state of the ability's own machine, listed under feasibility, not a registered guard). Oddities, not fixed: canApply does not call super.canApply, so skipDuringMovesetGen is ignored (it is false for this class, so no effect); the class applies on simulated power previews too, which is correct for damage previews.",
+    "The 10% step is a constructor argument (default 0.1) and an editable param. The marker name perpetual-motion is deliberately NOT a param: it is the shared key that ties this attr to the follow-up move and to four other attrs of the same ability (three of them in B17); changing it on this attr alone would silently switch the bonus off, and the gate is the editable slot for the condition. Package, reason: the multiplier is `1 + streak x 0.1` where the streak is a per-Pokemon counter written by PerpetualMotionProgressAbAttr; effect.multiply-power only takes a fixed number (a counter-based power effect is requested). Users (1): Perpetual Motion (6022) attr 4 of 5. Gate is legacy-closure pending move.scripted-marker. The armed-state check stays a non-editable guard clause in the class (it is state of the ability's own machine, listed under feasibility, not a registered guard). Oddities, not fixed: canApply does not call super.canApply, so skipDuringMovesetGen is ignored (it is false for this class, so no effect); the class applies on simulated power previews too, which is correct for damage previews.",
 });

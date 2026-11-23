@@ -20,10 +20,19 @@ export default defineDecl(PentaPunchMarkerAbAttr, {
   tier: "C",
   kind: "engine-query",
   when: "event.on-entry",
-  label: "Let me know a fifth move",
+  label: "Allow a fifth move slot",
   summary: () =>
-    "While I have this, I can know five moves instead of four. Example: a Pokemon that is full at four moves can learn a fifth.",
-  synonyms: ["fifth move", "extra move slot", "5th move", "five moves", "more moves", "move slot", "penta punch"],
+    "While I have this, I have room for five moves instead of four. Example: a Pokemon that is full at four moves can learn a fifth.",
+  synonyms: [
+    "fifth move",
+    "extra move slot",
+    "5th move",
+    "five moves",
+    "learn five moves",
+    "more moves",
+    "move slot",
+    "penta punch",
+  ],
   examples: ["Give this Pokemon a fifth move slot"],
   params: [],
   noParamsReason:
