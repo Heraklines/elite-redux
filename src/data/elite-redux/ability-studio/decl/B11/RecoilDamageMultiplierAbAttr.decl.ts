@@ -4,11 +4,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// PARKED (not registered): the trigger this declaration needs does not exist in WHEN_REGISTRY yet, and an unknown trigger id makes the
-// catalog generator throw for the whole game. To activate it once the librarian has added the trigger (request R-B11-C2-13): move this file to
-// src/data/elite-redux/ability-studio/decl/B11/RecoilDamageMultiplierAbAttr.decl.ts (drop the .txt), set `when` to the real id, regenerate the catalog, and
-// run chunk2.test.ts (its rebuild half switches on by itself when the declaration is registered).
-
 // B11 chunk 2 / calc-modifier (Tier C: one number, read by a by-name scan).
 //
 // Read by hand from archetypes/recoil-damage-multiplier.ts and its two readers in data/moves/move.ts. The class extends only AbAttr
@@ -22,8 +17,8 @@
 //   damage was dealt else 0)`; crash: `toDmgValue(maxHp / 2 * recoilMult)`. Several such attrs multiply together.
 //
 // The only rule is the factor, so there is one setting and no IF. The engine never reads the attr's own condition, so an IF added to this
-// block would be ignored (see notes). There is no WHEN for "while the game calculates the recoil I take" in the library (request
-// R-B11-C2-13), so `when` names the requested id; the library also has no effect that multiplies recoil (request R-B11-C2-14:
+// block would be ignored (see notes). The trigger is the library WHEN calc.recoil-taken ("while the game calculates the recoil I take",
+// added with this declaration, a by-name scan); the library also has no effect that multiplies recoil (request R-B11-C2-14:
 // effect.recoil is "take a share of the damage as recoil", a different effect), so the effect is one piece with a typed factor.
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 import { RecoilDamageMultiplierAbAttr } from "#data/elite-redux/archetypes/recoil-damage-multiplier";
@@ -74,7 +69,7 @@ export default defineDecl(RecoilDamageMultiplierAbAttr, {
   flags: { rng: "none", state: "none", simulated: "ignores" },
   probes: [{ name: "a recoil move and a missed crash move", axes: {} }],
   l2StaticReason:
-    "The class is found by two by-name scans in move.ts, never dispatched with applyAbAttrs, and its trigger has no WHEN in the library yet (request R-B11-C2-13), so no trace event shows it evaluated. test/tests/elite-redux/decomp/B11/chunk2.test.ts rebuilds every live user and checks `fire` on a holder value for the original and the rebuild.",
+    "The class is found by two by-name scans in move.ts, never dispatched with applyAbAttrs, and its trigger is the by-name WHEN calc.recoil-taken, so no trace event shows it evaluated. test/tests/elite-redux/decomp/B11/chunk2.test.ts rebuilds every live user and checks `fire` on a holder value for the original and the rebuild.",
   status: "decomposed",
   notes:
     "Tier C package, justified in the header. Users (all with factor 0.5): Limber (7, attr 3), Steadfast (80, attr 4), Daredevil (5709, attr 0) and Superheavy (5549, attr 4). The readers in move.ts do not look at the attr's own condition, so an IF added with addCondition would be silently ignored (`reusableAlone.if` is false); a rule that needs 'only while at full HP' cannot use this block until the readers pass the attr through the condition check.",

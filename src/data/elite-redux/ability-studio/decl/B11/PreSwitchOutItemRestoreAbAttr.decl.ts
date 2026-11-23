@@ -34,7 +34,7 @@ export default defineDecl(PreSwitchOutItemRestoreAbAttr, {
   tier: "B",
   kind: "event-effect",
   when: "event.switch-out",
-  label: "Get my remembered items back when I switch out",
+  label: "Give back the items I remembered",
   summary: () =>
     "When I switch out after eating a berry, or while empty-handed, my eaten berries count as uneaten and I get back the items I remembered entering with.",
   synonyms: [

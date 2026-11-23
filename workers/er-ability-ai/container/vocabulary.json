@@ -212,6 +212,23 @@
       "composable": true
     },
     {
+      "id": "event.turn-start",
+      "kind": "event",
+      "dispatchKey": "PreemptivePriorityCounterAbAttr",
+      "provides": [
+        "holder"
+      ],
+      "label": "At the start of the turn, before anyone moves",
+      "group": "Turn",
+      "synonyms": [
+        "start of turn",
+        "turn begins",
+        "before moves",
+        "after commands are chosen",
+        "surprise"
+      ]
+    },
+    {
       "id": "event.wake-up",
       "kind": "event",
       "dispatchKey": "PostWakeUpAbAttr",
@@ -1088,6 +1105,24 @@
       "synonyms": [
         "lower foe stat",
         "aura"
+      ]
+    },
+    {
+      "id": "calc.recoil-taken",
+      "kind": "calc",
+      "dispatchKey": "RecoilDamageMultiplierAbAttr",
+      "provides": [
+        "holder"
+      ],
+      "label": "While the game calculates the recoil I take",
+      "group": "Damage and power",
+      "modifies": "recoilMultiplier",
+      "synonyms": [
+        "recoil",
+        "crash damage",
+        "recoil damage",
+        "jump kick crash",
+        "rock head"
       ]
     },
     {
@@ -5022,5 +5057,5 @@
       ]
     }
   ],
-  "hash": "1264fa83dbcdc7"
+  "hash": "04130ca78ceaf7"
 }

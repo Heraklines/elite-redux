@@ -4,11 +4,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// PARKED (not registered): the trigger this declaration needs does not exist in WHEN_REGISTRY yet, and an unknown trigger id makes the
-// catalog generator throw for the whole game. To activate it once the librarian has added the trigger (request R-B11-C2-08): move this file to
-// src/data/elite-redux/ability-studio/decl/B11/PreemptivePriorityCounterAbAttr.decl.ts (drop the .txt), set `when` to the real id, regenerate the catalog, and
-// run chunk2.test.ts (its rebuild half switches on by itself when the declaration is registered).
-
 // B11 chunk 2 / event-effect (Tier C: one effect that carries its own per-foe tests; the trigger and the holder-side IF stay swappable).
 //
 // Read by hand from archetypes/preemptive-priority-counter.ts and phases/turn-start-phase.ts. The class extends only AbAttr (no
@@ -26,8 +21,8 @@
 // attr-level condition (`addCondition`), which the engine reads before it calls the class. That is the IF block of this rule, and
 // recomposeAttr carries it over. The four per-foe tests are what makes the effect, and the move, its power and the "priority above 0"
 // line are fixed in the class (no constructor argument), so they cannot be settings without a class change (request R-B11-C2-07).
-// The trigger "at the start of each turn, before anyone moves" has no WHEN in the library (request R-B11-C2-08), so `when` names the
-// requested id.
+// The trigger "at the start of each turn, before anyone moves" is the library WHEN event.turn-start (added with this
+// declaration; the class is found by a by-name scan in TurnStartPhase).
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 import { PreemptivePriorityCounterAbAttr } from "#data/elite-redux/archetypes/preemptive-priority-counter";
 
@@ -67,7 +62,7 @@ export default defineDecl(PreemptivePriorityCounterAbAttr, {
     },
   ],
   l2StaticReason:
-    "The class is found by a by-name scan in TurnStartPhase, never dispatched with applyAbAttrs, and the trigger it needs has no WHEN in the library yet (request R-B11-C2-08). test/tests/elite-redux/decomp/B11/chunk2.test.ts drives queueCounters on the original and on the rebuild against foes that chose a priority move, a normal move and a switch.",
+    "The class is found by a by-name scan in TurnStartPhase, never dispatched with applyAbAttrs, and its trigger is the by-name WHEN event.turn-start, so no applyAbAttrs trace event shows it evaluated. test/tests/elite-redux/decomp/B11/chunk2.test.ts drives queueCounters on the original and on the rebuild against foes that chose a priority move, a normal move and a switch.",
   status: "decomposed",
   notes:
     "Tier C package, justified in the header. Only user: Surprise! (5327, its only attr), with the attr-level condition `fog or eerie fog, not suppressed` (a closure from archetype-dispatcher getWeatherCondition; carried over by recomposeAttr, not a constructor argument, so nothing is bound). Remark, NOT fixed: with two opposing foes in doubles, one MovePhase is unshifted for EACH qualifying foe, in `getOpponents()` order. The class itself does not check whether the holder can act (it only queues the move; the MovePhase decides).",

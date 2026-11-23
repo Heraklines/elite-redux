@@ -26,7 +26,7 @@ export default defineDecl(RechargeChargedOnElectricKoAbAttr, {
   tier: "B",
   kind: "event-effect",
   when: "event.on-win",
-  label: "Become charged after an Electric move knocks out a foe",
+  label: "Charge up again for my next Electric move (double damage)",
   summary: () =>
     "When my direct attack knocks out a foe and my last move was an Electric-type move, I become charged: my next Electric move does double damage. Example: Energized.",
   synonyms: [

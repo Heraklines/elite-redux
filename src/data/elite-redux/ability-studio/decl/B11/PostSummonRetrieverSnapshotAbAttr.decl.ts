@@ -24,7 +24,7 @@ export default defineDecl(PostSummonRetrieverSnapshotAbAttr, {
   tier: "A",
   kind: "event-effect",
   when: "event.on-entry",
-  label: "Remember the items I hold when I enter",
+  label: "Remember the items I hold now",
   summary: () =>
     "When I enter the battle I note which held items I carry. Another effect can give them back later (the shipped one hands them back when I switch out empty-handed).",
   synonyms: [

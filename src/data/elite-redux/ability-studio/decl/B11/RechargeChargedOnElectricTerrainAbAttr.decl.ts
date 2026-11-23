@@ -27,7 +27,7 @@ export default defineDecl(RechargeChargedOnElectricTerrainAbAttr, {
   tier: "B",
   kind: "event-effect",
   when: "event.terrain-changed",
-  label: "Become charged when Electric Terrain begins",
+  label: "Become charged (my next Electric move does double damage)",
   summary: () =>
     "When a new terrain begins and it is Electric Terrain, I become charged: my next Electric move does double damage. Example: Energized and Generator.",
   synonyms: [

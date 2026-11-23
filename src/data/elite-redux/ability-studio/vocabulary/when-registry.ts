@@ -125,6 +125,16 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
 
     composable: true,
   }),
+  event(
+    "event.turn-start",
+    "PreemptivePriorityCounterAbAttr",
+    [H],
+    "At the start of the turn, before anyone moves",
+    "Turn",
+    {
+      synonyms: ["start of turn", "turn begins", "before moves", "after commands are chosen", "surprise"],
+    },
+  ),
   event("event.wake-up", "PostWakeUpAbAttr", [H], "When I wake up", "Turn", { legacyHookId: "PostWakeUpAbAttr" }),
   event("event.flinched", "FlinchEffectAbAttr", [H, SIM], "When I flinch", "Turn", {
     legacyHookId: "FlinchEffectAbAttr",
@@ -554,6 +564,17 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     "statValue",
     {
       synonyms: ["lower foe stat", "aura"],
+    },
+  ),
+  calc(
+    "calc.recoil-taken",
+    "RecoilDamageMultiplierAbAttr",
+    [H],
+    "While the game calculates the recoil I take",
+    "Damage and power",
+    "recoilMultiplier",
+    {
+      synonyms: ["recoil", "crash damage", "recoil damage", "jump kick crash", "rock head"],
     },
   ),
   calc(

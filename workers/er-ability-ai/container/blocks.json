@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "1ed3d438faf95e",
+  "vocabularyHash": "04130ca78ceaf7",
+  "hash": "16abdae49865a0",
   "blocks": [
     {
       "id": "block.ally-faint-power-boost",
@@ -666,7 +666,7 @@
     {
       "id": "block.post-summon-retriever-snapshot",
       "className": "PostSummonRetrieverSnapshotAbAttr",
-      "label": "Remember the items I hold when I enter",
+      "label": "Remember the items I hold now",
       "summary": "When I enter the battle I note which held items I carry. Another effect can give them back later (the shipped one hands them back when I switch out empty-handed).",
       "tier": "A",
       "kind": "event-effect",
@@ -1194,7 +1194,7 @@
     {
       "id": "block.pre-switch-out-item-restore",
       "className": "PreSwitchOutItemRestoreAbAttr",
-      "label": "Get my remembered items back when I switch out",
+      "label": "Give back the items I remembered",
       "summary": "When I switch out after eating a berry, or while empty-handed, my eaten berries count as uneaten and I get back the items I remembered entering with.",
       "tier": "B",
       "kind": "event-effect",
@@ -1228,6 +1228,46 @@
         "Items only come back when I hold nothing at that moment (eaten berries are forgotten either way)",
         "Gives back copies of the remembered items, each marked as mine, so the memory survives another strip and switch",
         "Never in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.preemptive-priority-counter",
+      "className": "PreemptivePriorityCounterAbAttr",
+      "label": "Flinch foes that chose a priority move before they act",
+      "summary": "At the start of the turn, every foe that picked a move with priority above 0 is hit first by a free 40 power Astonish, which can make it flinch. Example: Surprise! in fog.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.turn-start",
+      "whenLabel": "At the start of the turn, before anyone moves",
+      "synonyms": [
+        "surprise",
+        "astonish first",
+        "counter priority moves",
+        "stop quick attack",
+        "flinch priority users",
+        "pre-empt the foe"
+      ],
+      "examples": [
+        "In fog, Astonish any foe that is about to use a priority move like Quick Attack"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only a foe that chose to attack counts (not one that switches, uses an item or has its turn skipped)",
+        "The foe's move priority is read for that foe, so abilities that change priority count",
+        "Each such foe is hit once, for free (no PP used), before any move of the turn"
       ],
       "effect": {
         "id": "effect.package",
@@ -1415,7 +1455,7 @@
     {
       "id": "block.recharge-charged-on-electric-ko",
       "className": "RechargeChargedOnElectricKoAbAttr",
-      "label": "Become charged after an Electric move knocks out a foe",
+      "label": "Charge up again for my next Electric move (double damage)",
       "summary": "When my direct attack knocks out a foe and my last move was an Electric-type move, I become charged: my next Electric move does double damage. Example: Energized.",
       "tier": "B",
       "kind": "event-effect",
@@ -1460,7 +1500,7 @@
     {
       "id": "block.recharge-charged-on-electric-terrain",
       "className": "RechargeChargedOnElectricTerrainAbAttr",
-      "label": "Become charged when Electric Terrain begins",
+      "label": "Become charged (my next Electric move does double damage)",
       "summary": "When a new terrain begins and it is Electric Terrain, I become charged: my next Electric move does double damage. Example: Energized and Generator.",
       "tier": "B",
       "kind": "event-effect",
@@ -1503,6 +1543,60 @@
         "do": true
       },
       "uses": 2
+    },
+    {
+      "id": "block.recoil-damage-multiplier",
+      "className": "RecoilDamageMultiplierAbAttr",
+      "label": "Take less recoil damage",
+      "summary": "The recoil I take from my own moves (and the crash damage when a move like Jump Kick misses) is multiplied by 0.5. Example: 0.5 = half recoil.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.recoil-taken",
+      "whenLabel": "While the game calculates the recoil I take",
+      "synonyms": [
+        "half recoil",
+        "reduce recoil",
+        "recoil reduction",
+        "less crash damage",
+        "limber",
+        "daredevil",
+        "steadfast"
+      ],
+      "examples": [
+        "Take half the recoil damage from my moves, like Daredevil"
+      ],
+      "params": [
+        {
+          "id": "factor",
+          "label": "Recoil multiplier (0.5 = half recoil, 0.25 = a quarter)",
+          "control": "number",
+          "default": 0.5,
+          "editable": true,
+          "min": 0.05,
+          "max": 0.95,
+          "step": 0.05
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Counts for recoil moves and for the crash damage of moves like Jump Kick when they miss",
+        "Recoil that is a share of my max HP (instead of the damage I dealt) is multiplied too",
+        "Several effects like this on one Pokemon multiply together"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "factor"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 4
     },
     {
       "id": "block.reflect-damage-on-defend",
