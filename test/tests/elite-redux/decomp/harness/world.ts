@@ -400,4 +400,29 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     hitCount: new NumberHolder(1),
     opponent: ctx.foe,
   }),
+  // Added by B09 chunk 4 (request R-B09-30). Move.calculateBattleAccuracy (move.ts:1239): the TARGET is the holder, the user is the
+  // opponent, the number is the move accuracy.
+  "calc.incoming-accuracy": ctx => ({
+    pokemon: ctx.holder,
+    opponent: ctx.foe,
+    move: ctx.move,
+    simulated: false,
+    accuracy: new NumberHolder(ctx.move.accuracy),
+  }),
+  // Added by B09 chunk 4 (request R-B09-30). FaintPhase (faint-phase.ts:268) fans PostKnockOutAbAttr out to every Pokemon on the
+  // field with the fainted one as `victim`. The victim's latest received attack (index 0, move-effect-phase.ts:989) is set to a
+  // direct hit by the holder, so the holder is the one credited with the knock-out and the "direct hit" rule is reachable.
+  "event.on-ko": ctx => {
+    ctx.foe.turnData.attacksReceived = [
+      {
+        move: ctx.move.id,
+        result: HitResult.EFFECTIVE,
+        damage: ctx.damage,
+        critical: false,
+        sourceId: ctx.holder.id,
+        sourceBattlerIndex: ctx.holder.getBattlerIndex(),
+      },
+    ];
+    return { pokemon: ctx.holder, victim: ctx.foe, simulated: false };
+  },
 };

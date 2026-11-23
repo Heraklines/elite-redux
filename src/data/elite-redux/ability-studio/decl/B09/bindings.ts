@@ -209,6 +209,49 @@ bindCondition(6094, 1, { id: "move.flag", flag: "PUNCHING_MOVE" }, "gate"); // T
 bindCondition(6103, 2, { id: "move.flag", flag: "BITING_MOVE" }, "gate"); // World-Eater
 
 // =============================================================================================
+// B09 chunk 4. Only the two Tier B classes have a closure slot: LifestealOnHitAbAttr and ScavengerLootAbAttr (slot "gate").
+// The other six (TypeAbsorbHeal, TypeAbsorbStatBoost, TypeAbsorbHighestAttackStatBoost, IncomingAccuracyMultiplier,
+// LifestealOnKo, MoveCategoryOverride) take no closure, so they have nothing to bind. Every line below was written after reading
+// archetypes/lifesteal.ts and the live attrs of all users (a throwaway dump of allAttrSites(): healFraction, filter, chance).
+// =============================================================================================
+
+// ---------------------------------------------------------------------------------------------
+// LifestealOnHitAbAttr. Slot gate = clauses 3-4 of the old canApply:
+//   `filter.targetTag !== undefined && target.getTag(targetTag) === undefined` -> false, then
+//   `matchesFilter(filter, user, move)`: (type -> user.getMoveType(move) === type) AND (flag -> move.hasFlag(flag)).
+// The status-move and null-target tests are guards() of the class, the damage test is its residual(); none is bound.
+// ---------------------------------------------------------------------------------------------
+// Energy Siphon and Energy Tap: an empty filter, so the gate is always true.
+bindCondition(5449, 0, { all: [] }, "gate"); // Energy Siphon
+bindCondition(5576, 0, { all: [] }, "gate"); // Energy Tap
+// Hydro Circuit (Water moves): move.type with effective true evaluates `moveUser.getMoveType(move) === type`, and for this WHEN
+// the moveUser is the holder, the same call as `pokemon.getMoveType(move)` in matchesFilter.
+bindCondition(5159, 1, { id: "move.type", type: "WATER", effective: true }, "gate"); // Hydro Circuit
+// Pure Love (heal only against an infatuated target): tag.has on the OTHER Pokemon is `other.getTag(INFATUATED) !== undefined`,
+// the negation of the class test, and the frame's other is the opponent of the hit.
+bindCondition(5238, 2, { id: "tag.has", who: "other", tag: "INFATUATED" }, "gate"); // Pure Love
+// The four property filters read the PRINTED property (`move.hasFlag(flag)`, no ability injection, no contact special cases).
+// move.flag calls doesFlagEffectApply, which also counts properties that other abilities inject (Rapier turns slicing into horn,
+// Taekkyeon makes attacks dances) and has special contact rules, so it would change behaviour while such an ability is in play.
+// Request R-B09-01 (an atom on move.hasFlag).
+const PRINTED_FLAG_LIFESTEAL =
+  "no library atom reads the move's own printed property (move.hasFlag): move.flag also counts properties that other abilities inject and has special contact rules, which would change behaviour; request R-B09-01";
+bindLegacyClosure(5122, 0, `${PRINTED_FLAG_LIFESTEAL} (Nosferatu, contact)`, "gate");
+bindLegacyClosure(5390, 0, `${PRINTED_FLAG_LIFESTEAL} (Vitality Strike, punching)`, "gate");
+bindLegacyClosure(5452, 2, `${PRINTED_FLAG_LIFESTEAL} (Energy Horns, horn)`, "gate");
+bindLegacyClosure(6094, 2, `${PRINTED_FLAG_LIFESTEAL} (Twin Lion Fists, punching)`, "gate");
+
+// ---------------------------------------------------------------------------------------------
+// ScavengerLootAbAttr. Slot gate = clause 4 of the old canApply: random draw 1,
+// `pokemon.randBattleSeedInt(100) >= Math.round(lootChance * 100)` -> false. rng.chance evaluates
+// `frame.holder.randBattleSeedInt(100) < pct` at this position (pct is a whole percent; both users are 50), so it is the same
+// draw and the same comparison. The guards (not simulated, alive, direct hit) run first in the class and the item clauses
+// (residual) after it, so the draw sits where it always sat. The `chance` setting moves `pct` through gateParams.
+// ---------------------------------------------------------------------------------------------
+bindCondition(5083, 1, { id: "rng.chance", pct: 50 }, "gate"); // Scavenger
+bindCondition(5702, 1, { id: "rng.chance", pct: 50 }, "gate"); // Bandit
+
+// =============================================================================================
 // B09 chunk 1. The Tier B gates of FieldStatShareAbAttr, FireUseFormChangeAbAttr and FireHitFormChangeAbAttr.
 // Every line was written by hand after reading archetypes/field-stat-share.ts and archetypes/fire-interaction-form-change.ts and the
 // live attrs of all users. The other five classes of the chunk (the two hazard markers, EntryTailwindClearWeatherAbAttr,

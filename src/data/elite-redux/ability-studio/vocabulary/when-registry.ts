@@ -985,6 +985,7 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
       "IgnoreGenderInfatuationAbAttr",
       "IgnoreProtectByFlagAbAttr",
       "IgnoreProtectOnContactAbAttr",
+      "MoveCategoryOverrideAbAttr",
       "OverruleCritAbAttr",
       "SpreadTargetByFlagAbAttr",
       "StealthRockImmunityAbAttr",
