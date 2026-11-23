@@ -20,6 +20,7 @@
 //   StatTriggerOnAllyStatLoweredAbAttr gate  stage.just-changed { lowered }
 //   StatusCascadeAbAttr                gate  status.has { other, Poison }
 //   PerFaintStatMultiplierAbAttr, StatTriggerOnEntryAbAttr: nothing to bind (no closure, no gate)
+// Classes of chunk 5 (the four weather classes): every gate is a legacy-closure until the weather atom exists (R-B12-39), see the end of the file.
 import { bindCondition, bindLegacyClosure } from "#data/elite-redux/ability-studio/bindings";
 
 type Site = readonly [abilityId: number, attrIndex: number, name: string];
@@ -498,4 +499,38 @@ const WEATHER_MOVES = [
 bindEach({ any: WEATHER_MOVES.map(moveId => ({ id: "move.is-move", moveId })) }, [
   [5092, 0, "Weather Control"],
   [5540, 1, "Neutralizing Fog"],
+]);
+
+// =============================================================================================
+// Chunk 5: the four weather classes. Every gate is a legacy-closure today: the weather test is "one of the listed weathers is on AND
+// the weather's effects are not switched off (Cloud Nine / Air Lock)", and the library's `field.weather` is `arena.weatherType === X`,
+// which has no suppression test and takes one weather. Binding it would change behaviour under Cloud Nine (request R-B12-39).
+// Nothing here is bound to a lookalike: a legacy-closure keeps the class's own gate running unchanged.
+//   WeatherStatMultiplierAbAttr   5 attrs  gate legacy (the stat test is the class's own `guards`)
+//   WeatherTypeBoostAbAttr        2 attrs  gate legacy (the move-type half maps to `move.type { effective }`, the weather half does not)
+//   WeatherDamageReductionAbAttr  2 attrs  gate legacy
+//   WeatherGroundAirborneAbAttr   1 attr   parked declaration (R-B12-40), so no binding yet: Desert Spirit 5311 attr 1
+// =============================================================================================
+const WEATHER_GATE_REASON =
+  "needs an atom for 'one of these weathers is on and its effects are not switched off' (arena.weather?.isEffectSuppressed() is false and arena.weatherType is in the list); field.weather takes one weather and has no suppression test; request R-B12-39";
+
+legacyEach(WEATHER_GATE_REASON, [
+  [5563, 0, "Thermal Slide (Speed x1.5 in Sun, Extremely harsh sunlight, Hail, Snow)"],
+  [5331, 0, "Ethereal Rush (Speed x1.5 in Fog, Eerie fog)"],
+  [5503, 0, "Rite Of Spring (Speed x1.5 in Sun, Extremely harsh sunlight)"],
+  [5359, 0, "Smokey Maneuvers (Evasion x4/3 in Fog, Eerie fog)"],
+  [5719, 0, "Abominable Monster (Sp. Def x1.5 in Hail, Snow)"],
+]);
+
+legacyEach(
+  `${WEATHER_GATE_REASON}; the move-type half of this gate is move.type { effective: true } and the final binding is all [move.type, weather atom]`,
+  [
+    [5296, 0, "Catastrophe attr 0 (Rock moves x1.5 in Hail, Snow)"],
+    [5296, 1, "Catastrophe attr 1 (Ice moves x1.5 in a Sandstorm)"],
+  ],
+);
+
+legacyEach(WEATHER_GATE_REASON, [
+  [5021, 0, "Christmas Spirit (x0.5 damage taken in Hail, Snow)"],
+  [5167, 0, "Dune Terror (x0.65 damage taken in a Sandstorm)"],
 ]);
