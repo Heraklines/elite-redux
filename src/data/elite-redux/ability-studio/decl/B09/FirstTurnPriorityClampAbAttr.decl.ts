@@ -36,11 +36,11 @@ export default defineDecl(FirstTurnPriorityClampAbAttr, {
   examples: ["Every move gets +1 priority on my first turn and slow moves count as normal speed, like Overwatch"],
   params: [],
   noParamsReason:
-    "The class has no constructor arguments: the first-turn test, the +1 and the lift of negative priority to 0 are fixed in the class. Staff reach a plain +1 with a composed rule (time.first-turn + effect.change-priority); only the clamp of negative priority has no library effect (R-B09-05).",
+    "The class has no constructor arguments: the first-turn test, the +1 and the lift of negative priority to 0 are fixed in the class. The effect is the planned effect.lift-slow-move-priority (R-B09-05). A plain effect.change-priority by +1 is NOT the same rule: it turns -5 into -4, the class makes it 0.",
   conditions: [{ slot: "gate", ctx: "params", lib: "time.first-turn", removable: true, editable: true }],
   guards: [],
   feasibility: [],
-  effect: { id: "effect.change-priority", params: [] },
+  effect: { id: "effect.lift-slow-move-priority", params: [] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "none", simulated: "ignores" },
   probes: [
@@ -51,5 +51,5 @@ export default defineDecl(FirstTurnPriorityClampAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "Tier B. 2 users: On the Prowl (5352 attr 0) and Overwatch (5429 attr 1), both bound to time.first-turn. The effect is not the plain `change priority by N`: a negative priority is set to 0 instead of being raised by 1, so a -1 move ends at 0 and a 0 move at +1. The declared effect id is the closest word (R-B09-05 asks for the clamp). The first turn is `waveTurnCount === 1`, which the engine increments at turn end and decrements on a switch-in that costs the turn; a Pokemon that never gets to act on its first turn loses the bonus. The two classes in this file that share the priority hook (FirstFlagged and this one) are independent: this one reads no memory. Parent ChangeMovePriorityAbAttr (B05) will get its own gate/gateOverride members; at merge this class's gateOverride and gate need the `override` keyword.",
+    "Tier B. 2 users: On the Prowl (5352 attr 0) and Overwatch (5429 attr 1), both bound to time.first-turn. The effect is not the plain `change priority by N`: a negative priority is set to 0 instead of being raised by 1, so a -1 move ends at 0 and a 0 move at +1. The effect is declared truthfully as the planned effect.lift-slow-move-priority (R-B09-05, implemented:false), not as effect.change-priority, because a -5 move becomes 0 here but -4 with a plain +1. The first turn is `waveTurnCount === 1`, which the engine increments at turn end and decrements on a switch-in that costs the turn; a Pokemon that never gets to act on its first turn loses the bonus. The two classes in this file that share the priority hook (FirstFlagged and this one) are independent: this one reads no memory. Parent ChangeMovePriorityAbAttr (B05) will get its own gate/gateOverride members; at merge this class's gateOverride and gate need the `override` keyword.",
 });

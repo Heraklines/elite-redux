@@ -17,9 +17,9 @@ import { enumListCodec } from "#data/elite-redux/ability-studio/param-codecs";
 //                                                  classes, cleared on switch-out with the rest of tempSummonData)  -> guards()
 //   2. `flags.some(flag => move.hasFlag(flag))`    the move carries one of the printed flags (move.hasFlag, NOT
 //                                                  doesFlagEffectApply)                                              -> gate (IF)
-// apply: `priority.value += 1`. The constructor passes `() => false` and 0 to the parent, so the parent's own rule and
-// amount are dead; the +1 is hard-coded here. No random draw, nothing reads `simulated`.
-// Constructor: (flag | flags[]). Quick Charge (arrow or reckless moves) and Flicker Jab (horn or punching moves) pass two.
+// apply: `priority.value += amount` (ctor arg, default 1). The constructor passes `() => false` and 0 to the parent, so the parent's own rule and
+// amount are dead. No random draw, nothing reads `simulated`.
+// Constructor: (flag | flags[], amount = 1). Quick Charge (arrow or reckless moves) and Flicker Jab (horn or punching moves) pass two.
 // Tier B: guards = clause 1, gate = clause 2, no prepare, no residual.
 //
 // Why the gate stays a legacy-closure for all 9 users: the library atom move.flag calls doesFlagEffectApply, which also
@@ -65,6 +65,19 @@ export default defineDecl(FirstFlaggedMovePriorityAbAttr, {
       default: "SLICING_MOVE",
       codec: enumListCodec(MoveFlags, "move property"),
     },
+    {
+      id: "amount",
+      gateIndependent: true,
+      ctorIndex: 1,
+      path: "amount",
+      control: "number",
+      min: -7,
+      max: 7,
+      step: 1,
+      label: "Priority steps added to the move (+1 = one step earlier)",
+      editable: true,
+      default: 1,
+    },
   ],
   conditions: [
     // The gate: "the move carries the printed property". Each user's binding names its own list (bindings.ts).
@@ -74,7 +87,7 @@ export default defineDecl(FirstFlaggedMovePriorityAbAttr, {
   feasibility: [
     "The bonus must not be spent yet (it is spent by a move of the chosen kind, and some abilities give it back); it resets when I switch out",
   ],
-  effect: { id: "effect.change-priority", params: [] },
+  effect: { id: "effect.change-priority", params: ["amount"] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "entry", simulated: "ignores" },
   probes: [
@@ -85,5 +98,5 @@ export default defineDecl(FirstFlaggedMovePriorityAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "Tier B. 9 users: Coil Up (5040 attr 0), Sidewinder (5380 attr 0), Cutthroat (5444 attr 0), Edgelord (5583 attr 0), Curlipede (5687 attr 1), First Serpent (5933 attr 0), Head First (6033 attr 0), Quick Charge (6092 attr 0, two flags), Flicker Jab (6093 attr 0, two flags). All 9 gates are legacy-closure pending request R-B09-01 (an atom that calls move.hasFlag; the existing move.flag atom sees injected flags, which would change behaviour with Rapier or Taekkyeon in play). The +1 is hard-coded in apply (the parent's changeAmount is 0 and never used), so the effect has no amount setting. The memory lives in tempSummonData under a module-private Symbol; the sister classes ConsumeFirstFlaggedMovePriorityAbAttr, ConsumeFirstFlaggedMoveOnUseAbAttr and RearmFirstFlaggedMoveOnMoveAbAttr write it. The rebuild shares it because it reads the same Symbol. Parent ChangeMovePriorityAbAttr (B05) will get its own gate/gateOverride members; at merge this class's gateOverride and gate need the `override` keyword.",
+    "Tier B. 9 users: Coil Up (5040 attr 0), Sidewinder (5380 attr 0), Cutthroat (5444 attr 0), Edgelord (5583 attr 0), Curlipede (5687 attr 1), First Serpent (5933 attr 0), Head First (6033 attr 0), Quick Charge (6092 attr 0, two flags), Flicker Jab (6093 attr 0, two flags). All 9 gates are legacy-closure pending request R-B09-01 (an atom that calls move.hasFlag; the existing move.flag atom sees injected flags, which would change behaviour with Rapier or Taekkyeon in play). The priority step is the constructor argument amount (default 1, so all 9 users keep +1); the parent's changeAmount is 0 and never used. The memory lives in tempSummonData under a module-private Symbol; the sister classes ConsumeFirstFlaggedMovePriorityAbAttr, ConsumeFirstFlaggedMoveOnUseAbAttr and RearmFirstFlaggedMoveOnMoveAbAttr write it. The rebuild shares it because it reads the same Symbol. Parent ChangeMovePriorityAbAttr (B05) will get its own gate/gateOverride members; at merge this class's gateOverride and gate need the `override` keyword.",
 });

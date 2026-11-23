@@ -30,10 +30,12 @@ function setUsedPriority(pokemon: ChangeMovePriorityAbAttrParams["pokemon"], use
 
 export class FirstFlaggedMovePriorityAbAttr extends ChangeMovePriorityAbAttr {
   private readonly flags: readonly MoveFlags[];
+  private readonly amount: number;
 
-  constructor(flag: MoveFlags | readonly MoveFlags[]) {
+  constructor(flag: MoveFlags | readonly MoveFlags[], amount = 1) {
     super(() => false, 0);
     this.flags = Array.isArray(flag) ? flag : [flag];
+    this.amount = amount;
   }
 
   /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
@@ -58,7 +60,7 @@ export class FirstFlaggedMovePriorityAbAttr extends ChangeMovePriorityAbAttr {
   }
 
   override apply({ priority }: ChangeMovePriorityAbAttrParams): void {
-    priority.value += 1;
+    priority.value += this.amount;
   }
 }
 
