@@ -255,8 +255,8 @@ describe("B13 chunk 1 review fix: constructor params keep the old values as defa
 
   it("the declarations expose these values as params that read back from a live instance and can be rebuilt", () => {
     const cases: [string, Record<string, number | string>][] = [
-      ["FinalSeasonEntryAbAttr", { tag: "ER_QUASHED", turns: 2 }],
-      ["FinalSeasonFogAbAttr", { weather: "EERIE_FOG", turns: 5 }],
+      ["FinalSeasonEntryAbAttr", { tag: "Move last (Quash-like)", turns: 2 }],
+      ["FinalSeasonFogAbAttr", { weather: "Eerie Fog", turns: 5 }],
       ["FinalSeasonPowerAbAttr", { multiplier: 1.3 }],
       ["FoulHarvestAbAttr", { ppDrain: 1, maxCharges: 3 }],
       ["PorousSoundReductionAbAttr", { multiplier: 0.5 }],

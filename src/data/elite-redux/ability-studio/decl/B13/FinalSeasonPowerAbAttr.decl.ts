@@ -24,11 +24,11 @@ export default defineDecl(FinalSeasonPowerAbAttr, {
   tier: "B",
   kind: "calc-modifier",
   when: "calc.move-power",
-  label: "Boost Dark and Flying moves by 1.3x in my own Eerie Fog",
+  label: "Boost Dark and Flying moves in my own Eerie Fog",
   summary: params =>
-    `While the Eerie Fog on the field is the one I set, my Dark and Flying moves have ${params.multiplier}x power. Example: a 100 power Dark move becomes ${Math.round(100 * Number(params.multiplier))}.`,
+    `While the Eerie Fog on the field is the one I set, my Dark and Flying moves have ${params.multiplier} times their power. Example: a 100 power Dark move becomes ${Math.round(100 * Number(params.multiplier))}.`,
   synonyms: ["weather power boost", "fog boost", "dark and flying boost", "own weather bonus", "final season"],
-  examples: ["Dark and Flying moves are 30% stronger while my own Eerie Fog is up"],
+  examples: ["Dark and Flying moves are stronger while the Eerie Fog I set is up"],
   params: [
     {
       id: "multiplier",

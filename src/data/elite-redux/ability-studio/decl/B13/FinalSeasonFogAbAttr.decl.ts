@@ -18,8 +18,23 @@
 //   No RNG. Effect = set the weather, an existing effect block (effect.set-weather).
 import { FinalSeasonFogAbAttr } from "#data/elite-redux/abilities/newcomer-signature-mechanics";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
-import { enumCodec, enumOptions } from "#data/elite-redux/ability-studio/param-codecs";
 import { WeatherType } from "#enums/weather-type";
+
+// Player-facing weather names (never the enum constants).
+const WEATHER_CHOICES: Record<string, WeatherType> = {
+  "Eerie Fog": WeatherType.EERIE_FOG,
+  Sun: WeatherType.SUNNY,
+  Rain: WeatherType.RAIN,
+  Sandstorm: WeatherType.SANDSTORM,
+  Hail: WeatherType.HAIL,
+  Snow: WeatherType.SNOW,
+  "Plain fog": WeatherType.FOG,
+  "Heavy rain": WeatherType.HEAVY_RAIN,
+  "Harsh sun": WeatherType.HARSH_SUN,
+  "Strong winds": WeatherType.STRONG_WINDS,
+  "Tempest storm": WeatherType.TEMPEST_STORM,
+  "Snowy wrath": WeatherType.SNOWY_WRATH,
+};
 
 export default defineDecl(FinalSeasonFogAbAttr, {
   tier: "B",
@@ -27,9 +42,9 @@ export default defineDecl(FinalSeasonFogAbAttr, {
   when: "event.end-of-turn",
   label: "Set the weather at turn end after my switch-in effect",
   summary: params =>
-    `At the end of a turn, if my switch-in effect happened this turn, the weather becomes ${params.weather} for ${params.turns} turns, and I remember it as my own weather.`,
+    `At the end of a turn, if my switch-in effect happened this turn, the weather becomes "${params.weather}" for ${params.turns} turns, and I remember it as my own weather.`,
   synonyms: ["delayed weather", "fog", "eerie fog", "end of turn weather", "set weather later", "final season"],
-  examples: ["Set Eerie Fog at the end of the turn when my special switch-in effect happened"],
+  examples: ["Change the weather at the end of the turn when my special switch-in effect happened"],
   params: [
     {
       id: "weather",
@@ -39,9 +54,18 @@ export default defineDecl(FinalSeasonFogAbAttr, {
       label: "Weather",
       editable: true,
       gateIndependent: true,
-      default: "EERIE_FOG",
-      options: enumOptions(WeatherType),
-      codec: enumCodec(WeatherType, "weather"),
+      default: "Eerie Fog",
+      options: Object.keys(WEATHER_CHOICES),
+      codec: {
+        toCtor: value => {
+          const resolved = WEATHER_CHOICES[String(value)];
+          if (resolved === undefined) {
+            throw new Error(`"${String(value)}" is not a known weather`);
+          }
+          return resolved;
+        },
+        fromInstance: raw => Object.keys(WEATHER_CHOICES).find(name => WEATHER_CHOICES[name] === raw),
+      },
     },
     {
       id: "turns",
@@ -64,7 +88,8 @@ export default defineDecl(FinalSeasonFogAbAttr, {
   ],
   guards: [],
   feasibility: [
-    "The field must accept Eerie Fog (a primal weather such as Heavy Rain or Harsh Sun cannot be overwritten)",
+    "The field must accept the weather (a primal weather such as Heavy Rain or Harsh Sun cannot be overwritten)",
+    "Final Season's power boost only works while the weather is Eerie Fog, so choosing another weather here removes that boost",
   ],
   effect: { id: "effect.set-weather", params: ["weather", "turns"] },
   reusableAlone: { when: true, if: true, do: true },

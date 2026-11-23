@@ -20,8 +20,13 @@
 //   No RNG. The effect is "apply a battle effect to every foe", an existing effect block (effect.apply-tag).
 import { FinalSeasonEntryAbAttr } from "#data/elite-redux/abilities/newcomer-signature-mechanics";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
-import { enumOptions } from "#data/elite-redux/ability-studio/param-codecs";
 import { BattlerTagType } from "#enums/battler-tag-type";
+
+// Player-facing names for the battle effect put on the foes. Only effects whose meaning matches the label
+// ("make foes move last") are offered, so the label and the setting cannot contradict each other.
+const FOE_EFFECT_CHOICES: Record<string, BattlerTagType> = {
+  "Move last (Quash-like)": BattlerTagType.ER_QUASHED,
+};
 
 export default defineDecl(FinalSeasonEntryAbAttr, {
   tier: "B",
@@ -29,7 +34,7 @@ export default defineDecl(FinalSeasonEntryAbAttr, {
   when: "event.on-entry",
   label: "Make foes move last when I switch in on purpose",
   summary: params =>
-    `When I switch in on purpose, every foe gets the "${params.tag}" battle effect for ${params.turns} turns (by default: it moves last in its priority bracket), and my end-of-turn fog is made ready.`,
+    `When I switch in on purpose, every foe gets the effect "${params.tag}" for ${params.turns} turns (by default it moves after everyone else in its priority group), and my end-of-turn weather effect is made ready.`,
   synonyms: ["quash", "move last", "slow the foes", "delay the opponent", "switch in debuff", "final season"],
   examples: ["Foes move last for 2 turns when I am switched in by choice"],
   params: [
@@ -38,11 +43,21 @@ export default defineDecl(FinalSeasonEntryAbAttr, {
       ctorIndex: 0,
       path: "quashTag",
       control: "select",
-      label: "Battle effect put on every foe",
+      label: "Effect put on every foe",
       editable: true,
       gateIndependent: true,
-      default: "ER_QUASHED",
-      options: enumOptions(BattlerTagType),
+      default: "Move last (Quash-like)",
+      options: Object.keys(FOE_EFFECT_CHOICES),
+      codec: {
+        toCtor: value => {
+          const resolved = FOE_EFFECT_CHOICES[String(value)];
+          if (resolved === undefined) {
+            throw new Error(`"${String(value)}" is not a known effect for foes`);
+          }
+          return resolved;
+        },
+        fromInstance: raw => Object.keys(FOE_EFFECT_CHOICES).find(name => FOE_EFFECT_CHOICES[name] === raw),
+      },
     },
     {
       id: "turns",
