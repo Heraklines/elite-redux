@@ -1,8 +1,171 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "064860fcb25c91",
+  "hash": "0120700d751f08",
   "blocks": [
+    {
+      "id": "block.ally-faint-power-boost",
+      "className": "AllyFaintPowerBoostAbAttr",
+      "label": "Stronger moves while the teammate-faint boost lasts",
+      "summary": "While the boost timer runs, the power of all my moves is multiplied by 1.5 (1.5 = 50% stronger). The timer is started by the 'Start a short power boost when a teammate faints' block.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "avenger",
+        "cursed spirit",
+        "revenge power",
+        "boosted after a faint",
+        "power up while timer runs",
+        "stronger moves"
+      ],
+      "examples": [
+        "All my moves are 50% stronger for a turn after a teammate faints"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.5 = 50% stronger, 2 = double)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:1",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.ally-faint-power-boost-expire",
+      "className": "AllyFaintPowerBoostExpireAbAttr",
+      "label": "Count the teammate-faint boost down at the end of each turn",
+      "summary": "At the end of every turn, while the boost timer runs, it loses one turn, so a boost of 2 lasts through the next full turn and then stops.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "avenger timer",
+        "cursed spirit timer",
+        "boost runs out",
+        "tick down the boost",
+        "end the boost after a turn"
+      ],
+      "examples": [
+        "The power boost from a fainted teammate ends after the following turn"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Never in a preview",
+        "The timer never goes below 0"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.ally-faint-power-boost-trigger",
+      "className": "AllyFaintPowerBoostTriggerAbAttr",
+      "label": "Start a short power boost when a teammate faints",
+      "summary": "When a teammate of mine faints, a boost timer starts and lasts 2 turn ends (2 = the rest of this turn and the next full turn). It only works together with a power boost block that reads the timer.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-ko",
+      "whenLabel": "When I knock out a Pokemon",
+      "synonyms": [
+        "avenger",
+        "cursed spirit",
+        "revenge boost",
+        "teammate fainted",
+        "ally down boost",
+        "power up after a loss"
+      ],
+      "examples": [
+        "When a teammate faints, my moves get stronger until the end of next turn"
+      ],
+      "params": [
+        {
+          "id": "turns",
+          "label": "How many turn ends the boost lasts (2 = rest of this turn plus the next one)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "side.is",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only for a holder that is on the field when the teammate faints, so a teammate that faints on the bench is not seen",
+        "Never in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
     {
       "id": "block.attack-type-immunity",
       "className": "AttackTypeImmunityAbAttr",
@@ -563,6 +726,355 @@
         "do": true
       },
       "uses": 7
+    },
+    {
+      "id": "block.post-turn-foe-stat-drop",
+      "className": "PostTurnFoeStatDropAbAttr",
+      "label": "Lower the foes' stat each turn (can also trap them)",
+      "summary": "Each turn's end, Speed of every foe next to me changes by -1 stages (-1 = one lower). All foes next to me. Trap: never.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "sap trap",
+        "serpent bind",
+        "tentalock",
+        "chokehold",
+        "slow the foes every turn",
+        "bind and slow",
+        "trap at minus three",
+        "residual stat drop"
+      ],
+      "examples": [
+        "Lower the foes' Speed by one stage at the end of every turn and trap them at -3",
+        "Slow every trapped foe by one stage each turn"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat changes",
+          "control": "select",
+          "default": "Speed",
+          "editable": true,
+          "options": [
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Sp. Def",
+            "Speed",
+            "Accuracy",
+            "Evasion"
+          ]
+        },
+        {
+          "id": "stages",
+          "label": "Number of stages per turn (-1 = one stage lower, 1 = one stage higher)",
+          "control": "number",
+          "default": -1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "trapAtStage",
+          "label": "Trap the foe for 4 turns once its stat stage gets this low",
+          "control": "select",
+          "default": "Never trap",
+          "editable": true,
+          "options": [
+            "Never trap",
+            "When it reaches -1 or lower",
+            "When it reaches -2 or lower",
+            "When it reaches -3 or lower",
+            "When it reaches -4 or lower",
+            "When it reaches -5 or lower",
+            "When it reaches -6 or lower"
+          ]
+        },
+        {
+          "id": "onlyIfTrapped",
+          "label": "Only hit foes that are already trapped",
+          "control": "boolean",
+          "default": false,
+          "editable": true
+        },
+        {
+          "id": "inflictStatus",
+          "label": "Also try to give each hit foe this status condition",
+          "control": "select",
+          "default": "None",
+          "editable": true,
+          "options": [
+            "None",
+            "Poison",
+            "Toxic",
+            "Paralysis",
+            "Sleep",
+            "Freeze",
+            "Burn"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only foes next to me are hit (every foe in a normal battle), and never a foe that has fainted",
+        "The turn only counts for the ability when at least one living foe qualifies (a trapped one when the setting is on)",
+        "A foe counts as trapped for any kind of trapping effect, not only one",
+        "The status is only given when the foe can really receive it",
+        "Never in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "stat",
+          "stages",
+          "trapAtStage",
+          "onlyIfTrapped",
+          "inflictStatus"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.post-turn-random-pure-type",
+      "className": "PostTurnRandomPureTypeAbAttr",
+      "label": "Become one random single type every turn",
+      "summary": "At the end of every turn my types are replaced by one random single type out of the 18 normal types. Example: a Fire/Flying Pokemon can become just Water.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "color spectrum",
+        "random type each turn",
+        "type roulette",
+        "shuffle my type",
+        "rainbow type",
+        "mono type"
+      ],
+      "examples": [
+        "Change to a random single type at the end of every turn",
+        "Rotate my type randomly each turn like Color Spectrum"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [
+        "not-fainted"
+      ],
+      "feasibility": [
+        "Never in a preview",
+        "Only one type is left afterwards, never two"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.post-turn-scripted-move",
+      "className": "PostTurnScriptedMoveAbAttr",
+      "label": "Use a free move on the foe every few turns",
+      "summary": "Every 2 turns, at the end of the turn, I use Circle throw on the first living foe for free (no PP). Power 0 (0 = the move's own power).",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "sumo wrestler",
+        "cool exit",
+        "free move every other turn",
+        "scheduled attack",
+        "periodic move",
+        "auto attack every turn"
+      ],
+      "examples": [
+        "Throw the foe with a weak Circle Throw every second turn",
+        "Use Chilly Reception for free every other turn"
+      ],
+      "params": [
+        {
+          "id": "moveId",
+          "label": "Move to use (type its name, for example Circle Throw)",
+          "control": "text",
+          "default": "Circle throw",
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "power",
+          "label": "Base power of that move (0 = the move's own power)",
+          "control": "number",
+          "default": 0,
+          "editable": true,
+          "min": 0,
+          "max": 250,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "everyNTurns",
+          "label": "Use it every this many turns (1 = every turn, 2 = every other turn)",
+          "control": "number",
+          "default": 2,
+          "editable": false,
+          "min": 1,
+          "max": 20,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [
+        "not-fainted"
+      ],
+      "feasibility": [
+        "Needs a living foe: the first living foe on the field is the target",
+        "The move is cast for free (no PP used, nothing added to the move history)",
+        "Never in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "moveId",
+          "power"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.post-victory-clear-recharge",
+      "className": "PostVictoryClearRechargeAbAttr",
+      "label": "Skip my recharge turn after I knock out a foe",
+      "summary": "When my direct attack knocks out a foe while I must recharge (Hyper Beam, Giga Impact), the recharge turn is cancelled and I can act freely next turn.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-win",
+      "whenLabel": "When I win the fight",
+      "synonyms": [
+        "rampage",
+        "no recharge on ko",
+        "cancel recharge",
+        "hyper beam no rest",
+        "berserker rage",
+        "skip the rest turn"
+      ],
+      "examples": [
+        "Hyper Beam does not need a recharge turn when it knocks the target out"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "tag.has",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Also removes the placeholder move that the recharge queued for next turn, so I really can act freely",
+        "Never in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 7
+    },
+    {
+      "id": "block.post-weather-move-follow-up",
+      "className": "PostWeatherMoveFollowUpAbAttr",
+      "label": "Follow up my weather move with an attack on a foe",
+      "summary": "After I use a move that sets the weather, I use Weather ball on the first living foe for free, right after it. Example: Weather Ball after Rain Dance.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-any-move",
+      "whenLabel": "After anyone uses a move",
+      "synonyms": [
+        "forecast",
+        "weather ball after weather",
+        "follow up after rain dance",
+        "weather combo",
+        "free attack after weather"
+      ],
+      "examples": [
+        "Use Weather Ball for free right after I set the weather"
+      ],
+      "params": [
+        {
+          "id": "followUpMoveId",
+          "label": "Move to use afterwards (type its name, for example Weather Ball)",
+          "control": "text",
+          "default": "Weather ball",
+          "editable": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A living foe must still be standing: the first living foe on the field is the target",
+        "The follow-up is cast for free (no PP used, nothing added to the move history) and shows the ability banner",
+        "Never in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "followUpMoveId"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.received-move-damage-multiplier",

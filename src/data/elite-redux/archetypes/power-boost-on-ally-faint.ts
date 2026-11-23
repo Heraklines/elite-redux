@@ -35,14 +35,36 @@ import {
   type PostKnockOutAbAttrParams,
   PostTurnAbAttr,
 } from "#abilities/ab-attrs";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { Pokemon } from "#field/pokemon";
+import type { PokemonAttackCondition } from "#types/ability-types";
 
 const TURNS = Symbol("PowerBoostOnAllyFaint.turns");
 
 const isActive = (pokemon: Pokemon): boolean => ((pokemon as unknown as Record<symbol, number>)[TURNS] ?? 0) > 0;
 
 export class AllyFaintPowerBoostTriggerAbAttr extends PostKnockOutAbAttr {
-  override canApply({ pokemon, victim }: PostKnockOutAbAttrParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostKnockOutAbAttrParams) => boolean) | undefined;
+
+  /**
+   * @param turns - How many turn ticks the boost lasts once armed. The default (2: this turn's remainder plus the
+   *   full following turn) is what `new AllyFaintPowerBoostTriggerAbAttr()` has always done; the ability studio sets it.
+   */
+  public readonly turns: number;
+
+  constructor(turns = 2) {
+    super();
+    this.turns = turns;
+  }
+
+  /** Tier B split (ability studio spec 3.1): the whole rule is the gate, nothing stays behind as a residual. */
+  override canApply(params: PostKnockOutAbAttrParams): boolean {
+    return gatedCanApply<PostKnockOutAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the Pokemon that fainted is a teammate of the holder (not the holder itself). */
+  public gate({ pokemon, victim }: PostKnockOutAbAttrParams): boolean {
     return victim.id !== pokemon.id && victim.isPlayer() === pokemon.isPlayer();
   }
 
@@ -50,19 +72,33 @@ export class AllyFaintPowerBoostTriggerAbAttr extends PostKnockOutAbAttr {
     if (simulated) {
       return;
     }
-    // 2 ticks: this turn's remainder + the full following turn.
-    (pokemon as unknown as Record<symbol, number>)[TURNS] = 2;
+    // Default 2 ticks: this turn's remainder + the full following turn.
+    (pokemon as unknown as Record<symbol, number>)[TURNS] = this.turns;
   }
 }
 
 export class AllyFaintPowerBoostAbAttr extends MovePowerBoostAbAttr {
-  constructor(factor = 1.5) {
-    super(user => isActive(user), factor, true);
+  /**
+   * @param factor - the power multiplier while the boost is armed
+   * @param condition - When the boost applies. The default is "the one-turn boost is armed for the attacker", so
+   *   `new AllyFaintPowerBoostAbAttr(1.5)` behaves exactly as before; the ability studio hands in a replacement.
+   */
+  constructor(factor = 1.5, condition: PokemonAttackCondition = user => isActive(user)) {
+    super(condition, factor, true);
   }
 }
 
 export class AllyFaintPowerBoostExpireAbAttr extends PostTurnAbAttr {
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole rule is the gate, nothing stays behind as a residual. */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The replaceable condition: the holder's one-turn boost is armed. */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     return isActive(pokemon);
   }
 

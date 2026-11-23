@@ -49,8 +49,15 @@ export interface PostTurnFoeStatDropOptions {
 }
 
 export class PostTurnFoeStatDropAbAttr extends PostTurnAbAttr {
-  constructor(private readonly opts: PostTurnFoeStatDropOptions) {
+  private readonly opts: PostTurnFoeStatDropOptions;
+
+  constructor(opts: PostTurnFoeStatDropOptions) {
     super();
+    // An option left undefined is dropped, so a rebuilt attr (the ability studio passes every option, "not set" ones
+    // included) keeps exactly the options object of one that never mentioned it. Every read below treats both the same.
+    this.opts = Object.fromEntries(
+      Object.entries(opts).filter(([, value]) => value !== undefined),
+    ) as unknown as PostTurnFoeStatDropOptions;
   }
 
   private eligible(opp: Pokemon | undefined): boolean {

@@ -322,6 +322,10 @@ const holderDamage = (ctx: ParamContext): NumberHolder => new NumberHolder(ctx.d
 export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
   "event.on-entry": ({ holder }) => ({ pokemon: holder, simulated: false }),
   "event.end-of-turn": ({ holder }) => ({ pokemon: holder, simulated: false }),
+  // FaintPhase: `applyAbAttrs("PostVictoryAbAttr", { pokemon: defeatSource })` (the holder landed the knock out).
+  "event.on-win": ({ holder }) => ({ pokemon: holder, simulated: false }),
+  // FaintPhase: `applyAbAttrs("PostKnockOutAbAttr", { pokemon: p, victim: pokemon })` for every Pokemon on the field.
+  "event.on-ko": ({ holder, foe }) => ({ pokemon: holder, victim: foe, simulated: false }),
   "event.after-taking-damage": ({ holder, foe, damage }) => ({
     pokemon: holder,
     source: foe,

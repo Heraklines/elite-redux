@@ -22,6 +22,7 @@
 
 import { PostMoveUsedAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { PokemonMove } from "#data/moves/pokemon-move";
 import type { MoveId } from "#enums/move-id";
 import { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
@@ -41,14 +42,22 @@ export class PostWeatherMoveFollowUpAbAttr extends PostMoveUsedAbAttr {
     return this.followUpMoveId;
   }
 
-  override canApply({ source, pokemon, move }: PostMoveUsedAbAttrParams): boolean {
-    // Only when the HOLDER itself used a weather-SETTING move, and a living foe
-    // remains for the follow-up to hit.
-    return (
-      source.getBattlerIndex() === pokemon.getBattlerIndex()
-      && move.getMove().hasAttr("WeatherChangeAttr")
-      && pokemon.getOpponents().some(o => !o.isFainted())
-    );
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveUsedAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the original clause order: the gate, then the residual. */
+  override canApply(params: PostMoveUsedAbAttrParams): boolean {
+    return gatedCanApply<PostMoveUsedAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the HOLDER itself used a weather-SETTING move. */
+  public gate({ source, pokemon, move }: PostMoveUsedAbAttrParams): boolean {
+    return source.getBattlerIndex() === pokemon.getBattlerIndex() && move.getMove().hasAttr("WeatherChangeAttr");
+  }
+
+  /** Stays in the class: a living foe remains for the follow-up to hit. */
+  public residual({ pokemon }: PostMoveUsedAbAttrParams): boolean {
+    return pokemon.getOpponents().some(o => !o.isFainted());
   }
 
   override apply({ pokemon, simulated }: PostMoveUsedAbAttrParams): void {

@@ -114,3 +114,65 @@ bindCondition(
 bindCondition(5068, 0, { all: [] }, "ctor:1");
 bindCondition(5258, 0, { all: [] }, "ctor:1");
 bindCondition(5608, 1, { all: [] }, "ctor:1");
+
+// =============================================================================================================================
+// CHUNK 1 of 5: PostTurnFoeStatDropAbAttr, PostTurnRandomPureTypeAbAttr, PostTurnScriptedMoveAbAttr,
+// PostVictoryClearRechargeAbAttr, PostWeatherMoveFollowUpAbAttr, AllyFaintPowerBoostTriggerAbAttr, AllyFaintPowerBoostAbAttr and
+// AllyFaintPowerBoostExpireAbAttr. Read by hand from the live attrs (the dump of every user and its fields).
+// PostTurnFoeStatDropAbAttr and PostTurnRandomPureTypeAbAttr have no condition slot, so nothing is bound for them.
+// =============================================================================================================================
+
+// ---------------------------------------------------------------------------------------------------------------
+// PostTurnScriptedMoveAbAttr, slot gate: `turn > 0 && turn % everyNTurns === 0` on `tempSummonData.turnCount`. Both users have
+// everyNTurns 2. time.turn-count only compares (`compare(turnCount, cmp, n)`), it has no "a multiple of N" form, so the cadence is a
+// legacy closure (request R-B11-C1-04).
+//   Sumo Wrestler (5638) and Cool Exit (5641).
+const CADENCE_REASON =
+  "The gate is 'turn > 0 and the turn count is a multiple of N' (here N = 2). The library atom time.turn-count only compares the turn count with a number, so it cannot say 'every 2nd turn'. Needs an atom for 'I have been out for a multiple of N turns' (R-B11-C1-04).";
+bindLegacyClosure(5638, 0, CADENCE_REASON, "gate");
+bindLegacyClosure(5641, 0, CADENCE_REASON, "gate");
+
+// ---------------------------------------------------------------------------------------------------------------
+// PostVictoryClearRechargeAbAttr, slot gate: `pokemon.getTag(BattlerTagType.RECHARGING) !== undefined`. This IS the atom tag.has
+// (`target.getTag(BattlerTagType[tag]) !== undefined`, the same call with the same enum value) on the holder.
+//   Rampage (5013), Berserker Rage (5211 attr 2), Master Hand (5387 attr 1), Raging Goddess (5424), Qigong (5463),
+//   Drake Of Rage (5512 attr 1) and Going Berserk (5693 attr 1).
+const RECHARGING = { block: "tag.has", params: { who: "holder", tag: "RECHARGING" } } as const;
+bindCondition(5013, 0, RECHARGING, "gate");
+bindCondition(5211, 2, RECHARGING, "gate");
+bindCondition(5387, 1, RECHARGING, "gate");
+bindCondition(5424, 0, RECHARGING, "gate");
+bindCondition(5463, 0, RECHARGING, "gate");
+bindCondition(5512, 1, RECHARGING, "gate");
+bindCondition(5693, 1, RECHARGING, "gate");
+
+// ---------------------------------------------------------------------------------------------------------------
+// PostWeatherMoveFollowUpAbAttr, slot gate: `source.getBattlerIndex() === pokemon.getBattlerIndex()` (the mover is the holder,
+// side.is self) AND `move.getMove().hasAttr("WeatherChangeAttr")` (the move sets the weather: no library atom). One gate slot holds
+// one binding, so the whole gate stays a legacy closure until the atom exists (request R-B11-C1-07); then it is
+// `all [side.is self, move.sets-weather]`.
+//   Forecast (59, attr 3).
+bindLegacyClosure(
+  59,
+  3,
+  "The gate is 'the mover is me AND the move sets the weather'. The first half is the atom side.is self, but the second half (the move carries the weather-change effect, move.getMove().hasAttr('WeatherChangeAttr')) has no library atom, and one gate holds one binding. Needs an atom 'the move sets the weather' (R-B11-C1-07).",
+  "gate",
+);
+
+// ---------------------------------------------------------------------------------------------------------------
+// AllyFaintPowerBoostTriggerAbAttr, slot gate: `victim.id !== pokemon.id && victim.isPlayer() === pokemon.isPlayer()`. In the
+// PostKnockOut frame `other` is the victim, so this IS side.is ally (`other !== holder && other.isPlayer() === holder.isPlayer()`).
+//   Avenger (5030 attr 0) and Cursed Spirit (6095 attr 1).
+bindCondition(5030, 0, { block: "side.is", params: { kind: "ally" } }, "gate");
+bindCondition(6095, 1, { block: "side.is", params: { kind: "ally" } }, "gate");
+
+// ---------------------------------------------------------------------------------------------------------------
+// AllyFaintPowerBoostAbAttr (slot ctor:1, a PokemonAttackCondition) and AllyFaintPowerBoostExpireAbAttr (slot gate): both read the
+// holder's private Symbol timer (`isActive(pokemon)`), which the trigger attr arms. No library atom can read it (request R-B11-C1-09).
+//   Avenger (5030: boost attr 1, expire attr 2) and Cursed Spirit (6095: boost attr 2, expire attr 3).
+const TIMER_REASON =
+  "The condition is 'the holder's teammate-faint boost timer is running', a private per-Pokemon Symbol number armed by the trigger attr. No library atom can read a timed effect. Needs an atom 'my timed effect is running' with the matching arm and tick-down effects (R-B11-C1-09, R-B11-C1-10, R-B11-C1-11).";
+bindLegacyClosure(5030, 1, TIMER_REASON, "ctor:1");
+bindLegacyClosure(6095, 2, TIMER_REASON, "ctor:1");
+bindLegacyClosure(5030, 2, TIMER_REASON, "gate");
+bindLegacyClosure(6095, 3, TIMER_REASON, "gate");

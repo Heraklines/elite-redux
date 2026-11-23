@@ -28,12 +28,22 @@
 // =============================================================================
 
 import { PostVictoryAbAttr } from "#abilities/ab-attrs";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveId } from "#enums/move-id";
 import type { AbAttrBaseParams } from "#types/ability-types";
 
 export class PostVictoryClearRechargeAbAttr extends PostVictoryAbAttr {
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole rule is the gate, nothing stays behind as a residual. */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The replaceable condition: the holder is in its recharge turn. */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     return pokemon.getTag(BattlerTagType.RECHARGING) !== undefined;
   }
 
