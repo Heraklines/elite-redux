@@ -4,6 +4,29 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import {
+  FIELD_OPTION_NAMES,
+  fieldCodec,
+  HAZARD_SIDE_NAMES,
+  hazardSideCodec,
+  KIND_NAMES,
+  kindCodec,
+  MOVE_NAMES,
+  moveCodec,
+  NOT_USED,
+  STAT_NAMES,
+  statCodec,
+  TERRAIN_NAMES,
+  TRAP_OPTION_NAMES,
+  TYPE_NAMES,
+  terrainCodec,
+  terrainListCodec,
+  trapCodec,
+  typeCodec,
+  WEATHER_NAMES,
+  weatherCodec,
+  zeroLeavesOut,
+} from "#data/elite-redux/ability-studio/decl/B08/chunk5-choices";
 // B08 chunk 5 / event-effect, Tier A with branches (nothing to bind, nothing to gate). Read from the source
 // (archetypes/entry-effect.ts, its parent PostSummonAbAttr in ab-attrs.ts, the dispatcher translators and the patch functions of
 // init-elite-redux-vanilla-rebalance.ts) and from a live dump of all 67 users. The class has no condition at all:
@@ -26,32 +49,20 @@
 // Genius), add-self-type x25 (Turboblaze, Teravolt, Aquatic, Grounded, ...), self-stat-boost x5 (Embody Aspect x4, Headstrong, ...),
 // scripted-move x7 (Water Veil x2, Forewarn, Pastel Veil, Purifying Waters, Woodland Curse, Royal Decree (once), ...).
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
-import {
-  fieldCodec,
-  FIELD_OPTION_NAMES,
-  HAZARD_SIDE_NAMES,
-  hazardSideCodec,
-  KIND_NAMES,
-  kindCodec,
-  MOVE_NAMES,
-  moveCodec,
-  NOT_USED,
-  STAT_NAMES,
-  statCodec,
-  TERRAIN_NAMES,
-  terrainCodec,
-  terrainListCodec,
-  TRAP_OPTION_NAMES,
-  TYPE_NAMES,
-  trapCodec,
-  typeCodec,
-  WEATHER_NAMES,
-  weatherCodec,
-  zeroLeavesOut,
-} from "#data/elite-redux/ability-studio/decl/B08/chunk5-choices";
 import { EntryEffectAbAttr } from "#data/elite-redux/archetypes/entry-effect";
 
 const turnsWords = (turns: unknown): string => (Number(turns) > 0 ? `${turns} turns` : "the usual number of turns");
+
+const trapWords = (hazard: unknown): string =>
+  hazard == null || String(hazard) === "Not used" ? "a trap" : String(hazard);
+
+const sideWords = (side: unknown): string => {
+  const text = side == null ? "" : String(side).toLowerCase();
+  if (text === "" || text === "not used") {
+    return "both sides of the field";
+  }
+  return text;
+};
 
 export default defineDecl(EntryEffectAbAttr, {
   tier: "A",
@@ -68,7 +79,7 @@ export default defineDecl(EntryEffectAbAttr, {
       case "Set one terrain picked at random":
         return `When I enter the battle, set one terrain from the list at random (a held terrain seed of a listed terrain decides it): ${String(params.terrains)}.${once}`;
       case "Lay a trap on the field":
-        return `When I enter the battle, lay ${Number(params.layers) > 0 ? params.layers : 1} layer(s) of ${String(params.hazard)} on ${String(params.hazardSide).toLowerCase()}. Example: 2 layers of Spikes.${once}`;
+        return `When I enter the battle, lay ${Number(params.layers) > 0 ? params.layers : 1} layer(s) of ${trapWords(params.hazard)} on ${sideWords(params.hazardSide)}. Example: 2 layers of Spikes.${once}`;
       case "Set a screen, room or other field effect":
         return `When I enter the battle, set ${String(params.tag)} on my side (field-wide effects reach everyone) for ${turnsWords(params.turns)}. Example: Tailwind for 3 turns.${once}`;
       case "Add a type to myself":

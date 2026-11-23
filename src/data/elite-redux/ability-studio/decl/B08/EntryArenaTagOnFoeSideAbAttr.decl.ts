@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { EVERY_FIELD_NAMES, fieldEffectCodec } from "#data/elite-redux/ability-studio/decl/B08/chunk5-choices";
+import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
 // B08 chunk 5 / event-effect, Tier A (nothing to bind, nothing to gate). Read from the source
 // (archetypes/entry-arena-tag-on-foe-side.ts, its parent PostSummonAbAttr in ab-attrs.ts, the three dispatcher cases 877, 893 and 924
 // that build it, and a live dump of its four users). The class has no closure and:
@@ -17,8 +19,6 @@
 // (5627, attr 1, Water-Fire pledge, my own side) and Taste the Rainbow (5628, Water-Fire pledge, my own side), all with 4 turns.
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 import { EntryArenaTagOnFoeSideAbAttr } from "#data/elite-redux/archetypes/entry-arena-tag-on-foe-side";
-import { EVERY_FIELD_NAMES, fieldEffectCodec } from "#data/elite-redux/ability-studio/decl/B08/chunk5-choices";
-import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
 
 const FOES = "The foes' side";
 const MINE = "My own side";
@@ -73,7 +73,7 @@ export default defineDecl(EntryArenaTagOnFoeSideAbAttr, {
       max: 20,
       step: 1,
       integer: true,
-      label: "Number of turns the field effect lasts (traps ignore it and wait for a Pokemon)",
+      label: "Number of turns the field effect lasts",
       editable: true,
       default: 4,
     },
