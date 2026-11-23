@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// Porous, part 3 of 4 (Tier B, package effect). "When a foe's hit damages me, store one impact charge (up to 3)."
+// Porous, part 3 of 4 (Tier B, package effect). "When a foe's hit damages me, store one charge (up to 3)."
 //
-// Source: abilities/newcomer-signature-mechanics.ts, PorousChargeAbAttr (PostDefendAbAttr, no constructor arguments).
+// Source: abilities/newcomer-signature-mechanics.ts, PorousChargeAbAttr (PostDefendAbAttr; the cap is a trailing constructor argument added in the review fix, default 3).
 //   canApply, one expression, now the gate (clause order kept):
 //     1. damage > 0                                         \  no library atom for any of the three:
 //     2. hitResult < HitResult.NO_EFFECT                     |  legacy-closure + requests `hit.dealt-damage`,
@@ -24,21 +24,34 @@ export default defineDecl(PorousChargeAbAttr, {
   tier: "B",
   kind: "package",
   when: "event.after-hit",
-  label: "Store an impact charge when a foe's hit damages me",
-  summary: () =>
-    "When a foe's move damages me, I store 1 impact charge, up to 3. A multi-hit move counts once. My next Ground move spends the charges for extra power.",
+  label: "Store a charge when a foe's hit damages me",
+  summary: params =>
+    `When a foe's move damages me, I store 1 charge, up to ${params.maxCharges}. A multi-hit move counts once. My next Ground move spends the stored charges for extra power.`,
   synonyms: ["store power", "absorb impact", "charge up when hit", "stack on damage", "counter on hit", "porous"],
   examples: ["Gain 1 stored charge each time a foe's attack damages me, up to 3"],
-  params: [],
-  noParamsReason:
-    "The class has no constructor arguments: the cap of 3 charges and the 'count each foe move once' memory are fixed in its code.",
+  params: [
+    {
+      id: "maxCharges",
+      ctorIndex: 0,
+      path: "maxCharges",
+      control: "number",
+      label: "Most charges I can store",
+      editable: true,
+      gateIndependent: true,
+      default: 3,
+      min: 1,
+      max: 10,
+      step: 1,
+      integer: true,
+    },
+  ],
   conditions: [
     // The whole canApply expression. Legacy closure until the librarian adds the three atoms (see bindings.ts).
     { slot: "gate", ctx: "params", removable: true, editable: true },
   ],
   guards: [],
   feasibility: [],
-  effect: { id: "effect.package", params: [] },
+  effect: { id: "effect.package", params: ["maxCharges"] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "battle", simulated: "ignores" },
   probes: [
@@ -50,5 +63,5 @@ export default defineDecl(PorousChargeAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "PACKAGE for the EFFECT only; the trigger (after I am hit) and the gate are separate. Justified: the effect adds 1 to a private per-Pokemon counter capped at 3 and records which foe move was counted, both read and spent by a different attr (PorousPowerAbAttr). The library has no 'charge counter' memory block (requested in requests/B13.md as `effect.store-charge` / `time.charges`), and `effect.arm-effect` has no stack count or cap, so the effect cannot be split without re-implementing the counter. Users: Porous (5974, attr 2). ODDITY (not fixed): apply has no `simulated` check, so a simulated PostDefend call would add a charge and queue the message; the L1/L2 harness never simulates PostDefend. The ability text says 'direct hit', but canApply tests only damage > 0 and a landed hit.",
+    "PACKAGE for the EFFECT only; the trigger (after I am hit) and the gate are separate. Justified: the effect adds 1 to a private per-Pokemon counter capped at 3 and records which foe move was counted, both read and spent by a different attr (PorousPowerAbAttr). The library has no 'charge counter' memory block (requested in requests/B13.md as `effect.store-charge` / `time.charges`), and `effect.arm-effect` has no stack count or cap, so the effect cannot be split without re-implementing the counter. Review fix: the cap (default 3) is now a constructor argument and a param; the once-per-foe-move memory stays inside the package. Users: Porous (5974, attr 2). ODDITY (not fixed): apply has no `simulated` check, so a simulated PostDefend call would add a charge and queue the message; the L1/L2 harness never simulates PostDefend. The ability text says 'direct hit', but canApply tests only damage > 0 and a landed hit.",
 });

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// Porous, part 1 of 4 (Tier C, package). "When I enter, forget my stored impact charges."
+// Porous, part 1 of 4 (Tier C, package). "When I enter, forget my stored charges."
 //
 // Source: abilities/newcomer-signature-mechanics.ts, PorousResetAbAttr (PostSummonAbAttr).
 //   canApply  the base class's (always true): no condition at all.
@@ -18,9 +18,8 @@ export default defineDecl(PorousResetAbAttr, {
   tier: "C",
   kind: "package",
   when: "event.on-entry",
-  label: "Clear my stored impact charges when I enter",
-  summary: () =>
-    "When I enter the battle, any impact charges I had stored are lost and my counter starts again from 0.",
+  label: "Clear my stored charges when I enter",
+  summary: () => "When I enter the battle, any charges I had stored are lost and my counter starts again from 0.",
   synonyms: [
     "reset charges",
     "reset counter",
@@ -29,7 +28,7 @@ export default defineDecl(PorousResetAbAttr, {
     "fresh start on switch in",
     "porous",
   ],
-  examples: ["Start every switch-in with no stored impact charges"],
+  examples: ["Start every switch-in with no stored charges"],
   params: [],
   noParamsReason:
     "The class has no constructor arguments and no number: it resets one private counter to zero. There is nothing to tune.",

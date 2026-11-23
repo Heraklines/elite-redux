@@ -35,13 +35,42 @@ export default defineDecl(FoulHarvestAbAttr, {
   kind: "package",
   when: "event.after-my-hit",
   label: "Drain a foe move's PP and store a charge when I hit",
-  summary: () =>
-    "When my damaging move hits, the foe's last-used move (or a random one) loses 1 PP and I store a charge, up to 3. Stored charges power up my draining moves.",
-  synonyms: ["pp drain", "pp steal", "spite", "store charge", "drain bonus", "foul harvest"],
+  summary: params =>
+    `When my damaging move hits, the foe's last-used move (or a random one) loses ${params.ppDrain} PP and I store a charge, up to ${params.maxCharges}. Stored charges power up my draining moves.`,
+  synonyms: ["pp drain", "pp steal", "spite", "store charge", "drain bonus", "foul harvest", "reduce pp"],
   examples: ["Each time I land a hit, take 1 PP from the move the foe used last"],
-  params: [],
-  noParamsReason:
-    "The class has no constructor arguments of its own: the 1 PP, the 3-charge cap and the way the foe's move is picked are fixed in its code. The only constructor argument, the attack condition, is a condition slot, not a number.",
+  params: [
+    // Constructor arguments 0 (attack condition) and 1 (show ability) are the base class's: 0 is the ctor:0 condition
+    // slot below, 1 stays undefined for every user (base default).
+    {
+      id: "ppDrain",
+      ctorIndex: 2,
+      path: "ppDrain",
+      control: "number",
+      label: "PP taken from the foe's move",
+      editable: true,
+      gateIndependent: true,
+      default: 1,
+      min: 1,
+      max: 10,
+      step: 1,
+      integer: true,
+    },
+    {
+      id: "maxCharges",
+      ctorIndex: 3,
+      path: "maxCharges",
+      control: "number",
+      label: "Most charges I can store",
+      editable: true,
+      gateIndependent: true,
+      default: 3,
+      min: 1,
+      max: 10,
+      step: 1,
+      integer: true,
+    },
+  ],
   conditions: [
     // Clause 1: the base class's attack condition (a real constructor argument). Every user takes the default.
     { slot: "ctor:0", ctx: "attack", lib: "move.damaging", path: "attackCondition", removable: true, editable: true },
@@ -50,7 +79,7 @@ export default defineDecl(FoulHarvestAbAttr, {
   ],
   guards: [],
   feasibility: ["The foe must have a move with PP left to drain"],
-  effect: { id: "effect.package", params: [] },
+  effect: { id: "effect.package", params: ["ppDrain", "maxCharges"] },
   reusableAlone: { when: true, if: true, do: true },
   flags: {
     rng: "apply",
@@ -69,5 +98,5 @@ export default defineDecl(FoulHarvestAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "PACKAGE for the EFFECT only. The trigger (after my hit) and every condition are separate: the attack condition is a real constructor slot bound to move.damaging, the other three clauses are the gate (legacy-closure, requests in requests/B13.md). Why the effect cannot be split with today's blocks: it drains one PP from a foe move that is chosen by a remembered per-foe name or by a random draw, adds to a private charge counter capped at 3, and remembers the last move record so a multi-hit move counts once. There is no 'drain PP' effect and no 'charge counter' memory block in the library (both requested), and the counter is read by a different place (HitHealAttr), so splitting would re-implement the class. Users: Foul Harvest (5973, attr 0). ODDITIES (not fixed): (1) apply stores lastMoveRecord BEFORE its simulated and empty-moveset checks, so a simulated call or a foe without usable moves still spends the once-per-move memory; (2) the random pick (the only draw) happens before the 'no PP left' check, so a foe whose moves are all out of PP still consumes one draw; (3) the heal bonus lives in HitHealAttr by class name, an engine coupling the decomposition does not see; (4) the ability text says a 'direct hit', but canApply has no direct-hit test beyond the PostAttack dispatch.",
+    "PACKAGE for the EFFECT only. The trigger (after my hit) and every condition are separate: the attack condition is a real constructor slot bound to move.damaging, the other three clauses are the gate (legacy-closure, requests in requests/B13.md). Why the effect cannot be split with today's blocks: it drains one PP from a foe move that is chosen by a remembered per-foe name or by a random draw, adds to a private charge counter capped at 3, and remembers the last move record so a multi-hit move counts once. There is no 'drain PP' effect and no 'charge counter' memory block in the library (both requested), and the counter is read by a different place (HitHealAttr), so splitting would re-implement the class. Users: Foul Harvest (5973, attr 0). Review fix: the PP taken (default 1) and the charge cap (default 3) are now trailing constructor arguments (indices 2 and 3, after the base class's attack condition and show-ability) and params; with PP drain 1 the PP update equals the old `ppUsed++` because the move is known to have PP left. The foe-move pick (remembered move, else one random draw) stays fixed inside the package. ODDITIES (not fixed): (1) apply stores lastMoveRecord BEFORE its simulated and empty-moveset checks, so a simulated call or a foe without usable moves still spends the once-per-move memory; (2) the random pick (the only draw) happens before the 'no PP left' check, so a foe whose moves are all out of PP still consumes one draw; (3) the heal bonus lives in HitHealAttr by class name, an engine coupling the decomposition does not see; (4) the ability text says a 'direct hit', but canApply has no direct-hit test beyond the PostAttack dispatch.",
 });

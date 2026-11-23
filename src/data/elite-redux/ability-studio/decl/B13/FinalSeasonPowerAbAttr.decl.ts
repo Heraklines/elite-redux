@@ -25,13 +25,25 @@ export default defineDecl(FinalSeasonPowerAbAttr, {
   kind: "calc-modifier",
   when: "calc.move-power",
   label: "Boost Dark and Flying moves by 1.3x in my own Eerie Fog",
-  summary: () =>
-    "While the Eerie Fog on the field is the one I set, my Dark and Flying moves have 1.3x power. Example: a 100 power Dark move becomes 130.",
+  summary: params =>
+    `While the Eerie Fog on the field is the one I set, my Dark and Flying moves have ${params.multiplier}x power. Example: a 100 power Dark move becomes ${Math.round(100 * Number(params.multiplier))}.`,
   synonyms: ["weather power boost", "fog boost", "dark and flying boost", "own weather bonus", "final season"],
   examples: ["Dark and Flying moves are 30% stronger while my own Eerie Fog is up"],
-  params: [],
-  noParamsReason:
-    "The class has no constructor arguments: the 1.3x multiplier is passed to the base class by the constructor itself. Staff reach the same behaviour with a composed rule (a move-power trigger, a weather condition, a move-type condition and the multiply-power block set to 1.3).",
+  params: [
+    {
+      id: "multiplier",
+      ctorIndex: 0,
+      path: "powerMultiplier",
+      control: "number",
+      label: "Power multiplier (times)",
+      editable: true,
+      gateIndependent: true,
+      default: 1.3,
+      min: 0,
+      max: 8,
+      step: 0.05,
+    },
+  ],
   conditions: [
     // Clauses 3 and 4 of the original closure, in order: the weather is Eerie Fog, the move is Dark or Flying.
     { slot: "gate", ctx: "params", removable: true, editable: true },
@@ -40,7 +52,7 @@ export default defineDecl(FinalSeasonPowerAbAttr, {
   feasibility: [
     "The Eerie Fog on the field must be the one I set myself and still the same fog (checked inside the class until a library condition exists)",
   ],
-  effect: { id: "effect.multiply-power", params: [] },
+  effect: { id: "effect.multiply-power", params: ["multiplier"] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "battle", simulated: "respects" },
   l2StaticReason:
@@ -54,5 +66,5 @@ export default defineDecl(FinalSeasonPowerAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "Users: Final Season (5972, attr 2). Clauses 3 and 4 are bound to library atoms (bindings.ts); clauses 1 and 2 (fog owner and fog instance, module-level variables written by FinalSeasonFogAbAttr) need a new atom, requested as `field.weather-set-by-me` in requests/B13.md. Until then they are the class's `guards`, which run before the gate exactly as the original clauses did. The multiplier 1.3 is hidden in the constructor call, not an argument, so it is not a param here; the L1 differential compares the original gate with the rebuilt one over the grid and B13/final-season.test.ts proves the positive case (an owned fog) with draws counted.",
+    "Users: Final Season (5972, attr 2). Clauses 3 and 4 are bound to library atoms (bindings.ts); clauses 1 and 2 (fog owner and fog instance, module-level variables written by FinalSeasonFogAbAttr) need a new atom, requested as `field.weather-set-by-me` in requests/B13.md. Until then they are the class's `guards`, which run before the gate exactly as the original clauses did. Review fix: the multiplier is now a constructor argument (default 1.3) and a param, with no gate binding repeating it (gateIndependent); the L1 differential compares the original gate with the rebuilt one over the grid and B13/final-season.test.ts proves the positive case (an owned fog) with draws counted.",
 });

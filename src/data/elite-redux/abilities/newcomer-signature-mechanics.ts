@@ -124,6 +124,17 @@ export class FinalSeasonEntryAbAttr extends PostSummonAbAttr implements GatedAtt
   /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
   public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
 
+  /** The battle effect every foe receives (ability studio param; the default is the original ER_QUASHED). */
+  public readonly quashTag: BattlerTagType;
+  /** How many turns the battle effect lasts (ability studio param; the default is the original 2). */
+  public readonly quashTurns: number;
+
+  constructor(quashTag: BattlerTagType = BattlerTagType.ER_QUASHED, quashTurns = 2) {
+    super();
+    this.quashTag = quashTag;
+    this.quashTurns = quashTurns;
+  }
+
   /** Tier B (ability studio spec 3.1): the one clause of the rule lives in `gate`; there is no residual. */
   override canApply(params: AbAttrBaseParams): boolean {
     return gatedCanApply<AbAttrBaseParams>(this, params);
@@ -140,7 +151,7 @@ export class FinalSeasonEntryAbAttr extends PostSummonAbAttr implements GatedAtt
       return;
     }
     for (const opponent of pokemon.getOpponents()) {
-      opponent.addTag(BattlerTagType.ER_QUASHED, 2, MoveId.NONE, pokemon.id);
+      opponent.addTag(this.quashTag, this.quashTurns, MoveId.NONE, pokemon.id);
     }
     globalScene.phaseManager.queueMessage(`${pokemon.getNameToRender()}'s Final Season delayed the opposing side!`);
     FINAL_SEASON_PENDING_FOG.add(pokemon);
@@ -150,6 +161,17 @@ export class FinalSeasonEntryAbAttr extends PostSummonAbAttr implements GatedAtt
 export class FinalSeasonFogAbAttr extends PostTurnAbAttr implements GatedAttr<AbAttrBaseParams> {
   /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
   public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** The weather that is set (ability studio param; the default is the original Eerie Fog). */
+  public readonly fogWeather: WeatherType;
+  /** How many turns the weather lasts (ability studio param; the default is the original 5). */
+  public readonly fogTurns: number;
+
+  constructor(fogWeather: WeatherType = WeatherType.EERIE_FOG, fogTurns = 5) {
+    super();
+    this.fogWeather = fogWeather;
+    this.fogTurns = fogTurns;
+  }
 
   /** Tier B (ability studio spec 3.1): the one clause of the rule lives in `gate`; there is no residual. */
   override canApply(params: AbAttrBaseParams): boolean {
@@ -163,7 +185,7 @@ export class FinalSeasonFogAbAttr extends PostTurnAbAttr implements GatedAttr<Ab
 
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
     FINAL_SEASON_PENDING_FOG.delete(pokemon);
-    if (!simulated && globalScene.arena.trySetWeather(WeatherType.EERIE_FOG, pokemon, 5)) {
+    if (!simulated && globalScene.arena.trySetWeather(this.fogWeather, pokemon, this.fogTurns)) {
       finalSeasonFogOwner = pokemon;
       finalSeasonFogInstance = globalScene.arena.weather ?? undefined;
     }
@@ -187,8 +209,11 @@ export class FinalSeasonPowerAbAttr
   extends MovePowerBoostAbAttr
   implements GatedAttr<PreAttackModifyPowerAbAttrParams>
 {
-  constructor() {
-    super((pokemon, _target, move) => finalSeasonFogIsMine(pokemon) && finalSeasonBoostedMoveInFog(pokemon, move), 1.3);
+  constructor(powerMultiplier = 1.3) {
+    super(
+      (pokemon, _target, move) => finalSeasonFogIsMine(pokemon) && finalSeasonBoostedMoveInFog(pokemon, move),
+      powerMultiplier,
+    );
   }
 
   /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
@@ -242,6 +267,26 @@ export class FoulHarvestAbAttr extends PostAttackAbAttr implements GatedAttr<Pos
   /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
   public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
 
+  /** PP taken from the foe's move per hit (ability studio param; the default is the original 1). */
+  public readonly ppDrain: number;
+  /** The most charges that can be stored (ability studio param; the default is the original 3). */
+  public readonly maxCharges: number;
+
+  /**
+   * The first two arguments are the base class's (attack condition, show ability); both stay `undefined` for every
+   * shipped user so the base defaults apply, exactly as when this class had no constructor.
+   */
+  constructor(
+    attackCondition?: ConstructorParameters<typeof PostAttackAbAttr>[0],
+    showAbility?: boolean,
+    ppDrain = 1,
+    maxCharges = 3,
+  ) {
+    super(attackCondition, showAbility);
+    this.ppDrain = ppDrain;
+    this.maxCharges = maxCharges;
+  }
+
   /** Tier B (ability studio spec 3.1): attack condition first (`guards`), then the replaceable `gate`. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
     return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
@@ -281,9 +326,11 @@ export class FoulHarvestAbAttr extends PostAttackAbAttr implements GatedAttr<Pos
     if (!selected || selected.isOutOfPp()) {
       return;
     }
-    selected.ppUsed++;
-    state.charges = Math.min(3, state.charges + 1);
-    globalScene.phaseManager.queueMessage(`${opponent.getNameToRender()}'s ${selected.getName()} lost 1 PP!`);
+    selected.ppUsed = Math.min(selected.ppUsed + this.ppDrain, selected.getMovePp());
+    state.charges = Math.min(this.maxCharges, state.charges + 1);
+    globalScene.phaseManager.queueMessage(
+      `${opponent.getNameToRender()}'s ${selected.getName()} lost ${this.ppDrain} PP!`,
+    );
     globalScene.phaseManager.queueMessage(`${pokemon.getNameToRender()}'s Foul Harvest stored a charge!`);
   }
 }
@@ -342,8 +389,8 @@ export class PorousSoundReductionAbAttr
   extends ReceivedMoveDamageMultiplierAbAttr
   implements GatedAttr<PreDefendModifyDamageAbAttrParams>
 {
-  constructor() {
-    super((_holder, attacker, move) => porousIsSoundMove(attacker, move), 0.5);
+  constructor(damageMultiplier = 0.5) {
+    super((_holder, attacker, move) => porousIsSoundMove(attacker, move), damageMultiplier);
   }
 
   /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
@@ -363,6 +410,14 @@ export class PorousChargeAbAttr extends PostDefendAbAttr implements GatedAttr<Po
   /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
   public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
 
+  /** The most charges that can be stored (ability studio param; the default is the original 3). */
+  public readonly maxCharges: number;
+
+  constructor(maxCharges = 3) {
+    super();
+    this.maxCharges = maxCharges;
+  }
+
   /** Tier B (ability studio spec 3.1): the whole rule lives in `gate`; there is no residual. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
     return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
@@ -376,7 +431,7 @@ export class PorousChargeAbAttr extends PostDefendAbAttr implements GatedAttr<Po
   override apply({ pokemon, opponent }: PostMoveInteractionAbAttrParams): void {
     const state = porousState(pokemon);
     state.lastMoveRecord = opponent.getLastXMoves(1)[0] as object | undefined;
-    state.stacks = Math.min(3, state.stacks + 1);
+    state.stacks = Math.min(this.maxCharges, state.stacks + 1);
     globalScene.phaseManager.queueMessage(`${pokemon.getNameToRender()}'s Porous body stored the impact!`);
   }
 }
@@ -392,8 +447,12 @@ function porousHasCharge(pokemon: Pokemon): boolean {
 }
 
 export class PorousPowerAbAttr extends MovePowerBoostAbAttr implements GatedAttr<PreAttackModifyPowerAbAttrParams> {
-  constructor() {
+  /** Extra power per stored charge, in percent (ability studio param; the default is the original 25). */
+  public readonly percentPerCharge: number;
+
+  constructor(percentPerCharge = 25) {
     super((pokemon, _target, move) => porousIsGroundMove(pokemon, move) && porousHasCharge(pokemon), 1);
+    this.percentPerCharge = percentPerCharge;
   }
 
   /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
@@ -417,7 +476,7 @@ export class PorousPowerAbAttr extends MovePowerBoostAbAttr implements GatedAttr
 
   override apply({ pokemon, power, simulated }: PreAttackModifyPowerAbAttrParams): void {
     const state = porousState(pokemon);
-    power.value *= 1 + 0.25 * state.stacks;
+    power.value *= 1 + (this.percentPerCharge / 100) * state.stacks;
     if (!simulated) {
       state.stacks = 0;
       globalScene.phaseManager.queueMessage(`${pokemon.getNameToRender()} released its Porous power!`);

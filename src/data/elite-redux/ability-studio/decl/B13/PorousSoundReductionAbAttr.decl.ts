@@ -21,23 +21,36 @@ export default defineDecl(PorousSoundReductionAbAttr, {
   kind: "calc-modifier",
   when: "calc.damage-taken",
   label: "Halve damage from sound-based moves",
-  summary: () => "Sound-based moves do half damage to me. Example: a sound move that would deal 100 damage deals 50.",
+  summary: params =>
+    `Sound-based moves do ${params.multiplier}x damage to me. Example: a sound move that would deal 100 damage deals ${Math.round(100 * Number(params.multiplier))}.`,
   synonyms: [
     "soundproof",
     "sound resist",
     "resist sound moves",
     "half damage from sound",
-    "bulletproof style",
+    "hyper voice resist",
     "porous",
   ],
   examples: ["Take half damage from sound-based moves"],
-  params: [],
-  noParamsReason:
-    "The class has no constructor arguments: the 0.5 multiplier and the sound-move test are passed to the base class by the constructor itself. Staff reach the same behaviour with a composed rule (a damage-taken trigger, a move-property condition and the multiply-damage-taken block set to 0.5).",
+  params: [
+    {
+      id: "multiplier",
+      ctorIndex: 0,
+      path: "damageMultiplier",
+      control: "number",
+      label: "Damage multiplier (times)",
+      editable: true,
+      gateIndependent: true,
+      default: 0.5,
+      min: 0,
+      max: 4,
+      step: 0.05,
+    },
+  ],
   conditions: [{ slot: "gate", ctx: "params", lib: "move.flag", removable: true, editable: true }],
   guards: [],
   feasibility: [],
-  effect: { id: "effect.multiply-damage-taken", params: [] },
+  effect: { id: "effect.multiply-damage-taken", params: ["multiplier"] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "none", simulated: "respects" },
   probes: [
@@ -49,5 +62,5 @@ export default defineDecl(PorousSoundReductionAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "Users: Porous (5974, attr 1). Fully decomposed: one condition (move.flag SOUND_BASED) bound to a library atom plus one calc effect; nothing stays inside the class. The 0.5 multiplier is a literal in the constructor call, not an argument, so it is not a param (staff use the multiply-damage-taken block for another number). The base class's `affectsFixedDamage` is false (default), so fixed-damage moves are not halved. The rebuilt `move.flag` atom passes the holder as target while the original passes none; the two only differ for contact checks against Substitute, which a sound flag never reaches, and the L1 grid shows them equal.",
+    "Users: Porous (5974, attr 1). Fully decomposed: one condition (move.flag SOUND_BASED) bound to a library atom plus one calc effect; nothing stays inside the class. Review fix: the multiplier is now a constructor argument (default 0.5) and a param. The base class's `affectsFixedDamage` is false (default), so fixed-damage moves are not halved. The rebuilt `move.flag` atom passes the holder as target while the original passes none; the two only differ for contact checks against Substitute, which a sound flag never reaches, and the L1 grid shows them equal.",
 });

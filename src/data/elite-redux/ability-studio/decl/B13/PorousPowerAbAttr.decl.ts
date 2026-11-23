@@ -23,9 +23,9 @@ export default defineDecl(PorousPowerAbAttr, {
   tier: "B",
   kind: "package",
   when: "calc.move-power",
-  label: "Spend impact charges to boost my Ground moves",
-  summary: () =>
-    "My Ground move gains 25% power per stored charge (up to +75% with 3) and all charges are spent. Example: 2 charges turn 100 power into 150.",
+  label: "Spend stored charges to boost my Ground moves",
+  summary: params =>
+    `My Ground move gains ${params.percentPerCharge}% power per stored charge and all charges are spent. Example: 2 charges turn 100 power into ${Math.round(100 * (1 + (Number(params.percentPerCharge) / 100) * 2))}.`,
   synonyms: [
     "release stored power",
     "ground boost",
@@ -35,16 +35,28 @@ export default defineDecl(PorousPowerAbAttr, {
     "porous",
   ],
   examples: ["My next Ground move is 25% stronger for every charge I stored"],
-  params: [],
-  noParamsReason:
-    "The class has no constructor arguments: the 25% per charge, the 'Ground only' test and the spending of all charges are fixed in its code.",
+  params: [
+    {
+      id: "percentPerCharge",
+      ctorIndex: 0,
+      path: "percentPerCharge",
+      control: "number",
+      label: "Extra power per stored charge (percent)",
+      editable: true,
+      gateIndependent: true,
+      default: 25,
+      min: 0,
+      max: 200,
+      step: 5,
+    },
+  ],
   conditions: [
     // Clause 1 of the original closure: the move is Ground (library atom). Clause 2 is the class's residual.
     { slot: "gate", ctx: "params", lib: "move.type", removable: true, editable: true },
   ],
   guards: [],
-  feasibility: ["I must have at least one stored impact charge (a private counter, checked inside the class)"],
-  effect: { id: "effect.package", params: [] },
+  feasibility: ["I must have at least one stored charge (a private counter, checked inside the class)"],
+  effect: { id: "effect.package", params: ["percentPerCharge"] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "battle", simulated: "respects" },
   l2StaticReason:
@@ -58,5 +70,5 @@ export default defineDecl(PorousPowerAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "PACKAGE for the EFFECT only; the trigger (move power) and the move-type condition are separate and bound to a library atom. Justified: the multiplier is derived from a private counter (1 + 0.25 x charges, not a constant the multiply-power block can hold) and the same effect spends the counter and queues a message; splitting would re-implement the counter. The library has no 'multiply by an amount per stored charge' effect, no 'stored charges' condition and no 'spend charges' effect (requested in requests/B13.md). The 'has a charge' clause stays in the class as the residual (listed under 'also requires') and keeps its original second position. Users: Porous (5974, attr 3). ODDITIES (not fixed): (1) apply multiplies power even when simulated but only spends the charges when not simulated (correct for a preview); (2) the base class's multiplier argument (1) is dead because apply is overridden; (3) the boost is computed from the counter AT the time the power is calculated, so a power calculation that is not followed by the real move (a preview that is not marked simulated) would spend charges early.",
+    "PACKAGE for the EFFECT only; the trigger (move power) and the move-type condition are separate and bound to a library atom. Justified: the multiplier is derived from a private counter (1 + 0.25 x charges, not a constant the multiply-power block can hold) and the same effect spends the counter and queues a message; splitting would re-implement the counter. The library has no 'multiply by an amount per stored charge' effect, no 'stored charges' condition and no 'spend charges' effect (requested in requests/B13.md). The 'has a charge' clause stays in the class as the residual (listed under 'also requires') and keeps its original second position. Review fix: the percent per charge (default 25, was a literal) is now a constructor argument and a param; the cap (+75% at 3 charges) follows from the Store-a-charge cap. The multiplier is still computed in the overridden apply as 1 + percent/100 x charges, which is why this stays a package instead of the multiply-power block (R-B13-9). Users: Porous (5974, attr 3). ODDITIES (not fixed): (1) apply multiplies power even when simulated but only spends the charges when not simulated (correct for a preview); (2) the base class's multiplier argument (1) is dead because apply is overridden; (3) the boost is computed from the counter AT the time the power is calculated, so a power calculation that is not followed by the real move (a preview that is not marked simulated) would spend charges early.",
 });

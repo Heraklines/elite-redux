@@ -29,7 +29,7 @@ bindLegacyClosure(
 bindLegacyClosure(
   5972,
   1,
-  "Final Season fog: FINAL_SEASON_PENDING_FOG.has(holder), a private set filled by the entry effect (an armed effect); needs the atom time.armed (R-B13-2)",
+  "Final Season fog: FINAL_SEASON_PENDING_FOG.has(holder), a private set filled by the entry effect (a flag set by the switch-in effect); needs the atom time.armed (R-B13-2)",
   "gate",
 );
 

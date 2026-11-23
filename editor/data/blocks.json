@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "0e2504035af90f",
+  "hash": "1ceb9d16c6fa4a",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -129,7 +129,7 @@
       "id": "block.final-season-entry",
       "className": "FinalSeasonEntryAbAttr",
       "label": "Make foes move last when I switch in on purpose",
-      "summary": "When I switch in on purpose, every foe moves last in its priority bracket for 2 turns, and the end-of-turn fog is readied.",
+      "summary": "When I switch in on purpose, every foe gets the \"Er quashed\" battle effect for 2 turns (by default: it moves last in its priority bracket), and my end-of-turn fog is made ready.",
       "tier": "B",
       "kind": "event-effect",
       "status": "decomposed",
@@ -146,7 +146,153 @@
       "examples": [
         "Foes move last for 2 turns when I am switched in by choice"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "tag",
+          "label": "Battle effect put on every foe",
+          "control": "select",
+          "default": "ER_QUASHED",
+          "editable": true,
+          "options": [
+            "RECHARGING",
+            "FLINCHED",
+            "INTERRUPTED",
+            "SKY_DROP",
+            "CONFUSED",
+            "INFATUATED",
+            "SEEDED",
+            "NIGHTMARE",
+            "FRENZY",
+            "CHARGING",
+            "ENCORE",
+            "HELPING_HAND",
+            "INGRAIN",
+            "OCTOLOCK",
+            "AQUA_RING",
+            "DROWSY",
+            "TRAPPED",
+            "BIND",
+            "WRAP",
+            "FIRE_SPIN",
+            "WHIRLPOOL",
+            "CLAMP",
+            "SAND_TOMB",
+            "MAGMA_STORM",
+            "SNAP_TRAP",
+            "THUNDER_CAGE",
+            "INFESTATION",
+            "PROTECTED",
+            "SPIKY_SHIELD",
+            "KINGS_SHIELD",
+            "OBSTRUCT",
+            "SILK_TRAP",
+            "MIND_READER",
+            "BANEFUL_BUNKER",
+            "BURNING_BULWARK",
+            "ER_PARALYZING_SHIELD",
+            "ER_TANGLING_HUSK",
+            "ENDURING",
+            "STURDY",
+            "PERISH_SONG",
+            "TRUANT",
+            "SLOW_START",
+            "PROTOSYNTHESIS",
+            "QUARK_DRIVE",
+            "FLYING",
+            "UNDERGROUND",
+            "UNDERWATER",
+            "HIDDEN",
+            "FIRE_BOOST",
+            "CRIT_BOOST",
+            "ALWAYS_CRIT",
+            "IGNORE_ACCURACY",
+            "IGNORE_FLYING",
+            "SALT_CURED",
+            "CURSED",
+            "ER_SLAB_CURSE",
+            "CHARGED",
+            "ROOSTED",
+            "FLOATING",
+            "MINIMIZED",
+            "DESTINY_BOND",
+            "CENTER_OF_ATTENTION",
+            "STOCKPILING",
+            "RECEIVE_DOUBLE_DAMAGE",
+            "ALWAYS_GET_HIT",
+            "DISABLED",
+            "SUBSTITUTE",
+            "IGNORE_GHOST",
+            "IGNORE_DARK",
+            "GULP_MISSILE_ARROKUDA",
+            "GULP_MISSILE_PIKACHU",
+            "BEAK_BLAST_CHARGING",
+            "SHELL_TRAP",
+            "DRAGON_CHEER",
+            "NO_RETREAT",
+            "GORILLA_TACTICS",
+            "UNBURDEN",
+            "THROAT_CHOPPED",
+            "TAR_SHOT",
+            "BURNED_UP",
+            "DOUBLE_SHOCKED",
+            "AUTOTOMIZED",
+            "MYSTERY_ENCOUNTER_POST_SUMMON",
+            "POWER_TRICK",
+            "HEAL_BLOCK",
+            "TORMENT",
+            "TAUNT",
+            "IMPRISON",
+            "SYRUP_BOMB",
+            "ELECTRIFIED",
+            "TELEKINESIS",
+            "COMMANDED",
+            "GRUDGE",
+            "PSYCHO_SHIFT",
+            "ENDURE_TOKEN",
+            "POWDER",
+            "MAGIC_COAT",
+            "SUPREME_OVERLORD",
+            "BYPASS_SPEED",
+            "SNATCH",
+            "ME_FIRST",
+            "ER_BLEED",
+            "ER_FROSTBITE",
+            "ER_FEAR",
+            "ER_ITEM_DISABLED",
+            "ER_SILKEN_DECREE",
+            "ER_ICE_STATUE",
+            "ER_PARASITIC_SPORES",
+            "ER_DESPAIR",
+            "ER_DRENCHED",
+            "ER_ENRAGE",
+            "ER_QUASHED",
+            "ER_EMPOWERED_SWITCH_IN",
+            "ER_COMMANDED",
+            "ER_SAFE_PASSAGE",
+            "ER_SAGE_POWER_LOCK",
+            "ER_BLIND_JUSTICE",
+            "ER_CONFECTED",
+            "ER_IRRADIATED_TOXIC",
+            "ER_IRRADIATED_LOCK",
+            "ER_BREACHED",
+            "ER_EMBEDDED",
+            "ER_DECAY_POISON"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "turns",
+          "label": "Turns the effect lasts",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
       "conditions": [
         {
           "slot": "gate",
@@ -159,7 +305,10 @@
       "feasibility": [],
       "effect": {
         "id": "effect.apply-tag",
-        "params": []
+        "params": [
+          "tag",
+          "turns"
+        ]
       },
       "reusableAlone": {
         "when": true,
@@ -171,8 +320,8 @@
     {
       "id": "block.final-season-fog",
       "className": "FinalSeasonFogAbAttr",
-      "label": "Set Eerie Fog for 5 turns at turn end once armed",
-      "summary": "At the end of a turn, if my switch-in effect readied it, Eerie Fog covers the field for 5 turns and I remember it as my own fog.",
+      "label": "Set the weather at turn end after my switch-in effect",
+      "summary": "At the end of a turn, if my switch-in effect happened this turn, the weather becomes Eerie fog for 5 turns, and I remember it as my own weather.",
       "tier": "B",
       "kind": "event-effect",
       "status": "decomposed",
@@ -187,9 +336,45 @@
         "final season"
       ],
       "examples": [
-        "Set Eerie Fog at the end of the turn after my special switch-in"
+        "Set Eerie Fog at the end of the turn when my special switch-in effect happened"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "weather",
+          "label": "Weather",
+          "control": "select",
+          "default": "EERIE_FOG",
+          "editable": true,
+          "options": [
+            "NONE",
+            "SUNNY",
+            "RAIN",
+            "SANDSTORM",
+            "HAIL",
+            "SNOW",
+            "FOG",
+            "HEAVY_RAIN",
+            "HARSH_SUN",
+            "STRONG_WINDS",
+            "TEMPEST_STORM",
+            "SNOWY_WRATH",
+            "EERIE_FOG"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "turns",
+          "label": "Turns the weather lasts",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 1,
+          "max": 20,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
       "conditions": [
         {
           "slot": "gate",
@@ -204,7 +389,10 @@
       ],
       "effect": {
         "id": "effect.set-weather",
-        "params": []
+        "params": [
+          "weather",
+          "turns"
+        ]
       },
       "reusableAlone": {
         "when": true,
@@ -233,7 +421,19 @@
       "examples": [
         "Dark and Flying moves are 30% stronger while my own Eerie Fog is up"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (times)",
+          "control": "number",
+          "default": 1.3,
+          "editable": true,
+          "min": 0,
+          "max": 8,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
       "conditions": [
         {
           "slot": "gate",
@@ -248,7 +448,9 @@
       ],
       "effect": {
         "id": "effect.multiply-power",
-        "params": []
+        "params": [
+          "multiplier"
+        ]
       },
       "reusableAlone": {
         "when": true,
@@ -307,12 +509,38 @@
         "spite",
         "store charge",
         "drain bonus",
-        "foul harvest"
+        "foul harvest",
+        "reduce pp"
       ],
       "examples": [
         "Each time I land a hit, take 1 PP from the move the foe used last"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "ppDrain",
+          "label": "PP taken from the foe's move",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "maxCharges",
+          "label": "Most charges I can store",
+          "control": "number",
+          "default": 3,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
       "conditions": [
         {
           "slot": "ctor:0",
@@ -334,14 +562,17 @@
       ],
       "effect": {
         "id": "effect.package",
-        "params": []
+        "params": [
+          "ppDrain",
+          "maxCharges"
+        ]
       },
       "reusableAlone": {
         "when": true,
         "if": true,
         "do": true
       },
-      "packageReason": "PACKAGE for the EFFECT only. The trigger (after my hit) and every condition are separate: the attack condition is a real constructor slot bound to move.damaging, the other three clauses are the gate (legacy-closure, requests in requests/B13.md). Why the effect cannot be split with today's blocks: it drains one PP from a foe move that is chosen by a remembered per-foe name or by a random draw, adds to a private charge counter capped at 3, and remembers the last move record so a multi-hit move counts once. There is no 'drain PP' effect and no 'charge counter' memory block in the library (both requested), and the counter is read by a different place (HitHealAttr), so splitting would re-implement the class. Users: Foul Harvest (5973, attr 0). ODDITIES (not fixed): (1) apply stores lastMoveRecord BEFORE its simulated and empty-moveset checks, so a simulated call or a foe without usable moves still spends the once-per-move memory; (2) the random pick (the only draw) happens before the 'no PP left' check, so a foe whose moves are all out of PP still consumes one draw; (3) the heal bonus lives in HitHealAttr by class name, an engine coupling the decomposition does not see; (4) the ability text says a 'direct hit', but canApply has no direct-hit test beyond the PostAttack dispatch.",
+      "packageReason": "PACKAGE for the EFFECT only. The trigger (after my hit) and every condition are separate: the attack condition is a real constructor slot bound to move.damaging, the other three clauses are the gate (legacy-closure, requests in requests/B13.md). Why the effect cannot be split with today's blocks: it drains one PP from a foe move that is chosen by a remembered per-foe name or by a random draw, adds to a private charge counter capped at 3, and remembers the last move record so a multi-hit move counts once. There is no 'drain PP' effect and no 'charge counter' memory block in the library (both requested), and the counter is read by a different place (HitHealAttr), so splitting would re-implement the class. Users: Foul Harvest (5973, attr 0). Review fix: the PP taken (default 1) and the charge cap (default 3) are now trailing constructor arguments (indices 2 and 3, after the base class's attack condition and show-ability) and params; with PP drain 1 the PP update equals the old `ppUsed++` because the move is known to have PP left. The foe-move pick (remembered move, else one random draw) stays fixed inside the package. ODDITIES (not fixed): (1) apply stores lastMoveRecord BEFORE its simulated and empty-moveset checks, so a simulated call or a foe without usable moves still spends the once-per-move memory; (2) the random pick (the only draw) happens before the 'no PP left' check, so a foe whose moves are all out of PP still consumes one draw; (3) the heal bonus lives in HitHealAttr by class name, an engine coupling the decomposition does not see; (4) the ability text says a 'direct hit', but canApply has no direct-hit test beyond the PostAttack dispatch.",
       "uses": 1
     },
     {
@@ -496,8 +727,8 @@
     {
       "id": "block.porous-charge",
       "className": "PorousChargeAbAttr",
-      "label": "Store an impact charge when a foe's hit damages me",
-      "summary": "When a foe's move damages me, I store 1 impact charge, up to 3. A multi-hit move counts once. My next Ground move spends the charges for extra power.",
+      "label": "Store a charge when a foe's hit damages me",
+      "summary": "When a foe's move damages me, I store 1 charge, up to 3. A multi-hit move counts once. My next Ground move spends the stored charges for extra power.",
       "tier": "B",
       "kind": "package",
       "status": "decomposed",
@@ -514,7 +745,20 @@
       "examples": [
         "Gain 1 stored charge each time a foe's attack damages me, up to 3"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "maxCharges",
+          "label": "Most charges I can store",
+          "control": "number",
+          "default": 3,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
       "conditions": [
         {
           "slot": "gate",
@@ -527,21 +771,23 @@
       "feasibility": [],
       "effect": {
         "id": "effect.package",
-        "params": []
+        "params": [
+          "maxCharges"
+        ]
       },
       "reusableAlone": {
         "when": true,
         "if": true,
         "do": true
       },
-      "packageReason": "PACKAGE for the EFFECT only; the trigger (after I am hit) and the gate are separate. Justified: the effect adds 1 to a private per-Pokemon counter capped at 3 and records which foe move was counted, both read and spent by a different attr (PorousPowerAbAttr). The library has no 'charge counter' memory block (requested in requests/B13.md as `effect.store-charge` / `time.charges`), and `effect.arm-effect` has no stack count or cap, so the effect cannot be split without re-implementing the counter. Users: Porous (5974, attr 2). ODDITY (not fixed): apply has no `simulated` check, so a simulated PostDefend call would add a charge and queue the message; the L1/L2 harness never simulates PostDefend. The ability text says 'direct hit', but canApply tests only damage > 0 and a landed hit.",
+      "packageReason": "PACKAGE for the EFFECT only; the trigger (after I am hit) and the gate are separate. Justified: the effect adds 1 to a private per-Pokemon counter capped at 3 and records which foe move was counted, both read and spent by a different attr (PorousPowerAbAttr). The library has no 'charge counter' memory block (requested in requests/B13.md as `effect.store-charge` / `time.charges`), and `effect.arm-effect` has no stack count or cap, so the effect cannot be split without re-implementing the counter. Review fix: the cap (default 3) is now a constructor argument and a param; the once-per-foe-move memory stays inside the package. Users: Porous (5974, attr 2). ODDITY (not fixed): apply has no `simulated` check, so a simulated PostDefend call would add a charge and queue the message; the L1/L2 harness never simulates PostDefend. The ability text says 'direct hit', but canApply tests only damage > 0 and a landed hit.",
       "uses": 1
     },
     {
       "id": "block.porous-power",
       "className": "PorousPowerAbAttr",
-      "label": "Spend impact charges to boost my Ground moves",
-      "summary": "My Ground move gains 25% power per stored charge (up to +75% with 3) and all charges are spent. Example: 2 charges turn 100 power into 150.",
+      "label": "Spend stored charges to boost my Ground moves",
+      "summary": "My Ground move gains 25% power per stored charge and all charges are spent. Example: 2 charges turn 100 power into 150.",
       "tier": "B",
       "kind": "package",
       "status": "decomposed",
@@ -558,7 +804,19 @@
       "examples": [
         "My next Ground move is 25% stronger for every charge I stored"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "percentPerCharge",
+          "label": "Extra power per stored charge (percent)",
+          "control": "number",
+          "default": 25,
+          "editable": true,
+          "min": 0,
+          "max": 200,
+          "step": 5,
+          "gateIndependent": true
+        }
+      ],
       "conditions": [
         {
           "slot": "gate",
@@ -570,25 +828,27 @@
       ],
       "guards": [],
       "feasibility": [
-        "I must have at least one stored impact charge (a private counter, checked inside the class)"
+        "I must have at least one stored charge (a private counter, checked inside the class)"
       ],
       "effect": {
         "id": "effect.package",
-        "params": []
+        "params": [
+          "percentPerCharge"
+        ]
       },
       "reusableAlone": {
         "when": true,
         "if": true,
         "do": true
       },
-      "packageReason": "PACKAGE for the EFFECT only; the trigger (move power) and the move-type condition are separate and bound to a library atom. Justified: the multiplier is derived from a private counter (1 + 0.25 x charges, not a constant the multiply-power block can hold) and the same effect spends the counter and queues a message; splitting would re-implement the counter. The library has no 'multiply by an amount per stored charge' effect, no 'stored charges' condition and no 'spend charges' effect (requested in requests/B13.md). The 'has a charge' clause stays in the class as the residual (listed under 'also requires') and keeps its original second position. Users: Porous (5974, attr 3). ODDITIES (not fixed): (1) apply multiplies power even when simulated but only spends the charges when not simulated (correct for a preview); (2) the base class's multiplier argument (1) is dead because apply is overridden; (3) the boost is computed from the counter AT the time the power is calculated, so a power calculation that is not followed by the real move (a preview that is not marked simulated) would spend charges early.",
+      "packageReason": "PACKAGE for the EFFECT only; the trigger (move power) and the move-type condition are separate and bound to a library atom. Justified: the multiplier is derived from a private counter (1 + 0.25 x charges, not a constant the multiply-power block can hold) and the same effect spends the counter and queues a message; splitting would re-implement the counter. The library has no 'multiply by an amount per stored charge' effect, no 'stored charges' condition and no 'spend charges' effect (requested in requests/B13.md). The 'has a charge' clause stays in the class as the residual (listed under 'also requires') and keeps its original second position. Review fix: the percent per charge (default 25, was a literal) is now a constructor argument and a param; the cap (+75% at 3 charges) follows from the Store-a-charge cap. The multiplier is still computed in the overridden apply as 1 + percent/100 x charges, which is why this stays a package instead of the multiply-power block (R-B13-9). Users: Porous (5974, attr 3). ODDITIES (not fixed): (1) apply multiplies power even when simulated but only spends the charges when not simulated (correct for a preview); (2) the base class's multiplier argument (1) is dead because apply is overridden; (3) the boost is computed from the counter AT the time the power is calculated, so a power calculation that is not followed by the real move (a preview that is not marked simulated) would spend charges early.",
       "uses": 1
     },
     {
       "id": "block.porous-reset",
       "className": "PorousResetAbAttr",
-      "label": "Clear my stored impact charges when I enter",
-      "summary": "When I enter the battle, any impact charges I had stored are lost and my counter starts again from 0.",
+      "label": "Clear my stored charges when I enter",
+      "summary": "When I enter the battle, any charges I had stored are lost and my counter starts again from 0.",
       "tier": "C",
       "kind": "package",
       "status": "decomposed",
@@ -603,7 +863,7 @@
         "porous"
       ],
       "examples": [
-        "Start every switch-in with no stored impact charges"
+        "Start every switch-in with no stored charges"
       ],
       "params": [],
       "conditions": [],
@@ -625,7 +885,7 @@
       "id": "block.porous-sound-reduction",
       "className": "PorousSoundReductionAbAttr",
       "label": "Halve damage from sound-based moves",
-      "summary": "Sound-based moves do half damage to me. Example: a sound move that would deal 100 damage deals 50.",
+      "summary": "Sound-based moves do 0.5x damage to me. Example: a sound move that would deal 100 damage deals 50.",
       "tier": "B",
       "kind": "calc-modifier",
       "status": "decomposed",
@@ -636,13 +896,25 @@
         "sound resist",
         "resist sound moves",
         "half damage from sound",
-        "bulletproof style",
+        "hyper voice resist",
         "porous"
       ],
       "examples": [
         "Take half damage from sound-based moves"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Damage multiplier (times)",
+          "control": "number",
+          "default": 0.5,
+          "editable": true,
+          "min": 0,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
       "conditions": [
         {
           "slot": "gate",
@@ -656,7 +928,9 @@
       "feasibility": [],
       "effect": {
         "id": "effect.multiply-damage-taken",
-        "params": []
+        "params": [
+          "multiplier"
+        ]
       },
       "reusableAlone": {
         "when": true,
