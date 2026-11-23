@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "0e5efe73604f23",
-  "hash": "0cf1af30d9eb36",
+  "hash": "0f1139a7815b2c",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -3950,6 +3950,360 @@
       "uses": 1
     },
     {
+      "id": "block.post-summon-quash-foes",
+      "className": "PostSummonQuashFoesAbAttr",
+      "label": "Slow down every foe's Speed when I enter",
+      "summary": "When I enter the battle, the Speed of every foe next to me changes by -6 stages (-6 = as slow as possible, so they tend to move last). Example: -6 makes every foe act after me.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "make foes move last",
+        "quash on entry",
+        "lower foe speed on entry",
+        "speed drop on switch in",
+        "slow the opposing side",
+        "rejection",
+        "suppress"
+      ],
+      "examples": [
+        "When I enter, every foe's Speed drops by 6 stages so they move last, like Rejection",
+        "When I enter, every foe's Speed drops by 1 stage"
+      ],
+      "params": [
+        {
+          "id": "stages",
+          "label": "Speed stages added to every foe (-6 = as slow as possible, -1 = a little slower)",
+          "control": "number",
+          "default": -6,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one foe must still be standing",
+        "Only foes next to me are affected (every foe in a normal or double battle)",
+        "Foes that already fainted are skipped",
+        "It always changes Speed, never another stat",
+        "Nothing happens in a preview"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.post-summon-scripted-move",
+      "className": "PostSummonScriptedMoveAbAttr",
+      "label": "Use a free move as soon as I enter the battle",
+      "summary": "When I enter, I use Tickle at its own power for free (the first foe). It costs no PP. Example: Sand Attack on the foe the moment I arrive.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "use a move on entry",
+        "cast a move when I switch in",
+        "free move on switch in",
+        "entry move",
+        "start of battle move",
+        "intimidate with a move",
+        "tailwind on entry",
+        "sand pit",
+        "wildfire",
+        "jumpscare",
+        "web spinner",
+        "wishmaker"
+      ],
+      "examples": [
+        "When I enter, I use a 40 power Astonish on the foe, only the first time, like Jumpscare",
+        "When I enter, I use String Shot on every foe, like Web Spinner",
+        "When I enter, I set Mist on my own side, like Frosty Prescence",
+        "When I enter, I use Wish on myself up to three times per battle, like Wishmaker"
+      ],
+      "params": [
+        {
+          "id": "moveId",
+          "label": "Move to use (type its name, for example Tickle)",
+          "control": "text",
+          "default": "TICKLE",
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "power",
+          "label": "Power of the move (0 = the move's own power)",
+          "control": "number",
+          "default": 0,
+          "editable": true,
+          "min": 0,
+          "max": 250,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "aim",
+          "label": "Who the move is aimed at (the first foe, every foe, or me for set-up moves)",
+          "control": "select",
+          "default": "THE_FIRST_FOE",
+          "editable": true,
+          "options": [
+            "THE_FIRST_FOE",
+            "EVERY_FOE",
+            "ME"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "alwaysHit",
+          "label": "The move cannot miss (skips the accuracy check)",
+          "control": "boolean",
+          "default": false,
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "nonReflectable",
+          "label": "A foe's move-bouncing ability cannot send it back at me",
+          "control": "boolean",
+          "default": false,
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "memoryKey",
+          "label": "Built-in rule: name of the per-battle memory (None = no limit; your condition block replaces it)",
+          "control": "text",
+          "default": "NONE",
+          "editable": false
+        },
+        {
+          "id": "maxUses",
+          "label": "Built-in rule: most casts per battle (0 = once per battle when a memory name is set)",
+          "control": "number",
+          "default": 0,
+          "editable": false,
+          "min": 0,
+          "max": 10,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A move aimed at a foe needs at least one foe still standing; a move aimed at me works even with nobody on the other side",
+        "A move aimed at every foe is one cast that hits all of them; a move aimed at the first foe picks the leftmost foe that is still standing",
+        "A move aimed at me is cast as a free follow-up, so a foe's flinch cannot cancel it",
+        "Nothing happens in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "moveId",
+          "power",
+          "aim",
+          "alwaysHit",
+          "nonReflectable"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 40
+    },
+    {
+      "id": "block.post-summon-stack-set-effects",
+      "className": "PostSummonStackSetEffectsAbAttr",
+      "label": "Set a terrain and a field effect together when I enter",
+      "summary": "When I enter, the terrain becomes Grassy and Tailwind is set for 4 turns. Example: Grassy Terrain plus Tailwind for 4 turns on my side.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "terrain and tailwind",
+        "set terrain and a screen",
+        "double field setup on entry",
+        "surge and tailwind",
+        "field effect on entry",
+        "gale bloom",
+        "harukaze",
+        "team buff on switch in"
+      ],
+      "examples": [
+        "When I enter, Grassy Terrain is set and Tailwind runs for 4 turns on my side, like Harukaze",
+        "When I enter, Light Screen goes up on my side for 5 turns"
+      ],
+      "params": [
+        {
+          "id": "terrain",
+          "label": "Terrain to set (None = leave the terrain alone)",
+          "control": "select",
+          "default": "GRASSY",
+          "editable": true,
+          "options": [
+            "NONE",
+            "MISTY",
+            "ELECTRIC",
+            "GRASSY",
+            "PSYCHIC",
+            "TOXIC"
+          ]
+        },
+        {
+          "id": "tagType1",
+          "label": "The first field effect to set (None = not used)",
+          "control": "select",
+          "default": "TAILWIND",
+          "editable": true,
+          "options": [
+            "NONE",
+            "TAILWIND",
+            "TRICK_ROOM",
+            "LIGHT_SCREEN",
+            "REFLECT",
+            "AURORA_VEIL",
+            "SAFEGUARD",
+            "MIST",
+            "GRAVITY"
+          ]
+        },
+        {
+          "id": "tagTurns1",
+          "label": "Number of turns the first field effect lasts (1-10)",
+          "control": "number",
+          "default": 4,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "tagSide1",
+          "label": "Which side gets the first field effect (my side, the foes' side or both)",
+          "control": "select",
+          "default": "MY_SIDE",
+          "editable": true,
+          "options": [
+            "MY_SIDE",
+            "THE_FOES_SIDE",
+            "BOTH_SIDES"
+          ]
+        },
+        {
+          "id": "tagType2",
+          "label": "The second field effect to set (None = not used)",
+          "control": "select",
+          "default": "NONE",
+          "editable": true,
+          "options": [
+            "NONE",
+            "TAILWIND",
+            "TRICK_ROOM",
+            "LIGHT_SCREEN",
+            "REFLECT",
+            "AURORA_VEIL",
+            "SAFEGUARD",
+            "MIST",
+            "GRAVITY"
+          ]
+        },
+        {
+          "id": "tagTurns2",
+          "label": "Number of turns the second field effect lasts (1-10)",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "tagSide2",
+          "label": "Which side gets the second field effect (my side, the foes' side or both)",
+          "control": "select",
+          "default": "MY_SIDE",
+          "editable": true,
+          "options": [
+            "MY_SIDE",
+            "THE_FOES_SIDE",
+            "BOTH_SIDES"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The terrain can fail to change when the game blocks it (the same terrain already up, or a terrain lock)",
+        "Each field effect lands on the side chosen RELATIVE to me: my side is whichever side I am on",
+        "The terrain is set first, then the field effects in order",
+        "Nothing happens in a preview"
+      ],
+      "branches": [
+        {
+          "label": "Set the terrain",
+          "conditions": [],
+          "effect": {
+            "id": "effect.set-terrain",
+            "params": [
+              "terrain"
+            ]
+          }
+        },
+        {
+          "label": "Set a field effect on a side",
+          "conditions": [],
+          "effect": {
+            "id": "effect.arena-tag",
+            "params": [
+              "tagType1",
+              "tagTurns1",
+              "tagSide1",
+              "tagType2",
+              "tagTurns2",
+              "tagSide2"
+            ]
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
       "id": "block.post-summon-weather-change",
       "className": "PostSummonWeatherChangeAbAttr",
       "label": "Set the weather when I enter",
@@ -4012,6 +4366,166 @@
         "do": true
       },
       "uses": 7
+    },
+    {
+      "id": "block.post-turn-apply-tag-on-foes",
+      "className": "PostTurnApplyTagOnFoesAbAttr",
+      "label": "Keep a lasting effect on every foe at the end of each turn",
+      "summary": "At the end of every turn, every foe next to me gets \"Heal block\" again for 2 turns, so it lasts while I stay in battle. Example: Heal block for 2 turns keeps foes from healing.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "refresh a debuff every turn",
+        "keep heal block up",
+        "permanence",
+        "reapply an effect each turn",
+        "constant debuff on the foes",
+        "foes cannot heal while I am here",
+        "turn end curse on the opposing side"
+      ],
+      "examples": [
+        "At the end of every turn, every foe cannot heal for 2 more turns, like Permanence",
+        "At the end of every turn, every foe is tormented again for 2 turns"
+      ],
+      "params": [
+        {
+          "id": "tag",
+          "label": "Lasting effect the foes get (Heal block = cannot heal)",
+          "control": "select",
+          "default": "HEAL_BLOCK",
+          "editable": true,
+          "options": [
+            "HEAL_BLOCK",
+            "SYRUP_BOMB",
+            "TAUNT",
+            "TORMENT",
+            "CONFUSED",
+            "CURSED",
+            "SEEDED",
+            "SALT_CURED",
+            "DROWSY",
+            "TAR_SHOT"
+          ]
+        },
+        {
+          "id": "turns",
+          "label": "Number of turns the effect lasts each time it is renewed (1-10)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one foe must still be standing",
+        "Only foes next to me are affected (every foe in a normal or double battle)",
+        "Foes that already fainted are skipped",
+        "Nothing happens in a preview"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": [
+          "tag",
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.post-turn-drain",
+      "className": "PostTurnDrainAbAttr",
+      "label": "Drain foes' HP every turn and heal me (like Life Steal)",
+      "summary": "At the end of every turn, every foe next to me loses 10% of its max HP and I heal by what I took. Example: 10 = a tenth of each foe's max HP.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "drain hp each turn",
+        "leech the foes every turn",
+        "steal hp at end of turn",
+        "life steal",
+        "soul tap",
+        "vampire aura",
+        "constant lifesteal"
+      ],
+      "examples": [
+        "At the end of every turn, steal a tenth of every foe's max HP and heal myself, like Life Steal",
+        "At the end of every turn in fog, drain a tenth of every foe's max HP, like Soul Tap",
+        "At the end of every turn, drain a sixth of each trapped foe's max HP, like Poseidon's Dominion"
+      ],
+      "params": [
+        {
+          "id": "percent",
+          "label": "Share of each foe's max HP drained every turn (%, 10 = a tenth, 16.6667 = a sixth)",
+          "control": "number",
+          "default": 10,
+          "editable": true,
+          "min": 1,
+          "max": 50,
+          "step": 0.5,
+          "gateIndependent": true
+        },
+        {
+          "id": "onlyTrapped",
+          "label": "Only drain foes that cannot leave the battle (trapped)",
+          "control": "boolean",
+          "default": false,
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "weather",
+          "label": "Built-in rule: weather needed for the drain (a list; None = any weather; your condition block replaces it)",
+          "control": "text",
+          "default": "NONE",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "At least one foe next to me must still be standing (and trapped, when only trapped foes are drained)",
+        "Only foes next to me are drained (every foe in a normal or double battle)",
+        "A foe that loses no HP gives me nothing",
+        "A foe whose ability reverses draining (like Liquid Ooze) hurts me instead of healing me",
+        "Nothing happens in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "percent",
+          "onlyTrapped"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B split by hand (gate = the weather list, residual = a living (trapped) foe; no guards, no random draw; the preview check stays in apply as before). Users (3 attrs): Life Steal attr 0 (a tenth, any weather), Soul Tap attr 0 (a tenth, Fog or Eerie fog) and Poseidon's Dominion attr 3 (a sixth, only trapped foes). Bindings: Life Steal and Poseidon's Dominion have no weather clause (an empty ALL group); Soul Tap is any-of two field.weather atoms (the class reads arena.weather?.weatherType ?? NONE and the atom reads arena.weatherType, the same expression). Package justified in the header (hurt by a share of max HP, then heal by what was really taken from each foe, no library pieces: request R-B10-c5-05, which also asks for the shared piece R-B10-08). The share is shown as a percent and snapped to the exact unit fraction when it is within a hundred-thousandth of one, so a sixth survives the round trip (a plain percent / 100 would not). Oddities, NOT fixed: canApply asks whether ANY opponent qualifies (getOpponents) but apply only drains ADJACENT opponents (a far foe in a triple battle lets it fire with nobody to drain); the heal message is the generic end-of-turn heal text with the ability's name; the amount healed is the HP the foe really lost (so a foe with little HP left gives less), queued as one heal per foe although the class description says the holder heals by the total drained.",
+      "uses": 3
     },
     {
       "id": "block.received-move-damage-multiplier",

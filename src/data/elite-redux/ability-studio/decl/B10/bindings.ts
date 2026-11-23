@@ -29,6 +29,8 @@
 // carried by the `allies` param instead).
 // The L1 differential evaluates the class's own gate and the compiled library gate over the state grid and fails on any
 // difference; the B10 test chunk2-gates.test.ts adds the states the grid does not have (fog, terrains, types, poison).
+// Chunk 5 binds the Tier B gates of PostSummonScriptedMoveAbAttr (the per-battle memory) and PostTurnDrainAbAttr (the weather list); the other three
+// classes of the chunk (PostSummonQuashFoesAbAttr, PostSummonStackSetEffectsAbAttr, PostTurnApplyTagOnFoesAbAttr) are Tier A with no closure.
 // Later chunks of B10 add their bindings below this comment.
 import { bindCondition, bindLegacyClosure } from "#data/elite-redux/ability-studio/bindings";
 
@@ -164,7 +166,9 @@ bindCondition(5042, 0, { id: "move.flag", flag: "MAKES_CONTACT" }, "gate"); // M
 
 // ---- PostAttackRemoveTargetTypeAbAttr (the ab-attrs class): damaging move, then the target has the type. The type is the class's
 // `type` setting (gateParams). ----
-const ghostStrip = (): unknown => ({ all: [{ id: "move.damaging" }, { id: "mon.has-type", who: "other", type: "GHOST" }] });
+const ghostStrip = (): unknown => ({
+  all: [{ id: "move.damaging" }, { id: "mon.has-type", who: "other", type: "GHOST" }],
+});
 bindCondition(35, 1, ghostStrip(), "gate"); // Illuminate
 bindCondition(5229, 2, ghostStrip(), "gate"); // Refrigerator (its Illuminate copy)
 bindCondition(5603, 2, ghostStrip(), "gate"); // Depth Explorer
@@ -294,3 +298,75 @@ const TERRAIN_OBJECT =
 bindLegacyClosure(5309, 0, TERRAIN_OBJECT, "gate"); // Lawnmower
 bindLegacyClosure(5587, 0, TERRAIN_OBJECT, "gate"); // Curse of Famine
 bindLegacyClosure(5608, 0, TERRAIN_OBJECT, "gate"); // Turf War
+
+// =============================================================================================
+// Chunk 5 gates (Tier B). Quash foes, stack set effects and apply tag on foes (turn end) are Tier A with no closure and nothing to bind.
+// =============================================================================================
+
+// ---- PostSummonScriptedMoveAbAttr: the gate is the per-battle memory. A user without `oncePerBattleKey` tests nothing (an empty ALL group). ----
+const noMemory = (): unknown => ({ all: [] });
+const noMemoryUsers: ReadonlyArray<readonly [number, number, string]> = [
+  [15, 3, "Insomnia: Torment"],
+  [5031, 0, "Let's Roll: Defense Curl on me"],
+  [5121, 0, "Low Blow: 40 power"],
+  [5164, 0, "Cheap Tactics"],
+  [5192, 0, "Monkey Business: Tickle"],
+  [5212, 0, "Trickster: Disable"],
+  [5215, 0, "Soothing Aroma: Heal Bell on me"],
+  [5225, 0, "Doombringer"],
+  [5228, 0, "Suppress: Torment"],
+  [5234, 0, "Change of Heart"],
+  [5243, 0, "Powder Burst"],
+  [5245, 0, "Monster Mash"],
+  [5250, 0, "Phantom Thief: 40 power Spectral Thief"],
+  [5269, 0, "Web Spinner: String Shot on every foe"],
+  [5374, 0, "Draco Morale: on me"],
+  [5389, 1, "Butter Up: on me"],
+  [5413, 0, "Dream Whimsy"],
+  [5420, 0, "Wildfire: 50 power Fire Spin"],
+  [5422, 0, "Tar Toss"],
+  [5430, 0, "Wind Rage"],
+  [5446, 0, "Sand Pit: 20 power Sand Tomb on every foe, cannot miss"],
+  [5485, 0, "Poseidon's Dominion: 50 power Whirlpool"],
+  [5524, 0, "Chilling Presence: 10 power Icy Wind"],
+  [5540, 0, "Neutralizing Fog"],
+  [5579, 0, "Frosty Prescence: Mist on me"],
+  [5618, 0, "Let's Dance"],
+  [5648, 0, "I Am Steve: on me"],
+  [5681, 1, "Overcast: Mist on me"],
+  [5687, 0, "Curlipede: Defense Curl on me"],
+  [5707, 0, "Electro Booster: Magnet Rise on me"],
+  [5707, 1, "Electro Booster: second entry move"],
+  [5940, 6, "Brainpower: Torment"],
+  [6012, 0, "Daydreamer"],
+  [6027, 2, "Dirty Snowball: Defense Curl on me"],
+  [6047, 0, "Oracle"],
+  [6097, 0, "Mudball: on me"],
+];
+for (const [abilityId, attrIndex] of noMemoryUsers) {
+  bindCondition(abilityId, attrIndex, noMemory(), "gate");
+}
+// Once per battle, written on the same per-wave Set the class uses (pokemon.waveData.entryEffectsFired, the plain key).
+bindCondition(5421, 0, { id: "time.once-per", scope: "wave", key: "jumpscare-scripted-move" }, "gate"); // Jumpscare: Astonish, once
+bindCondition(6114, 0, { id: "time.once-per", scope: "wave", key: "jackpot-happy-hour" }, "gate"); // Jackpot: Happy Hour on me, once
+// A cap of three casts: the class counts `key#N` markers in that Set, the library has no counted memory (R-B10-c5-01).
+const CAST_CAP =
+  "At most 3 casts per battle: the class counts the markers wishmaker#0, wishmaker#1, ... in the per-battle memory and stops at the cap, while the library only has a one-time flag (time.once-per) and a counter that lives elsewhere (time.nth-use), request R-B10-c5-01 in requests/B10.md";
+bindLegacyClosure(5226, 0, CAST_CAP, "gate"); // Wishmaker
+bindLegacyClosure(6012, 1, CAST_CAP, "gate"); // Daydreamer (second copy of the Wishmaker rule, same memory key)
+
+// ---- PostTurnDrainAbAttr: the gate is the weather list; Life Steal and Poseidon's Dominion require none (an empty ALL group). ----
+bindCondition(5439, 0, noMemory(), "gate"); // Life Steal: any weather
+bindCondition(5485, 3, noMemory(), "gate"); // Poseidon's Dominion: any weather (drains only trapped foes: a setting, not the gate)
+// Fog or Eerie fog: arena.weather?.weatherType ?? NONE is in the list, the same value as arena.weatherType.
+bindCondition(
+  5521,
+  0,
+  {
+    any: [
+      { id: "field.weather", weather: "FOG" },
+      { id: "field.weather", weather: "EERIE_FOG" },
+    ],
+  },
+  "gate",
+); // Soul Tap: in fog
