@@ -30,7 +30,14 @@ export const ER_HEARTBREAK_ABILITY_ID = 5920;
 
 /** PostSummon marker: forms the link on entry. */
 export class HeartbreakAbAttr extends PostSummonAbAttr {
-  constructor() {
+  /**
+   * @param boostStages - Stages gained in Speed and in the higher attacking stat when the linked ally faints (default 1).
+   * @param dropStages - Stages lost in Defense and Sp. Def when the linked ally faints (default 1).
+   */
+  constructor(
+    public readonly boostStages: number = 1,
+    public readonly dropStages: number = 1,
+  ) {
     super(false);
   }
 
@@ -41,11 +48,14 @@ export class HeartbreakAbAttr extends PostSummonAbAttr {
   }
 }
 
-/** Whether `pokemon` carries an unsuppressed Heartbreak and is active. */
-function hasHeartbreak(pokemon: Pokemon): boolean {
-  return (
-    pokemon.isActive(true) && pokemon.getAllActiveAbilityAttrs().some(a => a?.constructor?.name === "HeartbreakAbAttr")
-  );
+/** The unsuppressed Heartbreak attr `pokemon` carries while it is active, if any (found by name). */
+function heartbreakOf(pokemon: Pokemon): HeartbreakAbAttr | undefined {
+  if (!pokemon.isActive(true)) {
+    return;
+  }
+  return pokemon.getAllActiveAbilityAttrs().find(a => a?.constructor?.name === "HeartbreakAbAttr") as
+    | HeartbreakAbAttr
+    | undefined;
 }
 
 /**
@@ -56,15 +66,18 @@ function hasHeartbreak(pokemon: Pokemon): boolean {
  */
 export function erHeartbreakOnAllyFaint(fainted: Pokemon): void {
   const holder = getRawLinkPartner(fainted);
-  if (!holder || holder === fainted || !hasHeartbreak(holder)) {
+  const attr = holder === undefined || holder === fainted ? undefined : heartbreakOf(holder);
+  if (!holder || !attr) {
     return;
   }
+  const boost = attr.boostStages ?? 1;
+  const drop = attr.dropStages ?? 1;
   breakLink(fainted);
 
   const higherAttack = holder.getStat(Stat.ATK) >= holder.getStat(Stat.SPATK) ? Stat.ATK : Stat.SPATK;
   const index = holder.getBattlerIndex();
   // +1 Speed and +1 higher attacking stat.
-  globalScene.phaseManager.unshiftNew("StatStageChangePhase", index, true, [Stat.SPD, higherAttack], 1);
+  globalScene.phaseManager.unshiftNew("StatStageChangePhase", index, true, [Stat.SPD, higherAttack], boost);
   // -1 Defense and -1 Sp.Def.
-  globalScene.phaseManager.unshiftNew("StatStageChangePhase", index, true, [Stat.DEF, Stat.SPDEF], -1);
+  globalScene.phaseManager.unshiftNew("StatStageChangePhase", index, true, [Stat.DEF, Stat.SPDEF], -drop);
 }

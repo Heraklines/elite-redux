@@ -35,6 +35,7 @@
 // =============================================================================
 
 import { AddSecondStrikeAbAttr, type AddSecondStrikeAbAttrParams, VariableMovePowerAbAttr } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import type { Pokemon } from "#field/pokemon";
@@ -64,10 +65,26 @@ function isCrosscutActive(move: Move, pokemon: Pokemon, opponent: Pokemon | unde
   return isCrosscutTypedMove(move) && move.canBeMultiStrikeEnhanced(pokemon, true, opponent ?? undefined);
 }
 
-export class CrosscutSecondStrikeAbAttr extends AddSecondStrikeAbAttr {
+export class CrosscutSecondStrikeAbAttr
+  extends AddSecondStrikeAbAttr
+  implements GatedAttr<AddSecondStrikeAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AddSecondStrikeAbAttrParams) => boolean) | undefined;
+
+  /** Tier B (ability studio spec 3.1): `canApply` is `gate && residual`, the original clause order. */
   override canApply(params: AddSecondStrikeAbAttrParams): boolean {
-    const { pokemon, opponent, move, hitCount } = params;
-    return hitCount.value === 1 && isCrosscutActive(move, pokemon, opponent);
+    return gatedCanApply<AddSecondStrikeAbAttrParams>(this, params);
+  }
+
+  /** The replaceable part, in the original order: the move still hits once, it is a damaging slicing or pulse move. */
+  public gate({ move, hitCount }: AddSecondStrikeAbAttrParams): boolean {
+    return hitCount.value === 1 && isCrosscutTypedMove(move);
+  }
+
+  /** What stays in the class: the move must be a legal single-hit multi-strike target (no OHKO, charge, multi-hit or spread). */
+  public residual({ pokemon, opponent, move }: AddSecondStrikeAbAttrParams): boolean {
+    return move.canBeMultiStrikeEnhanced(pokemon, true, opponent ?? undefined);
   }
 
   override apply({ hitCount }: AddSecondStrikeAbAttrParams): void {
@@ -96,12 +113,34 @@ export class CrosscutSecondStrikeAbAttr extends AddSecondStrikeAbAttr {
   }
 }
 
-export class CrosscutPowerAbAttr extends VariableMovePowerAbAttr {
+export class CrosscutPowerAbAttr
+  extends VariableMovePowerAbAttr
+  implements GatedAttr<PreAttackModifyPowerAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreAttackModifyPowerAbAttrParams) => boolean) | undefined;
+
+  /** @param powerMultiplier - Power multiplier of each strike (default 0.7). */
+  constructor(public readonly powerMultiplier: number = CROSSCUT_POWER_MULTIPLIER) {
+    super();
+  }
+
+  /** Tier B (ability studio spec 3.1): `canApply` is `gate && residual`, the original clause order. */
   override canApply(params: PreAttackModifyPowerAbAttrParams): boolean {
-    return isCrosscutActive(params.move, params.pokemon, params.opponent);
+    return gatedCanApply<PreAttackModifyPowerAbAttrParams>(this, params);
+  }
+
+  /** The replaceable part: a damaging slicing or pulse move. */
+  public gate({ move }: PreAttackModifyPowerAbAttrParams): boolean {
+    return isCrosscutTypedMove(move);
+  }
+
+  /** What stays in the class: the move must be a legal single-hit multi-strike target. */
+  public residual({ pokemon, opponent, move }: PreAttackModifyPowerAbAttrParams): boolean {
+    return move.canBeMultiStrikeEnhanced(pokemon, true, opponent ?? undefined);
   }
 
   override apply({ power }: PreAttackModifyPowerAbAttrParams): void {
-    power.value *= CROSSCUT_POWER_MULTIPLIER;
+    power.value *= this.powerMultiplier;
   }
 }

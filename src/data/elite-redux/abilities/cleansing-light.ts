@@ -56,7 +56,21 @@ export function erCleansingLightKoState(pokemon: Pokemon): Readonly<{ key: strin
   return CLEANSING_LIGHT_KO_COUNT.get(pokemon);
 }
 
+/** From this KO of the turn on, the heal also cures the ally's status (2 = the second KO and later). */
+export const CLEANSING_LIGHT_CURE_FROM_KO = 2;
+
 export class CleansingLightAbAttr extends PostVictoryAbAttr {
+  /**
+   * @param healFraction - Share of the ally's max HP healed per KO (default 0.1).
+   * @param cureFromKo - From which KO of the turn on the ally's status is also cured (default 2).
+   */
+  constructor(
+    public readonly healFraction: number = CLEANSING_LIGHT_HEAL_FRACTION,
+    public readonly cureFromKo: number = CLEANSING_LIGHT_CURE_FROM_KO,
+  ) {
+    super();
+  }
+
   /** The lowest-HP living ally, or `undefined` in singles / when none survive. */
   private lowestAlly(pokemon: Pokemon): Pokemon | undefined {
     const living = pokemon.getAllies().filter(a => a?.isActive(true) && !a.isFainted());
@@ -88,7 +102,7 @@ export class CleansingLightAbAttr extends PostVictoryAbAttr {
       globalScene.phaseManager.unshiftNew(
         "PokemonHealPhase",
         ally.getBattlerIndex(),
-        toDmgValue(ally.getMaxHp() * CLEANSING_LIGHT_HEAL_FRACTION),
+        toDmgValue(ally.getMaxHp() * this.healFraction),
         i18next.t("abilityTriggers:postTurnHeal", {
           pokemonNameWithAffix: getPokemonNameWithAffix(ally),
           abilityName,
@@ -97,7 +111,7 @@ export class CleansingLightAbAttr extends PostVictoryAbAttr {
       );
     }
     // Second (or later) KO this turn also cures the chosen ally's status.
-    if (koCount >= 2 && ally.status) {
+    if (koCount >= this.cureFromKo && ally.status) {
       ally.resetStatus();
       globalScene.phaseManager.queueMessage(`${ally.getNameToRender()}'s status was cleansed!`);
     }

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "02cf0b7efbf200",
+  "hash": "0fab6f28f74017",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -484,6 +484,394 @@
       "uses": 1
     },
     {
+      "id": "block.cleansing-light",
+      "className": "CleansingLightAbAttr",
+      "label": "Heal my weakest ally after each knockout",
+      "summary": "Each time I knock out a Pokemon, my ally with the lowest HP heals 10% of its max HP. From knockout number 2 of the turn on, the ally is also cured of its status.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-win",
+      "whenLabel": "When I win the fight",
+      "synonyms": [
+        "cleansing light",
+        "heal ally on ko",
+        "ko heal",
+        "heal the weakest ally",
+        "cure ally status",
+        "heal teammate after knocking out",
+        "doubles heal"
+      ],
+      "examples": [
+        "When I KO a foe, heal my lowest-HP ally by 10%",
+        "Second KO in one turn also cures my ally's status, like Cleansing Light"
+      ],
+      "params": [
+        {
+          "id": "healPercent",
+          "label": "Heal (% of the ally's max HP)",
+          "control": "slider",
+          "default": 10,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "cureFromKo",
+          "label": "Cure the ally's status from this knockout of the turn on (1 = every one, 2 = the second)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 9,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A living ally must be standing on the field (in singles the heal is wasted)",
+        "The ally at full HP is not healed, but the status cure can still happen",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "healPercent",
+          "cureFromKo"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified. 1 attr in 1 ability: Cleansing Light (5912 attr 0). The trigger (WHEN event.on-win, which fires once per KO the holder scores) is a separate swappable block and the class has no condition of its own beyond the living-ally feasibility, which is the effect's target and stays in the class. The effect cannot be split with the current library because (1) the target is 'the ally with the lowest HP' and effect.heal-percent / effect.cure-status can only target the holder, the other Pokemon or a side, and (2) the rider depends on how many KOs the holder scored THIS TURN, a per-turn counter (module WeakMap keyed by holder with a wave:turn key) that the library has no atom for (time.nth-use counts per battle). Requests R-B15-9 (target 'my weakest ally') and R-B15-10 (atom 'KOs I scored this turn') would let it become WHEN + heal-percent + (IF kos >= 2) cure-status. Both numbers (heal share, KO number that starts the cure) are typed params. State: erCleansingLightKoState is read by the AI snapshot (ai/combat-private-state.ts), so the WeakMap stays as it is. Suspected oddities, NOT fixed: (1) the KO counter only runs when canApply found a living ally, so a KO scored while no ally stands does not count toward 'second KO this turn' (and the `if (!ally)` branch after the bump can never be reached); (2) the status cure message is a hard-coded English string, not an i18n key; (3) the heal message reuses the 'postTurnHeal' text.",
+      "uses": 1
+    },
+    {
+      "id": "block.common-root",
+      "className": "CommonRootAbAttr",
+      "label": "Share Leech Seed healing with all my allies",
+      "summary": "While I have this, when a foe loses HP to Leech Seed, every active Pokemon on the seeder's side heals the same amount the seeder heals, not just the seeder.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "common root",
+        "leech seed",
+        "share leech seed healing",
+        "heal the whole team",
+        "seed drain heals allies",
+        "drain share"
+      ],
+      "examples": [
+        "When my ally's Leech Seed drains a foe, my whole side heals the same amount"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only Pokemon on the field heal, and one at full HP is skipped",
+        "Nothing is shared when the drain was turned into damage (Liquid Ooze)",
+        "Only the side of the Pokemon that planted the seed shares it, and one holder on that side is enough"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.crosscut-power",
+      "className": "CrosscutPowerAbAttr",
+      "label": "Multiply the power of my single-hit slicing and pulse moves",
+      "summary": "While the game calculates my move's power, a single-hit damaging slicing or pulse move gets its power multiplied by 0.7. Crosscut uses 0.7 so each of its two strikes is weaker.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "crosscut power",
+        "weaker strikes",
+        "power multiplier",
+        "slicing power",
+        "pulse power",
+        "reduce power of double strike"
+      ],
+      "examples": [
+        "Each of my two strikes lands at 70% power"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (0.7 = 30% less power)",
+          "control": "number",
+          "default": 0.7,
+          "editable": true,
+          "min": 0,
+          "max": 10,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must be one that can be split into strikes: no one-hit KO moves, charge moves, spread moves or moves that already hit several times"
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.crosscut-second-strike",
+      "className": "CrosscutSecondStrikeAbAttr",
+      "label": "Strike a second time with slicing and pulse moves",
+      "summary": "While the game decides how many times a move hits, a single-hit damaging slicing or pulse move strikes twice. The second strike uses the opposite category (physical or special).",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.hit-count",
+      "whenLabel": "While the game decides how many times a move hits",
+      "synonyms": [
+        "crosscut",
+        "double strike",
+        "hit twice",
+        "second hit",
+        "extra strike",
+        "slicing moves hit twice",
+        "parental bond"
+      ],
+      "examples": [
+        "My slicing and pulse moves hit twice, once physical and once special"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must be one that can be split into strikes: no one-hit KO moves, charge moves, spread moves or moves that already hit several times"
+      ],
+      "effect": {
+        "id": "effect.hit-n-times",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.dandelion-burst",
+      "className": "DandelionBurstAbAttr",
+      "label": "Seed every foe and cut its stats once when my HP gets low",
+      "summary": "Once per battle, the hit that takes me to 50% HP or less plants Leech Seed on every foe and changes its Speed by -2 stages.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-taking-damage",
+      "whenLabel": "After I take any damage",
+      "synonyms": [
+        "dandelion burst",
+        "leech seed all foes",
+        "cotton spore",
+        "seed the foes",
+        "slow the foes at low hp",
+        "once per battle at half hp"
+      ],
+      "examples": [
+        "At half HP, once per battle, seed all foes and drop their Speed by 2",
+        "Low-HP panic button that seeds the whole enemy side"
+      ],
+      "params": [
+        {
+          "id": "hpRatio",
+          "label": "HP line to fall to or below (0.5 = half of max HP)",
+          "control": "slider",
+          "default": 0.5,
+          "editable": true,
+          "min": 0.01,
+          "max": 0.99,
+          "step": 0.01
+        },
+        {
+          "id": "stat",
+          "label": "Stat each foe loses",
+          "control": "select",
+          "default": "SPD",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "stages",
+          "label": "Stat stages changed on each foe (-2 = two stages lower)",
+          "control": "number",
+          "default": -2,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "hp.crossed-below",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [
+        "not-fainted"
+      ],
+      "feasibility": [
+        "Only once per battle (the ability remembers this itself; it is not yet a swappable block, see the requests)",
+        "At least one foe must still be standing",
+        "Leech Seed does not stick to Grass types, and the stat change honours Clear Body, Mist and Contrary",
+        "It does nothing in a preview"
+      ],
+      "gateParams": [
+        {
+          "param": "hpRatio",
+          "block": "hp.crossed-below",
+          "field": "ratio"
+        }
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "stat",
+          "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B, PACKAGE for the effect only. 1 attr in 1 ability: Dandelion Burst (5907 attr 0). The trigger (after taking damage), the crossing condition (hp.crossed-below, floor-half, ratio param linked by gateParams) and the not-fainted guard are separate blocks; the effect does two things per foe in one loop (plant Leech Seed with the source move Leech Seed, and a stat-stage phase). Why the effect is a package: effect.apply-tag is not implemented in the library, so the seeding cannot be an existing block; the stat half could be effect.stat-stage on the opposing side but the two are interleaved per foe in one loop and splitting them would change phase order for several foes (see requests R-B15-8). The Leech Seed tag and its source move are fixed (the pair SEEDED + Leech Seed); stat and stages are typed params. LEGACY part: the once-per-battle memory (clause 2) is the ability's own WeakMap keyed by holder with the wave index as value, which the AI snapshot also reads (erDandelionBurstUsedWave); library time.once-per (wave scope) uses waveData.entryEffectsFired, a different memory, and adding a key there would change the AI state, so clause 2 stays in guards() and is listed as feasibility until the librarian adds a scope that can share a caller-owned memory (R-B15-7). Suspected oddities, NOT fixed: (1) Cotton Spore is modelled as a Speed drop to EACH active foe (by design, documented in the source), (2) a foe's stat-stage phase is queued even when the Leech Seed tag was refused (Grass type), by design; (3) the once-per mark is written before any foe is acted on, so a holder whose foes all faint in the loop still uses it up.",
+      "uses": 1
+    },
+    {
+      "id": "block.draconic-voodoo",
+      "className": "DraconicVoodooAbAttr",
+      "label": "Add an extra type to the foe across from me",
+      "summary": "When I enter, the foe across from me gains the Dragon type on top of its own. Later, a foe I damage with a biting move or a Dragon-type move gains it too.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "draconic voodoo",
+        "add a type to the foe",
+        "extra type on entry",
+        "make the foe dragon type",
+        "type graft",
+        "give the opponent a type"
+      ],
+      "examples": [
+        "When I enter, the foe in front of me becomes part Dragon",
+        "Biting moves add a type to whatever they hit"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Type added to foes",
+          "control": "select",
+          "default": "DRAGON",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A foe that already has the type is left alone",
+        "If nothing stands across from me, the first foe is used",
+        "The type is added on top of the foe's own types, stays when it switches out and fades at the end of the wave",
+        "The on-hit half (a biting move or a move of that type, only when it deals damage and the target is still standing) is built into the game's hit handling and is not part of this block",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "type"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified. 1 attr in 1 ability: Draconic Voodoo (5930 attr 0). The entry trigger is a separate swappable WHEN and the class has no condition, so nothing is hidden. The effect cannot be split because the library has no 'add a type to a Pokemon' effect (the graft substrate with its wave-end expiry and its message), see request R-B15-4 (the same graft effect Bad Splice needs). The second half of the ability (graft on a damaging biting or same-type hit) lives in the engine's hit seam (batch4-on-hit.ts), found by constructor name; it needs a WHEN 'when my attack damages a target' that the library lacks and a printed-flag atom (biting uses move.hasFlag), requests R-B15-12 (the moment) and R-B15-6 (the flag atom). The only setting is the type (typed, default Dragon), shared by both halves. Suspected oddities, NOT fixed: (1) the on-hit half tests the PRINTED biting flag while most flag consumers use doesFlagEffectApply; (2) the entry half targets one foe only (across, else first), the on-hit half any damaged target, which matches the ability text; (3) a foe that is Tera Dragon counts as already Dragon (isOfType) and is skipped silently.",
+      "uses": 1
+    },
+    {
       "id": "block.float",
       "className": "FloatAbAttr",
       "label": "I float above the ground",
@@ -516,6 +904,176 @@
         "do": true
       },
       "uses": 5
+    },
+    {
+      "id": "block.genesis-supernova",
+      "className": "GenesisSupernovaAbAttr",
+      "label": "Set a terrain when I use a move of a chosen type",
+      "summary": "Each time I use a Psychic-type move, damaging or not, the terrain changes to Psychic. A terrain that is already up is left alone.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-any-move",
+      "whenLabel": "After anyone uses a move",
+      "synonyms": [
+        "genesis supernova",
+        "psychic terrain",
+        "terrain on move",
+        "terrain after a move",
+        "set terrain when attacking",
+        "move type sets terrain"
+      ],
+      "examples": [
+        "Psychic moves summon Psychic Terrain",
+        "Using a Grass move starts Grassy Terrain"
+      ],
+      "params": [
+        {
+          "id": "terrain",
+          "label": "Terrain to set",
+          "control": "select",
+          "default": "PSYCHIC",
+          "editable": true,
+          "options": [
+            "MISTY",
+            "ELECTRIC",
+            "GRASSY",
+            "PSYCHIC",
+            "TOXIC"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "moveType",
+          "label": "Move type that triggers it",
+          "control": "select",
+          "default": "PSYCHIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A terrain that is already active is left alone",
+        "It does nothing in a preview"
+      ],
+      "gateParams": [
+        {
+          "param": "moveType",
+          "block": "move.type",
+          "field": "type"
+        }
+      ],
+      "effect": {
+        "id": "effect.set-terrain",
+        "params": [
+          "terrain"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.heartbreak",
+      "className": "HeartbreakAbAttr",
+      "label": "Link to my nearest ally and rage when it faints",
+      "summary": "When I enter I link to my nearest living ally. When that ally faints I gain 1 stage(s) in Speed and my higher attacking stat and lose 1 in Defense and Sp. Def. No ally, no effect.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "heartbreak",
+        "link to ally",
+        "grief rage",
+        "boost when my ally faints",
+        "avenge my partner",
+        "doubles revenge"
+      ],
+      "examples": [
+        "If my doubles partner faints I get +1 Speed and attack but lose some bulk",
+        "Soul link that powers me up when it breaks"
+      ],
+      "params": [
+        {
+          "id": "boostStages",
+          "label": "Stages gained in Speed and my higher attacking stat (1 = one stage)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 6,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "dropStages",
+          "label": "Stages lost in Defense and Sp. Def (1 = one stage lower)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 6,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Needs an adjacent living ally on the field; in singles it does nothing",
+        "In triples with two possible allies one is picked with a seeded roll",
+        "The stat changes go through the normal stat phases, so Clear Body, Mist and Contrary still apply",
+        "The faint half and the link are built into the game's faint handling and are not part of this block",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "boostStages",
+          "dropStages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified. 1 attr in 1 ability: Heartbreak (5920 attr 0). The entry trigger is a separate swappable WHEN and the class has no condition. The effect is a soul link plus a faint reaction: the library has no 'link two Pokemon' effect (state in link.ts, broken when either leaves) and no moment 'when my linked ally faints' (the reaction is driven from FaintPhase, found by constructor name), see request R-B15-13. Both stage amounts are typed params; the 'higher attacking stat' pick (raw getStat, Attack wins a tie) is fixed in the engine function. Suspected oddities, NOT fixed: (1) the pick compares RAW stats (getStat) while the comparable Berserk archetype compares getEffectiveStat, so stat stages are ignored here; (2) the link is read raw at faint time without the both-on-field gate, so a holder that already left the field cannot react (hasHeartbreak requires isActive), which is intended; (3) formLink skips allies that are already linked, so two Heartbreak holders in a triple battle can leave one unlinked.",
+      "uses": 1
     },
     {
       "id": "block.hp-threshold-form-change",

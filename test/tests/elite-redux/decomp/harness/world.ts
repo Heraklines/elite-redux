@@ -15,6 +15,7 @@
 
 import { allMoves } from "#data/data-lists";
 import { Gender } from "#data/gender";
+import { PokemonMove } from "#data/moves/pokemon-move";
 import { Status } from "#data/status-effect";
 import { Terrain, TerrainType } from "#data/terrain";
 import { Weather } from "#data/weather";
@@ -371,6 +372,23 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     opponent: ctx.foe,
     move: ctx.move,
     power: new NumberHolder(ctx.move.power),
+    simulated: false,
+  }),
+  // B15 chunk 2. The holder's own move was just used (PostMoveUsed hands over a PokemonMove and the user as `source`).
+  // The "someone else used it" half of the gate is proven in test/tests/elite-redux/decomp/B15/chunk2.test.ts.
+  "event.after-any-move": ctx => ({
+    pokemon: ctx.holder,
+    source: ctx.holder,
+    move: new PokemonMove(ctx.move.id),
+    targets: [ctx.foe.getBattlerIndex()],
+    simulated: false,
+  }),
+  // B15 chunk 2. The hit count the engine starts from for a single-hit move is 1.
+  "calc.hit-count": ctx => ({
+    pokemon: ctx.holder,
+    opponent: ctx.foe,
+    move: ctx.move,
+    hitCount: new NumberHolder(1),
     simulated: false,
   }),
 };
