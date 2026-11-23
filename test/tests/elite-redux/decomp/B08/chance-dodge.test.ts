@@ -5,6 +5,7 @@
  */
 
 import { allMoves } from "#data/data-lists";
+import { normalizeBindingSpec } from "#data/elite-redux/ability-studio/bindings";
 import { buildAttr, recomposeAttr } from "#data/elite-redux/ability-studio/build-attr";
 import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
 // B08 chunk 1, ChanceDodgeAbAttr (Ole!). Two things the shared L1 grid and L2 twin cannot show:
@@ -90,8 +91,20 @@ describe("B08: Ole! (ChanceDodgeAbAttr)", () => {
         cancelled: new BooleanHolder(false),
         simulated: false,
       } as never);
-    const onlySingle = buildAttr(module, { chance: 100, singleTargetOnly: true }) as ChanceDodgeAbAttr;
-    const any = buildAttr(module, { chance: 100, singleTargetOnly: false }) as ChanceDodgeAbAttr;
+    // The single-target test is the first atom of the gate, the roll the last: Ole!'s own binding with the chance at 100, and
+    // the same without the target test.
+    const singleAims = ["one adjacent Pokemon", "one other Pokemon, any distance", "one adjacent foe", "the foe's side of the field"];
+    const target = { any: singleAims.map(aim => ({ id: "move.aimed-at", target: aim })) };
+    const onlySingle = buildAttr(
+      module,
+      { chance: 100, singleTargetOnly: true },
+      { gate: normalizeBindingSpec({ all: [target, { id: "rng.chance", pct: 100 }] }) },
+    ) as ChanceDodgeAbAttr;
+    const any = buildAttr(
+      module,
+      { chance: 100, singleTargetOnly: false },
+      { gate: normalizeBindingSpec({ id: "rng.chance", pct: 100 }) },
+    ) as ChanceDodgeAbAttr;
     expect(run(onlySingle, MoveId.SURF)).toBe(false);
     expect(run(any, MoveId.SURF)).toBe(true);
     expect(run(onlySingle, MoveId.TACKLE)).toBe(true);

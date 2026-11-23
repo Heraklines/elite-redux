@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// B08 / calc-modifier (Tier C).
+// B08 / calc-modifier (Tier B, review round 4).
 //
 // The class extends only AbAttr and is never dispatched through applyAbAttrs: Pokemon.getBaseDamage (field/pokemon.ts, around line 5612) scans
 // the attacker's `getAllActiveAbilityAttrs()` for any attr that has a `resolveStat` function and calls
@@ -15,66 +15,92 @@
 //
 // What the class is (read from the source and from the 15 live users): one options object, no closure, no random draw.
 //   resolveStat(move, isPhysical, source), in order:
-//     1. moveIds set and move.id not in it                    -> no substitution
-//     2. contactOnly and !move.hasFlag(MAKES_CONTACT)         -> no substitution (the move's OWN flag; Long Reach is ignored)
-//     3. flag set and !move.hasFlag(flag)                     -> no substitution
-//     4. useHigherOffense: ATK if source.getStat(ATK) >= getStat(SPATK) else SPATK   (raw stats, no stages)
-//     5. useLowerOffense:  ATK if source.getStat(ATK) <= getStat(SPATK) else SPATK
-//     6. otherwise (isPhysical ? physicalStat : specialStat), or no substitution when that stat is unset
+//     GATE (the three move filters, pure, replaceable through gateOverride, called at the top of resolveStat via gatedCanApply):
+//       1. moveIds set and move.id not in it                    -> no substitution          atom move.is-move (any[...] for a list)
+//       2. contactOnly and !move.hasFlag(MAKES_CONTACT)         -> no substitution          atom move.inherent-flag MAKES_CONTACT (the move's OWN flag; Long Reach is ignored)
+//       3. flag set and !move.hasFlag(flag)                     -> no substitution          atom move.inherent-flag <flag>
+//     EFFECT (stays in the class, one piece):
+//       4. useHigherOffense: ATK if source.getStat(ATK) >= getStat(SPATK) else SPATK   (raw stats, no stages)
+//       5. useLowerOffense:  ATK if source.getStat(ATK) <= getStat(SPATK) else SPATK
+//       6. otherwise (isPhysical ? physicalStat : specialStat), or no substitution when that stat is unset
 //   The engine then replaces the attacker's offensive stat with that effective stat. The constructor throws when both the
 //   higher and the lower mode are set.
-// The filters of steps 1 to 3 are SETTINGS of the class (constructor fields), not closures, so there is no condition
-// slot. The engine never calls canApply for this class, so extra IFs cannot be ANDed on top: reusableAlone.if is false.
+// "Only contact moves use Speed" (Momentum) and "only biting moves use Sp. Atk" (Mind Crunch, Megabite, Gnashing Cannon) are real IFs, so they are
+// the replaceable gate of a Tier B class: staff can remove one, change it or AND another IF in. Every live user's gate is bound by hand
+// in bindings.ts. The three settings stay on the instance (not editable) only so a rebuild keeps the same options; the gate carries them.
 import { defineDecl, type ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
-import { enumListCodec, enumOptions } from "#data/elite-redux/ability-studio/param-codecs";
-import { MOVE_FLAG_OPTIONS } from "#data/elite-redux/ability-studio/vocabulary/enums";
+import {
+  MOVE_NAMES,
+  moveNamesCodec,
+  NO_PROPERTY,
+  PROPERTY_CHOICES,
+  propertyCodec,
+} from "#data/elite-redux/ability-studio/decl/B08/tag-choices";
 import { AttackStatSubstituteAbAttr } from "#data/elite-redux/archetypes/attack-stat-substitute";
-import { MoveFlags } from "#enums/move-flags";
-import { MoveId } from "#enums/move-id";
 import { Stat } from "#enums/stat";
 
-const STAT_CHOICES = ["NONE", "ATK", "DEF", "SPATK", "SPDEF", "SPD"] as const;
+/** The stats a player can pick, in player words ("None" leaves that kind of move alone). */
+const STAT_WORDS = ["None", "Attack", "Defense", "Sp. Atk", "Sp. Def", "Speed"] as const;
+const STAT_BY_WORD: Readonly<Record<string, number>> = {
+  Attack: Stat.ATK,
+  Defense: Stat.DEF,
+  "Sp. Atk": Stat.SPATK,
+  "Sp. Def": Stat.SPDEF,
+  Speed: Stat.SPD,
+};
 
-/** "NONE" <-> undefined (the stat is left alone), otherwise the Stat member. */
+/** "None" <-> undefined (the stat is left alone), otherwise the Stat member. */
 const optionalStatCodec: ParamCodec = {
-  toCtor: value => (value === "NONE" ? undefined : (Stat as unknown as Record<string, number>)[String(value)]),
+  toCtor: value => (value === "None" ? undefined : STAT_BY_WORD[String(value)]),
   fromInstance: raw => {
     if (raw === undefined || raw === null) {
-      return "NONE";
+      return "None";
     }
-    return STAT_CHOICES.find(name => name !== "NONE" && (Stat as unknown as Record<string, number>)[name] === raw);
+    return STAT_WORDS.find(word => word !== "None" && STAT_BY_WORD[word] === raw);
   },
 };
 
-/** "NONE" <-> undefined (no flag needed), otherwise the MoveFlags member. */
-const optionalFlagCodec: ParamCodec = {
-  toCtor: value => (value === "NONE" ? undefined : (MoveFlags as unknown as Record<string, number>)[String(value)]),
-  fromInstance: raw => {
-    if (raw === undefined || raw === null) {
-      return "NONE";
-    }
-    return MOVE_FLAG_OPTIONS.find(name => (MoveFlags as unknown as Record<string, number>)[name] === raw);
-  },
-};
-
+/** "" <-> undefined (every move), otherwise the listed moves by their names. */
 const moveListCodec: ParamCodec = {
-  toCtor: value => (String(value).trim() === "" ? undefined : enumListCodec(MoveId, "move").toCtor(value)),
-  fromInstance: raw => (raw === undefined || raw === null ? "" : enumListCodec(MoveId, "move").fromInstance(raw)),
+  toCtor: value => (String(value).trim() === "" ? undefined : moveNamesCodec.toCtor(value)),
+  fromInstance: raw => (raw === undefined || raw === null ? "" : moveNamesCodec.fromInstance(raw)),
 };
 
 export default defineDecl(AttackStatSubstituteAbAttr, {
-  tier: "C",
+  tier: "B",
   kind: "calc-modifier",
   when: "calc.attack-stat",
   label: "Attack using a different stat",
   summary: params => {
+    const conditions: string[] = [];
+    if (params.contactOnly === true) {
+      conditions.push("make contact");
+    }
+    if (params.flag !== undefined && params.flag !== NO_PROPERTY) {
+      conditions.push(`are ${String(params.flag).toLowerCase()}`);
+    }
+    if (params.moveIds !== undefined && String(params.moveIds) !== "") {
+      conditions.push("are on a chosen list");
+    }
+    const scope = conditions.length === 0 ? "My attacks" : `My attacks that ${conditions.join(" and ")}`;
     if (params.useHigherOffense === true) {
-      return "My attacks use whichever is higher of my Attack and Sp. Atk, instead of the stat the move normally uses.";
+      return `${scope} use whichever is higher of my Attack and Sp. Atk, instead of the stat they normally use.`;
     }
     if (params.useLowerOffense === true) {
-      return "My attacks use whichever is lower of my Attack and Sp. Atk, instead of the stat the move normally uses.";
+      return `${scope} use whichever is lower of my Attack and Sp. Atk, instead of the stat they normally use.`;
     }
-    return `My physical attacks use my ${params.physicalStat} and my special attacks use my ${params.specialStat} instead of Attack and Sp. Atk. None means that kind is unchanged. Example: Body Press style.`;
+    const physical = String(params.physicalStat);
+    const special = String(params.specialStat);
+    if (physical !== "None" && special !== "None") {
+      return `${scope}: physical ones use my ${physical} and special ones use my ${special}, instead of Attack and Sp. Atk.`;
+    }
+    if (physical !== "None") {
+      return `${scope}: physical ones use my ${physical} instead of Attack. Special ones are unchanged.`;
+    }
+    if (special !== "None") {
+      return `${scope}: special ones use my ${special} instead of Sp. Atk. Physical ones are unchanged.`;
+    }
+    return `${scope} keep their normal stat. Pick a stat for physical or special moves to change that. Example: Body Press style.`;
   },
   synonyms: [
     "body press",
@@ -96,8 +122,9 @@ export default defineDecl(AttackStatSubstituteAbAttr, {
       control: "select",
       label: "Stat my physical moves use instead of Attack (None = unchanged)",
       editable: true,
-      default: "NONE",
-      options: STAT_CHOICES,
+      gateIndependent: true,
+      default: "None",
+      options: STAT_WORDS,
       codec: optionalStatCodec,
     },
     {
@@ -108,8 +135,9 @@ export default defineDecl(AttackStatSubstituteAbAttr, {
       control: "select",
       label: "Stat my special moves use instead of Sp. Atk (None = unchanged)",
       editable: true,
-      default: "NONE",
-      options: STAT_CHOICES,
+      gateIndependent: true,
+      default: "None",
+      options: STAT_WORDS,
       codec: optionalStatCodec,
     },
     {
@@ -118,8 +146,9 @@ export default defineDecl(AttackStatSubstituteAbAttr, {
       ctorOption: "contactOnly",
       path: "contactOnly",
       control: "boolean",
-      label: "Only for moves that make contact",
-      editable: true,
+      label: "Only for moves that make contact (set by the conditions)",
+      // A condition of the gate (move.inherent-flag MAKES_CONTACT), carried by each user's binding.
+      editable: false,
       default: false,
     },
     {
@@ -128,11 +157,12 @@ export default defineDecl(AttackStatSubstituteAbAttr, {
       ctorOption: "flag",
       path: "flag",
       control: "select",
-      label: "Only for moves with this property (None = any move)",
-      editable: true,
-      default: "NONE",
-      options: ["NONE", ...MOVE_FLAG_OPTIONS],
-      codec: optionalFlagCodec,
+      label: "Only for moves with this property (None = any move) (set by the conditions)",
+      // A condition of the gate (move.inherent-flag <property>), carried by each user's binding.
+      editable: false,
+      default: NO_PROPERTY,
+      options: PROPERTY_CHOICES,
+      codec: propertyCodec,
     },
     {
       id: "useHigherOffense",
@@ -142,6 +172,7 @@ export default defineDecl(AttackStatSubstituteAbAttr, {
       control: "boolean",
       label: "Use the higher of my Attack and Sp. Atk for every attack",
       editable: true,
+      gateIndependent: true,
       default: false,
     },
     {
@@ -152,6 +183,7 @@ export default defineDecl(AttackStatSubstituteAbAttr, {
       control: "boolean",
       label: "Use the lower of my Attack and Sp. Atk for every attack",
       editable: true,
+      gateIndependent: true,
       default: false,
     },
     {
@@ -160,21 +192,29 @@ export default defineDecl(AttackStatSubstituteAbAttr, {
       ctorOption: "moveIds",
       path: "moveIds",
       control: "text",
-      label: "Only for these moves (comma separated, empty = every move)",
-      editable: true,
+      label: "Only for these moves (comma separated, empty = every move) (set by the conditions)",
+      // A condition of the gate (move.is-move, any of the list), carried by each user's binding.
+      editable: false,
       default: "",
-      options: enumOptions(MoveId),
+      options: MOVE_NAMES,
       codec: moveListCodec,
     },
   ],
-  conditions: [],
+  conditions: [
+    // The gate is a group of atoms per user, in the original order (bindings.ts): [move.is-move M] (any[...] for a list),
+    // [move.inherent-flag MAKES_CONTACT], [move.inherent-flag F]. A user with no filter has the always-true group { all: [] }.
+    { slot: "gate", ctx: "params", removable: true, editable: true },
+  ],
   guards: [],
   feasibility: [
     "The higher and the lower mode cannot both be on",
     "A stat that is None leaves that kind of move on its normal stat",
   ],
-  effect: { id: "effect.package", params: [] },
-  reusableAlone: { when: true, if: false, do: true },
+  effect: {
+    id: "effect.package",
+    params: ["physicalStat", "specialStat", "useHigherOffense", "useLowerOffense"],
+  },
+  reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "none", simulated: "respects" },
   probes: [
     {
@@ -183,8 +223,8 @@ export default defineDecl(AttackStatSubstituteAbAttr, {
     },
   ],
   l2StaticReason:
-    "The class is read by a duck-typed scan inside the damage formula (Pokemon.getBaseDamage), not dispatched, so no trace event shows it evaluated. The B08 test (test/tests/elite-redux/decomp/B08/attack-stat-substitute.test.ts) compares resolveStat of the original and the rebuild over every grid move, both categories and several Attack / Sp. Atk orders.",
+    "The class is read by a duck-typed scan inside the damage formula (Pokemon.getBaseDamage), not dispatched, so no trace event shows it evaluated. The B08 test (test/tests/elite-redux/decomp/B08/attack-stat-substitute.test.ts) compares resolveStat of the original and the rebuild (the library gate of every binding) over every grid move, both categories and several Attack / Sp. Atk orders.",
   status: "decomposed",
   notes:
-    "Tier C, the whole decision lives in resolveStat. WHEN `calc.attack-stat` added to the library (R-B08-7 done). 15 users: Ancient Idol (Def / Sp. Def), Momentum (Speed on contact), Equinox, Magistrate, Formless Fist (punch flag), Mimicry (terrain moves, higher), Subversion (lower), Mind Crunch, Megabite, Gnashing Cannon (biting, Sp. Atk), Magical Fists (punching), Mythical Arrows, Kagutsuchi (arrow), Energy Horns (horn), Magic Touch (Sp. Atk on contact for both kinds of move). Nothing to bind. showAbility is false for every user (the class passes false to AbAttr). Related by-name classes RelativityAbAttr and the subversion category half are separate classes.",
+    "Tier B (review round 4): resolveStat is gatedCanApply over a replaceable `gate` (the same three clauses in the same order, no guard, no residual, no random draw) followed by the stat choice, which stays in the class as the one-piece effect (effect.package: there is no library effect that swaps the stat the damage formula reads; the choice of stats, higher or lower is its set of params). The three filters (move list, contact, move property) are library atoms bound per user (bindings.ts), so staff can remove one, change it or AND another IF in (reusableAlone.if is true). The engine call site still calls resolveStat directly (no dispatch); that is fine because resolveStat itself honours the replaced gate. The settings stay on the instance only so a rebuild keeps the same options; they are not editable because the gate carries them. WHEN `calc.attack-stat` added to the library (R-B08-7 done). 15 users, all bound: Ancient Idol (Defense / Sp. Def, no filter), Momentum (Speed, contact), Equinox (higher, no filter), Magistrate (higher, no filter), Formless Fist (higher, punching), Mimicry (higher, six terrain moves), Subversion (lower, no filter), Mind Crunch, Megabite, Gnashing Cannon (Sp. Atk for biting moves), Magical Fists (Sp. Atk for punching), Mythical Arrows and Kagutsuchi (Sp. Atk for arrow moves), Energy Horns (Sp. Atk for horn moves), Magic Touch (Sp. Atk on contact for both kinds of move). The contact test is the move's OWN flag (move.hasFlag), so the atom is move.inherent-flag (Long Reach does not change it), not move.flag. showAbility is false for every user (the class passes false to AbAttr). Related by-name classes RelativityAbAttr and the subversion category half are separate classes.",
 });

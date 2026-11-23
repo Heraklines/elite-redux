@@ -366,6 +366,19 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     cancelled: new BooleanHolder(false),
     simulated: false,
   }),
+  // The two engine scans that are not dispatched (Pokemon.getBaseDamage reads resolveStat, getAttackTypeEffectiveness reads fire) ask
+  // their question with the holder and the move; this is the same frame the Tier B gate of those classes reads.
+  "calc.attack-stat": ctx => ({ pokemon: ctx.holder, move: ctx.move }),
+  "calc.my-attack-matchup": ctx => ({ pokemon: ctx.holder, move: ctx.move }),
+  // The legacy PreDefend hook: what the (undispatched) dodge class would receive.
+  "calc.incoming-move": ctx => ({
+    pokemon: ctx.holder,
+    opponent: ctx.foe,
+    move: ctx.move,
+    typeMultiplier: new NumberHolder(1),
+    cancelled: new BooleanHolder(false),
+    simulated: false,
+  }),
   "calc.move-power": ctx => ({
     pokemon: ctx.holder,
     opponent: ctx.foe,

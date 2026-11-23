@@ -93,6 +93,30 @@ const TARGET_KINDS: Readonly<Record<string, readonly MoveTarget[]>> = {
   field: [MoveTarget.BOTH_SIDES, MoveTarget.USER_SIDE, MoveTarget.ALL, MoveTarget.PARTY],
 };
 
+/** The player word of an exact aim (MOVE_AIM_OPTIONS) and the MoveTarget it stands for. */
+const EXACT_TARGETS: Readonly<Record<string, MoveTarget>> = {
+  "one other Pokemon, any distance": MoveTarget.OTHER,
+  "one adjacent Pokemon": MoveTarget.NEAR_OTHER,
+  "one adjacent foe": MoveTarget.NEAR_ENEMY,
+  "one random adjacent foe": MoveTarget.RANDOM_NEAR_ENEMY,
+  "all adjacent Pokemon": MoveTarget.ALL_NEAR_OTHERS,
+  "all adjacent foes": MoveTarget.ALL_NEAR_ENEMIES,
+  "all foes": MoveTarget.ALL_ENEMIES,
+  "all other Pokemon": MoveTarget.ALL_OTHERS,
+  "the foe's side of the field": MoveTarget.ENEMY_SIDE,
+  "my side of the field": MoveTarget.USER_SIDE,
+  "both sides of the field": MoveTarget.BOTH_SIDES,
+  "only the user": MoveTarget.USER,
+  "an adjacent ally": MoveTarget.NEAR_ALLY,
+  "an ally, any distance": MoveTarget.ALLY,
+  "the user or an adjacent ally": MoveTarget.USER_OR_NEAR_ALLY,
+  "the user and its allies": MoveTarget.USER_AND_ALLIES,
+  "every Pokemon": MoveTarget.ALL,
+  "the whole party": MoveTarget.PARTY,
+  "the Pokemon that last hit the user": MoveTarget.ATTACKER,
+  "the Curse aim": MoveTarget.CURSE,
+};
+
 // ---- once-per / nth-use memory -----------------------------------------------------------
 // State is keyed by (pokemon.battleData, key) through a WeakMap, never in static fields.
 const onceMemory = new WeakMap<object, Map<string, unknown>>();
@@ -211,6 +235,13 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
   "move.target-kind": p => {
     const targets = TARGET_KINDS[String(p.kind)];
     return frame => frame.move !== undefined && (targets ?? []).includes(frame.move.moveTarget);
+  },
+  "move.aimed-at": p => {
+    const target = EXACT_TARGETS[String(p.target)];
+    if (target === undefined) {
+      throw new Error(`"${String(p.target)}" is not a way a move can be aimed`);
+    }
+    return frame => frame.move !== undefined && frame.move.moveTarget === target;
   },
   "move.priority": p => frame =>
     frame.move !== undefined && compare(frame.move.priority, p.cmp as CompareOp, Number(p.n)),

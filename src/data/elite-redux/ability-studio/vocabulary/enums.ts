@@ -108,3 +108,30 @@ export const SIDE_KIND_OPTIONS = ["ally", "foe", "self"] as const;
 export const ITEM_KIND_OPTIONS = ["any", "berry"] as const;
 
 export const TARGET_KIND_OPTIONS = ["single", "all-foes", "all-others", "user-or-ally", "field"] as const;
+
+/**
+ * The exact aim of a move, one entry per way the game can aim it, in player words. The evaluate side maps each word to
+ * the MoveTarget it stands for (evaluate/conditions.ts EXACT_TARGETS).
+ */
+export const MOVE_AIM_OPTIONS = [
+  "one other Pokemon, any distance",
+  "one adjacent Pokemon",
+  "one adjacent foe",
+  "one random adjacent foe",
+  "all adjacent Pokemon",
+  "all adjacent foes",
+  "all foes",
+  "all other Pokemon",
+  "the foe's side of the field",
+  "my side of the field",
+  "both sides of the field",
+  "only the user",
+  "an adjacent ally",
+  "an ally, any distance",
+  "the user or an adjacent ally",
+  "the user and its allies",
+  "every Pokemon",
+  "the whole party",
+  "the Pokemon that last hit the user",
+  "the Curse aim",
+] as const;

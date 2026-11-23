@@ -10,7 +10,8 @@
 // the live instance) and compared with the original: the read-back values, the structural fingerprint and the answer
 // of `resolveStat` for physical and special moves, with Attack above, equal to and below Sp. Atk.
 import { allMoves } from "#data/data-lists";
-import { buildAttr, readDeclParams } from "#data/elite-redux/ability-studio/build-attr";
+import { buildAttr, readDeclParams, recomposeAttr } from "#data/elite-redux/ability-studio/build-attr";
+import { normalizeBindingSpec } from "#data/elite-redux/ability-studio/bindings";
 import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
 import type { DeclModule } from "#data/elite-redux/ability-studio/define-decl";
 import type { AttackStatSubstituteAbAttr } from "#data/elite-redux/archetypes/attack-stat-substitute";
@@ -76,7 +77,7 @@ describe("B08: attack stat substitution (AttackStatSubstituteAbAttr)", () => {
       expect(Object.keys(params).sort(), `${site.abilityName}: params read back`).toEqual(
         module.decl.params.map(param => param.id).sort(),
       );
-      const rebuilt = buildAttr(module, params) as unknown as AttackStatSubstituteAbAttr;
+      const rebuilt = recomposeAttr(module, site.attr, site.abilityId, site.attrIndex) as unknown as AttackStatSubstituteAbAttr;
       expect(attrFingerprint(rebuilt as never), `${site.abilityName}: fingerprint`).toEqual(attrFingerprint(site.attr));
       expect(readDeclParams(module, rebuilt as never), `${site.abilityName}: read back after the rebuild`).toEqual(
         params,
@@ -106,12 +107,38 @@ describe("B08: attack stat substitution (AttackStatSubstituteAbAttr)", () => {
     expect(none).toBeGreaterThan(0);
   });
 
-  it("the settings reach the compiled attr: higher and lower offense cannot both be on", () => {
-    expect(() => buildAttr(module, { useHigherOffense: true, useLowerOffense: true })).toThrow();
-    const defender = buildAttr(module, {
-      physicalStat: "DEF",
-      specialStat: "SPDEF",
+  it("the filters are IFs of the gate: removing or changing one changes what resolveStat answers", async () => {
+    const world = await startWorld(phaserGame);
+    world.holder.stats[Stat.ATK] = 100;
+    world.holder.stats[Stat.SPATK] = 200;
+    const momentum = sitesOf().find(site => site.abilityName === "Momentum")!;
+    const contactBinding = normalizeBindingSpec({ id: "move.inherent-flag", flag: "MAKES_CONTACT" });
+    const tackle = allMoves[MoveId.TACKLE];
+    const waterGun = allMoves[MoveId.WATER_GUN];
+    const biting = normalizeBindingSpec({ id: "move.inherent-flag", flag: "BITING_MOVE" });
+    const stock = recomposeAttr(module, momentum.attr, momentum.abilityId, momentum.attrIndex) as unknown as AttackStatSubstituteAbAttr;
+    expect(stock.resolveStat(tackle, true, world.holder)).toBe(Stat.SPD);
+    expect(stock.resolveStat(waterGun, false, world.holder)).toBe(null);
+    // The contact IF removed (an always-true gate): Momentum now applies to every move.
+    const noFilter = recomposeAttr(module, momentum.attr, momentum.abilityId, momentum.attrIndex, {
+      conds: { gate: normalizeBindingSpec({ all: [] }) },
     }) as unknown as AttackStatSubstituteAbAttr;
+    expect(noFilter.resolveStat(waterGun, false, world.holder)).toBe(Stat.SPD);
+    // Another IF ANDed in (biting moves only on top of contact): neither Tackle nor Water Gun passes any more.
+    const both = recomposeAttr(module, momentum.attr, momentum.abilityId, momentum.attrIndex, {
+      conds: { gate: { all: [contactBinding, biting] } as never },
+    }) as unknown as AttackStatSubstituteAbAttr;
+    expect(both.resolveStat(tackle, true, world.holder)).toBe(null);
+    expect(both.resolveStat(allMoves[MoveId.CRUNCH], true, world.holder)).toBe(Stat.SPD);
+  });
+
+  it("the settings reach the compiled attr: higher and lower offense cannot both be on", () => {
+    expect(() => buildAttr(module, { useHigherOffense: true, useLowerOffense: true }, { gate: normalizeBindingSpec({ all: [] }) })).toThrow();
+    const defender = buildAttr(
+      module,
+      { physicalStat: "Defense", specialStat: "Sp. Def" },
+      { gate: normalizeBindingSpec({ all: [] }) },
+    ) as unknown as AttackStatSubstituteAbAttr;
     expect(defender).toBeDefined();
   });
 });

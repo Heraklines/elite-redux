@@ -14,6 +14,7 @@ import {
   COMPARE_OPTIONS,
   HP_ROUNDING_OPTIONS,
   ITEM_KIND_OPTIONS,
+  MOVE_AIM_OPTIONS,
   MOVE_FLAG_OPTIONS,
   ONCE_PER_SCOPES,
   SIDE_KIND_OPTIONS,
@@ -236,6 +237,20 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     },
     synonyms: ["spread move", "single target", "multi target"],
     examples: ["Only single-target moves"],
+  },
+  {
+    id: "move.aimed-at",
+    group: "Move",
+    label: "The move is aimed at {target}",
+    requires: ["move"],
+    params: [selectParam("target", "Aim", MOVE_AIM_OPTIONS, "one adjacent Pokemon")],
+    pure: true,
+    formula: {
+      expr: "move.moveTarget === MoveTarget[target]  (one exact aim; use several of these in an ANY group for a set such as Ole's single-target test: one adjacent Pokemon, one other Pokemon, one adjacent foe, the foe's side)",
+      source: "src/data/elite-redux/archetypes/chance-dodge.ts SINGLE_TARGET_KINDS",
+    },
+    synonyms: ["move target", "who the move hits", "aimed at", "single target exactly", "targeting"],
+    examples: ["Only when the move is aimed at one adjacent foe"],
   },
   {
     id: "move.priority",

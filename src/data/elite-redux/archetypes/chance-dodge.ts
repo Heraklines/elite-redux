@@ -17,6 +17,7 @@
 // =============================================================================
 
 import { PreDefendAbAttr, type TypeMultiplierAbAttrParams } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { MoveTarget } from "#enums/move-target";
 
 export interface ChanceDodgeOptions {
@@ -33,7 +34,10 @@ const SINGLE_TARGET_KINDS = new Set<MoveTarget>([
   MoveTarget.ENEMY_SIDE,
 ]);
 
-export class ChanceDodgeAbAttr extends PreDefendAbAttr {
+export class ChanceDodgeAbAttr extends PreDefendAbAttr implements GatedAttr<TypeMultiplierAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: TypeMultiplierAbAttrParams) => boolean) | undefined;
+
   private readonly chance: number;
   private readonly singleTargetOnly: boolean;
 
@@ -46,11 +50,21 @@ export class ChanceDodgeAbAttr extends PreDefendAbAttr {
     this.singleTargetOnly = options.singleTargetOnly ?? false;
   }
 
+  /** Tier B split (ability studio spec 3.1): `guards`, then `gate` (the target test, then the ONE random draw). */
   override canApply(params: TypeMultiplierAbAttrParams): boolean {
-    const { move, opponent: attacker, pokemon } = params;
-    if (attacker === pokemon || !move.is("AttackMove")) {
-      return false;
-    }
+    return gatedCanApply<TypeMultiplierAbAttrParams>(this, params);
+  }
+
+  /** Safety rules that stay in the class, checked first: never dodge my own move, and only attacking moves can be dodged. */
+  public guards({ move, opponent: attacker, pokemon }: TypeMultiplierAbAttrParams): boolean {
+    return !(attacker === pokemon || !move.is("AttackMove"));
+  }
+
+  /**
+   * The replaceable condition, in the original clause order: the single-target test (a setting of the class), then the
+   * chance roll LAST (the one random draw, only reached when everything before it passed).
+   */
+  public gate({ move, pokemon }: TypeMultiplierAbAttrParams): boolean {
     if (this.singleTargetOnly && !SINGLE_TARGET_KINDS.has(move.moveTarget)) {
       return false;
     }

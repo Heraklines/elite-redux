@@ -11,8 +11,7 @@
 // settings of each user). The L1 differential evaluates the class's own gate and the compiled library gate over the
 // state grid and fails on any difference.
 //
-// Classes without a binding here: AllyAttackPowerBoostAbAttr and ChanceDodgeAbAttr (Tier C, no constructor closure),
-// AttackStatSubstituteAbAttr and BoneMoveTypeChartAbAttr (Tier C, nothing to bind).
+// Class without a binding here: AllyAttackPowerBoostAbAttr (Tier C, no constructor closure and nothing to gate).
 import { bindCondition } from "#data/elite-redux/ability-studio/bindings";
 
 // =============================================================================================
@@ -540,3 +539,75 @@ bindCondition(
 
 // no setting: every move never misses
 bindCondition(5485, 2, { all: [] }, "gate"); // Poseidon's Dominion
+
+// =============================================================================================
+// AttackStatSubstituteAbAttr (Tier B, 15 attrs). Slot "gate" = the three move filters at the top of `resolveStat`, in the ORIGINAL order:
+//   moveIds -> move.is-move (any[...] for a list)   contactOnly -> move.inherent-flag MAKES_CONTACT   flag -> move.inherent-flag <flag>
+// The tests are the move's OWN properties (move.hasFlag), so the atom is move.inherent-flag, not the user-aware move.flag.
+// A user with no filter at all has the always-true group { all: [] }. Written by hand from the dump of the 15 live instances.
+// =============================================================================================
+const substituteFlag = (flag: string): unknown => ({ id: "move.inherent-flag", flag });
+const substituteMove = (moveId: string): unknown => ({ id: "move.is-move", moveId });
+
+// No filter: every move.
+bindCondition(5024, 0, { all: [] }, "gate"); // Ancient Idol: physical moves use Defense, special moves use Sp. Def
+bindCondition(5160, 0, { all: [] }, "gate"); // Equinox: the higher of Attack and Sp. Atk
+bindCondition(6010, 0, { all: [] }, "gate"); // Magistrate: the higher of Attack and Sp. Atk
+bindCondition(6081, 0, { all: [] }, "gate"); // Subversion: the lower of Attack and Sp. Atk
+
+// Contact only.
+bindCondition(5109, 0, substituteFlag("MAKES_CONTACT"), "gate"); // Momentum: contact moves use Speed
+bindCondition(6077, 0, substituteFlag("MAKES_CONTACT"), "gate"); // Magic Touch: contact moves use Sp. Atk, both kinds
+
+// A move property.
+bindCondition(5284, 1, substituteFlag("BITING_MOVE"), "gate"); // Mind Crunch: biting moves use Sp. Atk
+bindCondition(5411, 1, substituteFlag("BITING_MOVE"), "gate"); // Megabite: biting moves use Sp. Atk
+bindCondition(5555, 2, substituteFlag("BITING_MOVE"), "gate"); // Gnashing Cannon: biting moves use Sp. Atk
+bindCondition(5308, 1, substituteFlag("ARROW_BASED"), "gate"); // Mythical Arrows: arrow moves use Sp. Atk
+bindCondition(6109, 1, substituteFlag("ARROW_BASED"), "gate"); // Kagutsuchi: arrow moves use Sp. Atk
+bindCondition(5443, 1, substituteFlag("PUNCHING_MOVE"), "gate"); // Magical Fists: punching moves use Sp. Atk
+bindCondition(5966, 2, substituteFlag("PUNCHING_MOVE"), "gate"); // Formless Fist: punching moves use the higher of Attack and Sp. Atk
+bindCondition(5452, 1, substituteFlag("HORN_BASED"), "gate"); // Energy Horns: horn moves use Sp. Atk
+
+// A list of moves.
+bindCondition(
+  250,
+  1,
+  {
+    any: ["TERRAIN_PULSE", "EXPANDING_FORCE", "RISING_VOLTAGE", "MISTY_EXPLOSION", "GRASSY_GLIDE", "PSYBLADE"].map(
+      substituteMove,
+    ),
+  },
+  "gate",
+); // Mimicry: the six terrain moves use the higher of Attack and Sp. Atk
+
+// =============================================================================================
+// BoneMoveTypeChartAbAttr (Tier B, 2 attrs). Slot "gate" = the first clause of `fire`: the move has the bone property (the move's OWN
+// flag, move.hasFlag). The `flag` param is repeated into this atom through gateParams, so a different property moves the gate.
+// =============================================================================================
+bindCondition(5091, 0, { id: "move.inherent-flag", flag: "BONE_BASED" }, "gate"); // Bone Zone
+bindCondition(6096, 0, { id: "move.inherent-flag", flag: "BONE_BASED" }, "gate"); // Cranisphere
+
+// =============================================================================================
+// ChanceDodgeAbAttr (Tier B, 1 attr). Slot "gate", in the ORIGINAL clause order: the single-target test (the class's own set of four aims:
+// one adjacent Pokemon NEAR_OTHER, one other Pokemon OTHER, one adjacent foe NEAR_ENEMY, the foe's side ENEMY_SIDE), then the chance roll LAST
+// (the ONE random draw). The guards (not my own move, an attacking move) stay in the class and run before the gate.
+// =============================================================================================
+bindCondition(
+  5304,
+  0,
+  {
+    all: [
+      {
+        any: [
+          { id: "move.aimed-at", target: "one adjacent Pokemon" },
+          { id: "move.aimed-at", target: "one other Pokemon, any distance" },
+          { id: "move.aimed-at", target: "one adjacent foe" },
+          { id: "move.aimed-at", target: "the foe's side of the field" },
+        ],
+      },
+      { id: "rng.chance", pct: 20 },
+    ],
+  },
+  "gate",
+); // Ole!: 20% chance to dodge a single-target attack

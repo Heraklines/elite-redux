@@ -61,7 +61,7 @@ export default defineDecl(AddTypeToAttackerOnContactAbAttr, {
     "Does nothing to an attacker that is Terastallized",
     "Does nothing when the attacker already has that type",
   ],
-  effect: { id: "effect.package", params: [] },
+  effect: { id: "effect.package", params: ["addedType"] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "none", simulated: "respects" },
   probes: [

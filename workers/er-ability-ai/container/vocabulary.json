@@ -2334,6 +2334,59 @@
       ]
     },
     {
+      "id": "move.aimed-at",
+      "group": "Move",
+      "label": "The move is aimed at {target}",
+      "requires": [
+        "move"
+      ],
+      "params": [
+        {
+          "id": "target",
+          "label": "Aim",
+          "control": "select",
+          "default": "one adjacent Pokemon",
+          "options": [
+            "one other Pokemon, any distance",
+            "one adjacent Pokemon",
+            "one adjacent foe",
+            "one random adjacent foe",
+            "all adjacent Pokemon",
+            "all adjacent foes",
+            "all foes",
+            "all other Pokemon",
+            "the foe's side of the field",
+            "my side of the field",
+            "both sides of the field",
+            "only the user",
+            "an adjacent ally",
+            "an ally, any distance",
+            "the user or an adjacent ally",
+            "the user and its allies",
+            "every Pokemon",
+            "the whole party",
+            "the Pokemon that last hit the user",
+            "the Curse aim"
+          ]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "move.moveTarget === MoveTarget[target]  (one exact aim; use several of these in an ANY group for a set such as Ole's single-target test: one adjacent Pokemon, one other Pokemon, one adjacent foe, the foe's side)",
+        "source": "src/data/elite-redux/archetypes/chance-dodge.ts SINGLE_TARGET_KINDS"
+      },
+      "synonyms": [
+        "move target",
+        "who the move hits",
+        "aimed at",
+        "single target exactly",
+        "targeting"
+      ],
+      "examples": [
+        "Only when the move is aimed at one adjacent foe"
+      ]
+    },
+    {
       "id": "move.priority",
       "group": "Move",
       "label": "The move's priority is {cmp} {n}",
@@ -5453,5 +5506,5 @@
       ]
     }
   ],
-  "hash": "011a53489c2835"
+  "hash": "00364cc4280fe3"
 }

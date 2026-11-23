@@ -4389,7 +4389,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         // ER Bone Zone: bone-flagged moves bypass type immunities (0x → 1x) and
         // double resisted damage (<1x → ×2). Needs the move, so gate on it.
         if (move && attr?.constructor?.name === "BoneMoveTypeChartAbAttr") {
-          (attr as unknown as { fire: (m: typeof move, h: NumberHolder) => void }).fire(move, multi);
+          (attr as unknown as { fire: (m: typeof move, h: NumberHolder, s: Pokemon) => void }).fire(
+            move,
+            multi,
+            source,
+          );
         }
         // ER Desert Spirit: in sand, Ground moves hit airborne (0x → 1x).
         if (attr?.constructor?.name === "WeatherGroundAirborneAbAttr") {
