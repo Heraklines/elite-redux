@@ -71,6 +71,7 @@ import {
   PostSummonAbAttr,
 } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { HitResult } from "#enums/hit-result";
 import type { MoveFlags } from "#enums/move-flags";
 import type { PokemonType } from "#enums/pokemon-type";
@@ -212,7 +213,12 @@ export interface StatTriggerOnEventAbAttr {
  * require (by default) that the holder is the one credited with the KO
  * (Moxie/Hubris-style). `Forsaken Heart` opts out via `triggerOnAnyFaint`.
  */
-export class StatTriggerOnKoAbAttr extends PostKnockOutAbAttr implements StatTriggerOnEventAbAttr {
+export class StatTriggerOnKoAbAttr
+  extends PostKnockOutAbAttr
+  implements StatTriggerOnEventAbAttr, GatedAttr<PostKnockOutAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostKnockOutAbAttrParams) => boolean) | undefined;
   public readonly event: StatTriggerEvent = "on-ko";
   private readonly stats: readonly StatChange[];
   private readonly triggerOnAnyFaint: boolean;
@@ -239,6 +245,14 @@ export class StatTriggerOnKoAbAttr extends PostKnockOutAbAttr implements StatTri
    * any faint anywhere on the field, by design.
    */
   public override canApply(params: PostKnockOutAbAttrParams): boolean {
+    return gatedCanApply<PostKnockOutAbAttrParams>(this, params);
+  }
+
+  /**
+   * Tier B (ability studio spec 3.1): the whole rule is the replaceable gate, in the original clause order. There is
+   * no guard and no residual.
+   */
+  public gate(params: PostKnockOutAbAttrParams): boolean {
     if (this.triggerOnAnyFaint) {
       return true;
     }
@@ -267,7 +281,12 @@ export class StatTriggerOnKoAbAttr extends PostKnockOutAbAttr implements StatTri
  * matching the `Inflatable` description "if hit by Flying or Fire MOVES"
  * (where Flying or Fire is the type set; the flag set is empty).
  */
-export class StatTriggerOnHitAbAttr extends PostDefendAbAttr implements StatTriggerOnEventAbAttr {
+export class StatTriggerOnHitAbAttr
+  extends PostDefendAbAttr
+  implements StatTriggerOnEventAbAttr, GatedAttr<PostMoveInteractionAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
   public readonly event: StatTriggerEvent = "on-hit";
   private readonly stats: readonly StatChange[];
   private readonly filter: OnHitFilter | null;
@@ -289,10 +308,19 @@ export class StatTriggerOnHitAbAttr extends PostDefendAbAttr implements StatTrig
   }
 
   public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    // Must be a damaging move that actually connected (HitResult < NO_EFFECT).
-    if (params.hitResult >= HitResult.NO_EFFECT) {
-      return false;
-    }
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /**
+   * Tier B (ability studio spec 3.1), guard: the move must be a damaging move that actually connected
+   * (HitResult < NO_EFFECT). It is the first clause of the original `canApply`.
+   */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    return params.hitResult < HitResult.NO_EFFECT;
+  }
+
+  /** The replaceable condition: the optional type and property filter. There is no residual. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
     if (this.filter === null) {
       return true;
     }
@@ -364,7 +392,12 @@ export class StatTriggerOnEntryAbAttr extends PostSummonAbAttr implements StatTr
  * like Defiant exclude that case so a Pokemon's own Close Combat doesn't
  * trigger its Defiant boost. We follow the same convention.
  */
-export class StatTriggerOnStatLoweredAbAttr extends PostStatStageChangeAbAttr implements StatTriggerOnEventAbAttr {
+export class StatTriggerOnStatLoweredAbAttr
+  extends PostStatStageChangeAbAttr
+  implements StatTriggerOnEventAbAttr, GatedAttr<PostStatStageChangeAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostStatStageChangeAbAttrParams) => boolean) | undefined;
   public readonly event: StatTriggerEvent = "on-stat-lowered";
   private readonly stats: readonly StatChange[];
   private readonly scope: "self" | "side";
@@ -381,9 +414,20 @@ export class StatTriggerOnStatLoweredAbAttr extends PostStatStageChangeAbAttr im
   }
 
   public override canApply(params: PostStatStageChangeAbAttrParams): boolean {
-    // Only fire when the *originating* change was a drop and the drop came
-    // from another source (not the subject's own self-targeting move).
-    return params.stages < 0 && !params.selfTarget;
+    return gatedCanApply<PostStatStageChangeAbAttrParams>(this, params);
+  }
+
+  /** Tier B (ability studio spec 3.1), the replaceable condition: the originating change was a drop. */
+  public gate(params: PostStatStageChangeAbAttrParams): boolean {
+    return params.stages < 0;
+  }
+
+  /**
+   * Tier B residual, kept in the class and checked after the gate (the original clause order): the drop came from
+   * another source, not from the subject's own self-targeting move.
+   */
+  public residual(params: PostStatStageChangeAbAttrParams): boolean {
+    return !params.selfTarget;
   }
 
   public override apply(params: PostStatStageChangeAbAttrParams): void {
@@ -407,8 +451,10 @@ export class StatTriggerOnStatLoweredAbAttr extends PostStatStageChangeAbAttr im
  */
 export class StatTriggerOnAllyStatLoweredAbAttr
   extends PostAllyStatStageChangeAbAttr
-  implements StatTriggerOnEventAbAttr
+  implements StatTriggerOnEventAbAttr, GatedAttr<PostStatStageChangeAbAttrParams>
 {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostStatStageChangeAbAttrParams) => boolean) | undefined;
   public readonly event: StatTriggerEvent = "on-stat-lowered";
   private readonly stats: readonly StatChange[];
 
@@ -423,9 +469,20 @@ export class StatTriggerOnAllyStatLoweredAbAttr
   }
 
   public override canApply(params: PostStatStageChangeAbAttrParams): boolean {
-    // Fire only when the ally's change was a drop from a foreign source (not the
-    // ally's own self-targeting move — "does not activate from self drops").
-    return params.stages < 0 && !params.selfTarget;
+    return gatedCanApply<PostStatStageChangeAbAttrParams>(this, params);
+  }
+
+  /** Tier B (ability studio spec 3.1), the replaceable condition: the ally's change was a drop. */
+  public gate(params: PostStatStageChangeAbAttrParams): boolean {
+    return params.stages < 0;
+  }
+
+  /**
+   * Tier B residual, kept in the class and checked after the gate (the original clause order): the drop came from a
+   * foreign source, not from the ally's own self-targeting move ("does not activate from self drops").
+   */
+  public residual(params: PostStatStageChangeAbAttrParams): boolean {
+    return !params.selfTarget;
   }
 
   public override apply(params: PostStatStageChangeAbAttrParams): void {

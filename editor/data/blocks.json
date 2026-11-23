@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "096ef32b703c2f",
+  "hash": "004c9b4ab67198",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -124,6 +124,53 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.faint-count-trigger",
+      "className": "FaintCountTriggerAbAttr",
+      "label": "Count every other Pokemon that faints while I am out",
+      "summary": "Each time a Pokemon other than me faints while I am on the field, my faint count for this battle goes up by 1. The count resets in the next battle.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-ko",
+      "whenLabel": "When I knock out a Pokemon",
+      "synonyms": [
+        "faint counter",
+        "count faints",
+        "soul harvest",
+        "tally knock outs",
+        "dead pokemon counter",
+        "snowball counter"
+      ],
+      "examples": [
+        "Add one to my faint count whenever any other Pokemon faints, like Soul Harvest"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "side.is",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Nothing is counted when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package (effect only), justified: the library has no counter memory, only yes/no memory (time.once-per, time.nth-use), and the count is read by PerFaintStatMultiplierAbAttr from the same private field of the holder's battle data, so the pair works together. The trigger and the one condition are separate blocks. Tier B: the gate is the single clause `victim.id !== pokemon.id`, expressed as not(side.is self) (the id comparison and the object comparison agree because every Pokemon has a unique id). 1 attr: Soul Harvest (5589 attr 0). Oddities, not fixed: (a) PostKnockOutAbAttr reaches the holder for every faint on the field, so an ally's faint and a foe's faint both count, as the Soul Harvest text says; (b) the count is stored under the Soul Harvest name in the shared battle data, so a second ability using this class would share one counter; (c) apply writes the counter and does not draw a random number.",
+      "uses": 1
     },
     {
       "id": "block.float",
@@ -307,6 +354,76 @@
         "do": true
       },
       "uses": 1
+    },
+    {
+      "id": "block.per-faint-stat-multiplier",
+      "className": "PerFaintStatMultiplierAbAttr",
+      "label": "Grow a stat with every faint (like Soul Harvest)",
+      "summary": "My Attack goes up by 5% for every Pokemon that fainted while I was out. Example: 5% and 3 faints makes it x1.15.",
+      "tier": "A",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "soul harvest",
+        "snowball",
+        "faint boost",
+        "stat grows per faint",
+        "stronger for each knock out",
+        "faint counter boost"
+      ],
+      "examples": [
+        "Attack, Sp. Atk and Sp. Def each go up 5% for every Pokemon that fainted, like Soul Harvest"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat grows",
+          "control": "select",
+          "default": "ATK",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ]
+        },
+        {
+          "id": "perFaint",
+          "label": "Boost for each fainted Pokemon (% of the stat, 5 = 5%)",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 0.5,
+          "max": 100,
+          "step": 0.5
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only the chosen stat is changed",
+        "Nothing changes until at least one Pokemon has fainted (the count starts at 0)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "stat",
+          "perFaint"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package, justified: the multiplier is 1 + perFaint x the faint count, and the count is the private counter that FaintCountTriggerAbAttr keeps in the holder's battle data. The library has no counter to read and its multiply-stat effect is a fixed number, so the formula cannot be split further until R-B12-02 and R-B12-03 exist. Tier A: nothing to bind (the parent gets no closure). 3 attrs, all in Soul Harvest (5589): attr 1 Attack, attr 2 Sp. Atk, attr 3 Sp. Def, each 0.05 (5%). The percent shown to staff is perFaint x 100; the class keeps the fraction. Oddities, not fixed: (a) the parent `multiplier` stays 1, so code that reads it (the studio's reflection) sees 1, not the formula; (b) the multiplier is applied on every stat query, including previews and the AI; (c) the count is not capped, so a long battle can grow a stat without limit.",
+      "uses": 3
     },
     {
       "id": "block.post-damage-force-switch",
@@ -628,6 +745,415 @@
         "do": true
       },
       "uses": 64
+    },
+    {
+      "id": "block.stat-trigger-on-ally-stat-lowered",
+      "className": "StatTriggerOnAllyStatLoweredAbAttr",
+      "label": "Change my stats when someone lowers my ally's stats",
+      "summary": "When a foe (not my ally's own move) lowers my ally's stats, my stats change once for each stat lowered: Attack +1, Defense +1. Example: two stats lowered doubles it.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.ally-stat-changed",
+      "whenLabel": "When my ally's stat changes",
+      "synonyms": [
+        "king's wrath",
+        "queen's mourning",
+        "knight's honor",
+        "partner stat drop reaction",
+        "ally was lowered",
+        "avenge my partner",
+        "boost when my ally is weakened"
+      ],
+      "examples": [
+        "Raise my Attack and Defense by one stage for each stat a foe lowers on my ally, like King's Wrath",
+        "Raise my Sp. Atk and Sp. Def by one stage when my ally's stats are lowered, like Queen's Mourning"
+      ],
+      "params": [
+        {
+          "id": "stats",
+          "label": "Stat changes, like 'Attack +1, Defense +1' (stages -6 to 6; the game stops at 6, so 12 acts like 6)",
+          "control": "text",
+          "default": "Attack +1, Defense +1",
+          "editable": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "stage.just-changed",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only a drop caused by someone else counts, never one from my ally's own move (this rule stays in the ability for now)",
+        "I need an ally on the field: the game only tells an ally about the change",
+        "A stat that is already at its limit does not move further",
+        "Nothing happens when the game only previews the change"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stats"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 6
+    },
+    {
+      "id": "block.stat-trigger-on-entry",
+      "className": "StatTriggerOnEntryAbAttr",
+      "label": "Change my stats when I enter the battle",
+      "summary": "As soon as I enter the battle, my stats change: Sp. Def +1. Example: Sp. Def +1, like Headstrong. It also works when the ability is gained mid-battle.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "headstrong",
+        "embody aspect",
+        "petal shield",
+        "switch in boost",
+        "start with a boost",
+        "entry boost",
+        "self buff on entry"
+      ],
+      "examples": [
+        "Raise Sp. Def by one stage when I enter the battle, like Headstrong",
+        "Raise Defense by 12 stages (the most the game allows is 6) when I enter, like Petal Shield"
+      ],
+      "params": [
+        {
+          "id": "stats",
+          "label": "Stat changes, like 'Sp. Def +1, Speed +1' (stages -6 to 6; the game stops at 6, so 12 acts like 6)",
+          "control": "text",
+          "default": "Sp. Def +1",
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A stat that is already at its limit does not move further",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stats"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.stat-trigger-on-hit",
+      "className": "StatTriggerOnHitAbAttr",
+      "label": "Change my stats when a move hits me",
+      "summary": "After a damaging move hits me, my stats change: Attack +1. Example: Attack +1, like Anger Point.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "anger point",
+        "inflatable",
+        "furnace",
+        "berserker rage",
+        "boost when hit",
+        "stat change when hit",
+        "react to being hit",
+        "weak armor",
+        "stamina"
+      ],
+      "examples": [
+        "Raise Defense and Sp. Def by one stage when I am hit by a Flying or Fire move, like Inflatable",
+        "Raise Speed by two stages when a Rock move hits me, like Furnace",
+        "Lower my own Speed by one stage when a contact move hits me, like Super Hot Goo"
+      ],
+      "params": [
+        {
+          "id": "stats",
+          "label": "Stat changes, like 'Defense +1, Sp. Def +1' (stages -6 to 6; the game stops at 6, so 12 acts like 6)",
+          "control": "text",
+          "default": "Attack +1",
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "filter",
+          "label": "Only moves of these types or properties, like 'Fire, Flying, Contact' (Any move = no limit)",
+          "control": "text",
+          "default": "Any move",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must have hit and done damage: a miss, a blocked move or a status move does not count",
+        "A stat that is already at its limit does not move further",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stats"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 13
+    },
+    {
+      "id": "block.stat-trigger-on-ko",
+      "className": "StatTriggerOnKoAbAttr",
+      "label": "Change my stats when I knock a Pokemon out",
+      "summary": "When I knock a Pokemon out, my stats change: Attack +1. Example: Attack +1, like Chilling Neigh.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-ko",
+      "whenLabel": "When I knock out a Pokemon",
+      "synonyms": [
+        "moxie",
+        "chilling neigh",
+        "beast boost",
+        "boost after a knock out",
+        "snowball",
+        "kill boost",
+        "hubris",
+        "adrenaline rush",
+        "forsaken heart"
+      ],
+      "examples": [
+        "Raise Attack by one stage after I knock a Pokemon out, like Chilling Neigh",
+        "Raise Attack and Speed by one stage each after a knock out, like Dragon's Ritual",
+        "Lower my Attack by one stage after a knock out, like Super Strain"
+      ],
+      "params": [
+        {
+          "id": "stats",
+          "label": "Stat changes, like 'Attack +1, Speed +2' (stages -6 to 6; the game stops at 6, so 12 acts like 6)",
+          "control": "text",
+          "default": "Attack +1",
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "triggerOnAnyFaint",
+          "label": "React to every faint on the field, not only knock outs I caused (yes or no)",
+          "control": "boolean",
+          "default": false,
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A stat that is already at its limit does not move further",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stats"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 10
+    },
+    {
+      "id": "block.stat-trigger-on-stat-lowered",
+      "className": "StatTriggerOnStatLoweredAbAttr",
+      "label": "Change my stats when someone lowers one of mine",
+      "summary": "When a foe (not my own move) lowers one of my stats, my stats change: Speed +2. It happens once per drop. Example: Speed +2, like Rattled.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.stat-changed",
+      "whenLabel": "When one of my stats changes",
+      "synonyms": [
+        "defiant",
+        "competitive",
+        "rattled",
+        "run away",
+        "boost after a stat drop",
+        "stat drop reaction",
+        "punish intimidate",
+        "king's wrath"
+      ],
+      "examples": [
+        "Raise Speed by two stages whenever a foe lowers one of my stats",
+        "Raise Attack and Defense by one stage for each stat a foe lowers, like King's Wrath"
+      ],
+      "params": [
+        {
+          "id": "stats",
+          "label": "Stat changes, like 'Speed +2' (stages -6 to 6; the game stops at 6, so 12 acts like 6)",
+          "control": "text",
+          "default": "Speed +2",
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "scope",
+          "label": "How often the change happens",
+          "control": "select",
+          "default": "Once per drop",
+          "editable": true,
+          "options": [
+            "Once per drop",
+            "Once for each stat lowered"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "stage.just-changed",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only a drop caused by someone else counts, never one from my own move (this rule stays in the ability for now)",
+        "A stat that is already at its limit does not move further",
+        "Nothing happens when the game only previews the change"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stats",
+          "scope"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 13
+    },
+    {
+      "id": "block.status-cascade",
+      "className": "StatusCascadeAbAttr",
+      "label": "Change the target's stats after my attack if it has a status",
+      "summary": "After my attack, if the target has Poison, its stats change: Attack -1, Sp. Atk -1, Speed -1. Example: a poisoned target loses Attack, Sp. Atk and Speed, like Neurotoxin.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "neurotoxin",
+        "poison also lowers stats",
+        "status cascade",
+        "extra stat drop on a poisoned foe",
+        "weaken a burned foe",
+        "debuff a statused target"
+      ],
+      "examples": [
+        "Lower the target's Attack, Sp. Atk and Speed by one stage after I hit it while it is poisoned, like Neurotoxin",
+        "Lower the target's Attack by one stage after I hit a burned target"
+      ],
+      "params": [
+        {
+          "id": "trigger",
+          "label": "The status the target must have",
+          "control": "select",
+          "default": "POISON",
+          "editable": true,
+          "options": [
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN"
+          ]
+        },
+        {
+          "id": "stats",
+          "label": "Stat changes for the target, like 'Attack -1, Speed -1' (stages -6 to 6)",
+          "control": "text",
+          "default": "Attack -1, Sp. Atk -1, Speed -1",
+          "editable": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "status.has",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The target must still be standing: a fainted target is left alone",
+        "A stat that is already at its limit does not move further",
+        "Nothing happens when the game only previews the move"
+      ],
+      "gateParams": [
+        {
+          "param": "trigger",
+          "block": "status.has",
+          "field": "status"
+        }
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stats"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     }
   ]
 }

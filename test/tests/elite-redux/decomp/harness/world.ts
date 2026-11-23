@@ -344,6 +344,38 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     hitResult: HitResult.EFFECTIVE,
     simulated: false,
   }),
+  // Added by B12 chunk 1 (request R-B12-07; the same builders B03, B09 and B11 add, keep one of each when merging).
+  // FaintPhase (faint-phase.ts:268) fans PostKnockOutAbAttr out to every Pokemon on the field with the fainted one as
+  // `victim`. The victim's latest received attack (index 0) is a direct hit by the holder, so the holder is credited.
+  "event.on-ko": ctx => {
+    ctx.foe.turnData.attacksReceived = [
+      {
+        move: ctx.move.id,
+        result: HitResult.EFFECTIVE,
+        damage: ctx.damage,
+        critical: false,
+        sourceId: ctx.holder.id,
+        sourceBattlerIndex: ctx.holder.getBattlerIndex(),
+      },
+    ];
+    return { pokemon: ctx.holder, victim: ctx.foe, simulated: false };
+  },
+  // StatStageChangePhase (stat-stage-change-phase.ts:357 and :372): the Pokemon whose stat changed (or its observing ally),
+  // the stats that moved, the requested stages and whether the holder's own move caused it. A foe caused a one-stage drop.
+  "event.stat-changed": ({ holder }) => ({
+    pokemon: holder,
+    stats: [Stat.ATK],
+    stages: -1,
+    selfTarget: false,
+    simulated: false,
+  }),
+  "event.ally-stat-changed": ({ holder }) => ({
+    pokemon: holder,
+    stats: [Stat.ATK],
+    stages: -1,
+    selfTarget: false,
+    simulated: false,
+  }),
   "calc.damage-taken": ctx => ({
     pokemon: ctx.holder,
     opponent: ctx.foe,
