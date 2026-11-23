@@ -4,11 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// B10 chunk 4 / engine-query (Tier C, a presence flag read by name). PARKED: status legacy-closure-pending-request.
-//
-// Complete but deliberately NOT named *.decl.ts, so the registry glob does not pick it up: the WHEN while.active lists its flag classes in
-// flagKeys and this class is not one of them (request R-B10-c4-10 in requests/B10.md). Rename it to
-// PostDefendSuppressOpponentDamageBoostAbAttr.decl.ts and move it up to decl/B10 once the librarian has added the class name to flagKeys.
+// B10 chunk 4 / engine-query (Tier C, a presence flag read by name). Status legacy-closure-pending-request.
 //
 // Read by hand from archetypes/post-defend-suppress-opponent-damage-boost.ts. Despite the name the class extends only AbAttr: it has no
 // canApply, no apply and is never dispatched. Constructor takes nothing, `super(false)` (no banner). The engine looks for it BY NAME:
@@ -24,7 +20,7 @@
 //
 // Nothing is configurable and no clause lives in the class, so there is nothing to bind. The engine-query routing belongs to the
 // foundation's `abilityQuery` sweep; class agents never touch the call sites. The trigger is "while the ability is active"
-// (`while.active`), which needs the class name in its `flagKeys` (request R-B10-c4-10), so this declaration is parked until then.
+// (`while.active`), whose flagKeys now list this class (added in the chunk 4 fix round, request R-B10-c4-10 done).
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 import { PostDefendSuppressOpponentDamageBoostAbAttr } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
 

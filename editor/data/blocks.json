@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "03ef54e0d0a23c",
-  "hash": "1936db1468044f",
+  "vocabularyHash": "0e5efe73604f23",
+  "hash": "0cf1af30d9eb36",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -3168,10 +3168,47 @@
       "uses": 1
     },
     {
+      "id": "block.post-defend-suppress-opponent-damage-boost",
+      "className": "PostDefendSuppressOpponentDamageBoostAbAttr",
+      "label": "Shut off foes' damage boosts and extra hits against me",
+      "summary": "Foes cannot boost the damage they deal me above what the move does without their own abilities, and most extra-hit abilities stop working on me. Moves that ignore abilities get past this.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "fort knox",
+        "wonder skin",
+        "stainless steel",
+        "block damage boosts",
+        "no multi hit against me",
+        "ignore the foe's damage boosting ability",
+        "anti boost shield"
+      ],
+      "examples": [
+        "Foes' damage boosting abilities do nothing to me, like Fort Knox",
+        "A foe with an ability that adds hits only hits me once"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A foe's move that ignores abilities (such as with Mold Breaker) is not affected",
+        "Extra-hit abilities that add a second strike (Parental Bond style) and multi-headed abilities still work"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 7
+    },
+    {
       "id": "block.post-faint-deferred-revive",
       "className": "PostFaintDeferredReviveAbAttr",
-      "label": "Come back to the party after fainting, once per battle",
-      "summary": "When I faint, I am revived at 25% HP as a reserve the next time my side sends out a Pokemon. Once per battle.",
+      "label": "Come back to the party after fainting, only once ever",
+      "summary": "When I faint, I am revived at 25% HP as a reserve the next time my side sends out a Pokemon. This works only once for this Pokemon: it never resets, not even in the next battle.",
       "tier": "B",
       "kind": "event-effect",
       "status": "decomposed",
@@ -3228,7 +3265,7 @@
       ],
       "guards": [],
       "feasibility": [
-        "Only once each battle (the latch is kept per Pokemon and starts again with the next battle)",
+        "Only once for this Pokemon in the whole run: the latch is kept per Pokemon object and nothing ever clears it, so it does not start again with the next battle (game behaviour kept as is, see the oddities)",
         "I really do faint and leave the field; the revive comes when my side next sends out a Pokemon, and I return as a reserve, not onto the field",
         "Nothing is armed in a preview"
       ],

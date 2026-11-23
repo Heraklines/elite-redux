@@ -1789,6 +1789,7 @@
         "IgnoreProtectOnContactAbAttr",
         "IgnoreResistancesAbAttr",
         "OverruleCritAbAttr",
+        "PostDefendSuppressOpponentDamageBoostAbAttr",
         "SpreadTargetByFlagAbAttr",
         "StealthRockImmunityAbAttr",
         "SuppressFieldAbilitiesWhenEnragedAbAttr",
@@ -5080,5 +5081,5 @@
       ]
     }
   ],
-  "hash": "03ef54e0d0a23c"
+  "hash": "0e5efe73604f23"
 }
