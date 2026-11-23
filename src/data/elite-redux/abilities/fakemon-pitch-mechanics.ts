@@ -43,6 +43,7 @@ import type { AbBuilder } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-debuff-on-flag-attack";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { ABILITY_STUDIO_RUNTIME_CAPABILITIES } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { AbilityStudioRuntimeCapabilityAbAttr } from "#data/elite-redux/ability-studio/runtime-components";
 import {
@@ -695,7 +696,16 @@ class PerpetualMotionResolutionAbAttr extends ExecutedMoveAbAttr {
 }
 
 export class PerpetualMotionProgressAbAttr extends PostAttackAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole rule is the replaceable {@linkcode gate}; no guards, no residual. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition, in the original order: the move deals damage, and it is the own follow-up move. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
     return (
       super.canApply(params)
       && params.move.attrs.some(attr => attr instanceof ScriptedMoveMarkerAttr && attr.key === PERPETUAL_MOTION_MARKER)
@@ -721,11 +731,22 @@ export class PerpetualMotionProgressAbAttr extends PostAttackAbAttr {
 }
 
 export class PerpetualMotionPowerAbAttr extends VariableMovePowerAbAttr {
-  override canApply({ pokemon, move }: PreAttackModifyPowerAbAttrParams): boolean {
-    return (
-      !!pokemon.summonData.erPerpetualMotionPending
-      && move.attrs.some(attr => attr instanceof ScriptedMoveMarkerAttr && attr.key === PERPETUAL_MOTION_MARKER)
-    );
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreAttackModifyPowerAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `guards`, then `gate`. */
+  override canApply(params: PreAttackModifyPowerAbAttrParams): boolean {
+    return gatedCanApply<PreAttackModifyPowerAbAttrParams>(this, params);
+  }
+
+  /** Clause 1: the free follow-up is currently armed (state of the ability's own state machine, not editable). */
+  public guards({ pokemon }: PreAttackModifyPowerAbAttrParams): boolean {
+    return !!pokemon.summonData.erPerpetualMotionPending;
+  }
+
+  /** Clause 2, the replaceable condition: the move is the own scripted follow-up move. */
+  public gate({ move }: PreAttackModifyPowerAbAttrParams): boolean {
+    return move.attrs.some(attr => attr instanceof ScriptedMoveMarkerAttr && attr.key === PERPETUAL_MOTION_MARKER);
   }
 
   override apply({ pokemon, power }: PreAttackModifyPowerAbAttrParams): void {
@@ -1266,14 +1287,27 @@ export class PropheticAbAttr extends PostSummonAbAttr {
 
 /** Southern Cross Punch rotates queued opposing targets one active slot right. */
 export class SouthernCrossPunchAbAttr extends PostAttackAbAttr {
-  override canApply({ pokemon, move, damage, hitResult, simulated }: PostMoveInteractionAbAttrParams): boolean {
-    return (
-      !simulated
-      && damage > 0
-      && hitResult < HitResult.NO_EFFECT
-      && move.hasFlag(MoveFlags.PUNCHING_MOVE)
-      && pokemon.getAllActiveAbilityAttrs().some(attr => attr instanceof SouthernCrossPunchAbAttr)
-    );
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `guards`, `gate`, `residual`. */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Clauses 1 to 3: a real, damaging hit (not a preview, damage dealt, not blocked). Not editable. */
+  public guards({ damage, hitResult, simulated }: PostMoveInteractionAbAttrParams): boolean {
+    return !simulated && damage > 0 && hitResult < HitResult.NO_EFFECT;
+  }
+
+  /** Clause 4, the replaceable condition: the move is a punching move (its own flag, not an injected one). */
+  public gate({ move }: PostMoveInteractionAbAttrParams): boolean {
+    return move.hasFlag(MoveFlags.PUNCHING_MOVE);
+  }
+
+  /** Clause 5: the holder still has this attr on an active ability. */
+  public residual({ pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    return pokemon.getAllActiveAbilityAttrs().some(attr => attr instanceof SouthernCrossPunchAbAttr);
   }
 
   override apply({ pokemon, simulated }: PostMoveInteractionAbAttrParams): void {
@@ -1313,8 +1347,22 @@ export function rotateSouthernCrossPunchTargets(pokemon: Pokemon): void {
 
 /** Bitter Drill lays persistent grounded entry bits after a successful drill hit. */
 export class BitterDrillAbAttr extends PostAttackAbAttr {
-  override canApply({ move, damage, hitResult, simulated }: PostMoveInteractionAbAttrParams): boolean {
-    return !simulated && damage > 0 && hitResult < HitResult.NO_EFFECT && move.hasFlag(MoveFlags.DRILL_BASED);
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `guards`, then `gate`. */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Clauses 1 to 3: a real, damaging hit (not a preview, damage dealt, not blocked). Not editable. */
+  public guards({ damage, hitResult, simulated }: PostMoveInteractionAbAttrParams): boolean {
+    return !simulated && damage > 0 && hitResult < HitResult.NO_EFFECT;
+  }
+
+  /** Clause 4, the replaceable condition: the move is a drill move (its own flag, not an injected one). */
+  public gate({ move }: PostMoveInteractionAbAttrParams): boolean {
+    return move.hasFlag(MoveFlags.DRILL_BASED);
   }
 
   override apply({ pokemon, move, simulated }: PostMoveInteractionAbAttrParams): void {

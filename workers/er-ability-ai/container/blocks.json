@@ -1,8 +1,43 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "096ef32b703c2f",
+  "hash": "19c915bfa082f0",
   "blocks": [
+    {
+      "id": "block.astral-project-star-marker",
+      "className": "AstralProjectStarMarkerAbAttr",
+      "label": "Count all my moves as Star moves",
+      "summary": "While I have this, every move I use counts as a Star move for other abilities. Example: a Star-move double-hit ability makes all my moves hit twice.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "star move",
+        "lunar move",
+        "moon move",
+        "every move counts as",
+        "all moves are",
+        "astral",
+        "starcrossed"
+      ],
+      "examples": [
+        "All my moves count as Star moves, so my Star-move abilities always work"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "It changes nothing on its own: an ability that reacts to Star moves (such as the one that makes them hit twice) must also be present"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
     {
       "id": "block.attack-type-immunity",
       "className": "AttackTypeImmunityAbAttr",
@@ -124,6 +159,52 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.bitter-drill",
+      "className": "BitterDrillAbAttr",
+      "label": "Lay Drill Bits on the foes' side after my drill move",
+      "summary": "After a drill move of mine hits, Drill Bits are laid on the opposing side. Foes that come in on the ground later are embedded.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "bitter drill",
+        "entry hazard",
+        "set a hazard",
+        "drill hazard",
+        "spikes",
+        "field effect after hit"
+      ],
+      "examples": [
+        "After a drill move hits, leave a hazard on the opposing side"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must really have hurt the target (it dealt damage and was not blocked), and the game must not be only previewing",
+        "Only one set of Drill Bits can be on a side at a time"
+      ],
+      "effect": {
+        "id": "effect.arena-tag",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.float",
@@ -306,6 +387,176 @@
         "if": false,
         "do": true
       },
+      "uses": 1
+    },
+    {
+      "id": "block.penta-punch-marker",
+      "className": "PentaPunchMarkerAbAttr",
+      "label": "Let me know a fifth move",
+      "summary": "While I have this, I can know five moves instead of four. Example: a Pokemon that is full at four moves can learn a fifth.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "fifth move",
+        "extra move slot",
+        "5th move",
+        "five moves",
+        "more moves",
+        "move slot",
+        "penta punch"
+      ],
+      "examples": [
+        "Give this Pokemon a fifth move slot"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The extra slot is not stacked with the fifth-slot reward: the game gives the larger of the two, so having both still means five moves"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.perpetual-motion-power",
+      "className": "PerpetualMotionPowerAbAttr",
+      "label": "Raise power for each free follow-up hit in a row",
+      "summary": "While my free follow-up move is queued, its power is multiplied by 1 plus 0.1 for each hit in a row. Example: after 3 hits in a row, power x1.3.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "combo power",
+        "power per hit",
+        "streak bonus",
+        "escalating power",
+        "rollout",
+        "perpetual motion"
+      ],
+      "examples": [
+        "Each free Rollout that lands in a row hits 10% harder"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": false,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only while my free follow-up is waiting to resolve (the streak is armed)",
+        "The bonus is 10% of the power for each hit in a row that landed so far"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package, reason: the multiplier is `1 + streak x 0.1` where the streak is a per-Pokemon counter written by PerpetualMotionProgressAbAttr; effect.multiply-power only takes a fixed number (a counter-based power effect is requested). Users (1): Perpetual Motion (6022) attr 4 of 5. Gate is legacy-closure pending move.scripted-marker. The armed-state check stays a non-editable guard clause in the class (it is state of the ability's own machine, listed under feasibility, not a registered guard). Oddities, not fixed: canApply does not call super.canApply, so skipDuringMovesetGen is ignored (it is false for this class, so no effect); the class applies on simulated power previews too, which is correct for damage previews.",
+      "uses": 1
+    },
+    {
+      "id": "block.perpetual-motion-progress",
+      "className": "PerpetualMotionProgressAbAttr",
+      "label": "Count free follow-up hits that land in a row",
+      "summary": "After my free follow-up move, I count one more hit in a row if it hurt the target, or reset the count to zero if it did not.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "hit streak",
+        "combo counter",
+        "in a row",
+        "consecutive hits",
+        "streak",
+        "perpetual motion"
+      ],
+      "examples": [
+        "Count each free Rollout that lands in a row so the next one hits harder"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": false,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only counts a follow-up that is still waiting for its result (the streak is armed); a hit that did not hurt the target resets the streak",
+        "Does nothing while the game is only previewing a hit"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package, reason: the effect is one step of a counter state machine (pending flag and streak) shared with PerpetualMotionTriggerAbAttr, PerpetualMotionPostTurnAbAttr, PerpetualMotionResolutionAbAttr (B17) and PerpetualMotionPowerAbAttr; the library has no counter effect (requested). Users (1): Perpetual Motion (6022) attr 3 of 5. Gate is legacy-closure pending the request move.scripted-marker. Oddities, not fixed: the inherited attackCondition (`move.category !== STATUS`, constructor argument 0) is not exposed as its own slot; for this user it is always the default, and the gate re-states it as move.damaging. The streak is stored on summonData, so it resets when the Pokemon leaves the field.",
+      "uses": 1
+    },
+    {
+      "id": "block.photovoltaic-type",
+      "className": "PhotovoltaicTypeAbAttr",
+      "label": "Gain the Electric type when I enter",
+      "summary": "When I enter the battle, I gain the Electric type in addition to my own types. Example: a Water type becomes Water and Electric.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "add a type",
+        "extra type",
+        "dual type",
+        "gain electric type",
+        "second type",
+        "electric typing",
+        "photovoltaic"
+      ],
+      "examples": [
+        "Gain the Electric type when I enter the battle"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing if I am already an Electric type",
+        "The new type lasts until I leave the field"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package, reason: no effect.add-type in the effect library (requested), not because the effect cannot be split. Users (1): Photovoltaic (6030) attr 1; attr 0 is a SelfHighestStatMultiplierAbAttr (Solar Power half) from another batch. apply writes pokemon.summonData.types, which is reset when the Pokemon leaves the field. It ignores `simulated` (never read), harmless because PostSummon is never dispatched simulated. A Pokemon that already has summonData.types set (a type change before entry) keeps that list and gets Electric appended; with no summon types it starts from getTypes().",
       "uses": 1
     },
     {
@@ -565,6 +816,48 @@
       "uses": 7
     },
     {
+      "id": "block.prophetic",
+      "className": "PropheticAbAttr",
+      "label": "Set up a delayed attack on a foe when I enter",
+      "summary": "When I enter, I set a delayed attack on the first foe still standing. It hits 3 turns later with Future Sight or Doom Desire, whichever would hurt more.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "future sight",
+        "doom desire",
+        "delayed attack",
+        "delayed damage",
+        "time bomb",
+        "attack later",
+        "prophecy"
+      ],
+      "examples": [
+        "When I enter, a Future Sight style attack lands on the foe three turns later"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "There must be a foe still standing",
+        "No delayed attack may already be waiting on that foe's position",
+        "Nothing is set up while the game is only previewing"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package, reason: no delayed-attack effect in the library (requested); the class itself is one call to positionalTagManager.addTag with fixed arguments (sourceMoves [Future Sight, Doom Desire], turnCount 3), so it should be re-declared as an event-effect with params {moves, turns} when the effect exists. Users (1): Prophetic (6014) attr 0 (its only attr). Oddities, not fixed: canApply is the inherited true, so the ability flyout can show when no delayed attack is set (no foe, or a delayed attack already waiting on that slot); the tag is aimed at the first living foe only, never at both foes in a double battle.",
+      "uses": 1
+    },
+    {
       "id": "block.received-move-damage-multiplier",
       "className": "ReceivedMoveDamageMultiplierAbAttr",
       "label": "Take less (or more) damage",
@@ -628,6 +921,55 @@
         "do": true
       },
       "uses": 64
+    },
+    {
+      "id": "block.southern-cross-punch",
+      "className": "SouthernCrossPunchAbAttr",
+      "label": "Re-aim queued attacks at the next foe after my punch",
+      "summary": "After my punching move hits, every move still queued this turn that aims at a foe is re-aimed at the next foe over. Example: with two foes, the targets swap.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "southern cross punch",
+        "retarget",
+        "redirect attacks",
+        "swap targets",
+        "rotate targets",
+        "punch",
+        "double battle"
+      ],
+      "examples": [
+        "After a punch hits, the foes' targets are shifted one slot to the right"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must really have hurt the target (it dealt damage and was not blocked), and the game must not be only previewing",
+        "I must still have this ability active",
+        "There must be at least two foes on the field to rotate between"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package, reason: the effect rewrites `battle.turnCommands[*].targets` and `command.move.targets` for every queued command; no library effect touches the turn queue (requested as effect.rotate-queued-targets). Users (1): Southern Cross Punch (6016) attr 0 (its only attr). Gate legacy-closure pending move.has-own-flag; the guards need not-simulated and hit-dealt-damage (requested). The inherited attackCondition (constructor argument 0, default `move.category !== STATUS`) is never read: this canApply does not call super. Oddities, not fixed: (1) the class rewrites commands that already executed this turn as well as later ones, harmless but wider than the description 'later intended targets'; (2) the rotation also re-aims the holder's own queued command and its ally's; (3) clause 5 is redundant for the shipped ability.",
+      "uses": 1
     }
   ]
 }
