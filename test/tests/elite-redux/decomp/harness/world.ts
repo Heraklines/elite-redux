@@ -418,4 +418,12 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     power: new NumberHolder(ctx.move.power),
     simulated: false,
   }),
+  // Added by B12 chunk 3 (request R-B12-26). The move-type moment (Pokemon.getMoveType): the type holder starts at the move's own type.
+  "calc.move-type": ctx => ({
+    pokemon: ctx.holder,
+    opponent: ctx.foe,
+    move: ctx.move,
+    moveType: new NumberHolder(ctx.move.type),
+    simulated: false,
+  }),
 };

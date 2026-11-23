@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "16867ded510194",
+  "hash": "18f66a35212cb5",
   "blocks": [
     {
       "id": "block.activate-once-per-battle-entry-window",
@@ -1605,6 +1605,713 @@
         "do": true
       },
       "uses": 2
+    },
+    {
+      "id": "block.toxic-terrain-self-poison-on-summon",
+      "className": "ToxicTerrainSelfPoisonOnSummonAbAttr",
+      "label": "Give myself a status condition when I enter the battle",
+      "summary": "As soon as I enter the battle I get Poison, even if I am flying. Example: Poison while Toxic Terrain is active, like Toxic Boost. Nothing happens if I already have a status.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "toxic boost",
+        "poison myself",
+        "self poison",
+        "toxic terrain",
+        "start poisoned",
+        "self inflicted status on entry",
+        "status on switch in"
+      ],
+      "examples": [
+        "Poison myself when I enter while Toxic Terrain is active, like Toxic Boost",
+        "Burn myself when I enter the battle (change the status setting)"
+      ],
+      "params": [
+        {
+          "id": "status",
+          "label": "Status condition I get (Toxic = badly poisoned)",
+          "control": "select",
+          "default": "POISON",
+          "editable": true,
+          "options": [
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens if I have fainted or already have a status condition",
+        "A Pokemon that cannot get the status (for example a Poison or Steel type for poison) stays unaffected",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.inflict-status",
+        "params": [
+          "status"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.toxic-terrain-self-poison-on-terrain-change",
+      "className": "ToxicTerrainSelfPoisonOnTerrainChangeAbAttr",
+      "label": "Give myself a status condition when the terrain changes",
+      "summary": "The moment the terrain changes I get Poison, even if I am flying. Example: Poison when the terrain becomes Toxic Terrain, like Toxic Boost. Nothing happens if I already have a status.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.terrain-changed",
+      "whenLabel": "When the terrain changes",
+      "synonyms": [
+        "toxic boost",
+        "poison myself",
+        "self poison",
+        "toxic terrain",
+        "poisoned by terrain",
+        "status when terrain changes",
+        "self inflicted status"
+      ],
+      "examples": [
+        "Poison myself when the terrain becomes Toxic Terrain, like Toxic Boost",
+        "Paralyze myself when the terrain changes (change the status and the terrain test)"
+      ],
+      "params": [
+        {
+          "id": "status",
+          "label": "Status condition I get (Toxic = badly poisoned)",
+          "control": "select",
+          "default": "POISON",
+          "editable": true,
+          "options": [
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens if I have fainted or already have a status condition",
+        "A Pokemon that cannot get the status (for example a Poison or Steel type for poison) stays unaffected",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.inflict-status",
+        "params": [
+          "status"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.trap-duration-modifier",
+      "className": "TrapDurationModifierAbAttr",
+      "label": "Make my trapping moves last longer and hurt more",
+      "summary": "After my trapping move (Fire Spin, Wrap, Whirlpool...) lands, the trap lasts 6 turns and hurts 1/6 of the target's max HP each turn. Example: 6 turns, 1/6, like Tentalock.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "trap lasts longer",
+        "binding moves",
+        "wrap damage",
+        "partial trapping",
+        "grappler",
+        "fire spin duration",
+        "tentalock",
+        "tangled tails",
+        "wildfire"
+      ],
+      "examples": [
+        "Trapping moves last 6 turns and deal 1/6 of max HP, like Tentalock",
+        "Only Fire Spin lasts 4 turns and deals 1/6 of max HP, like Wildfire"
+      ],
+      "params": [
+        {
+          "id": "turns",
+          "label": "Turns the trap lasts (6 = six turns)",
+          "control": "number",
+          "default": 6,
+          "editable": true,
+          "min": 1,
+          "max": 15,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "denominator",
+          "label": "Trap damage each turn (1/N of the target's max HP, 6 = one sixth)",
+          "control": "number",
+          "default": 6,
+          "editable": true,
+          "min": 1,
+          "max": 16,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "moves",
+          "label": "Only these trapping moves, like 'Fire Spin, Wrap' (empty = every trapping move)",
+          "control": "text",
+          "default": "",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The target must still be on the field and standing",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "turns",
+          "denominator"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.turn-decay-damage-multiplier",
+      "className": "TurnDecayDamageMultiplierAbAttr",
+      "label": "Make my moves weaker every turn I stay in",
+      "summary": "My moves' power is x1 minus 0.2 for every turn I have been in, but never below x0.2. It starts over when I switch in. Example: 1, 0.2, 0.2 like Lethargy.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "lethargy",
+        "power fades",
+        "weaker each turn",
+        "damage decay",
+        "slow start",
+        "tire out",
+        "diminishing damage"
+      ],
+      "examples": [
+        "My damage drops by 20% of normal each turn I stay in, down to 20%, and resets on switch-in, like Lethargy"
+      ],
+      "params": [
+        {
+          "id": "start",
+          "label": "Power multiplier before any turn has passed (1 = normal power)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05
+        },
+        {
+          "id": "drop",
+          "label": "Power lost every turn (0.2 = the multiplier falls by 0.2 each turn)",
+          "control": "number",
+          "default": 0.2,
+          "editable": true,
+          "min": 0,
+          "max": 1,
+          "step": 0.01
+        },
+        {
+          "id": "floor",
+          "label": "Lowest the multiplier can fall to (0.2 = one fifth of normal power)",
+          "control": "number",
+          "default": 0.2,
+          "editable": true,
+          "min": 0,
+          "max": 4,
+          "step": 0.05
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "start",
+          "drop",
+          "floor"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.type-conversion",
+      "className": "TypeConversionAbAttr",
+      "label": "Change the type of some of my moves",
+      "summary": "My moves that fit \"Normal\" become Fire type when I use them. Example: Normal moves become Fire type, like Immolate. The extra power some of these abilities add is a separate block.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-type",
+      "whenLabel": "While the game decides a move's type",
+      "synonyms": [
+        "aerilate",
+        "pixilate",
+        "galvanize",
+        "refrigerate",
+        "normal moves become",
+        "convert move type",
+        "ate ability",
+        "sound moves become",
+        "immolate",
+        "crystallize"
+      ],
+      "examples": [
+        "Normal moves become Fire type, like Immolate",
+        "Sound moves that are Normal become Ground type, like Sand Song",
+        "Rock moves become Ice type, like Crystallize"
+      ],
+      "params": [
+        {
+          "id": "source",
+          "label": "Which moves change, like 'Normal' or 'Sound moves that are Normal'",
+          "control": "text",
+          "default": "Normal",
+          "editable": false
+        },
+        {
+          "id": "newType",
+          "label": "Type they become",
+          "control": "select",
+          "default": "FIRE",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move's own type is checked, before any other ability changes it (so it can never loop)"
+      ],
+      "effect": {
+        "id": "effect.change-move-type",
+        "params": [
+          "newType"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 39
+    },
+    {
+      "id": "block.type-conversion-power-boost",
+      "className": "TypeConversionPowerBoostAbAttr",
+      "label": "Make some of my moves stronger by their kind",
+      "summary": "My moves that fit \"Normal\" get 1.1 times their power. Example: 1.2 on sound moves, like Sand Song. It is the power half of the type-changing abilities.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "aerilate boost",
+        "ate boost",
+        "sound moves stronger",
+        "normal moves stronger",
+        "power boost for converted moves",
+        "sand song",
+        "crystallize",
+        "extra power for one kind of move"
+      ],
+      "examples": [
+        "Sound moves get 1.2 times their power, like Sand Song",
+        "Rock moves get 1.1 times their power, like Crystallize"
+      ],
+      "params": [
+        {
+          "id": "source",
+          "label": "Which moves get stronger, like 'Normal' or 'Sound moves'",
+          "control": "text",
+          "default": "Normal",
+          "editable": false
+        },
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.2 = 20% stronger)",
+          "control": "number",
+          "default": 1.1,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move's own type is checked, before any other ability changes it",
+        "Moves that deal fixed damage are not changed by a power boost"
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 10
+    },
+    {
+      "id": "block.type-damage-boost",
+      "className": "TypeDamageBoostAbAttr",
+      "label": "Make my moves of one type stronger",
+      "summary": "My Fire moves get 1.3 times their power, and 0 times while my HP is at or below 33.3333333333% (0 = no extra boost). Example: Fire 1.3, then 1.8 at one third HP, like Hellblaze.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "type boost",
+        "fire moves stronger",
+        "electric moves stronger",
+        "boost one type",
+        "pixilate second half",
+        "hellblaze",
+        "electrocytes",
+        "overgrow",
+        "blaze",
+        "torrent",
+        "swarm"
+      ],
+      "examples": [
+        "Electric moves get 1.25 times their power, like Electrocytes",
+        "Fire moves get 1.3 times their power, and 1.8 times when my HP is at or below one third, like Hellblaze"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Move type that gets stronger",
+          "control": "select",
+          "default": "FIRE",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.3 = 30% stronger)",
+          "control": "number",
+          "default": 1.3,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        },
+        {
+          "id": "lowHpMultiplier",
+          "label": "Power multiplier while my HP is low (1.8 = 80% stronger, 0 = no extra boost)",
+          "control": "number",
+          "default": 0,
+          "editable": true,
+          "min": 0,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        },
+        {
+          "id": "lowHpLine",
+          "label": "HP line for the extra boost (% of max HP, 33.33 = one third)",
+          "control": "number",
+          "default": 33.3333333333,
+          "editable": true,
+          "min": 1,
+          "max": 99,
+          "step": 0.01,
+          "gateIndependent": true
+        },
+        {
+          "id": "weathers",
+          "label": "Only in these weathers, like 'Rain, Heavy rain' (empty = any weather)",
+          "control": "text",
+          "default": "",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move's type is read after other abilities (such as a type-changing ability) have changed it",
+        "Moves that deal fixed damage are not changed by a power boost"
+      ],
+      "gateParams": [
+        {
+          "param": "type",
+          "block": "move.type",
+          "field": "type"
+        }
+      ],
+      "branches": [
+        {
+          "label": "Normal boost",
+          "conditions": [
+            "the move is the chosen type",
+            "my HP is above the line, or no extra boost is set"
+          ],
+          "effect": {
+            "id": "effect.multiply-power",
+            "params": [
+              "multiplier"
+            ]
+          }
+        },
+        {
+          "label": "Extra boost while my HP is low",
+          "conditions": [
+            "the move is the chosen type",
+            "my HP is at or below the line"
+          ],
+          "effect": {
+            "id": "effect.multiply-power",
+            "params": [
+              "lowHpMultiplier",
+              "lowHpLine"
+            ]
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 63
+    },
+    {
+      "id": "block.type-recoil",
+      "className": "TypeRecoilAbAttr",
+      "label": "Take recoil from my damaging moves of one type",
+      "summary": "After my Electric damaging move lands, I take 10% of the damage it dealt, but never enough to knock me out. Rock Head and Magic Guard block it. Example: 10% on Dark moves, like Doom Blast.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "recoil",
+        "self damage",
+        "life orb style",
+        "downside of a boost",
+        "pay for power",
+        "recoil for one type",
+        "doom blast",
+        "electric burst",
+        "infernal rage"
+      ],
+      "examples": [
+        "Take 10% of the damage I deal as recoil when I use an Electric move, like Electric Burst",
+        "Take 5% recoil on Fire moves, like Infernal Rage"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Move type that causes recoil",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "recoilPercent",
+          "label": "Recoil (% of the damage I deal, 10 = a tenth)",
+          "control": "number",
+          "default": 10,
+          "editable": true,
+          "min": 0.5,
+          "max": 100,
+          "step": 0.5,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens when the move dealt no damage",
+        "Rock Head and Magic Guard stop the recoil",
+        "The recoil never takes more than my HP minus 1, so it cannot knock me out",
+        "Nothing happens when the game only previews the move"
+      ],
+      "gateParams": [
+        {
+          "param": "type",
+          "block": "move.type",
+          "field": "type"
+        }
+      ],
+      "effect": {
+        "id": "effect.recoil",
+        "params": [
+          "recoilPercent"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 5
     }
   ]
 }

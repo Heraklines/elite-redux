@@ -22,6 +22,7 @@
 // =============================================================================
 
 import { PostAttackAbAttr } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveId } from "#enums/move-id";
 import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
@@ -48,16 +49,30 @@ export interface TrapDurationModifierOptions {
   readonly moveIds?: readonly MoveId[];
 }
 
-export class TrapDurationModifierAbAttr extends PostAttackAbAttr {
-  constructor(private readonly opts: TrapDurationModifierOptions) {
+export class TrapDurationModifierAbAttr extends PostAttackAbAttr implements GatedAttr<PostMoveInteractionAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  private readonly opts: TrapDurationModifierOptions;
+
+  constructor(opts: TrapDurationModifierOptions) {
     super(undefined, false);
+    // An absent subset stays absent (no `moveIds` key at all), however the options object was built, so a rebuilt instance
+    // is identical to the original one.
+    this.opts = opts.moveIds === undefined ? { turns: opts.turns, damageFraction: opts.damageFraction } : opts;
   }
 
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { move, opponent } = params;
-    if (!opponent || opponent.isFainted()) {
-      return false;
-    }
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Tier B (ability studio spec 3.1), first clause of the old `canApply`: the target is still there and standing. */
+  public guards({ opponent }: PostMoveInteractionAbAttrParams): boolean {
+    return !(!opponent || opponent.isFainted());
+  }
+
+  /** The replaceable condition (second clause): the move is a trapping move (and one of the configured moves, when a subset is set). */
+  public gate({ move }: PostMoveInteractionAbAttrParams): boolean {
     return TRAPPING_MOVES.has(move.id) && (this.opts.moveIds === undefined || this.opts.moveIds.includes(move.id));
   }
 

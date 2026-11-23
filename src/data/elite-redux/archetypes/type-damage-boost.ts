@@ -36,12 +36,20 @@
 //     → `Hellblaze` (1.2× normally, 1.5× under 1/3 HP).
 // =============================================================================
 
-import { MovePowerBoostAbAttr, PostAttackAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
+import {
+  MovePowerBoostAbAttr,
+  PostAttackAbAttr,
+  type PostMoveInteractionAbAttrParams,
+  type PreAttackModifyPowerAbAttrParams,
+} from "#abilities/ab-attrs";
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { HitResult } from "#enums/hit-result";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { WeatherType } from "#enums/weather-type";
+import type { Pokemon } from "#field/pokemon";
+import type { Move } from "#moves/move";
 import { toDmgValue } from "#utils/common";
 import { BooleanHolder } from "#utils/value-holder";
 
@@ -78,6 +86,28 @@ export interface TypeDamageBoostAbAttrOptions {
 }
 
 /**
+ * The type-damage-boost test: the move's resolved type is `type` (so Aerilate-style changes on the same Pokemon count) and,
+ * when a weather gate is configured, one of those weathers is active and not suppressed (Cloud Nine / Air Lock).
+ */
+function typeBoostApplies(
+  pokemon: Pokemon,
+  move: Move,
+  type: PokemonType,
+  weathers: readonly WeatherType[] | null,
+): boolean {
+  if (pokemon?.getMoveType(move) !== type) {
+    return false;
+  }
+  if (weathers) {
+    if (globalScene.arena.weather?.isEffectSuppressed()) {
+      return false;
+    }
+    return weathers.includes(globalScene.arena.weatherType);
+  }
+  return true;
+}
+
+/**
  * Parameterized `AbAttr` implementing the `type-damage-boost` archetype.
  *
  * Used (or will be used) by ER abilities such as `Vengeance`, `Hellblaze`,
@@ -98,7 +128,9 @@ export interface TypeDamageBoostAbAttrOptions {
  * `apply` override below recomputes the multiplier at apply-time so we can
  * read the user's current HP ratio.
  */
-export class TypeDamageBoostAbAttr extends MovePowerBoostAbAttr {
+export class TypeDamageBoostAbAttr extends MovePowerBoostAbAttr implements GatedAttr<PreAttackModifyPowerAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreAttackModifyPowerAbAttrParams) => boolean) | undefined;
   private readonly type: PokemonType;
   private readonly highHpMultiplier: number;
   private readonly lowHpMultiplier: number | null;
@@ -117,27 +149,24 @@ export class TypeDamageBoostAbAttr extends MovePowerBoostAbAttr {
     // to swap in lowHpMultiplier when appropriate. Super's `canApply` calls
     // the condition closure which checks type-match (and the optional weather
     // gate) so the super's existing gating works as-is.
-    super(
-      (pokemon, _defender, move) => {
-        if (pokemon?.getMoveType(move) !== opts.type) {
-          return false;
-        }
-        if (weathers) {
-          if (globalScene.arena.weather?.isEffectSuppressed()) {
-            return false;
-          }
-          return weathers.includes(globalScene.arena.weatherType);
-        }
-        return true;
-      },
-      opts.multiplier,
-      false,
-    );
+    super((pokemon, _defender, move) => typeBoostApplies(pokemon, move, opts.type, weathers), opts.multiplier, false);
     this.type = opts.type;
     this.highHpMultiplier = opts.multiplier;
     this.lowHpMultiplier = opts.lowHpMultiplier ?? null;
     this.lowHpThreshold = opts.lowHpThreshold ?? 1 / 3;
     this.weathers = weathers;
+  }
+
+  override canApply(params: PreAttackModifyPowerAbAttrParams): boolean {
+    return gatedCanApply<PreAttackModifyPowerAbAttrParams>(this, params);
+  }
+
+  /**
+   * Tier B (ability studio spec 3.1): the replaceable condition is the whole old `canApply`, which asked the closure the
+   * constructor hands to the parent: the move's type is the configured type (and the weather gate, when there is one).
+   */
+  public gate({ pokemon, move }: PreAttackModifyPowerAbAttrParams): boolean {
+    return typeBoostApplies(pokemon, move, this.type, this.weathers);
   }
 
   /** The configured weather gate, or `null` for an always-on type boost. */
@@ -221,7 +250,9 @@ export interface TypeRecoilAbAttrOptions {
  * per-hit `damage` from the params so multi-strike moves accrue recoil per hit
  * (summing to `recoilPct` of total damage), matching `RecoilAttr` semantics.
  */
-export class TypeRecoilAbAttr extends PostAttackAbAttr {
+export class TypeRecoilAbAttr extends PostAttackAbAttr implements GatedAttr<PostMoveInteractionAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
   private readonly type: PokemonType;
   private readonly recoilPct: number;
 
@@ -240,7 +271,14 @@ export class TypeRecoilAbAttr extends PostAttackAbAttr {
   }
 
   public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    // super.canApply gates on a damaging move; then require the type match.
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /**
+   * Tier B (ability studio spec 3.1): the replaceable condition is the whole old `canApply`, in the old order:
+   * `super.canApply` gates on a damaging move; then require the type match.
+   */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
     return super.canApply(params) && params.pokemon.getMoveType(params.move) === this.type;
   }
 

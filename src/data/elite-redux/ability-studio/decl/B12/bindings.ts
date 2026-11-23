@@ -204,3 +204,231 @@ legacyEach(
   "time.once-per {wave} would write the key before this class's apply runs, and apply then returns early without opening the window; needs the window effect or a deferred-write memory; request R-B12-15",
   [[108, 1, "Forewarn (opens the window)"]],
 );
+
+// =============================================================================================
+// Chunk 3. Every gate below was read from the live attr (the dump of its fields in the running game) and mapped to the atom that reads the SAME
+// engine value. Classes of chunk 3 and what they bind:
+//   ToxicTerrainSelfPoisonOnSummonAbAttr / OnTerrainChangeAbAttr  gate  legacy: 'Toxic Terrain is set' read from the terrain object (R-B12-20)
+//   TrapDurationModifierAbAttr          gate  any[ move.is-move ... ] (the trapping moves, or the configured subset)
+//   TypeConversionAbAttr                gate  move.type { effective: false } for a type source, legacy for a property source (R-B12-04)
+//   TypeConversionPowerBoostAbAttr      gate  the same filter as the conversion next to it
+//   TypeDamageBoostAbAttr               gate  move.type { effective: true }
+//   TypeRecoilAbAttr                    gate  all[ move.damaging, move.type { effective: true } ]
+//   TurnDecayDamageMultiplierAbAttr     nothing to bind (the parent's 'always true' closure is built inside the constructor)
+// =============================================================================================
+
+const typeIs = (type: string, effective: boolean): unknown => ({ id: "move.type", type, effective });
+
+// ---------------------------------------------------------------------------------------------
+// ToxicTerrainSelfPoisonOnSummonAbAttr (1 attr) and ToxicTerrainSelfPoisonOnTerrainChangeAbAttr (1 attr): Toxic Boost.
+// ---------------------------------------------------------------------------------------------
+legacyEach(
+  "needs an atom for 'Toxic Terrain is set on the field' read from the terrain object (arena.terrain?.terrainType === TOXIC; field.terrain reads arena.terrainType, which Clueless turns into NONE); request R-B12-20",
+  [
+    [137, 2, "Toxic Boost (on entry)"],
+    [137, 3, "Toxic Boost (terrain change)"],
+  ],
+);
+
+// ---------------------------------------------------------------------------------------------
+// TrapDurationModifierAbAttr (3 attrs). `TRAPPING_MOVES.has(move.id) && (moveIds === undefined || moveIds.includes(move.id))`.
+// ---------------------------------------------------------------------------------------------
+const TRAPPING_MOVE_NAMES = [
+  "BIND",
+  "WRAP",
+  "FIRE_SPIN",
+  "WHIRLPOOL",
+  "SAND_TOMB",
+  "MAGMA_STORM",
+  "INFESTATION",
+  "CLAMP",
+  "THUNDER_CAGE",
+  "SNAP_TRAP",
+];
+// No subset: every trapping move.
+bindEach({ any: TRAPPING_MOVE_NAMES.map(moveId => ({ id: "move.is-move", moveId })) }, [
+  [5519, 0, "Tentalock"],
+  [5649, 1, "Tangled Tails"],
+]);
+// moveIds [FIRE_SPIN]: the trapping moves that are also in the subset, which is Fire Spin alone.
+bindEach({ any: [{ id: "move.is-move", moveId: "FIRE_SPIN" }] }, [[5420, 1, "Wildfire"]]);
+
+// ---------------------------------------------------------------------------------------------
+// TypeConversionAbAttr (39 attrs): `matchesSource(source, user, move)`. A type source reads `move.type === source.type` (the move's base type,
+// the atom with effective false). A property source reads `move.hasFlag(flag)` (the plain bit) AND, when named, the base type.
+// ---------------------------------------------------------------------------------------------
+const SOURCE_FLAG_REASON =
+  "the source is a move property (move.hasFlag on the plain flag bit, not doesFlagEffectApply, which also counts abilities that grant a property); needs the atom move.has-built-in-flag, request R-B12-04";
+
+// Source type Normal.
+bindEach(typeIs("NORMAL", false), [
+  [5017, 0, "Immolate"],
+  [5038, 0, "Fighting Spirit"],
+  [5046, 0, "Tectonize"],
+  [5063, 0, "Intoxicate"],
+  [5104, 1, "Solar Flare"],
+  [5118, 0, "Pollinate"],
+  [5124, 0, "Spectral Shroud"],
+  [5140, 0, "Mineralize"],
+  [5149, 0, "Draconize"],
+  [5190, 0, "Emanate"],
+  [5219, 0, "Enlightened"],
+  [5237, 0, "Fertilize"],
+  [5351, 2, "Unicorn"],
+  [5404, 2, "Steel Beetle"],
+  [5428, 0, "Sludgy Mix"],
+  [5457, 1, "Twinkle Toes"],
+  [5463, 2, "Qigong"],
+  [5542, 0, "Draconic Might"],
+  [5552, 0, "Komodo"],
+  [5557, 0, "Molten Coat"],
+  [5619, 0, "Dragonfruit"],
+  [5621, 1, "Lead Claws"],
+  [5730, 1, "Warrior's Spear"],
+  [5940, 0, "Brainpower"],
+  [5956, 0, "Dragonfruit (second id)"],
+  [5957, 0, "Komodo (second id)"],
+  [6036, 2, "Nucleus"],
+  [6108, 0, "Blaze Release"],
+  [20008, 3, "Heartless Style"],
+]);
+// Other source types.
+bindEach(typeIs("ROCK", false), [
+  [5018, 0, "Crystallize"],
+  [6111, 0, "Bejeweled"],
+]);
+bindEach(typeIs("STEEL", false), [[5363, 0, "Superconductor"]]);
+bindEach(typeIs("FLYING", false), [[5639, 0, "Cosmic Wings"]]);
+// Property sources (Sound moves that are Normal; Drill moves that are Normal).
+legacyEach(SOURCE_FLAG_REASON, [
+  [5012, 0, "Sand Song"],
+  [5268, 0, "Banshee"],
+  [5328, 0, "Snow Song"],
+  [5361, 0, "Power Metal"],
+  [5959, 0, "Grievous Spear"],
+  [5964, 0, "Grim Jab"],
+]);
+
+// ---------------------------------------------------------------------------------------------
+// TypeConversionPowerBoostAbAttr (10 attrs): the same `matchesSource` filter, boosting power.
+// ---------------------------------------------------------------------------------------------
+bindEach(typeIs("ROCK", false), [
+  [5018, 1, "Crystallize"],
+  [6111, 1, "Bejeweled"],
+]);
+bindEach(typeIs("STEEL", false), [[5363, 1, "Superconductor"]]);
+bindEach(typeIs("NORMAL", false), [[5124, 1, "Spectral Shroud"]]);
+legacyEach(SOURCE_FLAG_REASON, [
+  [5012, 1, "Sand Song"],
+  [5268, 1, "Banshee"],
+  [5328, 1, "Snow Song"],
+  [5361, 1, "Power Metal"],
+  [5959, 1, "Grievous Spear"],
+  [5964, 1, "Grim Jab"],
+]);
+
+// ---------------------------------------------------------------------------------------------
+// TypeDamageBoostAbAttr (63 attrs): `typeBoostApplies`, the move's type after other abilities changed it (`user.getMoveType(move) === type`);
+// no user sets `weathers`, so the weather clause is not part of any gate. The type is moved by the declaration's gateParams.
+// ---------------------------------------------------------------------------------------------
+bindEach(typeIs("ICE", true), [
+  [174, 2, "Refrigerate"],
+  [5016, 0, "Antarctic Bird"],
+  [5465, 1, "Deep Freeze"],
+  [5642, 0, "Devious Present"],
+]);
+bindEach(typeIs("FAIRY", true), [
+  [182, 2, "Pixilate"],
+  [5954, 2, "Pixilate (second id)"],
+  [20007, 2, "Fae Heart"],
+]);
+bindEach(typeIs("FLYING", true), [
+  [184, 2, "Aerilate"],
+  [184, 3, "Aerilate (second boost)"],
+  [5016, 1, "Antarctic Bird"],
+  [5097, 0, "Flock"],
+  [5313, 2, "Aerialist"],
+  [5391, 3, "Imposing Wings"],
+  [5544, 3, "Fey Flight"],
+  [6019, 2, "Fluttering Spirit"],
+  [6019, 3, "Fluttering Spirit (second boost)"],
+]);
+bindEach(typeIs("STEEL", true), [
+  [200, 3, "Steelworker"],
+  [5385, 1, "Atomic Punch"],
+  [5530, 2, "Stainless Steel"],
+  [5584, 1, "Warmonger"],
+  [5938, 3, "Weighted Scales"],
+  [5995, 4, "Crude Steel"],
+  [6003, 2, "Stainless Steel (second id)"],
+  [6028, 6, "Solar Panel"],
+]);
+bindEach(typeIs("ELECTRIC", true), [
+  [206, 2, "Galvanize"],
+  [5019, 0, "Electrocytes"],
+  [5060, 0, "Short Circuit"],
+  [5074, 0, "Electric Burst"],
+  [5152, 3, "Atomic Burst"],
+  [5159, 0, "Hydro Circuit"],
+  [5197, 1, "Plasma Lamp"],
+  [5486, 4, "Two-Faced"],
+  [5948, 0, "Short Circuit (second id)"],
+  [20005, 4, "Thunder Gods Vessel"],
+  [20006, 4, "Malicious Empathy"],
+]);
+bindEach(typeIs("WATER", true), [
+  [5016, 2, "Antarctic Bird"],
+  [5154, 0, "Riptide"],
+  [5416, 0, "Aquatic Dweller"],
+  [5465, 0, "Deep Freeze"],
+  [5536, 0, "Atlantic Ruler"],
+  [5717, 1, "3 > 1"],
+]);
+bindEach(typeIs("DARK", true), [
+  [5044, 0, "Nocturnal"],
+  [5458, 0, "Doom Blast"],
+  [5486, 5, "Two-Faced"],
+  [5726, 1, "Reaper's Embarce"],
+  [5727, 0, "Foul Energy"],
+]);
+bindEach(typeIs("PSYCHIC", true), [
+  [5081, 0, "Psychic Mind"],
+  [5724, 0, "Overwhelming Mind"],
+]);
+bindEach(typeIs("GRASS", true), [
+  [5155, 0, "Forest Rage"],
+  [5733, 0, "Smoldering Wood"],
+]);
+bindEach(typeIs("FIRE", true), [
+  [5153, 0, "Hellblaze"],
+  [5168, 0, "Infernal Rage"],
+  [5197, 0, "Plasma Lamp"],
+  [5241, 0, "Combustion"],
+]);
+bindEach(typeIs("GHOST", true), [[5189, 0, "Purgatory"]]);
+bindEach(typeIs("FIGHTING", true), [
+  [5239, 0, "Fighter"],
+  [5471, 0, "Gladiator"],
+  [5584, 2, "Warmonger"],
+]);
+bindEach(typeIs("GROUND", true), [[5167, 1, "Dune Terror"]]);
+bindEach(typeIs("ROCK", true), [
+  [5321, 0, "Rockhard Will"],
+  [5500, 0, "We Will Rock You"],
+  [5582, 0, "Stonecutter"],
+  [5584, 0, "Warmonger"],
+]);
+
+// ---------------------------------------------------------------------------------------------
+// TypeRecoilAbAttr (5 attrs): `super.canApply` (the move is not a Status move) and then `user.getMoveType(move) === type`, in that order.
+// ---------------------------------------------------------------------------------------------
+const recoilGate = (type: string): unknown => ({ all: [{ id: "move.damaging" }, typeIs(type, true)] });
+bindEach(recoilGate("ELECTRIC"), [
+  [5074, 1, "Electric Burst"],
+  [5486, 6, "Two-Faced"],
+]);
+bindEach(recoilGate("FIRE"), [[5168, 1, "Infernal Rage"]]);
+bindEach(recoilGate("DARK"), [
+  [5458, 1, "Doom Blast"],
+  [5486, 7, "Two-Faced"],
+]);
