@@ -373,4 +373,11 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     power: new NumberHolder(ctx.move.power),
     simulated: false,
   }),
+  // B13 chunk 3 (Ring General): the engine asks the TRAPPER (`pokemon`) about the foe it may hold (`opponent`).
+  "calc.trap-check": ctx => ({
+    pokemon: ctx.holder,
+    opponent: ctx.foe,
+    trapped: new BooleanHolder(false),
+    simulated: false,
+  }),
 };

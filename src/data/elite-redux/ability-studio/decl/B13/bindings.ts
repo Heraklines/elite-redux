@@ -158,3 +158,59 @@ bindCondition(5982, 1, { id: "move.damaging" }, "ctor:0");
 // Clauses 1 and 2 (the base attack condition, damage > 0) are the class's `guards`, clause 4 (not yet used this turn)
 // its `residual`.
 bindCondition(5982, 1, HEAVYWEIGHT_MOVE, "gate");
+
+// ---------------------------------------------------------------------------------------------
+// Chunk 3: Two-Faced Unleashed (5977, attr 1), Ring General (5987), Setlist (5989) and Fan Favorite (5990).
+// The resets and the entry note (SetlistResetAbAttr, RingGeneralEntryAbAttr, TwoFacedPowerAbAttr's attr 0 is chunk 2) have
+// no condition to bind.
+// ---------------------------------------------------------------------------------------------
+
+// TwoFacedRecoilAbAttr (Two-Faced Unleashed attr 1), ctor:0 = the base class's default attack condition
+// `move.category !== STATUS`.
+bindCondition(5977, 1, { id: "move.damaging" }, "ctor:0");
+
+// TwoFacedRecoilAbAttr (Two-Faced Unleashed attr 1), gate = clause 3 of canApply: `TWO_FACED_ACTIVE_TURN[holder] === turnKey()`.
+// Clauses 1 and 2 (base attack condition, damage > 0) are the class's `guards`, clauses 4 and 5 (a last move record
+// exists and is not the one already counted) its `residual`; see its declaration.
+bindLegacyClosure(
+  5977,
+  1,
+  "Two-Faced recoil: TWO_FACED_ACTIVE_TURN[holder] === 'wave:turn', a private per-Pokemon memory set when the other face comes out; needs the atom time.armed-this-turn (R-B13-22)",
+  "gate",
+);
+
+// RingGeneralTrapAbAttr (Ring General attr 1), gate = clause 3 of the original closure: `!target.isOfType(GHOST)`.
+// Clauses 1 and 2 (my HP is above half in whole percents, I did not come in this turn) are the class's `guards`,
+// clause 4 (the engine's own trapping rules) its `residual`; see its declaration.
+bindCondition(5987, 1, { not: { id: "mon.has-type", who: "other", type: "GHOST" } }, "gate");
+
+// SetlistPowerAbAttr (Setlist attr 1), gate = the whole original closure: `setlistNextLevel(holder, move) > 0`
+//   (the pattern holds two moves and the move being used is the one expected next).
+bindLegacyClosure(
+  5989,
+  1,
+  "Setlist power: setlistNextLevel(holder, move) > 0, i.e. the pattern holds two moves and this is the one expected next (a private per-Pokemon state machine); needs the atom time.expected-move (R-B13-25)",
+  "gate",
+);
+
+// SetlistAccuracyAbAttr (Setlist attr 2), gate = clause 2 of canApply: the same `setlistNextLevel(holder, move) > 0`.
+// Clause 1 (accuracy > 0) is the class's `guards`.
+bindLegacyClosure(
+  5989,
+  2,
+  "Setlist accuracy: setlistNextLevel(holder, move) > 0, i.e. the pattern holds two moves and this is the one expected next (a private per-Pokemon state machine); needs the atom time.expected-move (R-B13-25)",
+  "gate",
+);
+
+// FanFavoritePowerAbAttr (Fan Favorite attr 0), gate = clause 1 of the original closure: `move.category === SPECIAL`.
+// Clause 2 (a healthy teammate waits on the bench) is the class's `residual`, see its declaration.
+bindCondition(5990, 0, { id: "move.category", category: "SPECIAL" }, "gate");
+
+// FanFavoriteAccuracyAbAttr (Fan Favorite attr 1), gate = clause 2 of canApply: `livingBenchCount(holder) > 0`
+//   (a party member of my side that is neither fainted nor on the field). Clause 1 (accuracy > 0) is the class's `guards`.
+bindLegacyClosure(
+  5990,
+  1,
+  "Fan Favorite accuracy: livingBenchCount(holder) > 0, i.e. a party member of my side that is neither fainted nor on the field; needs the atom party.bench-count (R-B13-29)",
+  "gate",
+);

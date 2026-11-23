@@ -191,6 +191,26 @@ export const TEMPLATES: Readonly<Record<string, ScenarioSpec>> = {
     party: [SpeciesId.MAGIKARP],
     turns: [{ faintHolder: true }],
   },
+  /**
+   * B13 chunk 3 (Ring General): a trapping ability of the HOLDER is evaluated when the FOE tries to switch or run, which
+   * the engine asks through `foe.isTrapped()`. The real engine entry point is called right after the move selection.
+   */
+  "foe-tries-to-leave": {
+    ...BASE,
+    id: "foe-tries-to-leave",
+    label: "The enemy tries to switch out or run while the holder is on the field",
+    foeMoves: [MoveId.CELEBRATE],
+    turns: [
+      {
+        move: MoveId.CELEBRATE,
+        until: "TurnEndPhase",
+        afterSelect: ({ foe }) => {
+          foe.isTrapped();
+        },
+      },
+      celebrate(),
+    ],
+  },
   /** The holder switches out. */
   "holder-switches-out": {
     ...BASE,
@@ -363,7 +383,7 @@ const WHEN_TEMPLATE: Readonly<Record<string, string>> = {
   "calc.redirect-move": t.doubles,
   "calc.priority": t.attack,
   "calc.speed-bypass": t.quiet,
-  "calc.trap-check": t.switchOut,
+  "calc.trap-check": "foe-tries-to-leave",
   "calc.run-chance": t.quiet,
   "calc.weight": t.hit,
   "calc.burn-damage": t.inflicted,

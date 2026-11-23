@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "10742527cbb1df",
-  "hash": "0f0db482b152a8",
+  "hash": "1f0cded1407f6a",
   "blocks": [
     {
       "id": "block.anneal",
@@ -267,6 +267,154 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.fan-favorite-accuracy",
+      "className": "FanFavoriteAccuracyAbAttr",
+      "label": "Boost move accuracy for each teammate waiting on the bench",
+      "summary": "My moves gain 5% accuracy for every healthy teammate waiting in the back, up to 5. Example: 2 waiting at 5% turns 80 accuracy into 88.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.accuracy",
+      "whenLabel": "While the game calculates my move's accuracy",
+      "synonyms": [
+        "cheering section",
+        "bench support",
+        "backup accuracy",
+        "team spirit",
+        "fan favorite",
+        "aim from reserves",
+        "waiting teammates"
+      ],
+      "examples": [
+        "My moves miss less often for every healthy teammate cheering from the back"
+      ],
+      "params": [
+        {
+          "id": "bonusPercentPerBenched",
+          "label": "Extra accuracy for each waiting teammate (percent)",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "gateIndependent": true
+        },
+        {
+          "id": "maxBenched",
+          "label": "Most waiting teammates that count (1-5)",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move's accuracy must be a real number: moves that never miss are left alone (checked inside the class until the librarian adds that rule, R-B13-28)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "bonusPercentPerBenched",
+          "maxBenched"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE for the EFFECT only; the trigger (my move's accuracy) and the 'a teammate waits' condition are separate blocks (the condition is a legacy-closure gate until R-B13-29). Why the effect cannot be split with today's blocks: the multiplier is 1 + 5% * (number of waiting teammates), read live from the party; requested as R-B13-27 (`effect.multiply-accuracy-per-count`). The first clause (accuracy > 0) is a guard inside the class (R-B13-28). The 5% and the cap of 5 were literals, now constructor arguments 0 and 1 with the old values as defaults. Users: Fan Favorite (5990, attr 1). ODDITIES (not fixed): (1) this attr has no category test, so physical moves get the bonus too, while the power attr tests for a special move (this matches the ability text: accuracy for all moves, damage for special ones). (2) the bonus is applied to the move's base accuracy before evasion and stat stages (move.ts, calcAccuracy).",
+      "uses": 1
+    },
+    {
+      "id": "block.fan-favorite-power",
+      "className": "FanFavoritePowerAbAttr",
+      "label": "Boost special moves for each teammate waiting on the bench",
+      "summary": "My special moves gain 5% power for every healthy teammate waiting in the back, up to 5. Example: 3 waiting at 5% turns 100 power into 115.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "cheering section",
+        "bench support",
+        "backup boost",
+        "team spirit",
+        "fan favorite",
+        "power from reserves",
+        "waiting teammates"
+      ],
+      "examples": [
+        "My special attacks get stronger for every healthy teammate cheering from the back"
+      ],
+      "params": [
+        {
+          "id": "bonusPercentPerBenched",
+          "label": "Extra power for each waiting teammate (percent)",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "gateIndependent": true
+        },
+        {
+          "id": "maxBenched",
+          "label": "Most waiting teammates that count (1-5)",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "At least one healthy teammate must be waiting on the bench: not fainted and not on the field (checked inside the class until the librarian adds that condition, R-B13-29)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "bonusPercentPerBenched",
+          "maxBenched"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE for the EFFECT only; the trigger (move power) and the special-move condition are separate and bound to a library atom. Why the effect cannot be split with today's blocks: the multiplier is 1 + 5% * (number of waiting teammates), read live from the party, not a constant that effect.multiply-power can hold; requested as R-B13-26 (`effect.multiply-power-per-count`). The 'a teammate waits' clause stays in the class as the residual (second position, as in the original) and is listed under 'also requires'; R-B13-29 adds `party.bench-count` so it can move into the gate. The 5% and the cap of 5 were literals, now constructor arguments 0 and 1 with the old values as defaults (the cap of 5 is also the most that can wait: a party has 6 and one is on the field). Users: Fan Favorite (5990, attr 0; attr 1 is FanFavoriteAccuracyAbAttr). ODDITIES (not fixed): (1) in a double battle both field slots are 'on the field', so only the 4 back Pokemon can count. (2) the cap of 5 is also the most that can wait, so a bigger value of the second param changes nothing in a normal party.",
+      "uses": 1
     },
     {
       "id": "block.final-season-entry",
@@ -1547,6 +1695,92 @@
       "uses": 64
     },
     {
+      "id": "block.ring-general-entry",
+      "className": "RingGeneralEntryAbAttr",
+      "label": "Remember the turn I came in",
+      "summary": "When I enter the battle, I note the current turn. Another part of the ability uses that note to stay quiet until the next turn.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "note arrival turn",
+        "mark entry turn",
+        "just arrived",
+        "entry timestamp",
+        "ring general",
+        "fresh arrival"
+      ],
+      "examples": [
+        "Remember that I only just came in, so my trap waits one turn"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified: the effect writes one private per-Pokemon note (the turn I came in) that only RingGeneralTrapAbAttr (and the debug snapshot in newcomer-signature-mechanics.ts) read. The library's `effect.arm-effect` arms a key with its own memory and has no 'this turn only' scope, and no condition reads it, so it cannot replace this note; requested as R-B13-30 (arm-effect with a this-turn scope plus `time.armed-this-turn` / `time.entered-this-turn`, shared with R-B13-2 and R-B13-22). It is a single assignment, so there is nothing further to split. The trigger is a normal switch-in WHEN and the class has no condition. Users: Ring General (5987, attr 0). ODDITY (not fixed): apply ignores `simulated`; no engine path simulates PostSummon today.",
+      "uses": 1
+    },
+    {
+      "id": "block.ring-general-trap",
+      "className": "RingGeneralTrapAbAttr",
+      "label": "Trap foes while I am above half HP and not freshly arrived",
+      "summary": "While my HP is above half and I did not come in this turn, foes cannot switch out or run away. Ghost types and Pokemon with Run Away still get away.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.trap-check",
+      "whenLabel": "While the game checks if a foe can escape",
+      "synonyms": [
+        "no escape",
+        "cannot switch",
+        "arena trap",
+        "shadow tag",
+        "trap the foe",
+        "ring general",
+        "block switching"
+      ],
+      "examples": [
+        "Foes cannot switch out while I am healthy, like Shadow Tag with a condition"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "My HP must be above half, counted in whole percents (checked inside the class until the librarian adds a condition for it, R-B13-31)",
+        "I must not have come in this turn (a private memory inside the class, written by the entry part, R-B13-30)",
+        "Ghost types and Pokemon with Run Away can never be trapped (a fixed engine rule)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE for the EFFECT only (`trapped = true`); the trigger (the game checks if a foe can escape) and the Ghost condition are separate blocks. Why the effect cannot be split with today's blocks: there is no 'trap the foe' effect in the library; requested as R-B13-32 (`effect.trap-foes`). The class's constructor closure was split into guards and gate (a pure move of code, the base class now gets an always-true closure so its residual does not test the gate again). Two clauses stay in the class until the librarian adds atoms: the HP rule (R-B13-31, getHpRatio rounds to 2 decimals, so the existing hp.at-least cannot reproduce it) and 'I did not come in this turn' (R-B13-30). Users: Ring General (5987, attr 1; attr 0 is RingGeneralEntryAbAttr). ODDITIES (not fixed): (1) the Ghost test is written twice in the original, once plain in the closure and once with Tera and defend flags in ArenaTrapAbAttr.canApply; both are kept. (2) the ability text also says the trap ignores a Shed Shell holder, but the class does not test any item, so any Shed Shell handling is outside this class (not checked here). (3) 'came in this turn' compares the wave and turn number at entry, not how long the Pokemon has been out.",
+      "uses": 1
+    },
+    {
       "id": "block.sediment-bloom-marker",
       "className": "SedimentBloomMarkerAbAttr",
       "label": "Plant a draining bloom when I remove a hazard",
@@ -1599,6 +1833,167 @@
         "do": true
       },
       "packageReason": "PACKAGE, justified: the mechanic is spread over three places (the marker, notifyHazardRemovedBy that plants a field effect, processSedimentBlooms that drains and heals at turn end) and has no moment of its own; splitting it would re-implement the field effect. Honest limits: (0) the always-on placeholder is tracked under R-B13-19 (the label says 'when I remove a hazard', the declared WHEN is the placeholder; the marker classes are now listed as while.active flag keys so L0 passes); (1) the trigger is not a library WHEN, so the declaration uses the always-on placeholder and the label says what really happens (R-B13-19 asks for 'When I remove an entry hazard from my side'); (2) the trigger has NO conditions of its own; (3) LIBRARY GAP, L0 will report it: the class extends AbAttr directly, so no WHEN dispatch key is an ancestor of it (while.active lists its flag classes explicitly); R-B13-19 asks the librarian to add the marker classes there. Edit made outside the class (same file): processSedimentBlooms now reads the planter's marker for the divisor (1/16 when the planter is gone or has no marker, which is the old constant). Users: Sediment Bloom (5976, attr 0). ODDITIES (not fixed): (1) the planter is found by the tag's source id; if the planter leaves the field its marker is no longer 'active' and the drain falls back to 1/16. (2) The heal goes to EVERY Pokemon on the planter's side for the FULL total (not split). (3) drained counts the HP actually lost, so a foe at 1 HP adds 1.",
+      "uses": 1
+    },
+    {
+      "id": "block.setlist-accuracy",
+      "className": "SetlistAccuracyAbAttr",
+      "label": "Boost move accuracy when I use the move my pattern expects",
+      "summary": "Once I have used two different moves, the one my pattern expects next gains 10% accuracy per step, up to 2 steps. Example: 10% turns 80 accuracy into 88, then 96.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.accuracy",
+      "whenLabel": "While the game calculates my move's accuracy",
+      "synonyms": [
+        "combo accuracy",
+        "rhythm accuracy",
+        "crescendo",
+        "alternating moves",
+        "setlist",
+        "never miss the beat"
+      ],
+      "examples": [
+        "If I keep alternating between my two attacks in order, each one misses less often"
+      ],
+      "params": [
+        {
+          "id": "bonusPercentPerStep",
+          "label": "Extra accuracy for each step of the pattern (percent)",
+          "control": "number",
+          "default": 10,
+          "editable": true,
+          "min": 0,
+          "max": 100,
+          "step": 5,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move's accuracy must be a real number: moves that never miss are left alone (checked inside the class until the librarian adds that rule, R-B13-28)",
+        "The move must be the one my pattern expects next (a private memory inside the class, the same one the power boost reads)",
+        "The pattern has at most 2 steps (fixed in the class)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "bonusPercentPerStep"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE for the EFFECT only; the trigger (my move's accuracy) and the 'expected move' condition are separate blocks (the condition is a legacy-closure gate until R-B13-25). Why the effect cannot be split with today's blocks: the multiplier is 1 + step * 10% where the step (1 or 2) is read from the live pattern memory; requested as R-B13-27 (`effect.multiply-accuracy-per-count`). The first clause (accuracy > 0) is a guard inside the class (R-B13-28 asks for it as a named rule). The 10% was the literal 0.1, now constructor argument 0 with default 10; the cap of 2 steps stays fixed. Users: Setlist (5989, attr 2). The base class's own fields (moveIds [NONE], accuracyValue 0) are inert here because canApply is overridden, so they are not params. ODDITIES (not fixed): (1) the pattern is updated after the move, so the accuracy of a move is judged against the pattern as it was before the move. (2) accuracy.value is the move's base accuracy at this point, before evasion and stat stages, so the 10% is applied to that number.",
+      "uses": 1
+    },
+    {
+      "id": "block.setlist-power",
+      "className": "SetlistPowerAbAttr",
+      "label": "Boost move power when I use the move my pattern expects",
+      "summary": "Once I have used two different moves, the one my pattern expects next gains 20% power per step, up to 2 steps. Example: 20% turns 100 power into 120, then 140.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "combo power",
+        "rhythm boost",
+        "crescendo",
+        "alternating moves",
+        "setlist",
+        "move pattern bonus",
+        "encore combo"
+      ],
+      "examples": [
+        "If I keep alternating between my two attacks in order, each one hits harder"
+      ],
+      "params": [
+        {
+          "id": "bonusPercentPerStep",
+          "label": "Extra power for each step of the pattern (percent)",
+          "control": "number",
+          "default": 20,
+          "editable": true,
+          "min": 0,
+          "max": 100,
+          "step": 5,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must be the one my pattern expects next: it records the first two different damaging moves I use, expects them in turn, and a wrong move starts the count again (a private memory inside the class, updated after each of my moves)",
+        "The pattern has at most 2 steps (fixed in the class, shared with the recording)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "bonusPercentPerStep"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE for the EFFECT only; the trigger (move power) and the 'expected move' condition are separate blocks (the condition is a legacy-closure gate until R-B13-25). Why the effect cannot be split with today's blocks: the multiplier is 1 + step * 20% where the step (1 or 2) is read from the live pattern memory, not a constant that effect.multiply-power can hold; requested as R-B13-26 (`effect.multiply-power-per-count`, shared with Fan Favorite, Porous and Heavyweight). The 20% was the literal 0.2, now constructor argument 0 with default 20; the cap of 2 steps lives in the shared state machine (also in finishSetlistMove) and stays fixed. Users: Setlist (5989, attr 1). ODDITIES (not fixed): (1) the recording and the move-order bookkeeping are done by finishSetlistMove, called by name from phases/move-effect-phase.ts, so the memory depends on an engine call site the declaration cannot show. (2) setlistNextLevel is called twice per use (gate, then apply); both calls are pure. (3) The ability text speaks of two moves; any two different damaging moves count, status moves and signature follow-ups are skipped.",
+      "uses": 1
+    },
+    {
+      "id": "block.setlist-reset",
+      "className": "SetlistResetAbAttr",
+      "label": "Forget my recorded move pattern when I enter",
+      "summary": "When I enter the battle, the two moves I had recorded and my combo count are wiped, so I start recording a new pattern.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "reset combo",
+        "forget move order",
+        "clear sequence",
+        "fresh start on switch in",
+        "setlist",
+        "forget pattern"
+      ],
+      "examples": [
+        "Every time I come in, my move pattern starts again from nothing"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified: the effect is the reset of a private per-Pokemon record (a four-field state machine) that only the Setlist classes and finishSetlistMove use; the library has no memory block to express a reset of it (requested as `effect.reset-memory`, R-B13-23, the same block Anneal's and Porous' resets need). It is a single assignment, so there is nothing further to split. The trigger is a normal switch-in WHEN and the class has no condition. Users: Setlist (5989, attr 0). ODDITIES (not fixed): (1) apply ignores `simulated`; no engine path simulates PostSummon today. (2) SetlistTrackAbAttr, a fourth Setlist class in the same file, is never attached to any ability (the builder wires only reset, power and accuracy); the recording is done by finishSetlistMove from move-effect-phase.ts, so that class is dead code and is not in the inventory.",
       "uses": 1
     },
     {
@@ -1729,6 +2124,75 @@
         "do": true
       },
       "packageReason": "PACKAGE for the EFFECT only; the trigger (move power) and the damaging-move condition are separate and bound to a library atom. Why the effect cannot be split with today's blocks: one effect does TWO multiplications, the second only for two move types, in a single apply (a conditional inside the effect; two effect.multiply-power blocks would be two attrs). Requested as R-B13-21 (a conditional multiply, or letting two attrs share the unleash memory). The 'face is out' clause stays in the class as the residual (second position, as in the original) and is listed under 'also requires'; request R-B13-22 adds a condition that reads that memory. Review of the numbers: 1.5, 1.4 and the types Electric and Dark were literals, now trailing constructor arguments with the old values as defaults. Users: Two-Faced Unleashed (5977, attr 0; attr 1 is TwoFacedRecoilAbAttr in another chunk). The ability is unsuppressable, uncopiable and unreplaceable (ability-level flags set by the builder, not by this class). ODDITIES (not fixed): (1) the unleash memory is written by prepareTwoFacedMove/finishTwoFacedMove in move-effect-phase.ts (found by class name), so the effect depends on engine call sites the declaration cannot show; (2) the 'every other turn' timing lives in twoFacedReady, also outside the class; (3) the ability text says 'damage', the class multiplies move power.",
+      "uses": 1
+    },
+    {
+      "id": "block.two-faced-recoil",
+      "className": "TwoFacedRecoilAbAttr",
+      "label": "Lose some max HP after my hit while my other face is out",
+      "summary": "While my other face is out, each damaging move I land costs me 15% of my max HP, once per move. It never takes me below 1 HP.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "self damage",
+        "backlash",
+        "price of power",
+        "recoil from max hp",
+        "life orb style recoil",
+        "jekyll and hyde recoil"
+      ],
+      "examples": [
+        "When my second face is out, every attack I land hurts me for 15% of my max HP"
+      ],
+      "params": [
+        {
+          "id": "recoilPercent",
+          "label": "Recoil for each move (percent of my max HP)",
+          "control": "number",
+          "default": 15,
+          "editable": true,
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "lib": "move.damaging",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really deal damage (checked inside the class until the librarian adds that condition)",
+        "Only the first hit of a move counts: a multi-hit move costs HP once (a private memory of the last counted move inside the class)",
+        "It never takes me below 1 HP (fixed in the class)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "recoilPercent"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE for the EFFECT only; the trigger (after my hit), the damaging-move condition (ctor:0) and the 'other face is out' condition (gate, legacy-closure until R-B13-22) are separate blocks. Why the effect cannot be split with today's blocks: effect.recoil takes a share of the DAMAGE DEALT, while this takes a share of my MAX HP, never leaves me below 1 HP, and also stores the counted move record that the residual reads in the same apply; requested as R-B13-24 (`effect.lose-max-hp-percent`) plus R-B13-5 for the memory. The recoil percent was the literal 0.15, now trailing constructor argument 2 with default 15. Users: Two-Faced Unleashed (5977, attr 1; attr 0 is TwoFacedPowerAbAttr). ODDITIES (not fixed): (1) apply stores the counted move record BEFORE its simulated check, so a simulated call spends the once-per-move memory; no engine path simulates PostAttack today. (2) The unleash memory is written by prepareTwoFacedMove and cleared by finishTwoFacedMove in move-effect-phase.ts (found by class name), so the gate depends on engine call sites the declaration cannot show. (3) finishTwoFacedMove clears the face after the move, so the recoil only fires for hits inside the unleashed move itself.",
       "uses": 1
     },
     {

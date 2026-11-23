@@ -7,6 +7,7 @@
 import {
   AbAttr,
   ArenaTrapAbAttr,
+  type CheckTrappedAbAttrParams,
   ConditionalCritAbAttr,
   ForceSwitchOutHelper,
   ForceSwitchOutImmunityAbAttr,
@@ -895,21 +896,53 @@ export function finishTwoFacedMove(pokemon: Pokemon, move: Move): void {
     TWO_FACED_ACTIVE_TURN.delete(pokemon);
   }
 }
-export class TwoFacedRecoilAbAttr extends PostAttackAbAttr {
-  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const record = params.pokemon.getLastXMoves(1)[0] as object | undefined;
-    return (
-      super.canApply(params)
-      && params.damage > 0
-      && TWO_FACED_ACTIVE_TURN.get(params.pokemon) === turnKey()
-      && !!record
-      && TWO_FACED_RECOIL_RECORD.get(params.pokemon) !== record
-    );
+export class TwoFacedRecoilAbAttr extends PostAttackAbAttr implements GatedAttr<PostMoveInteractionAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** The recoil, in percent of my max HP (ability studio param; the default is the original 15). */
+  public readonly recoilPercent: number;
+
+  /**
+   * The first two arguments are the base class's (attack condition, show ability); both stay `undefined` for every
+   * shipped user so the base defaults apply, exactly as when this class had no constructor.
+   */
+  constructor(
+    attackCondition?: ConstructorParameters<typeof PostAttackAbAttr>[0],
+    showAbility?: boolean,
+    recoilPercent = 15,
+  ) {
+    super(attackCondition, showAbility);
+    this.recoilPercent = recoilPercent;
   }
+
+  /**
+   * Tier B (ability studio spec 3.1), original clause order: `guards` = the base attack condition (a library condition
+   * through the "ctor:0" binding) and "damage was dealt", `gate` = my other face is out this turn (private memory, no
+   * library condition yet), `residual` = my last move record exists and is not the one already counted (private
+   * memory). All clauses are pure, no RNG.
+   */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    return super.canApply(params) && params.damage > 0;
+  }
+
+  public gate({ pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    return TWO_FACED_ACTIVE_TURN.get(pokemon) === turnKey();
+  }
+
+  public residual({ pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    const record = pokemon.getLastXMoves(1)[0] as object | undefined;
+    return !!record && TWO_FACED_RECOIL_RECORD.get(pokemon) !== record;
+  }
+
   override apply({ pokemon, simulated }: PostMoveInteractionAbAttrParams): void {
     TWO_FACED_RECOIL_RECORD.set(pokemon, pokemon.getLastXMoves(1)[0] as object);
     if (!simulated) {
-      pokemon.damageAndUpdate(Math.min(pokemon.hp - 1, Math.floor(pokemon.getMaxHp() * 0.15)), {
+      pokemon.damageAndUpdate(Math.min(pokemon.hp - 1, Math.floor(pokemon.getMaxHp() * (this.recoilPercent / 100))), {
         result: HitResult.INDIRECT,
       });
     }
@@ -992,47 +1025,143 @@ function setlistNextLevel(pokemon: Pokemon, move: Move): number {
   const state = setlistState(pokemon);
   return state.moves.length === 2 && state.expected === move.id ? Math.min(2, state.crescendo + 1) : 0;
 }
-export class SetlistPowerAbAttr extends MovePowerBoostAbAttr {
-  constructor() {
+export class SetlistPowerAbAttr extends MovePowerBoostAbAttr implements GatedAttr<PreAttackModifyPowerAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreAttackModifyPowerAbAttrParams) => boolean) | undefined;
+
+  /** Extra power for each step of the set list, in percent (ability studio param; the default is the original 20). */
+  public readonly bonusPercentPerStep: number;
+
+  constructor(bonusPercentPerStep = 20) {
     super((pokemon, _target, move) => setlistNextLevel(pokemon, move) > 0, 1);
+    this.bonusPercentPerStep = bonusPercentPerStep;
   }
+
+  /** Tier B (ability studio spec 3.1): the one clause of the original closure lives in `gate`; there is no residual. */
+  override canApply(params: PreAttackModifyPowerAbAttrParams): boolean {
+    return gatedCanApply<PreAttackModifyPowerAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: this is the move my set list expects next (private memory, no library atom yet). */
+  public gate({ pokemon, move }: PreAttackModifyPowerAbAttrParams): boolean {
+    return setlistNextLevel(pokemon, move) > 0;
+  }
+
   override apply({ pokemon, move, power }: PreAttackModifyPowerAbAttrParams): void {
-    power.value *= 1 + setlistNextLevel(pokemon, move) * 0.2;
+    power.value *= 1 + setlistNextLevel(pokemon, move) * (this.bonusPercentPerStep / 100);
   }
 }
-export class SetlistAccuracyAbAttr extends SetMoveAccuracyAbAttr {
-  constructor() {
+export class SetlistAccuracyAbAttr extends SetMoveAccuracyAbAttr implements GatedAttr<SetMoveAccuracyAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: SetMoveAccuracyAbAttrParams) => boolean) | undefined;
+
+  /** Extra accuracy for each step of the set list, in percent (ability studio param; the default is the original 10). */
+  public readonly bonusPercentPerStep: number;
+
+  constructor(bonusPercentPerStep = 10) {
     super([MoveId.NONE], 0);
+    this.bonusPercentPerStep = bonusPercentPerStep;
   }
-  override canApply({ pokemon, move, accuracy }: SetMoveAccuracyAbAttrParams): boolean {
-    return accuracy.value > 0 && setlistNextLevel(pokemon, move) > 0;
+
+  /**
+   * Tier B (ability studio spec 3.1), original clause order: `guards` = the move's accuracy is a real number (not a
+   * move that never misses), `gate` = this is the move my set list expects next (private memory). All clauses pure.
+   */
+  override canApply(params: SetMoveAccuracyAbAttrParams): boolean {
+    return gatedCanApply<SetMoveAccuracyAbAttrParams>(this, params);
   }
+
+  public guards({ accuracy }: SetMoveAccuracyAbAttrParams): boolean {
+    return accuracy.value > 0;
+  }
+
+  public gate({ pokemon, move }: SetMoveAccuracyAbAttrParams): boolean {
+    return setlistNextLevel(pokemon, move) > 0;
+  }
+
   override apply({ pokemon, move, accuracy }: SetMoveAccuracyAbAttrParams): void {
-    accuracy.value *= 1 + setlistNextLevel(pokemon, move) * 0.1;
+    accuracy.value *= 1 + setlistNextLevel(pokemon, move) * (this.bonusPercentPerStep / 100);
   }
 }
 
-function livingBenchCount(pokemon: Pokemon): number {
+function livingBenchCount(pokemon: Pokemon, maxCount = 5): number {
   const party = pokemon.isPlayer() ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
-  return Math.min(5, party.filter(member => !member.isFainted() && !member.isOnField()).length);
+  return Math.min(maxCount, party.filter(member => !member.isFainted() && !member.isOnField()).length);
 }
-export class FanFavoritePowerAbAttr extends MovePowerBoostAbAttr {
-  constructor() {
-    super((pokemon, _target, move) => move.category === MoveCategory.SPECIAL && livingBenchCount(pokemon) > 0, 1);
+export class FanFavoritePowerAbAttr
+  extends MovePowerBoostAbAttr
+  implements GatedAttr<PreAttackModifyPowerAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreAttackModifyPowerAbAttrParams) => boolean) | undefined;
+
+  /** Extra power for each healthy teammate waiting on the bench, in percent (the default is the original 5). */
+  public readonly bonusPercentPerBenched: number;
+  /** The most waiting teammates that count (the default is the original 5). */
+  public readonly maxBenched: number;
+
+  constructor(bonusPercentPerBenched = 5, maxBenched = 5) {
+    super(
+      (pokemon, _target, move) => move.category === MoveCategory.SPECIAL && livingBenchCount(pokemon, maxBenched) > 0,
+      1,
+    );
+    this.bonusPercentPerBenched = bonusPercentPerBenched;
+    this.maxBenched = maxBenched;
   }
+
+  /**
+   * Tier B (ability studio spec 3.1), original clause order: `gate` = the move is a special move (a library
+   * condition), `residual` = at least one healthy teammate waits on the bench (no library condition yet).
+   */
+  override canApply(params: PreAttackModifyPowerAbAttrParams): boolean {
+    return gatedCanApply<PreAttackModifyPowerAbAttrParams>(this, params);
+  }
+
+  public gate({ move }: PreAttackModifyPowerAbAttrParams): boolean {
+    return move.category === MoveCategory.SPECIAL;
+  }
+
+  public residual({ pokemon }: PreAttackModifyPowerAbAttrParams): boolean {
+    return livingBenchCount(pokemon, this.maxBenched) > 0;
+  }
+
   override apply({ pokemon, power }: PreAttackModifyPowerAbAttrParams): void {
-    power.value *= 1 + livingBenchCount(pokemon) * 0.05;
+    power.value *= 1 + livingBenchCount(pokemon, this.maxBenched) * (this.bonusPercentPerBenched / 100);
   }
 }
-export class FanFavoriteAccuracyAbAttr extends SetMoveAccuracyAbAttr {
-  constructor() {
+export class FanFavoriteAccuracyAbAttr extends SetMoveAccuracyAbAttr implements GatedAttr<SetMoveAccuracyAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: SetMoveAccuracyAbAttrParams) => boolean) | undefined;
+
+  /** Extra accuracy for each healthy teammate waiting on the bench, in percent (the default is the original 5). */
+  public readonly bonusPercentPerBenched: number;
+  /** The most waiting teammates that count (the default is the original 5). */
+  public readonly maxBenched: number;
+
+  constructor(bonusPercentPerBenched = 5, maxBenched = 5) {
     super([MoveId.NONE], 0);
+    this.bonusPercentPerBenched = bonusPercentPerBenched;
+    this.maxBenched = maxBenched;
   }
-  override canApply({ pokemon, accuracy }: SetMoveAccuracyAbAttrParams): boolean {
-    return accuracy.value > 0 && livingBenchCount(pokemon) > 0;
+
+  /**
+   * Tier B (ability studio spec 3.1), original clause order: `guards` = the move's accuracy is a real number (not a
+   * move that never misses), `gate` = at least one healthy teammate waits on the bench (no library condition yet).
+   */
+  override canApply(params: SetMoveAccuracyAbAttrParams): boolean {
+    return gatedCanApply<SetMoveAccuracyAbAttrParams>(this, params);
   }
+
+  public guards({ accuracy }: SetMoveAccuracyAbAttrParams): boolean {
+    return accuracy.value > 0;
+  }
+
+  public gate({ pokemon }: SetMoveAccuracyAbAttrParams): boolean {
+    return livingBenchCount(pokemon, this.maxBenched) > 0;
+  }
+
   override apply({ pokemon, accuracy }: SetMoveAccuracyAbAttrParams): void {
-    accuracy.value *= 1 + livingBenchCount(pokemon) * 0.05;
+    accuracy.value *= 1 + livingBenchCount(pokemon, this.maxBenched) * (this.bonusPercentPerBenched / 100);
   }
 }
 
@@ -1045,12 +1174,39 @@ export class RingGeneralEntryAbAttr extends PostSummonAbAttr {
     RING_ENTRY_TURN.set(pokemon, turnKey());
   }
 }
-export class RingGeneralTrapAbAttr extends ArenaTrapAbAttr {
+export class RingGeneralTrapAbAttr extends ArenaTrapAbAttr implements GatedAttr<CheckTrappedAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: CheckTrappedAbAttrParams) => boolean) | undefined;
+
+  /**
+   * The old constructor closure was `holder.getHpRatio() > 0.5 && RING_ENTRY_TURN.get(holder) !== turnKey()
+   * && !target.isOfType(GHOST)`. Its three clauses now live in `guards` and `gate`, so the base class gets an
+   * always-true closure and `residual` (`super.canApply`) only adds the engine's own trapping rules.
+   */
   constructor() {
-    super(
-      (holder, target) =>
-        holder.getHpRatio() > 0.5 && RING_ENTRY_TURN.get(holder) !== turnKey() && !target.isOfType(PokemonType.GHOST),
-    );
+    super(() => true);
+  }
+
+  /**
+   * Tier B (ability studio spec 3.1), original clause order: `guards` = my HP is above half and I did not come in
+   * this turn (no library conditions yet), `gate` = the foe is not a Ghost type (a library condition), `residual` =
+   * the engine's own trapping rules (Ghosts and Run Away are never trapped), which are the base class's `canApply`.
+   * All clauses are pure, no RNG.
+   */
+  override canApply(params: CheckTrappedAbAttrParams): boolean {
+    return gatedCanApply<CheckTrappedAbAttrParams>(this, params);
+  }
+
+  public guards({ pokemon }: CheckTrappedAbAttrParams): boolean {
+    return pokemon.getHpRatio() > 0.5 && RING_ENTRY_TURN.get(pokemon) !== turnKey();
+  }
+
+  public gate({ opponent }: CheckTrappedAbAttrParams): boolean {
+    return !opponent.isOfType(PokemonType.GHOST);
+  }
+
+  public residual(params: CheckTrappedAbAttrParams): boolean {
+    return super.canApply(params);
   }
 }
 
