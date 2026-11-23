@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "0120700d751f08",
+  "hash": "1ed3d438faf95e",
   "blocks": [
     {
       "id": "block.ally-faint-power-boost",
@@ -664,6 +664,45 @@
       "uses": 1
     },
     {
+      "id": "block.post-summon-retriever-snapshot",
+      "className": "PostSummonRetrieverSnapshotAbAttr",
+      "label": "Remember the items I hold when I enter",
+      "summary": "When I enter the battle I note which held items I carry. Another effect can give them back later (the shipped one hands them back when I switch out empty-handed).",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "retriever",
+        "remember my item",
+        "item memory",
+        "note my held items",
+        "record starting item",
+        "original item"
+      ],
+      "examples": [
+        "Remember the items I came in with so I can get them back after a Knock Off"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Replaces any earlier memory; when I carry nothing the memory is cleared",
+        "Items are remembered as copies, so later changes to the real items do not change the memory"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.post-summon-weather-change",
       "className": "PostSummonWeatherChangeAbAttr",
       "label": "Set the weather when I enter",
@@ -1077,6 +1116,238 @@
       "uses": 1
     },
     {
+      "id": "block.pre-faint-revive",
+      "className": "PreFaintReviveAbAttr",
+      "label": "Survive a knock-out hit with 1 HP left",
+      "summary": "A hit that would knock me out leaves me on 1 HP instead. It can work again every turn.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.damage-taken",
+      "whenLabel": "While the game calculates damage I take",
+      "synonyms": [
+        "sturdy",
+        "endure",
+        "survive a lethal hit",
+        "cannot be one shot",
+        "hang on with 1 HP",
+        "focus sash",
+        "lucky halo",
+        "survive one hit"
+      ],
+      "examples": [
+        "Survive the first knock-out hit of the battle with 1 HP left, like Lucky Halo",
+        "Survive a knock-out hit when I am at full HP, like Sturdy"
+      ],
+      "params": [
+        {
+          "id": "hpNeeded",
+          "label": "HP needed to survive (% of max HP; 100 = only at full HP, 0 = any HP)",
+          "control": "number",
+          "default": 100,
+          "editable": false,
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "firstHitsOnly",
+          "label": "Only the first N hits of the battle can be survived (0 = works again every turn)",
+          "control": "number",
+          "default": 0,
+          "editable": true,
+          "min": 0,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "hp.at-least",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must be one that would knock me out (its damage is at least my current HP)",
+        "I need more than 1 max HP, otherwise there is nothing to leave",
+        "In 'every turn' mode I must not already carry the one-turn survival marker; in 'first N hits' mode I must have taken fewer than N hits in this battle so far",
+        "Never in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.pre-switch-out-item-restore",
+      "className": "PreSwitchOutItemRestoreAbAttr",
+      "label": "Get my remembered items back when I switch out",
+      "summary": "When I switch out after eating a berry, or while empty-handed, my eaten berries count as uneaten and I get back the items I remembered entering with.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.switch-out",
+      "whenLabel": "When I switch out",
+      "synonyms": [
+        "retriever",
+        "get my item back",
+        "restore held item",
+        "keep my item after knock off",
+        "berry comes back",
+        "item returns on switch"
+      ],
+      "examples": [
+        "Get my item back when I switch out after it was knocked off, like Retriever"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [
+        "not-fainted"
+      ],
+      "feasibility": [
+        "Items only come back when I hold nothing at that moment (eaten berries are forgotten either way)",
+        "Gives back copies of the remembered items, each marked as mine, so the memory survives another strip and switch",
+        "Never in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.priority-modifier",
+      "className": "PriorityModifierAbAttr",
+      "label": "Change my matching moves' priority (go earlier or later)",
+      "summary": "My moves that pass the conditions get 1 priority: above 0 goes earlier in the turn, below 0 later. Example: +1 for Flying moves, like Gale Wings.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.priority",
+      "whenLabel": "While the game calculates my move's priority",
+      "synonyms": [
+        "gale wings",
+        "prankster",
+        "go first",
+        "priority boost",
+        "move last",
+        "negative priority",
+        "extra priority at full HP",
+        "quick"
+      ],
+      "examples": [
+        "Fire moves get +1 priority while I am at full HP, like Flaming Soul",
+        "Moves with less than 80% accuracy go 3 priority later, like Sighting System"
+      ],
+      "params": [
+        {
+          "id": "priority",
+          "label": "Priority change (+1 = goes a step earlier, -1 = a step later, 0 is not allowed)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": -7,
+          "max": 7,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "movesBuiltFor",
+          "label": "Which of my moves it was built for (shown for information; change it with the conditions)",
+          "control": "select",
+          "default": "Any move",
+          "editable": false,
+          "options": [
+            "Any move",
+            "Normal-type moves",
+            "Fighting-type moves",
+            "Flying-type moves",
+            "Poison-type moves",
+            "Ground-type moves",
+            "Rock-type moves",
+            "Bug-type moves",
+            "Ghost-type moves",
+            "Steel-type moves",
+            "Fire-type moves",
+            "Water-type moves",
+            "Grass-type moves",
+            "Electric-type moves",
+            "Psychic-type moves",
+            "Ice-type moves",
+            "Dragon-type moves",
+            "Dark-type moves",
+            "Fairy-type moves",
+            "Punching moves",
+            "Sound moves",
+            "Moves with 25 base power or less",
+            "Moves with less than 80% accuracy"
+          ]
+        },
+        {
+          "id": "whenBuiltFor",
+          "label": "When it was built to work (shown for information; change it with the conditions)",
+          "control": "select",
+          "default": "Always",
+          "editable": false,
+          "options": [
+            "Always",
+            "Only while I am at full HP",
+            "Only on my first turn out",
+            "Only while I am at half HP or less"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.type",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.change-priority",
+        "params": [
+          "priority"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 18
+    },
+    {
       "id": "block.received-move-damage-multiplier",
       "className": "ReceivedMoveDamageMultiplierAbAttr",
       "label": "Take less (or more) damage",
@@ -1140,6 +1411,98 @@
         "do": true
       },
       "uses": 64
+    },
+    {
+      "id": "block.recharge-charged-on-electric-ko",
+      "className": "RechargeChargedOnElectricKoAbAttr",
+      "label": "Become charged after an Electric move knocks out a foe",
+      "summary": "When my direct attack knocks out a foe and my last move was an Electric-type move, I become charged: my next Electric move does double damage. Example: Energized.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-win",
+      "whenLabel": "When I win the fight",
+      "synonyms": [
+        "energized",
+        "charge after electric ko",
+        "recharge on knock out",
+        "electric ko charge",
+        "double the next electric move"
+      ],
+      "examples": [
+        "Get charged up again when an Electric move knocks out a foe"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "I must be able to take the Charged state (it cannot be added twice)",
+        "Never in a preview"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.recharge-charged-on-electric-terrain",
+      "className": "RechargeChargedOnElectricTerrainAbAttr",
+      "label": "Become charged when Electric Terrain begins",
+      "summary": "When a new terrain begins and it is Electric Terrain, I become charged: my next Electric move does double damage. Example: Energized and Generator.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.terrain-changed",
+      "whenLabel": "When the terrain changes",
+      "synonyms": [
+        "energized",
+        "generator",
+        "charge up on terrain",
+        "electric terrain charge",
+        "recharge on electric terrain",
+        "double the next electric move"
+      ],
+      "examples": [
+        "Get charged up whenever Electric Terrain begins on the field"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "field.terrain",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "I must be able to take the Charged state (it cannot be added twice)",
+        "Never in a preview"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.reflect-damage-on-defend",

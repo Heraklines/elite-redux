@@ -370,6 +370,13 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     cancelled: new BooleanHolder(false),
     simulated: false,
   }),
+  // Move.getPriority: `applyAbAttrs("ChangeMovePriorityAbAttr", { pokemon: user, simulated, move: this, priority })`.
+  "calc.priority": ctx => ({
+    pokemon: ctx.holder,
+    move: ctx.move,
+    priority: new NumberHolder(ctx.move.priority),
+    simulated: false,
+  }),
   "calc.move-power": ctx => ({
     pokemon: ctx.holder,
     opponent: ctx.foe,

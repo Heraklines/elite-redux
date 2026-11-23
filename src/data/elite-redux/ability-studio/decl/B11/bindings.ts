@@ -176,3 +176,96 @@ bindLegacyClosure(5030, 1, TIMER_REASON, "ctor:1");
 bindLegacyClosure(6095, 2, TIMER_REASON, "ctor:1");
 bindLegacyClosure(5030, 2, TIMER_REASON, "gate");
 bindLegacyClosure(6095, 3, TIMER_REASON, "gate");
+
+// =============================================================================================================================
+// CHUNK 2 of 5: PreFaintReviveAbAttr, PostSummonRetrieverSnapshotAbAttr, PreSwitchOutItemRestoreAbAttr,
+// PreemptivePriorityCounterAbAttr, PriorityModifierAbAttr, RechargeChargedOnElectricTerrainAbAttr,
+// RechargeChargedOnElectricKoAbAttr and RecoilDamageMultiplierAbAttr. Read by hand from the live attrs (the dump of every user, its
+// options object and its position in `ability.attrs`).
+// PostSummonRetrieverSnapshotAbAttr, PreemptivePriorityCounterAbAttr and RecoilDamageMultiplierAbAttr have no condition slot, so nothing
+// is bound for them (Surprise!'s fog test is an attr-level condition that recomposeAttr carries over).
+// =============================================================================================================================
+
+// ---------------------------------------------------------------------------------------------------------------
+// PreFaintReviveAbAttr, slot gate: `matchesGate(hp / maxHp, isFullHp())`. Lucky Halo (5426 attr 1) is built with
+// `{ kind: "hp-threshold", threshold: 0 }`: `hp / maxHp >= 0` is true at every HP, so the gate is an always-true condition. (Its usage
+// policy, the first hit of the battle, is the `firstHitsOnly` setting of the residual, not part of the gate.)
+bindCondition(5426, 1, { all: [] }, "gate");
+
+// ---------------------------------------------------------------------------------------------------------------
+// PreSwitchOutItemRestoreAbAttr, slot gate: `ateBerry || canRestoreItem`, with
+//   ateBerry = `summonData.berriesEatenLast.length > 0` and canRestoreItem = `getHeldItems().length === 0 && memory.length > 0`.
+// item.none is the second half's first test (`getHeldItems().length === 0`), but the berry record and the remembered-items memory have no
+// atom, and one gate slot holds one binding, so the whole gate is a legacy closure (requests R-B11-C2-04 and R-B11-C2-05).
+//   Retriever (5244, attr 1).
+bindLegacyClosure(
+  5244,
+  1,
+  "The gate is 'a berry was eaten (summonData.berriesEatenLast is not empty) OR I hold nothing and remember items from entry'. The library has item.none for 'I hold nothing' but no atom for the eaten-berry record or for the remembered-items memory, and one gate holds one binding. Needs the two atoms (R-B11-C2-04, R-B11-C2-05).",
+  "gate",
+);
+
+// ---------------------------------------------------------------------------------------------------------------
+// PriorityModifierAbAttr, slot gate: `matchesFilter(filter, holder, move) && matchesCondition(condition, holder)`.
+//   type filter: `holder.getMoveType(move) === type`  = move.type with effective true (`matchesAbilityStudioMoveFilter(moveUser, move,
+//     { type })`, the same call; moveUser is the holder in the priority frame).
+//   full-hp condition: `holder.isFullHp()` = hp.full on the holder (the same call).
+//   maxBasePower filter: `!(move.power > n)` = move.power lte n (a status move has power -1 and qualifies in both).
+//   The tests run filter first, then condition, and `all` keeps that order.
+const FULL_HP = { block: "hp.full", params: { who: "holder" } } as const;
+const movesOfType = (type: string) => ({ block: "move.type", params: { type, effective: true } }) as const;
+const typeAtFullHp = (type: string) => ({ all: [movesOfType(type), FULL_HP] }) as const;
+//   Galeforce Wings (5624) and Sky Sovereign (20023): Flying moves, no HP condition.
+bindCondition(5624, 0, movesOfType("FLYING"), "gate");
+bindCondition(20023, 0, movesOfType("FLYING"), "gate");
+//   Flaming Soul (5089) and Flame Bubble (5368 attr 4): Fire moves at full HP.
+bindCondition(5089, 0, typeAtFullHp("FIRE"), "gate");
+bindCondition(5368, 4, typeAtFullHp("FIRE"), "gate");
+//   Frozen Soul (5100): Ice.   Volt Rush (5166) and Ultra Recon Hunter (20002 attr 1): Electric.   Early Grave (5251): Ghost.
+//   Stygian Rush (5279): Dark.   Tidal Rush (5281) and Ebb and Flow (6073): Water.   Pretty Privilege (5332): Fairy. All at full HP.
+bindCondition(5100, 0, typeAtFullHp("ICE"), "gate");
+bindCondition(5166, 0, typeAtFullHp("ELECTRIC"), "gate");
+bindCondition(20002, 1, typeAtFullHp("ELECTRIC"), "gate");
+bindCondition(5251, 0, typeAtFullHp("GHOST"), "gate");
+bindCondition(5279, 0, typeAtFullHp("DARK"), "gate");
+bindCondition(5281, 0, typeAtFullHp("WATER"), "gate");
+bindCondition(6073, 0, typeAtFullHp("WATER"), "gate");
+bindCondition(5332, 0, typeAtFullHp("FAIRY"), "gate");
+//   Perfectionist (5026 attr 1): moves with 25 base power or less, no HP condition.
+bindCondition(5026, 1, { block: "move.power", params: { cmp: "lte", n: 25 } }, "gate");
+//   Punching or sound moves at full HP: `move.hasFlag(flag)`, the move's own bit. move.flag asks doesFlagEffectApply, which also counts
+//   flags that abilities inject, so it is not the same predicate (request R-B11-13 of chunk 3).
+const OWN_FLAG_REASON =
+  "The filter tests the move's own property bit (move.hasFlag) and the holder's full HP. The library atom move.flag asks doesFlagEffectApply, which also counts flags that abilities inject, so it is not the same predicate; one gate holds one binding. Needs an atom for the plain move property (R-B11-13).";
+//   Blitz Boxer (5015): punching moves.   Presto (5468) and Siren's Song (20015): sound moves.
+bindLegacyClosure(5015, 0, OWN_FLAG_REASON, "gate");
+bindLegacyClosure(5468, 0, OWN_FLAG_REASON, "gate");
+bindLegacyClosure(20015, 0, OWN_FLAG_REASON, "gate");
+//   Accuracy limit: `move.accuracy >= 0 && move.accuracy < 80` (an always-hit move, accuracy -1, never qualifies).
+const ACCURACY_REASON =
+  "The filter is 'the move's accuracy is 0 or more and below 80' (an always-hit move never qualifies). The library has no atom for a move's accuracy. Needs an atom 'the move's accuracy is {cmp} {n}' (R-B11-C2-09).";
+//   Sighting System (5106 attr 1) and Iron Barrage (5132 attr 2): priority -3.
+bindLegacyClosure(5106, 1, ACCURACY_REASON, "gate");
+bindLegacyClosure(5132, 2, ACCURACY_REASON, "gate");
+
+// ---------------------------------------------------------------------------------------------------------------
+// RechargeChargedOnElectricTerrainAbAttr, slot gate: `terrain === TerrainType.ELECTRIC` on the terrain slot of the event (the terrain
+// that was just set). field.terrain reads `arena.terrainType`, which is NONE while a field-suppressing effect is up, so it is not the
+// same predicate (request R-B11-C2-10).
+//   Generator (5208, attr 1) and Energized (5402, attr 1).
+const TERRAIN_REASON =
+  "The gate is 'the terrain that just began is Electric Terrain' and reads the event's own terrain. The library atom field.terrain reads arena.terrainType, which is None while the field is suppressed (Clueless), so it is not the same predicate. Needs an atom 'the terrain that just began is {terrain}' (R-B11-C2-10).";
+bindLegacyClosure(5208, 1, TERRAIN_REASON, "gate");
+bindLegacyClosure(5402, 1, TERRAIN_REASON, "gate");
+
+// ---------------------------------------------------------------------------------------------------------------
+// RechargeChargedOnElectricKoAbAttr, slot gate: the holder's most recent move exists and its PRINTED type is Electric
+// (`allMoves[last.move]?.type === ELECTRIC`). The trigger has no move slot (move.type cannot read it) and time.last-move names a single
+// move, not a type (request R-B11-C2-12).
+//   Energized (5402, attr 2).
+bindLegacyClosure(
+  5402,
+  2,
+  "The gate is 'my most recent move's printed type is Electric' (allMoves[last.move].type). move.type reads the move slot, which the win trigger does not provide, and time.last-move names one move, not a type. Needs an atom 'my last move was a {type}-type move' (R-B11-C2-12).",
+  "gate",
+);
