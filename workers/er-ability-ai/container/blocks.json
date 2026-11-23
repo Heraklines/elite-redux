@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "0bd2ad6ba527e5",
+  "hash": "0cf948f52108b7",
   "blocks": [
     {
       "id": "block.astral-project-star-marker",
@@ -163,8 +163,8 @@
     {
       "id": "block.bitter-drill",
       "className": "BitterDrillAbAttr",
-      "label": "Lay Drill Bits on the foes' side after my drill move",
-      "summary": "After a drill move of mine hits, I lay Drill Bits on the foes' side, until it is removed. Example: Drill Bits on the foes' side.",
+      "label": "Lay a field effect on a side",
+      "summary": "I lay Drill Bits on the foes' side, until it is removed. Example: Drill Bits on the foes' side.",
       "tier": "B",
       "kind": "event-effect",
       "status": "decomposed",
@@ -172,6 +172,7 @@
       "whenLabel": "After my attack lands",
       "synonyms": [
         "bitter drill",
+        "drill bits",
         "entry hazard",
         "set a hazard",
         "drill hazard",
@@ -179,7 +180,7 @@
         "field effect after hit"
       ],
       "examples": [
-        "After a drill move hits, leave a hazard on the opposing side"
+        "After a drill move hits, leave Drill Bits (a hazard) on the opposing side"
       ],
       "params": [
         {
@@ -234,13 +235,195 @@
       "guards": [],
       "feasibility": [
         "The move must really have hurt the target (it dealt damage and was not blocked), and the game must not be only previewing",
-        "Only one set of Drill Bits can be on a side at a time"
+        "A field effect that is already on that side may not stack"
       ],
       "effect": {
         "id": "effect.arena-tag",
         "params": [
           "tag",
           "side"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.bitter-drill-damage",
+      "className": "BitterDrillDamageAbAttr",
+      "label": "Multiply a move's power by a set amount",
+      "summary": "The power of my move is multiplied by 2. Example: 2 = double power, 1.5 = 50% more. Bitter Drill uses it for drill moves against a foe with Drill Bits stuck in it.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "bitter drill",
+        "drill damage",
+        "double power",
+        "power boost",
+        "stronger moves",
+        "bonus power",
+        "boost power against a target"
+      ],
+      "examples": [
+        "Double the power of my drill moves against a foe that has Drill Bits stuck in it"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (2 = double, 0.5 = half)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 0,
+          "max": 8,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.booby-trap",
+      "className": "BoobyTrapAbAttr",
+      "label": "Curse the first foe that hurts me and heal off its pain",
+      "summary": "The first foe that damages me after I enter gets Curse. While it lasts, I heal half of any damage that foe takes. Only one foe per entry.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "booby trap",
+        "curse attacker",
+        "trap the attacker",
+        "revenge curse",
+        "lifesteal curse",
+        "heal from curse",
+        "mine"
+      ],
+      "examples": [
+        "The first foe that hits me after I switch in is cursed, and I heal half of the damage it takes"
+      ],
+      "params": [
+        {
+          "id": "tag",
+          "label": "Lingering effect laid on the foe",
+          "control": "select",
+          "default": "Curse",
+          "editable": true,
+          "options": [
+            "Curse"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really have hurt me (it dealt damage and was not blocked), and the game must not be only previewing",
+        "The foe must be able to receive the effect (it is not already affected and nothing blocks it)",
+        "Only one foe is trapped each time I enter the battle",
+        "While I have this ability, I heal half of any damage the trapped foe takes (built in, not a setting)"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": [
+          "tag"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.booby-trap-item-lost",
+      "className": "BoobyTrapItemLostAbAttr",
+      "label": "Curse the foe that takes or knocks off my item",
+      "summary": "When a foe takes or knocks off my held item, that foe gets Curse. While it lasts, I heal half of any damage that foe takes.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.item-lost",
+      "whenLabel": "When I lose my held item",
+      "synonyms": [
+        "booby trap",
+        "curse item thief",
+        "knock off punishment",
+        "thief revenge",
+        "curse the thief",
+        "trap the thief"
+      ],
+      "examples": [
+        "A foe that uses Thief or Knock Off on me is cursed"
+      ],
+      "params": [
+        {
+          "id": "tag",
+          "label": "Lingering effect laid on the foe",
+          "control": "select",
+          "default": "Curse",
+          "editable": true,
+          "options": [
+            "Curse"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "side.is",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Somebody else must have caused the loss (an item I used up or ate myself does nothing), and the game must not be only previewing",
+        "While I have this ability, I heal half of any damage the cursed foe takes (built in, not a setting)"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": [
+          "tag"
         ]
       },
       "reusableAlone": {
@@ -434,6 +617,86 @@
       "uses": 1
     },
     {
+      "id": "block.ofuda",
+      "className": "OfudaAbAttr",
+      "label": "Sometimes curse the attacker when I am hit",
+      "summary": "30% chance, each time a move hits me, that its user gets Curse. Contact is not needed. Example: 30% chance to curse the attacker.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "ofuda",
+        "curse the attacker",
+        "curse on hit",
+        "hex attacker",
+        "talisman",
+        "random curse",
+        "sometimes curse"
+      ],
+      "examples": [
+        "30% chance to curse any Pokemon that hits me, even with a ranged move"
+      ],
+      "params": [
+        {
+          "id": "chance",
+          "label": "Chance (%)",
+          "control": "slider",
+          "default": 30,
+          "editable": true,
+          "min": 1,
+          "max": 99,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "tag",
+          "label": "Lingering effect laid on the attacker",
+          "control": "select",
+          "default": "Curse",
+          "editable": true,
+          "options": [
+            "Curse"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "rng.chance",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must be a real hit (not blocked) and the game must not be only previewing, and the attacker must not be me",
+        "The attacker must be able to receive the effect (it is not already affected and nothing blocks it); this is asked after the chance roll"
+      ],
+      "gateParams": [
+        {
+          "param": "chance",
+          "block": "rng.chance",
+          "field": "pct"
+        }
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": [
+          "tag"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.penta-punch-marker",
       "className": "PentaPunchMarkerAbAttr",
       "label": "Allow a fifth move slot",
@@ -473,7 +736,7 @@
       "id": "block.perpetual-motion-power",
       "className": "PerpetualMotionPowerAbAttr",
       "label": "Raise power for each free follow-up hit in a row",
-      "summary": "While my free follow-up move is queued, its power is multiplied by 1 plus 0.1 for each hit in a row. Example: after 3 hits in a row, power x1.3.",
+      "summary": "Multiply the free follow-up move's power by 1 plus 0.1 for each hit in a row. Example: after 3 hits in a row, power x1.3.",
       "tier": "B",
       "kind": "package",
       "status": "decomposed",
@@ -514,7 +777,7 @@
       "guards": [],
       "feasibility": [
         "Only while my free follow-up is waiting to resolve (the streak is armed)",
-        "The bonus is 10% of the power for each hit in a row that landed so far"
+        "The bonus grows by the extra-power-per-hit setting for each hit in a row that landed so far"
       ],
       "effect": {
         "id": "effect.package",
@@ -534,7 +797,7 @@
       "id": "block.perpetual-motion-progress",
       "className": "PerpetualMotionProgressAbAttr",
       "label": "Count free follow-up hits that land in a row",
-      "summary": "After my free follow-up move, I count one more hit in a row if it hurt the target, or reset the count to zero if it did not.",
+      "summary": "I count one more hit in a row if the follow-up hurt the target, or reset the count to zero if it did not.",
       "tier": "B",
       "kind": "package",
       "status": "decomposed",
@@ -580,8 +843,8 @@
     {
       "id": "block.photovoltaic-type",
       "className": "PhotovoltaicTypeAbAttr",
-      "label": "Gain an extra type when I enter",
-      "summary": "When I enter the battle, I gain the Electric type in addition to my own types. Example: a Water type that gains Electric becomes Water and Electric.",
+      "label": "Gain an extra type",
+      "summary": "I gain the Electric type in addition to my own types. Example: a Water type that gains Electric becomes Water and Electric.",
       "tier": "C",
       "kind": "package",
       "status": "decomposed",
@@ -909,8 +1172,8 @@
     {
       "id": "block.prophetic",
       "className": "PropheticAbAttr",
-      "label": "Set up a delayed attack on a foe when I enter",
-      "summary": "When I enter, I set a delayed attack on the first foe still standing. It hits 3 turns later using the stronger of: Future sight, Doom desire.",
+      "label": "Set up a delayed attack on a foe",
+      "summary": "I set a delayed attack on the first foe still standing. It hits 3 turns later using the stronger of: Future Sight and Doom Desire.",
       "tier": "C",
       "kind": "package",
       "status": "decomposed",
@@ -931,10 +1194,16 @@
       "params": [
         {
           "id": "moves",
-          "label": "Attacks to choose from (names, comma separated; the first is the main one)",
-          "control": "text",
-          "default": "FUTURE_SIGHT,DOOM_DESIRE",
+          "label": "Which delayed attacks to choose from (the first one named is the main one)",
+          "control": "select",
+          "default": "Future Sight and Doom Desire",
           "editable": true,
+          "options": [
+            "Future Sight and Doom Desire",
+            "Future Sight only",
+            "Doom Desire only",
+            "Doom Desire and Future Sight"
+          ],
           "gateIndependent": true
         },
         {
@@ -1038,10 +1307,86 @@
       "uses": 64
     },
     {
+      "id": "block.slabs-curse",
+      "className": "SlabsCurseAbAttr",
+      "label": "Lay a PP-draining curse on the foe that knocked me out",
+      "summary": "Each turn, every move of the foe that knocked me out loses 2 PP, and each move of its neighbouring allies loses 1 PP. It ends when one of those moves has no PP left.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.faint",
+      "whenLabel": "When I faint",
+      "synonyms": [
+        "slab's curse",
+        "pp drain",
+        "pp curse",
+        "revenge curse",
+        "spite",
+        "last words",
+        "drain pp"
+      ],
+      "examples": [
+        "When a foe knocks me out, its moves lose 2 PP every turn"
+      ],
+      "params": [
+        {
+          "id": "ppLoss",
+          "label": "PP lost by each of the foe's moves every turn",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "allyPpLoss",
+          "label": "PP lost every turn by each move of the foe's neighbouring allies",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A different Pokemon must have knocked me out (no culprit, or myself, means nothing happens)",
+        "A foe that is already cursed this way is not cursed again",
+        "Only the foe's neighbouring allies that are still standing are cursed too"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": [
+          "ppLoss",
+          "allyPpLoss"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.southern-cross-punch",
       "className": "SouthernCrossPunchAbAttr",
-      "label": "Re-aim queued attacks at the next foe after my punch",
-      "summary": "After my punching move hits, every move still queued this turn that aims at a foe is re-aimed at the next foe over. Example: with two foes, the targets swap.",
+      "label": "Re-aim queued attacks at the next foe",
+      "summary": "Every move still queued this turn that aims at a foe is re-aimed at the next foe over. Example: with two foes, the targets swap.",
       "tier": "B",
       "kind": "package",
       "status": "decomposed",

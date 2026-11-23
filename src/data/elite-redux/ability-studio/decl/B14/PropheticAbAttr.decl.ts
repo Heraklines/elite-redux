@@ -22,8 +22,8 @@
 // KIND: package, because the effect library has no "delayed attack" effect (`effect.delayed-attack` is requested in
 // requests/B14.md). The trigger (on entry) is already a separate block, and the class has no IF.
 import { PropheticAbAttr } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
-import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
+import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 import { MoveId } from "#enums/move-id";
 
 // Staff pick attack names; the class wants a list of move ids. The first move in the list is the main one.

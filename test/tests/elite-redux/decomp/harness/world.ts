@@ -373,4 +373,14 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     power: new NumberHolder(ctx.move.power),
     simulated: false,
   }),
+  // B14 chunk 2 (Slab's Curse): the faint code hands over the culprit (`attacker`) and the move that caused it.
+  "event.faint": ({ holder, foe, move }) => ({
+    pokemon: holder,
+    attacker: foe,
+    move,
+    hitResult: HitResult.EFFECTIVE,
+    simulated: false,
+  }),
+  // B14 chunk 2 (Booby Trap): the item-loss code hands over the Pokemon that took or knocked off the item.
+  "event.item-lost": ({ holder, foe }) => ({ pokemon: holder, opponent: foe, simulated: false }),
 };

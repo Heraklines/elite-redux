@@ -65,7 +65,15 @@ export default defineDecl(BitterDrillAbAttr, {
     `I lay ${params.tag} on ${String(params.side).toLowerCase()}${
       Number(params.duration) > 0 ? `, lasting ${params.duration} turns` : ", until it is removed"
     }. Example: Drill Bits on the foes' side.`,
-  synonyms: ["bitter drill", "drill bits", "entry hazard", "set a hazard", "drill hazard", "spikes", "field effect after hit"],
+  synonyms: [
+    "bitter drill",
+    "drill bits",
+    "entry hazard",
+    "set a hazard",
+    "drill hazard",
+    "spikes",
+    "field effect after hit",
+  ],
   examples: ["After a drill move hits, leave Drill Bits (a hazard) on the opposing side"],
   params: [
     {
