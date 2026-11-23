@@ -59,7 +59,7 @@ export default defineDecl(SetFogOnHitAbAttr, {
       max: 20,
       step: 1,
       integer: true,
-      label: "How many turns the weather lasts (5 is the usual length)",
+      label: "How many turns the weather lasts (8 is the usual length)",
       editable: true,
       gateIndependent: true,
       default: 8,

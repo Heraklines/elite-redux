@@ -96,6 +96,8 @@ export class SpeedBonusToStatAbAttr extends StatMultiplierAbAttr {
   private readonly speedFraction: number;
   private readonly sourceStat: EffectiveStat;
   private readonly replace: boolean;
+  /** The move filter of the default condition; kept as a field so V1 reflection (`bonusFilter.contact`) and the saved fingerprints still see it. */
+  private readonly bonusFilter: SpeedBonusFilter;
   /**
    * Which moves the bonus applies to, called as (holder, null, move); read by the ability studio. Always set: it is the
    * constructor argument, or the move test of `options.filter` (see the constructor).
@@ -118,8 +120,8 @@ export class SpeedBonusToStatAbAttr extends StatMultiplierAbAttr {
     this.speedFraction = options.speedFraction;
     this.sourceStat = options.sourceStat ?? Stat.SPD;
     this.replace = options.replace ?? false;
-    const filter = options.filter ?? {};
-    this.moveCondition = condition ?? ((_user, _target, move) => speedBonusFilterPasses(filter, move));
+    this.bonusFilter = options.filter ?? {};
+    this.moveCondition = condition ?? ((_user, _target, move) => speedBonusFilterPasses(this.bonusFilter, move));
   }
 
   override canApply(params: StatMultiplierAbAttrParams): boolean {
