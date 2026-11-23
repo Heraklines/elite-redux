@@ -27,7 +27,7 @@ ls:
    src/data/elite-redux/ability-studio/decl:
       <<: *src
       .ts: pascalcase | kebab-case
-      .*.ts: pascalcase | kebab-case
+      .*.ts: pascalcase | kebab-case | regex:[A-Z][A-Za-z0-9]*
       # Batch directories decl/B01..B99 (exactly B plus two digits, nothing else upper-case).
       .dir: kebab-case | regex:B[0-9]{2}
    test: *src

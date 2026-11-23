@@ -21,7 +21,7 @@ export default defineDecl(FriskAbAttr, {
   when: "event.on-entry",
   label: "Reveal the foes' held items",
   summary: () =>
-    "When I enter, I look at what every foe is holding and list the items in the battle log. Example: Garchomp is holding Leftovers.",
+    'When I enter, I look at what every foe is holding and list the items in the battle log. Example: the log says "Garchomp frisked Blissey and found: Leftovers!"',
   synonyms: [
     "frisk",
     "gleam eyes",

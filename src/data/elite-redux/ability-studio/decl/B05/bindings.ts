@@ -128,8 +128,7 @@ bindLegacyClosure(
 
 // =============================================================================================
 // Chunk 3 of 4. Written by hand from the live attrs (the dump printed every field).
-// BlockWeatherDamageAttr, SuppressWeatherEffectAbAttr, FriskAbAttr and PostWeatherChangeFormChangeAbAttr have no closure and
-// no gate (their settings are constructor values), so they need no binding. The four Tier B classes below each have ONE gate.
+// SuppressWeatherEffectAbAttr and FriskAbAttr have no closure and no gate (their settings are constructor values), so they need no binding. The Tier B classes below each have ONE gate.
 // =============================================================================================
 
 // The form test, kept as its own IF piece: `pokemon.formIndex === formIndex` (the class setting, 1 for every user).
@@ -187,3 +186,86 @@ bindCondition(
   },
   "gate",
 ); // Protosynthesis (PostWeatherChangeAddBattlerTagAbAttr)
+
+// The weather is one of the listed ones: `weatherTypes.length === 0 || weatherTypes.includes(weather.weatherType)`
+// (BlockWeatherDamageAttr, Tier B). `!weather || cancelled.value` stays in the class as its guard. The weather the phase passes is the
+// arena weather, which field.weather reads. Overcoat (142 attr 0) lists no weather (= every weather) and is bound to any of all 13 weathers.
+const SANDSTORM = { id: "field.weather", weather: "SANDSTORM" };
+const HAIL = { id: "field.weather", weather: "HAIL" };
+const SNOW = { id: "field.weather", weather: "SNOW" };
+const HAIL_OR_SNOW = { any: [HAIL, SNOW] };
+bindCondition(8, 1, SANDSTORM, "gate"); // Sand Veil
+bindCondition(146, 1, SANDSTORM, "gate"); // Sand Rush
+bindCondition(159, 0, SANDSTORM, "gate"); // Sand Force
+bindCondition(5311, 2, SANDSTORM, "gate"); // Desert Spirit
+bindCondition(5445, 2, SANDSTORM, "gate"); // Sand Bender
+bindCondition(5506, 3, SANDSTORM, "gate"); // Sepia Lens
+bindCondition(5601, 0, SANDSTORM, "gate"); // Sand Fiend
+bindCondition(115, 0, HAIL, "gate"); // Ice Body
+bindCondition(5953, 0, HAIL, "gate"); // Ice Body (second ability with the same rule)
+bindCondition(5086, 1, HAIL, "gate"); // North Wind
+bindCondition(5573, 2, HAIL, "gate"); // Molten Core
+bindCondition(5632, 3, HAIL, "gate"); // Sundae
+bindCondition(202, 1, HAIL_OR_SNOW, "gate"); // Slush Rush
+bindCondition(5007, 1, HAIL_OR_SNOW, "gate"); // Whiteout
+bindCondition(5021, 1, HAIL_OR_SNOW, "gate"); // Christmas Spirit
+bindCondition(5348, 1, HAIL_OR_SNOW, "gate"); // Ice Cold Hunter
+bindCondition(5526, 1, HAIL_OR_SNOW, "gate"); // Glacial Ghost
+bindCondition(5563, 1, HAIL_OR_SNOW, "gate"); // Thermal Slide
+bindCondition(5633, 2, HAIL_OR_SNOW, "gate"); // Ice Picks
+bindCondition(5539, 1, { any: [SANDSTORM, HAIL, SNOW] }, "gate"); // Guardian Coat
+// Overcoat (142 attr 0): an EMPTY list, "every weather". Spelled out as "the weather is any of the 13 kinds", which is always true (the arena
+// weather is always one of them), so the gate says in plain words that no weather is excluded.
+bindCondition(
+  142,
+  0,
+  {
+    any: [
+      { id: "field.weather", weather: "NONE" },
+      { id: "field.weather", weather: "SUNNY" },
+      { id: "field.weather", weather: "RAIN" },
+      { id: "field.weather", weather: "SANDSTORM" },
+      { id: "field.weather", weather: "HAIL" },
+      { id: "field.weather", weather: "SNOW" },
+      { id: "field.weather", weather: "FOG" },
+      { id: "field.weather", weather: "HEAVY_RAIN" },
+      { id: "field.weather", weather: "HARSH_SUN" },
+      { id: "field.weather", weather: "STRONG_WINDS" },
+      { id: "field.weather", weather: "TEMPEST_STORM" },
+      { id: "field.weather", weather: "SNOWY_WRATH" },
+      { id: "field.weather", weather: "EERIE_FOG" },
+    ],
+  },
+  "gate",
+); // Overcoat
+
+// The weather sends me back to my normal form (PostWeatherChangeFormChangeAbAttr, Tier B). The class reads the ARENA weather as
+// `weatherType && list.includes(weatherType)`, so with no weather (or a 0 id) it is false: NONE, which sits in both live lists, can never
+// match and is left out here. The gate only picks the branch; the species guard stays in the class.
+bindCondition(
+  59,
+  2,
+  {
+    any: [
+      { id: "field.weather", weather: "SANDSTORM" },
+      { id: "field.weather", weather: "STRONG_WINDS" },
+    ],
+  },
+  "gate",
+); // Forecast, live list NONE, SANDSTORM, STRONG_WINDS
+bindCondition(
+  122,
+  2,
+  {
+    any: [
+      { id: "field.weather", weather: "SANDSTORM" },
+      { id: "field.weather", weather: "STRONG_WINDS" },
+      { id: "field.weather", weather: "FOG" },
+      { id: "field.weather", weather: "HAIL" },
+      { id: "field.weather", weather: "HEAVY_RAIN" },
+      { id: "field.weather", weather: "SNOW" },
+      { id: "field.weather", weather: "RAIN" },
+    ],
+  },
+  "gate",
+); // Flower Gift, live list NONE, SANDSTORM, STRONG_WINDS, FOG, HAIL, HEAVY_RAIN, SNOW, RAIN

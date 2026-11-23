@@ -82,7 +82,7 @@ describe("B05 chunk 3: weather classes", () => {
   // ---- BlockWeatherDamageAttr and SuppressWeatherEffectAbAttr ---------------------------------------------------
 
   it("BlockWeatherDamageAttr: every user's rebuild blocks exactly the weathers the original blocks (all 13 weathers, no weather, already cancelled)", async () => {
-    await startWorld(phaserGame);
+    const game: GameManager = (await startWorld(phaserGame)).game;
     const users = usersOf("BlockWeatherDamageAttr");
     expect(users.length).toBe(21);
     const blocked = new Map<string, WeatherType[]>();
@@ -93,9 +93,11 @@ describe("B05 chunk 3: weather classes", () => {
       const seen: WeatherType[] = [];
       for (const weather of [null, ...ALL_WEATHERS]) {
         for (const already of [false, true]) {
+          // The engine passes the arena's own weather (weather-effect-phase.ts), and the library gate reads the arena weather.
+          setWeatherOf(game, weather ?? WeatherType.NONE);
           const make = () => ({
             pokemon: globalScene.getPlayerPokemon()!,
-            weather: weather === null ? null : new Weather(weather, 5, 5),
+            weather: game.scene.arena.weather,
             cancelled: new BooleanHolder(already),
           });
           const a = make();
@@ -116,7 +118,8 @@ describe("B05 chunk 3: weather classes", () => {
       blocked.set(name, seen);
     }
     // Overcoat lists nothing and so blocks every weather; Sand Veil blocks only Sandstorm; a listed pair blocks two.
-    expect(blocked.get("Overcoat")).toEqual([...ALL_WEATHERS]);
+    // (the arena stores NONE as no weather at all, which the guard rejects, so NONE is never in the list)
+    expect(blocked.get("Overcoat")).toEqual(ALL_WEATHERS.filter(w => w !== WeatherType.NONE));
     expect(blocked.get("Sand Veil")).toEqual([WeatherType.SANDSTORM]);
     expect(blocked.get("Slush Rush")).toEqual([WeatherType.HAIL, WeatherType.SNOW]);
     expect(blocked.get("Guardian Coat")).toEqual([WeatherType.SANDSTORM, WeatherType.HAIL, WeatherType.SNOW]);

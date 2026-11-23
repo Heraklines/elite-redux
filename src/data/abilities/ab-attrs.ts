@@ -4838,12 +4838,25 @@ export class BlockWeatherDamageAttr extends PreWeatherDamageAbAttr {
     this.weatherTypes = weatherTypes;
   }
 
-  override canApply({ weather, cancelled }: PreWeatherEffectAbAttrParams): boolean {
-    if (!weather || cancelled.value) {
-      return false;
-    }
-    const weatherType = weather.weatherType;
-    return this.weatherTypes.length === 0 || this.weatherTypes.includes(weatherType);
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreWeatherEffectAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `guards` (there is a weather and nothing blocked
+   * the damage yet), then `gate` (the weather is one of the listed ones; an empty list means every weather). No residual.
+   */
+  override canApply(params: PreWeatherEffectAbAttrParams): boolean {
+    return gatedCanApply<PreWeatherEffectAbAttrParams>(this, params);
+  }
+
+  /** Safety rule that stays in the class: no weather, or damage that an earlier ability already blocked, needs no block. */
+  public guards({ weather, cancelled }: PreWeatherEffectAbAttrParams): boolean {
+    return !(!weather || cancelled.value);
+  }
+
+  /** The replaceable condition: the weather is one of the listed ones (an empty list means every weather). */
+  public gate({ weather }: PreWeatherEffectAbAttrParams): boolean {
+    return this.weatherTypes.length === 0 || (!!weather && this.weatherTypes.includes(weather.weatherType));
   }
 
   override apply({ cancelled }: PreWeatherEffectAbAttrParams): void {
@@ -5034,8 +5047,12 @@ export class PostWeatherChangeFormChangeAbAttr extends PostWeatherChangeAbAttr {
     this.formRevertingWeathers = formRevertingWeathers;
   }
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** Only the safety rule decides whether this runs; the weather rule below picks WHAT it does (see {@linkcode gate}). */
   override canApply(params: AbAttrBaseParams): boolean {
-    return gatedCanApply<AbAttrBaseParams>(this, params);
+    return this.guards(params);
   }
 
   /** Safety rule (guard `weather-form-species-only`): Castform with Forecast or Cherrim with Flower Gift, nothing else. */
@@ -5049,19 +5066,29 @@ export class PostWeatherChangeFormChangeAbAttr extends PostWeatherChangeAbAttr {
   }
 
   /**
-   * Calls {@linkcode Arena.triggerWeatherBasedFormChangesToNormal | triggerWeatherBasedFormChangesToNormal} when the
-   * weather changed to form-reverting weather, otherwise calls {@linkcode Arena.triggerWeatherBasedFormChanges | triggerWeatherBasedFormChanges}
+   * The replaceable weather rule: the weather sends me back to my normal form. Reads the ARENA weather, not the `weather` of the
+   * call (the class has always done so, see the TODO in {@linkcode apply}); no weather, or a weather whose id is 0, is never
+   * a reverting weather.
    */
-  override apply({ simulated }: AbAttrBaseParams): void {
-    if (simulated) {
+  public gate(_params: AbAttrBaseParams): boolean {
+    const weatherType = globalScene.arena.weather?.weatherType;
+    return !!weatherType && this.formRevertingWeathers.includes(weatherType);
+  }
+
+  /**
+   * Calls {@linkcode Arena.triggerWeatherBasedFormChangesToNormal | triggerWeatherBasedFormChangesToNormal} when the
+   * weather changed to form-reverting weather (the {@linkcode gate}), otherwise calls {@linkcode Arena.triggerWeatherBasedFormChanges | triggerWeatherBasedFormChanges}
+   *
+   * TODO: investigate why the rule does not use the weatherType parameter and reads the weather from the global scene
+   */
+  override apply(params: AbAttrBaseParams): void {
+    if (params.simulated) {
       return;
     }
 
-    // TODO: investigate why this is not using the weatherType parameter
-    // and is instead reading the weather from the global scene
-    const weatherType = globalScene.arena.weather?.weatherType;
-
-    if (weatherType && this.formRevertingWeathers.includes(weatherType)) {
+    // The weather rule is the replaceable `gate` (ability studio spec 3.1): it picks the branch, not whether this runs.
+    const sendsBackToNormal = this.gateOverride ?? this.gate.bind(this);
+    if (sendsBackToNormal(params)) {
       globalScene.arena.triggerWeatherBasedFormChangesToNormal();
     } else {
       globalScene.arena.triggerWeatherBasedFormChanges();
