@@ -20,6 +20,7 @@
 import { type AbAttrBaseParams, PostSummonAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { TerrainType } from "#data/terrain";
 import type { BattleStat } from "#enums/stat";
 import { toDmgValue } from "#utils/common";
@@ -40,10 +41,13 @@ export interface PostSummonClearTerrainOptions {
   readonly healFractionOnCleared?: number;
 }
 
-export class PostSummonClearTerrainAbAttr extends PostSummonAbAttr {
+export class PostSummonClearTerrainAbAttr extends PostSummonAbAttr implements GatedAttr<AbAttrBaseParams> {
   private readonly onCleared: ReadonlyArray<{ stat: BattleStat; stages: number }>;
   private readonly byTerrain: ReadonlyArray<{ terrain: TerrainType; stat: BattleStat; stages: number }>;
   private readonly healFractionOnCleared: number;
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
 
   constructor(options: PostSummonClearTerrainOptions = {}) {
     super(true);
@@ -52,7 +56,16 @@ export class PostSummonClearTerrainAbAttr extends PostSummonAbAttr {
     this.healFractionOnCleared = options.healFractionOnCleared ?? 0;
   }
 
-  override canApply(_params: AbAttrBaseParams): boolean {
+  /**
+   * Tier B split (ability studio spec 3.1): no guards, no residual; the one clause (a terrain is active) is the replaceable
+   * `gate`. The test reads the terrain object itself, so it ignores the Clueless suppression (see the declaration notes).
+   */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The replaceable condition: a terrain is active. */
+  public gate(_params: AbAttrBaseParams): boolean {
     return (
       globalScene.arena.terrain?.terrainType !== undefined && globalScene.arena.terrain.terrainType !== TerrainType.NONE
     );

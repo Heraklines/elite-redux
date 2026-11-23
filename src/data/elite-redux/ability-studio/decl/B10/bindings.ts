@@ -244,3 +244,53 @@ const ATTACKER_MOVE =
   "The attacker's last move makes contact: the frame of 'after I take any damage' has no move, so the library move.flag atom cannot read it, request R-B10-c3-02 in requests/B10.md";
 bindLegacyClosure(5393, 0, ATTACKER_MOVE, "gate"); // Restraining Order
 bindLegacyClosure(5565, 1, ATTACKER_MOVE, "gate"); // Chuckster
+
+// =============================================================================================
+// Chunk 4 (Tier B gates). Written by hand after reading each class and every live user.
+//   PostDefendHpGatedSelfTagAbAttr (No Turning Back): legacy, the class line is toDmgValue(maxHp * gate) = max(floor, 1) and the library
+//     crossing atoms use floor(..) (they differ at max HP 1), request R-B10-c4-01.
+//   PostFaintDeferredReviveAbAttr: Shallow Grave has an exact two-atom form but is legacy until L1 can drive event.faint (R-B10-c4-12); Backup Power is legacy (terrain object vs Clueless, R-B10-c4-02).
+//   PostFaintDetonateAbAttr (4 users): legacy, "the hit would knock me out" has no atom, request R-B10-c4-03.
+//   PostSummonClearTerrainAbAttr (3 users): legacy, the class tests the terrain object, request R-B10-c4-02.
+// The other four classes of the chunk have nothing to bind: PostDefendSuppressOpponentDamageBoostAbAttr is a presence flag,
+// PostFaintSpreadDetonateAbAttr, PostItemLostScriptedMoveAbAttr and PostSummonApplyTagOnFoesAbAttr take only plain values.
+// =============================================================================================
+bindLegacyClosure(
+  5372,
+  1,
+  "damaging move, the hit crossed the line toDmgValue(maxHp * gate) = max(floor(..), 1), and the tag is not on me yet: the library crossing atoms floor the line without the minimum of 1 (they differ at max HP 1), request R-B10-c4-01 in requests/B10.md",
+  "gate",
+); // No Turning Back
+
+// ---- PostFaintDeferredReviveAbAttr: the weather requirement is exact with the library weather atom (arena.weatherType), the terrain
+// requirement is not. Shallow Grave's gate IS exactly `any[ field.weather FOG, field.weather EERIE_FOG ]` (chunk4-gates.test.ts proves it by
+// compiling that tree over every weather, terrain and latch state), but it stays legacy for now: the L1 differential has no
+// engine-parameter builder for the trigger `event.faint` (harness/world.ts, not a batch file), and L1 refuses a Tier B class whose library
+// gate it cannot drive (request R-B10-c4-12). Replace this line with the bindCondition shown in the request once the builder exists. ----
+bindLegacyClosure(
+  5333,
+  0,
+  "Fog or Eerie fog must be active when I faint: this is exactly any-of two field.weather atoms (proved in chunk4-gates.test.ts), but the L1 harness has no engine-parameter builder for the trigger 'when I faint' yet, so it cannot drive a library gate for this class, request R-B10-c4-12 in requests/B10.md",
+  "gate",
+); // Shallow Grave
+bindLegacyClosure(
+  5600,
+  0,
+  "The Electric terrain must be active when I faint: the class reads the terrain object (arena.terrain?.terrainType) while the library terrain atom reads arena.terrainType, which is None while Clueless negates the terrain, request R-B10-c4-02 in requests/B10.md",
+  "gate",
+); // Backup Power
+
+// ---- PostFaintDetonateAbAttr: "the hit would knock me out" (max HP above 1 and damage at least my current HP) ----
+const LETHAL_HIT =
+  "The hit would knock me out (max HP above 1 and the damage is at least my current HP): the library has no would-knock-out atom, request R-B10-c4-03 in requests/B10.md";
+bindLegacyClosure(106, 0, LETHAL_HIT, "gate"); // Aftermath
+bindLegacyClosure(253, 1, LETHAL_HIT, "gate"); // Perish Body
+bindLegacyClosure(5721, 2, LETHAL_HIT, "gate"); // Unstable Core
+bindLegacyClosure(6085, 1, LETHAL_HIT, "gate"); // Pungency
+
+// ---- PostSummonClearTerrainAbAttr: a terrain is active (the terrain object is set and is not None) ----
+const TERRAIN_OBJECT =
+  "A terrain is active: the class tests the terrain object (arena.terrain?.terrainType is set and not None), so a terrain negated by Clueless still counts, while the library terrain atom answers None then, request R-B10-c4-02 in requests/B10.md";
+bindLegacyClosure(5309, 0, TERRAIN_OBJECT, "gate"); // Lawnmower
+bindLegacyClosure(5587, 0, TERRAIN_OBJECT, "gate"); // Curse of Famine
+bindLegacyClosure(5608, 0, TERRAIN_OBJECT, "gate"); // Turf War

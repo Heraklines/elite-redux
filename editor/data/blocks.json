@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "03ef54e0d0a23c",
-  "hash": "1bb7a3473e8b84",
+  "hash": "1936db1468044f",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -3066,6 +3066,813 @@
         "do": true
       },
       "uses": 9
+    },
+    {
+      "id": "block.post-defend-hp-gated-self-tag",
+      "className": "PostDefendHpGatedSelfTagAbAttr",
+      "label": "Get a lasting effect when a hit drops me low on HP",
+      "summary": "The first damaging hit that takes me to 50% HP or less puts \"No retreat\" on me for as long as it lasts. It does not repeat while I still have it.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "no turning back",
+        "trap myself at low hp",
+        "cannot switch out",
+        "cannot flee",
+        "no retreat",
+        "self trap",
+        "stuck below half hp"
+      ],
+      "examples": [
+        "The first time a hit drops me to half HP, I can no longer switch out or flee, like No Turning Back",
+        "Below 25% HP I get Aqua Ring once"
+      ],
+      "params": [
+        {
+          "id": "hpGate",
+          "label": "HP line (% of max HP, the hit must take me to this or below)",
+          "control": "number",
+          "default": 50,
+          "editable": true,
+          "min": 1,
+          "max": 99,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "tagType",
+          "label": "Lasting effect I get (No retreat = cannot switch out or flee)",
+          "control": "select",
+          "default": "NO_RETREAT",
+          "editable": true,
+          "options": [
+            "NO_RETREAT",
+            "TRAPPED",
+            "AQUA_RING",
+            "INGRAIN",
+            "CRIT_BOOST",
+            "DRAGON_CHEER",
+            "CHARGED",
+            "MINIMIZED"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "turnCount",
+          "label": "Turns the effect lasts (0 = until it ends by itself)",
+          "control": "number",
+          "default": 0,
+          "editable": true,
+          "min": 0,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens in a preview"
+      ],
+      "gateParams": [
+        {
+          "param": "hpGate",
+          "block": "hp.crossed-below",
+          "field": "ratio",
+          "scale": 0.01
+        }
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": [
+          "tagType",
+          "turnCount"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.post-faint-deferred-revive",
+      "className": "PostFaintDeferredReviveAbAttr",
+      "label": "Come back to the party after fainting, once per battle",
+      "summary": "When I faint, I am revived at 25% HP as a reserve the next time my side sends out a Pokemon. Once per battle.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.faint",
+      "whenLabel": "When I faint",
+      "synonyms": [
+        "revive after fainting",
+        "second life",
+        "come back from the dead",
+        "shallow grave",
+        "backup power",
+        "delayed revive",
+        "phoenix"
+      ],
+      "examples": [
+        "If I faint in fog, I come back at 25% HP when my next Pokemon is sent out, like Shallow Grave",
+        "If I faint in Electric Terrain, I am revived at 25% HP once, like Backup Power"
+      ],
+      "params": [
+        {
+          "id": "hpFraction",
+          "label": "HP I come back with (% of max HP, at least 1 HP)",
+          "control": "number",
+          "default": 25,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "requireWeather",
+          "label": "Built-in rule: weather needed when I faint (a list; None = any; your condition block replaces it)",
+          "control": "text",
+          "default": "NONE",
+          "editable": false
+        },
+        {
+          "id": "requireTerrain",
+          "label": "Built-in rule: terrain needed when I faint (a list; None = any; your condition block replaces it)",
+          "control": "text",
+          "default": "NONE",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only once each battle (the latch is kept per Pokemon and starts again with the next battle)",
+        "I really do faint and leave the field; the revive comes when my side next sends out a Pokemon, and I return as a reserve, not onto the field",
+        "Nothing is armed in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "hpFraction"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.post-faint-detonate",
+      "className": "PostFaintDetonateAbAttr",
+      "label": "Survive a knockout hit and explode (like Aftermath)",
+      "summary": "When a hit would knock me out, I stay at 1 HP and use a 100 power Normal blast on every Pokemon next to me, then faint. It always flinches them. Damp stops it.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.damage-taken",
+      "whenLabel": "While the game calculates damage I take",
+      "synonyms": [
+        "aftermath",
+        "explode when knocked out",
+        "last gasp explosion",
+        "self destruct on faint",
+        "blast when ko",
+        "perish body",
+        "unstable core"
+      ],
+      "examples": [
+        "When a hit would knock me out, I explode with 100 power on everything next to me, like Aftermath",
+        "A Fire type blast with 80 power that does not flinch"
+      ],
+      "params": [
+        {
+          "id": "power",
+          "label": "Power of the blast (100 = like Aftermath)",
+          "control": "number",
+          "default": 100,
+          "editable": true,
+          "min": 1,
+          "max": 250,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "flinch",
+          "label": "The blast always flinches the Pokemon it hits",
+          "control": "boolean",
+          "default": true,
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "type",
+          "label": "Type of the blast",
+          "control": "select",
+          "default": "NORMAL",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Keeps enduring the remaining hits of a multi-hit move in the same turn, and drops that memory on the next turn",
+        "Does nothing when I already have a Sturdy-style survival effect on this hit",
+        "Does nothing while a Damp-style ability is active on the field (then I simply faint)",
+        "The blast is a free move that cannot be cancelled by a flinch, and it knocks me out when it is used",
+        "Nothing is armed in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "power",
+          "flinch",
+          "type"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B split by hand (gate: the lethal-hit test; residual: multi-hit memory, Sturdy test, Damp block). Users (4 attrs): Aftermath attr 0, Perish Body attr 1, Unstable Core attr 2 and Pungency attr 1, all `{ power: 100, flinch: true }` with the default Normal type (the dispatcher replaces the vanilla contact-chip attr in place, patchAftermath). All four gates are legacy: the library has no atom for 'the damage of this hit is at least my HP' (request R-B10-c4-03). Package justified: the effect (a) leaves the holder at 1 HP through the Sturdy tag and a direct clamp of later sub-hits, (b) cuts the attacker's multi-hit volley, (c) builds a one-off Explosion-id move with the chosen power, type, always-flinch rider, no contact, all-adjacent targets and a self-KO, and (d) queues it as a FOLLOW_UP move ahead of every other move. Library pieces exist for (a) only (effect.cap-damage), not for (b), (c) or (d), and splitting (a) from the rest would let a rule survive without exploding (request R-B10-c4-08). Typed settings: power, always-flinch, type. Oddities, NOT fixed: the class name says PostFaint but it is a pre-damage clamp; the KO is credited to the explosion, not to the attacker (class comment); a hit that would knock out a holder under a Damp-class ability faints it normally; the explosion category is chosen with getEffectiveStat at the moment of the hit.",
+      "uses": 4
+    },
+    {
+      "id": "block.post-faint-spread-detonate",
+      "className": "PostFaintSpreadDetonateAbAttr",
+      "label": "Blast every adjacent foe when I faint",
+      "summary": "When I faint, whatever the cause, a 100 power Normal blast hits every foe next to me. It cannot miss. Damp stops it.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.faint",
+      "whenLabel": "When I faint",
+      "synonyms": [
+        "explode when I faint",
+        "revenge blast on ko",
+        "victory bomb",
+        "balloon bomb",
+        "damage foes when I die",
+        "spread damage on faint",
+        "last words explosion"
+      ],
+      "examples": [
+        "When I faint for any reason, a 100 power Fire blast hits every foe next to me, like Victory Bomb",
+        "A Normal blast of 60 power that also flinches the foes"
+      ],
+      "params": [
+        {
+          "id": "power",
+          "label": "Power of the blast (100 = like Victory Bomb)",
+          "control": "number",
+          "default": 100,
+          "editable": true,
+          "min": 1,
+          "max": 250,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "flinch",
+          "label": "The blast also flinches the foes it leaves standing",
+          "control": "boolean",
+          "default": false,
+          "editable": true
+        },
+        {
+          "id": "type",
+          "label": "Type of the blast",
+          "control": "select",
+          "default": "NORMAL",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one foe must be next to me",
+        "Does nothing while a Damp-style ability is active on the field",
+        "The blast uses the higher of my Attack and Sp. Atk (Sp. Atk only when it is higher), cannot miss, and does 0.75 times the damage when it hits more than one foe",
+        "Nothing happens in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "power",
+          "flinch",
+          "type"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier C (no gate). Users (2 attrs): Balloon Bomb attr 1 (100 power, no flinch, Normal) and Victory Bomb attr 0 (100 power, no flinch, Fire); nothing to bind. Package justified: a fainted Pokemon cannot run a move phase (MovePhase bails on an inactive user), so the class computes each foe's damage with getAttackDamage for a made-up Explosion-id move and applies it directly; the library 'Use a move' effect needs a real move and a living user, so it cannot be used (request R-B10-c4-09 for a 'hurt every adjacent foe' effect). Typed settings: power, flinch, type. Oddities, NOT fixed: the sibling class of Aftermath (PostFaintDetonateAbAttr) differs in timing, the always-flinch default and reach (that one is a pre-damage clamp that fires on damaging hits only); the class reads simulated only in apply.",
+      "uses": 2
+    },
+    {
+      "id": "block.post-item-lost-scripted-move",
+      "className": "PostItemLostScriptedMoveAbAttr",
+      "label": "Use a free move when I lose my held item",
+      "summary": "When I lose my held item, I use Thief on a foe that is still standing at the move's own power. It uses no PP. Example: Thief.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.item-lost",
+      "whenLabel": "When I lose my held item",
+      "synonyms": [
+        "greedy",
+        "thief when my item is taken",
+        "revenge for item loss",
+        "counter when knocked off",
+        "item loss reaction",
+        "steal back",
+        "use a move after losing an item"
+      ],
+      "examples": [
+        "When my item is knocked off or used up, I use Thief on a foe, like Greedy",
+        "When I lose my item, I hit a foe with a 40 power Knock Off"
+      ],
+      "params": [
+        {
+          "id": "moveId",
+          "label": "Move to use (type its name, for example Thief)",
+          "control": "text",
+          "default": "THIEF",
+          "editable": true
+        },
+        {
+          "id": "power",
+          "label": "Power of the move (0 = the move's own power)",
+          "control": "number",
+          "default": 0,
+          "editable": true,
+          "min": 0,
+          "max": 250,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one foe must still be standing; the move is aimed at the first one",
+        "The move is a free extra move: it uses no PP and cannot start another follow-up",
+        "Nothing happens in a preview"
+      ],
+      "effect": {
+        "id": "effect.scripted-move",
+        "params": [
+          "moveId",
+          "power"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.post-summon-apply-tag-on-foes",
+      "className": "PostSummonApplyTagOnFoesAbAttr",
+      "label": "Put a lasting effect on every foe when I enter",
+      "summary": "When I enter the battle, every foe next to me gets \"Heal block\" for 3 turns. Example: Heal block for 5 turns stops them healing.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "heal block on entry",
+        "debuff the foes on entry",
+        "permanence",
+        "mashed potato",
+        "syrup bomb on entry",
+        "curse the foes when I arrive",
+        "lasting effect on the opposing side"
+      ],
+      "examples": [
+        "When I enter, every foe cannot heal for 5 turns, like Permanence",
+        "When I enter, every foe is covered in syrup for 3 turns, like Mashed Potato"
+      ],
+      "params": [
+        {
+          "id": "tag",
+          "label": "Lasting effect the foes get (Heal block = cannot heal)",
+          "control": "select",
+          "default": "HEAL_BLOCK",
+          "editable": true,
+          "options": [
+            "HEAL_BLOCK",
+            "SYRUP_BOMB",
+            "TAUNT",
+            "TORMENT",
+            "CONFUSED",
+            "CURSED",
+            "SEEDED",
+            "SALT_CURED",
+            "DROWSY",
+            "TAR_SHOT"
+          ]
+        },
+        {
+          "id": "turns",
+          "label": "Number of turns the effect lasts (1-10)",
+          "control": "number",
+          "default": 3,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one foe must still be standing",
+        "Only foes next to me are affected (every foe in a normal or double battle)",
+        "Foes that already fainted are skipped",
+        "Nothing happens in a preview"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": [
+          "tag",
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.post-summon-clear-terrain",
+      "className": "PostSummonClearTerrainAbAttr",
+      "label": "Clear the terrain when I enter and gain a bonus",
+      "summary": "When I enter and a terrain is active, it is removed. Can raise a different stat for each terrain.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "remove the terrain",
+        "eat the terrain",
+        "destroy terrain on entry",
+        "lawnmower",
+        "turf war",
+        "curse of famine",
+        "terrain eater"
+      ],
+      "examples": [
+        "When I enter, the terrain is cleared and my Defense goes up one stage, and I heal 25%, like Curse of Famine",
+        "Clearing Grassy Terrain raises Defense, clearing Misty Terrain raises Sp. Def, like Lawnmower"
+      ],
+      "params": [
+        {
+          "id": "clearedStat",
+          "label": "Stat I raise whenever a terrain is cleared (None = no raise)",
+          "control": "select",
+          "default": "NONE",
+          "editable": true,
+          "options": [
+            "NONE",
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "clearedStages",
+          "label": "Stages for that raise (1 = one stage up)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "healPercent",
+          "label": "HP I heal when a terrain is cleared (% of max HP, 0 = no heal)",
+          "control": "number",
+          "default": 0,
+          "editable": true,
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "grassyStat",
+          "label": "Stat to raise when Grassy Terrain is cleared (None = no raise)",
+          "control": "select",
+          "default": "NONE",
+          "editable": true,
+          "options": [
+            "NONE",
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "grassyStages",
+          "label": "Stages for the Grassy Terrain raise (1 = one stage up)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "electricStat",
+          "label": "Stat to raise when Electric Terrain is cleared (None = no raise)",
+          "control": "select",
+          "default": "NONE",
+          "editable": true,
+          "options": [
+            "NONE",
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "electricStages",
+          "label": "Stages for the Electric Terrain raise (1 = one stage up)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "mistyStat",
+          "label": "Stat to raise when Misty Terrain is cleared (None = no raise)",
+          "control": "select",
+          "default": "NONE",
+          "editable": true,
+          "options": [
+            "NONE",
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "mistyStages",
+          "label": "Stages for the Misty Terrain raise (1 = one stage up)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "psychicStat",
+          "label": "Stat to raise when Psychic Terrain is cleared (None = no raise)",
+          "control": "select",
+          "default": "NONE",
+          "editable": true,
+          "options": [
+            "NONE",
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "psychicStages",
+          "label": "Stages for the Psychic Terrain raise (1 = one stage up)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "toxicStat",
+          "label": "Stat to raise when Toxic Terrain is cleared (None = no raise)",
+          "control": "select",
+          "default": "NONE",
+          "editable": true,
+          "options": [
+            "NONE",
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "toxicStages",
+          "label": "Stages for the Toxic Terrain raise (1 = one stage up)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The heal only happens when I am not already at full HP",
+        "The stat raises and the heal are queued in front of everything else, one after the other",
+        "Nothing happens in a preview"
+      ],
+      "branches": [
+        {
+          "label": "Clear the terrain",
+          "conditions": [
+            "a terrain is active"
+          ],
+          "effect": {
+            "id": "effect.set-terrain",
+            "params": []
+          }
+        },
+        {
+          "label": "Raise a stat of mine for the cleared terrain",
+          "conditions": [
+            "a terrain is active",
+            "the cleared terrain has a stat set"
+          ],
+          "effect": {
+            "id": "effect.stat-stage",
+            "params": [
+              "clearedStat",
+              "clearedStages",
+              "grassyStat",
+              "grassyStages",
+              "electricStat",
+              "electricStages",
+              "mistyStat",
+              "mistyStages",
+              "psychicStat",
+              "psychicStages",
+              "toxicStat",
+              "toxicStages"
+            ]
+          }
+        },
+        {
+          "label": "Heal a share of my max HP",
+          "conditions": [
+            "a terrain is active",
+            "I am not at full HP"
+          ],
+          "effect": {
+            "id": "effect.heal-percent",
+            "params": [
+              "healPercent"
+            ]
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
     },
     {
       "id": "block.post-summon-copy-ability",

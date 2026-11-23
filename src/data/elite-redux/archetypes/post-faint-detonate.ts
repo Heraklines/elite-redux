@@ -62,6 +62,7 @@
 import { PreDefendFullHpEndureAbAttr, type PreDefendModifyDamageAbAttrParams } from "#abilities/ab-attrs";
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { PokemonMove } from "#data/moves/pokemon-move";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveCategory } from "#enums/move-category";
@@ -169,10 +170,16 @@ class DetonationPokemonMove extends PokemonMove {
  * (not just full-HP) so the holder survives at 1 HP, then `apply` clamps and
  * queues the explosion the holder uses as its dying act.
  */
-export class PostFaintDetonateAbAttr extends PreDefendFullHpEndureAbAttr {
+export class PostFaintDetonateAbAttr
+  extends PreDefendFullHpEndureAbAttr
+  implements GatedAttr<PreDefendModifyDamageAbAttrParams>
+{
   private readonly power: number;
   private readonly flinch: boolean;
   private readonly type: PokemonType;
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreDefendModifyDamageAbAttrParams) => boolean) | undefined;
 
   constructor(opts: PostFaintDetonateOptions = {}) {
     super();
@@ -199,12 +206,23 @@ export class PostFaintDetonateAbAttr extends PreDefendFullHpEndureAbAttr {
     return this.type;
   }
 
+  /**
+   * Tier B split (ability studio spec 3.1), in the original clause order: no `guards`, `gate` (the hit is lethal and a 1-HP clamp
+   * is meaningful), then `residual` (the multi-hit memory, the Sturdy tag test and the Damp block). No random draw.
+   */
   public override canApply(params: PreDefendModifyDamageAbAttrParams): boolean {
+    return gatedCanApply<PreDefendModifyDamageAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: only lethal damaging hits matter, and only when a 1-HP clamp is meaningful. */
+  public gate(params: PreDefendModifyDamageAbAttrParams): boolean {
     const { pokemon, damage } = params;
-    // Only lethal damaging hits matter, and only when a 1-HP clamp is meaningful.
-    if (pokemon.getMaxHp() <= 1 || damage.value < pokemon.hp) {
-      return false;
-    }
+    return !(pokemon.getMaxHp() <= 1 || damage.value < pokemon.hp);
+  }
+
+  /** The rest of the old rule: keep enduring the sub-hits of an armed turn, no double arming over Sturdy, no blast under Damp. */
+  public residual(params: PreDefendModifyDamageAbAttrParams): boolean {
+    const { pokemon } = params;
     // Already armed THIS turn: a multi-hit move keeps striking after the arming
     // hit clamped the holder to 1 HP, and EVERY remaining lethal sub-hit must be
     // endured — otherwise one of them re-kills the holder before the queued
