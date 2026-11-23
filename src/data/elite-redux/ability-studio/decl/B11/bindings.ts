@@ -269,3 +269,147 @@ bindLegacyClosure(
   "The gate is 'my most recent move's printed type is Electric' (allMoves[last.move].type). move.type reads the move slot, which the win trigger does not provide, and time.last-move names one move, not a type. Needs an atom 'my last move was a {type}-type move' (R-B11-C2-12).",
   "gate",
 );
+
+// =================================================================================================================================
+// CHUNK 4 of 5: SelfHighestStatMultiplierAbAttr, SelfPersistentBleedAbAttr, SelfSwitchOnMoveTypeAbAttr, SelfSwitchOnStatLowerAbAttr,
+// SetFogOnHitAbAttr, SetTargetAbilityOnMoveAbAttr, SkipChargeTurnAbAttr and SpeedBonusToStatAbAttr.
+// Every line was read by hand from the live attr (the dump of the fields and the constructor options). `attrIndex` is the position
+// in `ability.attrs`.
+// =================================================================================================================================
+
+// ---------------------------------------------------------------------------------------------------------------
+// SelfHighestStatMultiplierAbAttr, slot ctor:1, an AbAttrCondition (holder): the weather list test `weather?.weatherType` is in the
+// list, which equals an OR of field.weather (`arena.weatherType` is `weather?.weatherType ?? NONE`). All users: Attack and Sp. Atk, 1.5.
+const SUN = { any: [{ id: "field.weather", weather: "SUNNY" }, { id: "field.weather", weather: "HARSH_SUN" }] };
+//   Sun or Extremely harsh sunlight: Solar Power (94), Big Leaves (5111 attrs 4 and 5), Rite Of Spring (5503), Photovoltaic (6030).
+//   Attr 4 of Big Leaves also carries an attr-level condition (addCondition) that the rebuild copies.
+bindCondition(94, 0, SUN, "ctor:1");
+bindCondition(5111, 4, SUN, "ctor:1");
+bindCondition(5111, 5, SUN, "ctor:1");
+bindCondition(5503, 1, SUN, "ctor:1");
+bindCondition(6030, 0, SUN, "ctor:1");
+//   Sandstorm only: Sand Force (159 attr 1), Sand Bender (5445 attr 3), Sand Fiend (5601 attr 1).
+const SAND = { id: "field.weather", weather: "SANDSTORM" };
+bindCondition(159, 1, SAND, "ctor:1");
+bindCondition(5445, 3, SAND, "ctor:1");
+bindCondition(5601, 1, SAND, "ctor:1");
+//   Whiteout (5007): Hail or Snow.   Ectoplasm (5325): Fog or Eerie fog.   Raging Storm (5636): Rain or Heavy rain.
+bindCondition(
+  5007,
+  0,
+  { any: [{ id: "field.weather", weather: "HAIL" }, { id: "field.weather", weather: "SNOW" }] },
+  "ctor:1",
+);
+bindCondition(
+  5325,
+  0,
+  { any: [{ id: "field.weather", weather: "FOG" }, { id: "field.weather", weather: "EERIE_FOG" }] },
+  "ctor:1",
+);
+bindCondition(
+  5636,
+  0,
+  { any: [{ id: "field.weather", weather: "RAIN" }, { id: "field.weather", weather: "HEAVY_RAIN" }] },
+  "ctor:1",
+);
+
+// ---------------------------------------------------------------------------------------------------------------
+// SelfPersistentBleedAbAttr, slot gate: `!pokemon.getTag(ER_BLEED)` = not(tag.has { holder, ER_BLEED }). Blood Stain (5377, attr 1).
+bindCondition(5377, 1, { not: { id: "tag.has", who: "holder", tag: "ER_BLEED" } }, "gate");
+
+// ---------------------------------------------------------------------------------------------------------------
+// SelfSwitchOnMoveTypeAbAttr, slot gate: `super.canApply` (the default attack condition: `move.category !== STATUS`) and
+// `pokemon.getMoveType(move) === moveType` (move.type with effective true, the same call). gateParams writes the live `type`.
+//   Hollow Ice Zone (5680, attr 1): Ice.
+bindCondition(
+  5680,
+  1,
+  { all: [{ id: "move.damaging" }, { id: "move.type", type: "ICE", effective: true }] },
+  "gate",
+);
+
+// ---------------------------------------------------------------------------------------------------------------
+// SelfSwitchOnStatLowerAbAttr, slot gate, in the class order: the once-per-battle memory (the per-wave Set under the key the class
+// writes itself), then `stages < 0`. Tactical Retreat (5282).
+bindCondition(
+  5282,
+  0,
+  {
+    all: [
+      { id: "time.once-per", scope: "wave", key: "erTacticalRetreat.used" },
+      { id: "stage.just-changed", direction: "lowered" },
+    ],
+  },
+  "gate",
+);
+
+// ---------------------------------------------------------------------------------------------------------------
+// SetFogOnHitAbAttr, slot gate: `move?.is("AttackMove")` and the active weather is not the weather to set. The first clause is the
+// engine class test, NOT the atom move.damaging (`category !== STATUS`): L1 found 9 moves where they differ (status moves whose data
+// category is Physical or Special: Whirlwind, Growl, Poison Gas, Flash, Splash, Nightmare, Captivate, Octolock, Decorate).
+//   Fog Machine (5606): Eerie fog.
+bindLegacyClosure(
+  5606,
+  0,
+  "The gate is 'the move is an attack (the AttackMove class) and the weather is not already up'. The library atom move.damaging asks category !== STATUS, which differs for 9 status moves with a Physical or Special data category (Splash, Whirlwind, Growl...). Needs an atom 'the move is an attack move' (R-B11-C4-08); the weather clause maps to not(field.weather).",
+  "gate",
+);
+
+// ---------------------------------------------------------------------------------------------------------------
+// SetTargetAbilityOnMoveAbAttr, slot gate: `move.id === moveId` = move.is-move. Temporal Rupture (5531): Roar of Time. The setting
+// `move` is read-only, so the move lives in the atom only.
+bindCondition(5531, 0, { id: "move.is-move", moveId: "ROAR_OF_TIME" }, "gate");
+
+// ---------------------------------------------------------------------------------------------------------------
+// SkipChargeTurnAbAttr, slot gate: any of the four charging tags is present on the holder. Accelerate (5205, attr 0).
+bindCondition(
+  5205,
+  0,
+  {
+    any: [
+      { id: "tag.has", who: "holder", tag: "CHARGING" },
+      { id: "tag.has", who: "holder", tag: "UNDERGROUND" },
+      { id: "tag.has", who: "holder", tag: "UNDERWATER" },
+      { id: "tag.has", who: "holder", tag: "FLYING" },
+    ],
+  },
+  "gate",
+);
+
+// ---------------------------------------------------------------------------------------------------------------
+// SpeedBonusToStatAbAttr, slot ctor:1, a PokemonAttackCondition called as (holder, null, move). With no filter the default test is
+// always true; with a contact filter it tests the move's RAW contact bit (`move.hasFlag(MAKES_CONTACT)`).
+//   Every move: Slipstream (5398 attrs 0, 1), Max Acceleration (5379 attrs 1, 2), Mach 3 (5635 attrs 2, 3), Sky Sovereign (20023 attrs
+//   1, 2), Power Core (5105 attrs 0, 1), Unstable Core (5721 attrs 0, 1), Sleek Scales (5731 attrs 0, 1).
+for (const [abilityId, attrIndexes] of [
+  [5398, [0, 1]],
+  [5379, [1, 2]],
+  [5635, [2, 3]],
+  [20023, [1, 2]],
+  [5105, [0, 1]],
+  [5721, [0, 1]],
+  [5731, [0, 1]],
+] as const) {
+  for (const attrIndex of attrIndexes) {
+    bindCondition(abilityId, attrIndex, { all: [] }, "ctor:1");
+  }
+}
+const RAW_CONTACT_REASON =
+  "The filter tests the move's RAW contact bit (move.hasFlag(MAKES_CONTACT)). The library atom move.flag asks doesFlagEffectApply (which also counts Long Reach, Punching Glove and substitutes) and needs the moveUser slot, which a stat calculation does not provide. Needs an atom 'the move has this property, plain' that needs only the move slot (R-B11-13 a, widened in R-B11-C4-07).";
+//   Contact moves only: Speed Force (5093 attrs 0, 1, 2), Juggernaut (5059 attr 0), Iron Giant (5386 attr 3), Sumo Guard (5637 attr 0),
+//   Blur (5510 attrs 0, 1).
+for (const [abilityId, attrIndexes] of [
+  [5093, [0, 1, 2]],
+  [5059, [0]],
+  [5386, [3]],
+  [5637, [0]],
+  [5510, [0, 1]],
+  // Moves that do NOT make contact: Terminal Velocity (5275 attrs 0, 1), Impulse (5274 attrs 0, 1), Elude (5511 attrs 0, 1).
+  [5275, [0, 1]],
+  [5274, [0, 1]],
+  [5511, [0, 1]],
+] as const) {
+  for (const attrIndex of attrIndexes) {
+    bindLegacyClosure(abilityId, attrIndex, RAW_CONTACT_REASON, "ctor:1");
+  }
+}

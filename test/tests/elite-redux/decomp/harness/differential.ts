@@ -30,6 +30,7 @@ import type { DeclModule } from "#data/elite-redux/ability-studio/define-decl";
 import type { ConditionNode } from "#data/elite-redux/ability-studio/vocabulary/composition-types";
 import { compileCondition } from "#data/elite-redux/ability-studio/vocabulary/evaluate/conditions";
 import type { ParamValues } from "#data/elite-redux/ability-studio/vocabulary/params";
+import { Stat } from "#enums/stat";
 import type { GameManager } from "#test/framework/game-manager";
 import { abilityFingerprint, attrFingerprint } from "#test/tests/elite-redux/decomp/fingerprint";
 import { BooleanHolder, NumberHolder } from "#utils/common";
@@ -284,6 +285,9 @@ function numberHolderValues(params: Record<string, unknown>): Record<string, num
   return out;
 }
 
+/** The stats a stat-value attr is asked about: every battle stat it may multiply or add to. */
+const STAT_VALUE_STATS: readonly number[] = [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD];
+
 export interface AttrCaseResult {
   readonly mismatches: AttrMismatch[];
   /** Sites skipped because no engine-parameter builder exists for their WHEN. */
@@ -310,6 +314,8 @@ export function runAttrDifferential(
     rebuilt: AbAttr;
     build: (ctx: ParamContext) => Record<string, unknown>;
     calc: boolean;
+    /** The stat being calculated (stat-value moments are tried once per battle stat). */
+    stat?: number;
   }[] = [];
   for (const site of sites) {
     const module = registry.get(site.className);
@@ -327,7 +333,14 @@ export function runAttrDifferential(
       noBuilder.push(site);
       continue;
     }
-    pairs.push({ site, module, rebuilt, build, calc: module.decl.when.startsWith("calc.") });
+    const calc = module.decl.when.startsWith("calc.");
+    if (module.decl.when === "calc.stat-value") {
+      for (const stat of STAT_VALUE_STATS) {
+        pairs.push({ site, module, rebuilt, build, calc, stat });
+      }
+    } else {
+      pairs.push({ site, module, rebuilt, build, calc });
+    }
   }
   let evaluations = 0;
   try {
@@ -336,7 +349,13 @@ export function runAttrDifferential(
       for (const move of gridMoves()) {
         for (const damage of [1, Math.max(1, Math.floor(world.holder.getMaxHp() / 10))]) {
           for (const pair of pairs) {
-            const ctx: ParamContext = { holder: world.holder, foe: world.foe, move, damage };
+            const ctx: ParamContext = {
+              holder: world.holder,
+              foe: world.foe,
+              move,
+              damage,
+              ...(pair.stat === undefined ? {} : { stat: pair.stat }),
+            };
             evaluations++;
             const say = (what: string, a: unknown, b: unknown): void => {
               if (mismatches.length < maxMismatches) {

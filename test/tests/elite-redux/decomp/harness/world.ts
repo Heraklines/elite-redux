@@ -313,6 +313,8 @@ export interface ParamContext {
   readonly move: Move;
   /** Damage dealt, for moments that carry it. */
   readonly damage: number;
+  /** The stat being calculated, for the stat-value moment (the differential tries every battle stat there). */
+  readonly stat?: number;
 }
 
 export type ParamBuilder = (ctx: ParamContext) => Record<string, unknown>;
@@ -346,6 +348,29 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     move,
     damage,
     hitResult: HitResult.EFFECTIVE,
+    simulated: false,
+  }),
+  // StatStageChangePhase passes pokemon, stats, stages and selfTarget to PostStatStageChangeAbAttr; here a drop of one stage.
+  "event.stat-changed": ({ holder }) => ({
+    pokemon: holder,
+    stats: [Stat.ATK],
+    stages: -1,
+    selfTarget: false,
+    simulated: false,
+  }),
+  // Pokemon.getEffectiveStat passes pokemon, stat, statVal, simulated and move to StatMultiplierAbAttr.
+  "calc.stat-value": ({ holder, move, stat }) => ({
+    pokemon: holder,
+    stat: stat ?? Stat.ATK,
+    statVal: new NumberHolder(100),
+    simulated: false,
+    move,
+  }),
+  // Never dispatched by the engine (PreAttackAbAttr is a base class); the same shape as the other attack-side moments.
+  "calc.outgoing-move": ({ holder, foe, move }) => ({
+    pokemon: holder,
+    opponent: foe,
+    move,
     simulated: false,
   }),
   "calc.damage-taken": ctx => ({

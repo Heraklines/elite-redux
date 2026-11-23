@@ -115,7 +115,11 @@ describe("L2 battle twin (live registry)", () => {
             // (ClassDecl.l2StaticReason): the original cannot be shown evaluating the attr there.
             const decl = declRegistry.get(attr.constructor.name)!.decl;
             const staticOnly = decl.l2StaticReason !== undefined && unreachedWhens()[decl.when] !== undefined;
-            if (getWhen(decl.when)?.dispatchKey != null && !staticOnly) {
+            // An ability with an ability-level condition (vanilla Solar Power and Sand Force only work in their weather) is dormant
+            // in a scenario whose weather axis does not satisfy it, so the original cannot be shown evaluating the attr there; the
+            // two battles are still compared as a whole (request R-B11-C4-09).
+            const dormantInWeather = scenario.axes.weather !== undefined && original.conditions.length > 0;
+            if (getWhen(decl.when)?.dispatchKey != null && !staticOnly && !dormantInWeather) {
               entry.attrs.push({ attrIndex: index, className: attr.constructor.name });
             }
             scenarios.set(key, entry);

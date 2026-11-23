@@ -16,6 +16,7 @@
 // =============================================================================
 
 import { ForceSwitchOutHelper, PostStatStageChangeAbAttr } from "#abilities/ab-attrs";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { SwitchType } from "#enums/switch-type";
 import type { PostStatStageChangeAbAttrParams } from "#types/ability-types";
 
@@ -33,7 +34,16 @@ const USED_KEY = "erTacticalRetreat.used";
 export class SelfSwitchOnStatLowerAbAttr extends PostStatStageChangeAbAttr {
   private readonly helper = new ForceSwitchOutHelper(SwitchType.SWITCH);
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostStatStageChangeAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole rule is the gate, there is no guard and no residual. */
   override canApply(params: PostStatStageChangeAbAttrParams): boolean {
+    return gatedCanApply<PostStatStageChangeAbAttrParams>(this, params);
+  }
+
+  /** The replaceable conditions, in the ORIGINAL order: not yet used in this battle, then a stat was lowered. */
+  public gate(params: PostStatStageChangeAbAttrParams): boolean {
     const { pokemon, stages } = params;
     // Any stat LOWERED (incl. self-drops, per the ROM). Once per battle.
     if (pokemon.waveData.entryEffectsFired.has(USED_KEY)) {

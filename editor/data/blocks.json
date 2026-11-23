@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "04130ca78ceaf7",
-  "hash": "16abdae49865a0",
+  "hash": "105492eb062d3e",
   "blocks": [
     {
       "id": "block.ally-faint-power-boost",
@@ -2197,6 +2197,602 @@
         "do": true
       },
       "uses": 6
+    },
+    {
+      "id": "block.self-highest-stat-multiplier",
+      "className": "SelfHighestStatMultiplierAbAttr",
+      "label": "Multiply the highest of my chosen stats",
+      "summary": "While my stats are worked out, the highest of Attack, Sp. Atk is multiplied by 1.5, if the condition holds. Example: x1.5 to my better attack in sun.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "best attacking stat",
+        "highest stat boost",
+        "strongest attack up",
+        "solar power",
+        "sand force",
+        "whiteout",
+        "weather attack boost"
+      ],
+      "examples": [
+        "Multiply my higher attacking stat by 1.5 in sun",
+        "Boost my best stat by 1.5 in a sandstorm"
+      ],
+      "params": [
+        {
+          "id": "candidates",
+          "label": "Which stats to compare (the highest of them is multiplied)",
+          "control": "select",
+          "default": "Attack, Sp. Atk",
+          "editable": true,
+          "options": [
+            "Attack, Defense, Sp. Atk, Sp. Def, Speed",
+            "Attack, Defense, Sp. Atk, Sp. Def",
+            "Attack, Defense, Sp. Atk, Speed",
+            "Attack, Defense, Sp. Def, Speed",
+            "Attack, Sp. Atk, Sp. Def, Speed",
+            "Defense, Sp. Atk, Sp. Def, Speed",
+            "Attack, Defense, Sp. Atk",
+            "Attack, Defense, Sp. Def",
+            "Attack, Sp. Atk, Sp. Def",
+            "Defense, Sp. Atk, Sp. Def",
+            "Attack, Defense, Speed",
+            "Attack, Sp. Atk, Speed",
+            "Defense, Sp. Atk, Speed",
+            "Attack, Sp. Def, Speed",
+            "Defense, Sp. Def, Speed",
+            "Sp. Atk, Sp. Def, Speed",
+            "Attack, Defense",
+            "Attack, Sp. Atk",
+            "Defense, Sp. Atk",
+            "Attack, Sp. Def",
+            "Defense, Sp. Def",
+            "Sp. Atk, Sp. Def",
+            "Attack, Speed",
+            "Defense, Speed",
+            "Sp. Atk, Speed",
+            "Sp. Def, Speed",
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Sp. Def",
+            "Speed"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Multiplier (1.5 = half as much again, 2 = double)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:1",
+          "lib": "field.weather",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only the highest stat of the list is multiplied; when two are equal the one listed first wins (Attack before Sp. Atk)",
+        "The highest stat is picked by the real stat value right now, before stat stages"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "candidates",
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 11
+    },
+    {
+      "id": "block.self-persistent-bleed",
+      "className": "SelfPersistentBleedAbAttr",
+      "label": "Start bleeding again at the end of the turn",
+      "summary": "At the end of every turn, if I am not bleeding, I start bleeding again (Rock and Ghost types cannot bleed). Example: a heal that cures the bleeding is undone at turn end.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "permanent bleed",
+        "always bleeding",
+        "reapply bleed",
+        "blood stain",
+        "keep bleeding",
+        "unremovable bleed"
+      ],
+      "examples": [
+        "Make this Pokemon bleed again at the end of every turn if it stopped",
+        "Always bleeding, even after a cure"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "tag.has",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Bleeding must be possible: Rock and Ghost types are immune, and so is a Pokemon that already has another Elite Redux major condition (Frostbite, Fear)",
+        "Never in a preview"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.self-switch-on-move-type",
+      "className": "SelfSwitchOnMoveTypeAbAttr",
+      "label": "Switch out after my attack of one type hits",
+      "summary": "After my damaging Ice-type move connects (on its last hit), I switch out, like U-turn. Example: every Ice move pivots me out.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "u-turn",
+        "pivot",
+        "switch after attacking",
+        "flip turn",
+        "hit and run",
+        "hollow ice zone"
+      ],
+      "examples": [
+        "Switch out after every Ice move I land",
+        "Pivot out after a Water attack"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Only after my move is this type",
+          "control": "select",
+          "default": "ICE",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.type",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Never in a preview",
+        "The hit must really connect: a move that is blocked or has no effect does not make me switch",
+        "Only after the last hit of a multi-hit move",
+        "The switch can fail like any switch (nothing to switch to, or something traps me)"
+      ],
+      "gateParams": [
+        {
+          "param": "type",
+          "block": "move.type",
+          "field": "type"
+        }
+      ],
+      "effect": {
+        "id": "effect.force-switch-out",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.self-switch-on-stat-lower",
+      "className": "SelfSwitchOnStatLowerAbAttr",
+      "label": "Switch out the first time one of my stats drops",
+      "summary": "The first time in a battle that one of my stats is lowered (even by my own move), I switch out. Example: an Intimidate drop sends me back to the party.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.stat-changed",
+      "whenLabel": "When one of my stats changes",
+      "synonyms": [
+        "eject button",
+        "tactical retreat",
+        "flee when stats drop",
+        "retreat on drop",
+        "pivot on stat drop",
+        "run away when lowered"
+      ],
+      "examples": [
+        "Switch out once per battle when a stat is lowered",
+        "Retreat the first time I get Intimidated"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "stage.just-changed",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Never in a preview",
+        "The switch can fail like any switch (nothing to switch to, or something traps me)"
+      ],
+      "effect": {
+        "id": "effect.force-switch-out",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.set-fog-on-hit",
+      "className": "SetFogOnHitAbAttr",
+      "label": "Set the weather when an attack hits me",
+      "summary": "When an attack hits me, the weather becomes Eerie fog for 8 turns, unless it already is. Example: Eerie fog for 8 turns, like Fog Machine.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "fog machine",
+        "weather on hit",
+        "summon weather when hit",
+        "eerie fog",
+        "set fog when attacked",
+        "sand spit"
+      ],
+      "examples": [
+        "Summon Eerie fog for 8 turns when an attack hits me",
+        "Make it rain whenever I am hit"
+      ],
+      "params": [
+        {
+          "id": "weather",
+          "label": "Weather to set",
+          "control": "select",
+          "default": "EERIE_FOG",
+          "editable": true,
+          "options": [
+            "SUNNY",
+            "RAIN",
+            "SANDSTORM",
+            "HAIL",
+            "SNOW",
+            "FOG",
+            "HEAVY_RAIN",
+            "HARSH_SUN",
+            "STRONG_WINDS",
+            "TEMPEST_STORM",
+            "SNOWY_WRATH",
+            "EERIE_FOG"
+          ]
+        },
+        {
+          "id": "turns",
+          "label": "How many turns the weather lasts (5 is the usual length)",
+          "control": "number",
+          "default": 8,
+          "editable": true,
+          "min": 1,
+          "max": 20,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Never in a preview",
+        "The weather must be allowed to change: a primal weather (Heavy Rain, Harsh Sun, Strong Winds) cannot be overwritten by an ordinary one",
+        "Items such as Damp Rock style extenders still add turns on top, as for every weather setter"
+      ],
+      "gateParams": [
+        {
+          "param": "weather",
+          "block": "field.weather",
+          "field": "weather"
+        }
+      ],
+      "effect": {
+        "id": "effect.set-weather",
+        "params": [
+          "weather",
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.set-target-ability-on-move",
+      "className": "SetTargetAbilityOnMoveAbAttr",
+      "label": "Change the target's ability after I use a chosen move",
+      "summary": "After I use Roar of time and it connects, the target's ability becomes Slow Start (like Entrainment). Example: Roar of Time gives the target Slow Start.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "entrainment",
+        "swap ability",
+        "give ability",
+        "replace target ability",
+        "temporal rupture",
+        "ability change"
+      ],
+      "examples": [
+        "After Roar of Time hits, the target gets Slow Start",
+        "Give the target a different ability after a chosen move"
+      ],
+      "params": [
+        {
+          "id": "move",
+          "label": "Move that triggers it (shown for information: change it in the condition block)",
+          "control": "text",
+          "default": "Roar of time",
+          "editable": false
+        },
+        {
+          "id": "ability",
+          "label": "Ability to give the target (type its name, for example Slow Start)",
+          "control": "text",
+          "default": "Slow Start",
+          "editable": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.is-move",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Never in a preview",
+        "The hit must really connect: a move that is blocked or has no effect changes nothing",
+        "Needs a living target that does not already have that ability"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "ability"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.skip-charge-turn",
+      "className": "SkipChargeTurnAbAttr",
+      "label": "End my charge-up turn right away",
+      "summary": "When I am in the first turn of a charging move (Solar Beam, Fly, Dig, Dive), the charge tags are removed so the move fires at once. Not used by the game yet: see the notes.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.outgoing-move",
+      "whenLabel": "Before I attack",
+      "synonyms": [
+        "power herb",
+        "skip charge",
+        "instant charge",
+        "no charge turn",
+        "accelerate",
+        "charge move in one turn"
+      ],
+      "examples": [
+        "Solar Beam fires on the first turn",
+        "Fly and Dig have no charge turn"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "tag.has",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Never in a preview"
+      ],
+      "effect": {
+        "id": "effect.remove-tag",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": false,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.speed-bonus-to-stat",
+      "className": "SpeedBonusToStatAbAttr",
+      "label": "Add a share of one of my stats to another",
+      "summary": "While my stats are worked out, 0.2 times my Speed is applied to my Attack (Add on top of the stat). Example: 0.2 of my Speed added to Attack.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "speed to attack",
+        "use speed instead of attack",
+        "add speed to damage",
+        "slipstream",
+        "speed force",
+        "impulse",
+        "stat substitute"
+      ],
+      "examples": [
+        "Add 20% of my Speed to my Attack",
+        "Use my Speed instead of my Defense when hit by contact moves"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat gets the bonus",
+          "control": "select",
+          "default": "Attack",
+          "editable": true,
+          "options": [
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Sp. Def",
+            "Speed",
+            "Accuracy",
+            "Evasion"
+          ]
+        },
+        {
+          "id": "source",
+          "label": "Which of my stats the bonus is taken from",
+          "control": "select",
+          "default": "Speed",
+          "editable": true,
+          "options": [
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Sp. Def",
+            "Speed"
+          ]
+        },
+        {
+          "id": "fraction",
+          "label": "Share of that stat (0.2 = 20%, 1 = all of it)",
+          "control": "number",
+          "default": 0.2,
+          "editable": true,
+          "min": 0.05,
+          "max": 4,
+          "step": 0.05
+        },
+        {
+          "id": "mode",
+          "label": "Add the share to the stat, or use it instead of the stat",
+          "control": "select",
+          "default": "Add on top of the stat",
+          "editable": true,
+          "options": [
+            "Add on top of the stat",
+            "Replace the stat"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:1",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The bonus is read from the stat as it is in battle right now, before stat stages and before a Choice Scarf",
+        "The share is rounded down to a whole number"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "stat",
+          "source",
+          "fraction",
+          "mode"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 28
     }
   ]
 }

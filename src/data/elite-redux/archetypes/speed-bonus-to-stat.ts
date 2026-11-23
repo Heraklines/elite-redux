@@ -27,6 +27,8 @@
 import { StatMultiplierAbAttr, type StatMultiplierAbAttrParams } from "#abilities/ab-attrs";
 import type { BattleStat, EffectiveStat } from "#enums/stat";
 import { Stat } from "#enums/stat";
+import type { Move } from "#moves/move";
+import type { PokemonAttackCondition } from "#types/ability-types";
 
 /** Filter shape — which moves trigger the speed bonus. */
 export interface SpeedBonusFilter {
@@ -66,6 +68,23 @@ export interface SpeedBonusToStatOptions {
   readonly replace?: boolean;
 }
 
+/** The move test of a {@linkcode SpeedBonusFilter}: true when the move passes (an empty filter passes every move). */
+function speedBonusFilterPasses(filter: SpeedBonusFilter, move: Move): boolean {
+  if (filter.category === "physical" && !move.is("AttackMove")) {
+    return false;
+  }
+  if (filter.category === "special" && !move.is("AttackMove")) {
+    return false;
+  }
+  if (filter.contact === "only" && !move.hasFlag(1 /* MoveFlags.MAKES_CONTACT */)) {
+    return false;
+  }
+  if (filter.contact === "non" && move.hasFlag(1 /* MoveFlags.MAKES_CONTACT */)) {
+    return false;
+  }
+  return true;
+}
+
 /**
  * Parameterized AbAttr implementing the `speed-bonus-to-stat` archetype.
  *
@@ -75,11 +94,20 @@ export interface SpeedBonusToStatOptions {
 export class SpeedBonusToStatAbAttr extends StatMultiplierAbAttr {
   private readonly bonusStat: BattleStat;
   private readonly speedFraction: number;
-  private readonly bonusFilter: SpeedBonusFilter;
   private readonly sourceStat: EffectiveStat;
   private readonly replace: boolean;
+  /**
+   * Which moves the bonus applies to, called as (holder, null, move); read by the ability studio. Always set: it is the
+   * constructor argument, or the move test of `options.filter` (see the constructor).
+   */
+  public readonly moveCondition: PokemonAttackCondition;
 
-  constructor(options: SpeedBonusToStatOptions) {
+  /**
+   * @param options - the stat, the share, the source stat, the mode and the move filter of the default condition
+   * @param condition - Which moves the bonus applies to. The default is the test of `options.filter` (no filter = every
+   *   move), so `new SpeedBonusToStatAbAttr({ ... })` behaves exactly as before; the ability studio hands in a replacement.
+   */
+  constructor(options: SpeedBonusToStatOptions, condition?: PokemonAttackCondition) {
     // Pass multiplier=1 to the parent so the base stat is unchanged; we add
     // the speed bonus in apply() instead.
     super(options.stat, 1);
@@ -88,9 +116,10 @@ export class SpeedBonusToStatAbAttr extends StatMultiplierAbAttr {
     }
     this.bonusStat = options.stat;
     this.speedFraction = options.speedFraction;
-    this.bonusFilter = options.filter ?? {};
     this.sourceStat = options.sourceStat ?? Stat.SPD;
     this.replace = options.replace ?? false;
+    const filter = options.filter ?? {};
+    this.moveCondition = condition ?? ((_user, _target, move) => speedBonusFilterPasses(filter, move));
   }
 
   override canApply(params: StatMultiplierAbAttrParams): boolean {
@@ -101,19 +130,8 @@ export class SpeedBonusToStatAbAttr extends StatMultiplierAbAttr {
     if (!move) {
       return true;
     }
-    if (this.bonusFilter.category === "physical" && !move.is("AttackMove")) {
-      return false;
-    }
-    if (this.bonusFilter.category === "special" && !move.is("AttackMove")) {
-      return false;
-    }
-    if (this.bonusFilter.contact === "only" && !move.hasFlag(1 /* MoveFlags.MAKES_CONTACT */)) {
-      return false;
-    }
-    if (this.bonusFilter.contact === "non" && move.hasFlag(1 /* MoveFlags.MAKES_CONTACT */)) {
-      return false;
-    }
-    return true;
+    // The move test (a condition the ability studio can replace), in its ORIGINAL position.
+    return this.moveCondition(params.pokemon, null, move);
   }
 
   override apply(params: StatMultiplierAbAttrParams): void {
