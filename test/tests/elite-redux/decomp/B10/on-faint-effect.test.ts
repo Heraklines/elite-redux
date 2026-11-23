@@ -13,8 +13,7 @@ import { globalScene } from "#app/global-scene";
 //     same canApply answer and the same side effects as the original for an attacker that is normal, a Ghost, fainted, or absent;
 //  3. the codec refuses text that is not one of the seven forms.
 import { allMoves } from "#data/data-lists";
-import { buildAttr, recomposeAttr } from "#data/elite-redux/ability-studio/build-attr";
-import { onFaintEffectCodec } from "#data/elite-redux/ability-studio/decl/B10/b10-codecs";
+import { buildAttr, readDeclParams } from "#data/elite-redux/ability-studio/build-attr";
 import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
 import type { DeclModule } from "#data/elite-redux/ability-studio/define-decl";
 import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
@@ -31,6 +30,7 @@ import { startWorld } from "#test/tests/elite-redux/decomp/harness/game";
 import { allAttrSites } from "#test/tests/elite-redux/decomp/harness/sites";
 import Phaser from "phaser";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { rebuildWithClassGate } from "./rebuild-with-class-gate";
 
 const module = declRegistry.get("OnFaintEffectAbAttr") as DeclModule;
 
@@ -47,7 +47,7 @@ const PAYLOADS: readonly { label: string; effect: object }[] = [
       kind: "attacker-battler-tag",
       tagType: BattlerTagType.CURSED,
       turns: 3,
-      excludeAttackerTypes: [PokemonType.GHOST, PokemonType.DARK],
+      excludeAttackerTypes: [PokemonType.DARK],
     },
   },
   {
@@ -78,30 +78,65 @@ describe("B10: do something when I faint (OnFaintEffectAbAttr)", () => {
   });
   const sitesOf = () => allAttrSites().filter(site => site.className === "OnFaintEffectAbAttr");
 
-  it("every payload kind survives text and back, and the rebuild equals the original", async () => {
+  it("every payload kind is read back as separate settings, and the rebuild equals the original", async () => {
     await startWorld(phaserGame);
     for (const { label, effect } of PAYLOADS) {
       const original = new OnFaintEffectAbAttr({ effect: effect as never });
-      const text = onFaintEffectCodec.fromInstance(effect);
-      expect(typeof text, label).toBe("string");
-      expect(onFaintEffectCodec.toCtor(text as string), `${label}: "${text}"`).toEqual(effect);
-      const rebuilt = buildAttr(module, { effect: text as string });
+      const params = readDeclParams(module, original as never);
+      expect(typeof params.kind, `${label}: the kind is a setting`).toBe("string");
+      const rebuilt: OnFaintEffectAbAttr = buildAttr(module, params, {
+        gate: ((p: unknown) => rebuilt.gate(p as never)) as never,
+      }) as unknown as OnFaintEffectAbAttr;
+      expect(rebuilt.getEffect(), label).toEqual(effect);
       expect(attrFingerprint(rebuilt as never), label).toEqual(attrFingerprint(original as never));
     }
   });
 
-  it("refuses text that is not one of the seven forms", async () => {
+  it("the settings are real numbers, types, stats and lists, not a sentence", async () => {
     await startWorld(phaserGame);
-    for (const text of [
-      "",
-      "Sing a song",
-      "Set the weather: Cloudy with meatballs",
-      "Set the weather: None",
-      "Hurt the Pokemon that knocked me out: lots",
-      "Change the stats of the Pokemon that knocked me out: Attack",
-      "Put a lasting effect on the Pokemon that knocked me out: Banana",
+    const ids = module.decl.params.map(param => param.id);
+    for (const id of [
+      "kind",
+      "weather",
+      "terrain",
+      "hurtPercent",
+      "hazard",
+      "layers",
+      "tag",
+      "turns",
+      "skipType",
+      "stat",
+      "stages",
+      "allyStages",
     ]) {
-      expect(() => onFaintEffectCodec.toCtor(text), text).toThrow();
+      expect(ids, id).toContain(id);
+    }
+    expect(module.decl.params.some(param => param.control === "text")).toBe(false);
+    const guilt = sitesOf().find(site => site.abilityName === "Guilt Trip") as never as { attr: never };
+    expect(readDeclParams(module, guilt.attr)).toMatchObject({
+      kind: "Change the stats of the Pokemon that knocked me out",
+      stat: "ATK",
+      stages: -2,
+      stat2: "SPATK",
+      stages2: -2,
+      allyStages: -1,
+      allyStages2: -1,
+    });
+  });
+
+  it("refuses settings that are not valid", async () => {
+    await startWorld(phaserGame);
+    const bad: Record<string, string | number>[] = [
+      { kind: "Sing a song" },
+      { kind: "Set the weather", weather: "Cloudy with meatballs" },
+      { kind: "Set the weather", weather: "NONE" },
+      { kind: "Hurt the Pokemon that knocked me out", hurtPercent: 0 },
+      { kind: "Hurt the Pokemon that knocked me out", hurtPercent: 400 },
+      { kind: "Change the stats of the Pokemon that knocked me out", stages: 0 },
+      { kind: "Put a lasting effect on the Pokemon that knocked me out", tag: "BANANA" },
+    ];
+    for (const params of bad) {
+      expect(() => buildAttr(module, params, { gate: (() => true) as never }), JSON.stringify(params)).toThrow();
     }
   });
 
@@ -112,7 +147,7 @@ describe("B10: do something when I faint (OnFaintEffectAbAttr)", () => {
       expect(names, name).toContain(name);
     }
     for (const site of sitesOf()) {
-      const rebuilt = recomposeAttr(module, site.attr, site.abilityId, site.attrIndex);
+      const rebuilt = rebuildWithClassGate(module, site.attr, site.abilityId, site.attrIndex);
       expect(rebuilt).not.toBe(site.attr);
       expect(attrFingerprint(rebuilt as never), site.abilityName).toEqual(attrFingerprint(site.attr as never));
     }
@@ -145,7 +180,7 @@ describe("B10: do something when I faint (OnFaintEffectAbAttr)", () => {
     ];
     for (const site of sitesOf()) {
       const original = site.attr as unknown as OnFaintEffectAbAttr;
-      const rebuilt = recomposeAttr(
+      const rebuilt = rebuildWithClassGate(
         module,
         site.attr,
         site.abilityId,

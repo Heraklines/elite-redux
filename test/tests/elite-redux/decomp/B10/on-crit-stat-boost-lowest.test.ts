@@ -10,7 +10,6 @@ import { globalScene } from "#app/global-scene";
 // driven here on the ORIGINAL and on its REBUILD: no crit means no trigger, a crit raises the n lowest stats (stable order, ties
 // keep Attack, Defense, Sp. Atk, Sp. Def, Speed), the second crit of the same turn is blocked, a preview does not use the turn up.
 import { allMoves } from "#data/data-lists";
-import { recomposeAttr } from "#data/elite-redux/ability-studio/build-attr";
 import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
 import type { DeclModule } from "#data/elite-redux/ability-studio/define-decl";
 import type { OnCritStatBoostLowestAbAttr } from "#data/elite-redux/archetypes/on-crit-stat-boost-lowest";
@@ -23,6 +22,7 @@ import { startWorld } from "#test/tests/elite-redux/decomp/harness/game";
 import { allAttrSites } from "#test/tests/elite-redux/decomp/harness/sites";
 import Phaser from "phaser";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { rebuildWithClassGate } from "./rebuild-with-class-gate";
 
 const module = declRegistry.get("OnCritStatBoostLowestAbAttr") as DeclModule;
 
@@ -66,14 +66,14 @@ describe("B10: crit boosts the lowest stats (OnCritStatBoostLowestAbAttr)", () =
     await startWorld(phaserGame);
     const sites = allAttrSites().filter(candidate => candidate.className === "OnCritStatBoostLowestAbAttr");
     expect(sites.map(candidate => candidate.abilityName)).toEqual(["Home Run"]);
-    const rebuilt = recomposeAttr(module, sites[0].attr, sites[0].abilityId, sites[0].attrIndex);
+    const rebuilt = rebuildWithClassGate(module, sites[0].attr, sites[0].abilityId, sites[0].attrIndex);
     expect(attrFingerprint(rebuilt as never)).toEqual(attrFingerprint(sites[0].attr as never));
   });
 
   it("original and rebuild trigger only on a crit, raise the three lowest stats in the same order, and only once per turn", async () => {
     const { holder, foe } = await startWorld(phaserGame);
     const original = site().attr as unknown as OnCritStatBoostLowestAbAttr;
-    const rebuilt = recomposeAttr(
+    const rebuilt = rebuildWithClassGate(
       module,
       site().attr,
       site().abilityId,
@@ -122,7 +122,7 @@ describe("B10: crit boosts the lowest stats (OnCritStatBoostLowestAbAttr)", () =
   it("the turn memory is shared by the original and the rebuild (one Symbol on the Pokemon), and a new turn frees it", async () => {
     const { holder, foe } = await startWorld(phaserGame);
     const original = site().attr as unknown as OnCritStatBoostLowestAbAttr;
-    const rebuilt = recomposeAttr(
+    const rebuilt = rebuildWithClassGate(
       module,
       site().attr,
       site().abilityId,

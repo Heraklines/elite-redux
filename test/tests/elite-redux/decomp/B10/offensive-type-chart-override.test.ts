@@ -9,8 +9,7 @@
 // behaviour. Every live user is rebuilt from the live declaration and compared with the original on `fire()` for every attack
 // type against every single and dual defender typing (including the same type twice), and the rule is checked against the
 // documented numbers (Ground Shock, Molten Down, Corrosion, the Psychic breaker with three rules).
-import { recomposeAttr } from "#data/elite-redux/ability-studio/build-attr";
-import { matchupRulesCodec } from "#data/elite-redux/ability-studio/decl/B10/b10-codecs";
+import { buildAttr, readDeclParams, recomposeAttr } from "#data/elite-redux/ability-studio/build-attr";
 import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
 import type { DeclModule } from "#data/elite-redux/ability-studio/define-decl";
 import type { OffensiveTypeChartOverrideAbAttr } from "#data/elite-redux/archetypes/offensive-type-chart-override";
@@ -64,13 +63,20 @@ describe("B10: offensive type chart override (OffensiveTypeChartOverrideAbAttr)"
   });
   const sitesOf = () => allAttrSites().filter(site => site.className === "OffensiveTypeChartOverrideAbAttr");
 
-  it("has the live users and one editable text param", async () => {
+  it("has the live users and separate settings for my type, the target types and the multiplier", async () => {
     await startWorld(phaserGame);
     const names = new Set(sitesOf().map(site => site.abilityName));
     for (const name of ["Ground Shock", "Molten Down", "Corrosion", "Draconic Might", "Draconize", "Trash Heap"]) {
       expect(names.has(name), `${name} is a live user`).toBe(true);
     }
-    expect(module.decl.params.map(param => param.id)).toEqual(["rules"]);
+    expect(module.decl.params.map(param => param.id)).toEqual([
+      "attackType",
+      "targetType",
+      "targetType2",
+      "targetType3",
+      "multiplier",
+    ]);
+    expect(module.decl.params.some(param => param.control === "text")).toBe(false);
   });
 
   it("the rebuild equals the original for every attack type against every single and dual typing", async () => {
@@ -128,20 +134,34 @@ describe("B10: offensive type chart override (OffensiveTypeChartOverrideAbAttr)"
     expect(fireOn(attrOf("Corrosion"), PokemonType.POISON, [PokemonType.STEEL])).toBe(2);
   });
 
-  it("the sentence codec round-trips every live rule list and rejects text it does not understand", async () => {
+  it("the settings read back from every live rule list, build the same rules, and refuse an empty target", async () => {
     await startWorld(phaserGame);
     for (const site of sitesOf()) {
       const rules = (site.attr as unknown as { getRules(): unknown }).getRules();
-      const text = matchupRulesCodec.fromInstance(rules);
-      expect(typeof text, site.abilityName).toBe("string");
-      expect(matchupRulesCodec.toCtor(text as string)).toEqual(rules);
+      const params = readDeclParams(module, site.attr);
+      expect(Object.keys(params).sort(), site.abilityName).toEqual(
+        ["attackType", "multiplier", "targetType", "targetType2", "targetType3"].sort(),
+      );
+      const rebuilt = buildAttr(module, params) as unknown as OffensiveTypeChartOverrideAbAttr;
+      expect(rebuilt.getRules(), site.abilityName).toEqual(rules);
     }
-    expect(matchupRulesCodec.toCtor("Poison > Steel = 2; fire > rock = 0.5")).toEqual([
-      { attackType: PokemonType.POISON, defenderType: PokemonType.STEEL, newMultiplier: 2 },
+    const corrupted = sitesOf().find(site => site.abilityName === "Corrupted Mind") as never as { attr: never };
+    expect(readDeclParams(module, corrupted.attr)).toMatchObject({
+      attackType: "PSYCHIC",
+      targetType: "STEEL",
+      targetType2: "PSYCHIC",
+      targetType3: "DARK",
+      multiplier: 1,
+    });
+    const built = buildAttr(module, {
+      attackType: "FIRE",
+      targetType: "ROCK",
+      multiplier: 0.5,
+    }) as unknown as OffensiveTypeChartOverrideAbAttr;
+    expect(built.getRules()).toEqual([
       { attackType: PokemonType.FIRE, defenderType: PokemonType.ROCK, newMultiplier: 0.5 },
     ]);
-    expect(() => matchupRulesCodec.toCtor("")).toThrow();
-    expect(() => matchupRulesCodec.toCtor("Poison to Steel")).toThrow();
-    expect(() => matchupRulesCodec.toCtor("Poisonous > Steel = 2")).toThrow();
+    expect(() => buildAttr(module, { attackType: "FIRE", targetType: "NONE", multiplier: 2 })).toThrow();
+    expect(() => buildAttr(module, { attackType: "FIRE", targetType: "ROCK", multiplier: 9 })).toThrow();
   });
 });

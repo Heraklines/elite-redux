@@ -88,8 +88,14 @@ export function buildAttr(
     args[Number(index)] = value;
   }
   let spread: { index: number; list: unknown[] } | undefined;
+  const assembled = decl.assembleCtorArg;
+  const withDefaults: Record<string, string | number | boolean> = {};
   for (const param of decl.params) {
     const value = params[param.id] ?? param.default;
+    withDefaults[param.id] = value;
+    if (assembled !== undefined && param.ctorIndex === assembled.index) {
+      continue;
+    }
     const ctorValue = param.codec === undefined ? value : param.codec.toCtor(value);
     if (param.ctorOption !== undefined) {
       const bag = (args[param.ctorIndex] ??= {}) as Record<string, unknown>;
@@ -99,6 +105,9 @@ export function buildAttr(
     } else {
       args[param.ctorIndex] = ctorValue;
     }
+  }
+  if (assembled !== undefined) {
+    args[assembled.index] = assembled.build(withDefaults);
   }
   let gate: Closure | undefined;
   let gateCommit: ((params: never) => void) | undefined;

@@ -8,14 +8,19 @@
 //
 // Chunk 1 of 5 (NullifyFirstNHitsAbAttr, IgnoreResistancesAbAttr, OffensiveTypeChartOverrideAbAttr, OnCritStatBoostLowestAbAttr,
 // OnFaintEffectAbAttr, OnOpponentStatRaiseAbAttr, OnOpponentStatRaiseScriptedMoveAbAttr, OnOpponentSwitchOutAbAttr):
-// there is nothing to bind, and that was checked class by class, not assumed:
-//  - none of them takes a constructor closure (NullifyFirstNHits hands the parent `() => true` itself, and its own two
-//    arguments are a number and a test seam);
-//  - none has a gate inside canApply that the library has to replace (Tier C: the whole rule is one piece);
-//  - the only closure in any user is the attr-level holder condition that Draconize and Draconic Might add to an
-//    OffensiveTypeChartOverrideAbAttr with `addCondition`; `recomposeAttr` copies it onto the rebuild, so it is not a
-//    constructor slot.
+// none of them takes a constructor closure (NullifyFirstNHits hands the parent `() => true` itself). Three of them are Tier B and have
+// a gate slot, bound below by hand after reading each class and every user; the other five have nothing to bind (checked class by
+// class): Ignore resistances is a flag, the type-chart class and the two scripted-move classes are Tier C, and Egoist has no condition.
+// The only closure in any user of the type-chart class is the attr-level holder condition that Draconize and Draconic Might add with
+// `addCondition`; `recomposeAttr` copies it onto the rebuild, so it is not a constructor slot.
 //
+// The three gates are legacy on purpose: each needs a library atom that does not exist yet (requests in requests/B10.md), and a
+// bound atom that tests something else would be a lie.
+//  - NullifyFirstNHits: `used(pokemon) < n`, the per-battle counter of hits already cancelled (R-B10-01 time.hits-taken-this-battle).
+//  - OnCritStatBoostLowest: once per turn (R-B10-05) and "the target's first hit this turn was critical" (R-B10-04).
+//  - OnFaintEffect: the clauses about the Pokemon that knocked me out, "it is still standing" (R-B10-c1-05 mon.is-standing), for
+//    the curse also "it is not of the skipped type" (mon.has-type, who other, which exists) and for the PP drain "the move was a
+//    damaging move" (move.damaging, which exists).
 // Chunk 2 of 5 binds the Tier B gates (slot "gate") of OncePerEntryContactDamageReductionAbAttr, OneShotTypeBoostAbAttr,
 // OneShotTypeBoostFollowupAbAttr, PassiveRecoveryAbAttr and PoisonedFoePurgeAbAttr, written by hand after reading each class and its live users. The other three classes of the chunk are Tier C
 // and have nothing to bind: OutgoingStatDropMultiplierAbAttr,
@@ -26,6 +31,29 @@
 // difference; the B10 test chunk2-gates.test.ts adds the states the grid does not have (fog, terrains, types, poison).
 // Later chunks of B10 add their bindings below this comment.
 import { bindCondition, bindLegacyClosure } from "#data/elite-redux/ability-studio/bindings";
+
+// =============================================================================================
+// Chunk 1 gates (Tier B, all legacy until the requested atoms exist).
+// =============================================================================================
+const HITS_COUNTER =
+  "Fewer than n hits cancelled so far in this battle: the count lives in the class's own per-Pokemon, per-battle memory and the library has no atom that reads it, request R-B10-01 in requests/B10.md";
+bindLegacyClosure(5163, 0, HITS_COUNTER, "gate"); // Cheating Death: the first 2 hits
+bindLegacyClosure(5292, 0, HITS_COUNTER, "gate"); // Gallantry: the first hit
+
+bindLegacyClosure(
+  5615,
+  0,
+  "Once per turn (the class's own turn flag on the Pokemon) AND the target's first hit this turn was a critical hit: the library has neither a shared once-per-turn memory nor a was-critical atom, requests R-B10-05 and R-B10-04 in requests/B10.md",
+  "gate",
+); // Home Run
+
+const KNOCKER_STANDING =
+  "The Pokemon that knocked me out is still standing (and, for the curse, is not of the skipped type): the library has no is-still-standing atom for the other Pokemon, request R-B10-c1-05 in requests/B10.md";
+bindLegacyClosure(5073, 0, KNOCKER_STANDING, "gate"); // Haunted Spirit: curse unless Ghost
+bindLegacyClosure(5283, 0, KNOCKER_STANDING, "gate"); // Vengeful Spirit: curse unless Ghost
+bindLegacyClosure(5280, 0, KNOCKER_STANDING, "gate"); // Guilt Trip: attacker still standing
+bindLegacyClosure(5285, 0, KNOCKER_STANDING, "gate"); // Ill Will: attacker standing and the move was damaging
+bindLegacyClosure(6095, 0, KNOCKER_STANDING, "gate"); // Cursed Spirit: attacker standing and the move was damaging
 
 // =============================================================================================
 // OncePerEntryContactDamageReductionAbAttr (Tier B). Slot "gate" = the parent's closure = move.doesFlagEffectApply(MAKES_CONTACT,

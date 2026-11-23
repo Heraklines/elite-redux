@@ -15,12 +15,14 @@
 // The inherited StatStageChangeCopyAbAttr.apply is NOT called, so no stat is copied. No random draw. The move never misses and
 // does not make the holder recharge (the dex says the triggered Hyper Beam "has no recharge period").
 //
+// The move and its power are two settings (the move, and an optional power with 0 = the move's own power, no `power` key),
+// built into `{ moveId }` or `{ moveId, power }` by `assembleCtorArg`.
+//
 // Why a package: the library effect "Use a move" needs the foe that caused the trigger (slot `other`), but this moment provides
 // only the stat and the stages, and the class aims at the first living foe instead (request R-B10-12 in requests/B10.md).
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 import { OnOpponentStatRaiseScriptedMoveAbAttr } from "#data/elite-redux/archetypes/on-opponent-stat-raise";
-import { MoveId } from "#enums/move-id";
-import { scriptedMoveCodec } from "./b10-codecs";
+import { buildScriptedMove, scriptedMoveIdCodec, scriptedMovePowerCodec } from "./b10-codecs";
 
 export default defineDecl(OnOpponentStatRaiseScriptedMoveAbAttr, {
   tier: "C",
@@ -28,21 +30,38 @@ export default defineDecl(OnOpponentStatRaiseScriptedMoveAbAttr, {
   when: "event.foe-raised-stat",
   label: "Strike back with a move when a foe raises a stat",
   summary: params =>
-    `When a foe raises a stat, I use the move ${params.move} on a foe at once. It never misses and has no recharge. Example: a 150 power Hyper Beam.`,
+    `When a foe raises a stat, I use ${params.moveId} on a foe at once${Number(params.power) > 0 ? ` with ${params.power} power` : " at the move's own power"}. It never misses and has no recharge. Example: Hyper Beam with 150 power.`,
   synonyms: ["retribution blow", "punish stat boosts", "counter boosts", "answer a boost", "free attack on boost"],
   examples: ["When the opposing Pokemon boosts its stats, I fire a 150 power Hyper Beam at it, like Retribution Blow"],
   params: [
     {
-      id: "move",
+      id: "moveId",
       ctorIndex: 0,
+      ctorOption: "moveId",
       path: "opts",
       control: "text",
-      label: "Move to use, with its power if you want to change it (for example: Hyper Beam at 150 power)",
+      label: "Move to use (type its name, for example Hyper Beam)",
       editable: true,
-      default: "Hyper Beam at 150 power",
-      codec: scriptedMoveCodec(MoveId),
+      default: "HYPER_BEAM",
+      codec: scriptedMoveIdCodec,
+    },
+    {
+      id: "power",
+      ctorIndex: 0,
+      ctorOption: "power",
+      path: "opts",
+      control: "number",
+      min: 0,
+      max: 250,
+      step: 1,
+      integer: true,
+      label: "Power of the move (0 = the move's own power)",
+      editable: true,
+      default: 150,
+      codec: scriptedMovePowerCodec,
     },
   ],
+  assembleCtorArg: { index: 0, build: buildScriptedMove },
   conditions: [],
   guards: [],
   feasibility: [
@@ -51,11 +70,11 @@ export default defineDecl(OnOpponentStatRaiseScriptedMoveAbAttr, {
     "The move is a free extra move: it uses no PP, never misses and leaves me with no recharge turn",
     "Nothing happens in a preview",
   ],
-  effect: { id: "effect.package", params: ["move"] },
+  effect: { id: "effect.package", params: ["moveId", "power"] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "none", simulated: "respects" },
   probes: [{ name: "a foe raises a stat", axes: {} }],
   status: "decomposed",
   notes:
-    "Package, justified (see the header). Only user: Retribution Blow (Hyper Beam at 150 power), nothing to bind. Oddity, not fixed: unlike its switch-out sibling this attr never checks that the holder is still standing. The move name is typed as text because the move list has hundreds of entries; the codec rejects a name that is not a move.",
+    "Package, justified (see the header): the library 'Use a move' needs the foe that raised the stat (slot other), which this moment does not provide, and the class aims at the first living foe (R-B10-12). The move and the power are separate settings now (power 0 = the move's own power). Only user: Retribution Blow (Hyper Beam with 150 power), nothing to bind. Oddity, not fixed: unlike its switch-out sibling this attr never checks that the holder is still standing. The move name is typed as text because the move list has hundreds of entries; an unknown name is refused.",
 });

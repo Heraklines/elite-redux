@@ -11,8 +11,7 @@ import { globalScene } from "#app/global-scene";
 // is rebuilt from its declaration and driven next to the original: the queued MovePhase (user, target, move id, real power,
 // use mode) must be identical, and so must every guard (fainted foe, no foe, simulated).
 import { allMoves } from "#data/data-lists";
-import { recomposeAttr } from "#data/elite-redux/ability-studio/build-attr";
-import { scriptedMoveCodec } from "#data/elite-redux/ability-studio/decl/B10/b10-codecs";
+import { buildAttr, readDeclParams, recomposeAttr } from "#data/elite-redux/ability-studio/build-attr";
 import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
 import type { DeclModule } from "#data/elite-redux/ability-studio/define-decl";
 import type { OnOpponentStatRaiseScriptedMoveAbAttr } from "#data/elite-redux/archetypes/on-opponent-stat-raise";
@@ -99,16 +98,34 @@ describe("B10: strike a foe as it switches out (OnOpponentSwitchOutAbAttr)", () 
     expect(powers.Tag).toBe(allMoves[MoveId.PURSUIT].power);
   });
 
-  it("the move sentence round-trips and refuses nonsense", async () => {
+  it("the move and its power are two separate settings, and a missing power has no power key at all", async () => {
     await startWorld(phaserGame);
-    const codec = scriptedMoveCodec(MoveId as never);
-    expect(codec.toCtor("Pursuit")).toEqual({ moveId: MoveId.PURSUIT });
-    expect(codec.toCtor("pursuit at 20 power")).toEqual({ moveId: MoveId.PURSUIT, power: 20 });
-    expect(codec.toCtor("HYPER_BEAM at 150 power")).toEqual({ moveId: MoveId.HYPER_BEAM, power: 150 });
-    expect(codec.fromInstance({ moveId: MoveId.PURSUIT })).toBe("Pursuit");
-    expect(codec.fromInstance({ moveId: MoveId.PURSUIT, power: 20 })).toBe("Pursuit at 20 power");
-    expect(() => codec.toCtor("Pursuit at lots")).toThrow();
-    expect(() => codec.toCtor("Not a move")).toThrow();
+    for (const module of [switchModule, strikeModule]) {
+      expect(module.decl.params.map(param => param.id)).toEqual(["moveId", "power"]);
+      expect(module.decl.params.find(param => param.id === "power")?.control).toBe("number");
+    }
+    const sniper = allAttrSites().find(
+      site => site.abilityName === "Super Sniper" && site.className === "OnOpponentSwitchOutAbAttr",
+    )!;
+    const tag = allAttrSites().find(
+      site => site.abilityName === "Tag" && site.className === "OnOpponentSwitchOutAbAttr",
+    )!;
+    const blow = allAttrSites().find(site => site.className === "OnOpponentStatRaiseScriptedMoveAbAttr")!;
+    expect(readDeclParams(switchModule, sniper.attr)).toEqual({ moveId: "PURSUIT", power: 20 });
+    expect(readDeclParams(switchModule, tag.attr)).toEqual({ moveId: "PURSUIT", power: 0 });
+    expect(readDeclParams(strikeModule, blow.attr)).toEqual({ moveId: "HYPER_BEAM", power: 150 });
+    const opts = (attr: unknown): unknown => (attr as { opts: unknown }).opts;
+    expect(opts(buildAttr(switchModule, { moveId: "PURSUIT", power: 0 }))).toEqual({ moveId: MoveId.PURSUIT });
+    expect(opts(buildAttr(switchModule, { moveId: "pursuit", power: 20 }))).toEqual({
+      moveId: MoveId.PURSUIT,
+      power: 20,
+    });
+    expect(opts(buildAttr(strikeModule, { moveId: "Hyper Beam", power: 150 }))).toEqual({
+      moveId: MoveId.HYPER_BEAM,
+      power: 150,
+    });
+    expect(() => buildAttr(switchModule, { moveId: "Not a move", power: 0 })).toThrow();
+    expect(() => buildAttr(switchModule, { moveId: "PURSUIT", power: 999 })).toThrow();
   });
 });
 

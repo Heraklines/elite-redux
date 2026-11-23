@@ -91,6 +91,17 @@ export interface DeclParam {
   readonly spread?: boolean;
 }
 
+/**
+ * For a constructor argument that is ONE structured object (a list of matchup rules, one of several effect payloads, an
+ * options object whose optional key must be absent rather than undefined). Every param with this `ctorIndex` is left out of
+ * the per-param loop of `buildAttr`; `build` receives all param values (defaults filled in) and returns the whole argument.
+ * The params still declare `path` and a codec each, so `readDeclParams` reads every one of them back from the live object.
+ */
+export interface AssembledCtorArg {
+  readonly index: number;
+  readonly build: (params: ParamValues) => unknown;
+}
+
 export interface DeclCondition {
   /** `ctor:N` (constructor closure), or `gate` (Tier B: the gate slot of the gate/residual split). */
   readonly slot: string;
@@ -170,6 +181,8 @@ export interface ClassDecl {
   readonly branches?: readonly DeclBranch[] | undefined;
   readonly reusableAlone: { readonly when: boolean; readonly if: boolean; readonly do: boolean };
   readonly flags: DeclFlags;
+  /** See {@linkcode AssembledCtorArg}. */
+  readonly assembleCtorArg?: AssembledCtorArg | undefined;
   /** Constructor arguments that are never exposed (for example `showAbility`), by index. */
   readonly fixedCtorArgs?: Readonly<Record<number, unknown>> | undefined;
   readonly provides?: readonly SlotId[] | undefined;

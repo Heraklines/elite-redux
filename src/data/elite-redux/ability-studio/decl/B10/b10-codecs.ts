@@ -5,18 +5,17 @@
  */
 
 import { playerName } from "#data/elite-redux/ability-studio/decl-naming";
-// Hand-written text codecs for the B10 declarations whose constructor takes a structured object (a list of type
-// matchup rules, one of seven "when I faint" effects). Staff see and type plain words ("Poison > Steel = 2",
-// "Set the weather: Sandstorm"); the codec turns that sentence into the object the class wants and back.
-//
-// Why a sentence and not several params: a declared param fills ONE constructor slot (or one key of an options
-// object), and these classes read ONE object (`{ rules }`, `{ effect }`). The sentence is the smallest honest
-// way to let staff edit it without changing the class. Every parser throws a plain-language error for text it does
-// not understand, so a typo never builds a half-formed attr.
+// Hand-written codecs and constructor-argument builders for the B10 declarations. Several classes take ONE structured
+// object (a list of type matchup rules, one of seven "when I faint" payloads, `{ moveId, power? }`). Staff edit every
+// field as its own setting (a type, a number of percent, a stat, a number of stages); the `build...` functions below turn
+// the settings into the object the class wants (declared as `assembleCtorArg`), and each setting's codec reads its value
+// back out of a live instance. Nothing is parsed from free text: an unknown name throws a plain-language error.
 import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
+import type { ParamValue, ParamValues } from "#data/elite-redux/ability-studio/vocabulary/params";
 import { TerrainType } from "#data/terrain";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
@@ -53,247 +52,6 @@ function memberNameOf(table: EnumTable, raw: unknown): string | undefined {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// Type matchup rules: "Poison > Steel = 2; Fire > Rock = 2"
-
-/** One matchup rule as the class stores it (OffensiveTypeChartRule). */
-interface MatchupRule {
-  readonly attackType: PokemonType;
-  readonly defenderType: PokemonType;
-  readonly newMultiplier: number;
-}
-
-const RULE = /^\s*([A-Za-z_ ]+?)\s*>\s*([A-Za-z_ ]+?)\s*=\s*(\d+(?:\.\d+)?)\s*$/;
-
-export const matchupRulesCodec: ParamCodec = {
-  toCtor: value => {
-    const parts = String(value)
-      .split(";")
-      .filter(part => part.trim().length > 0);
-    if (parts.length === 0) {
-      throw new Error("Write at least one matchup, for example: Poison > Steel = 2");
-    }
-    return parts.map((part): MatchupRule => {
-      const match = RULE.exec(part);
-      if (match === null) {
-        throw new Error(`"${part.trim()}" is not a matchup; write it like: Poison > Steel = 2`);
-      }
-      const attackName = nameFromWord(PokemonType, match[1], "type");
-      const defenderName = nameFromWord(PokemonType, match[2], "type");
-      return {
-        attackType: PokemonType[attackName as keyof typeof PokemonType],
-        defenderType: PokemonType[defenderName as keyof typeof PokemonType],
-        newMultiplier: Number(match[3]),
-      };
-    });
-  },
-  fromInstance: raw => {
-    if (!Array.isArray(raw) || raw.length === 0) {
-      return;
-    }
-    const parts: string[] = [];
-    for (const rule of raw as MatchupRule[]) {
-      const attack = memberNameOf(PokemonType, rule.attackType);
-      const defender = memberNameOf(PokemonType, rule.defenderType);
-      if (attack === undefined || defender === undefined) {
-        return;
-      }
-      parts.push(`${wordOf(attack)} > ${wordOf(defender)} = ${rule.newMultiplier}`);
-    }
-    return parts.join("; ");
-  },
-};
-
-// ---------------------------------------------------------------------------------------------------------------
-// The seven "when I faint" effects (OnFaintEffect)
-
-const BATTLE_STATS = {
-  ATK: Stat.ATK,
-  DEF: Stat.DEF,
-  SPATK: Stat.SPATK,
-  SPDEF: Stat.SPDEF,
-  SPD: Stat.SPD,
-  ACC: Stat.ACC,
-  EVA: Stat.EVA,
-};
-const WEATHER_NAMES = memberNames(WeatherType).filter(name => name !== "NONE");
-
-interface StatChange {
-  readonly stat: number;
-  readonly stages: number;
-}
-
-function statChangesText(changes: readonly StatChange[]): string {
-  return changes
-    .map(change => {
-      const name = memberNameOf(BATTLE_STATS, change.stat) ?? "?";
-      return `${wordOf(name)} ${change.stages > 0 ? "+" : ""}${change.stages}`;
-    })
-    .join(", ");
-}
-
-function parseStatChanges(text: string): StatChange[] {
-  return text
-    .split(",")
-    .filter(part => part.trim().length > 0)
-    .map(part => {
-      const match = /^\s*(.+?)\s*([+-]\d+)\s*$/.exec(part);
-      if (match === null) {
-        throw new Error(`"${part.trim()}" is not a stat change; write it like: Attack -2`);
-      }
-      const name = nameFromWord(BATTLE_STATS, match[1], "stat");
-      return { stat: BATTLE_STATS[name as keyof typeof BATTLE_STATS], stages: Number(match[2]) };
-    });
-}
-
-const PREFIX = {
-  weather: "Set the weather: ",
-  terrain: "Set the terrain: ",
-  damage: "Hurt the Pokemon that knocked me out: ",
-  hazard: "Set a hazard on the foe's side: ",
-  tag: "Put a lasting effect on the Pokemon that knocked me out: ",
-  stats: "Change the stats of the Pokemon that knocked me out: ",
-  pp: "Drain the PP of the move that knocked me out",
-} as const;
-
-/** Effect object as the class stores it (a loose view of OnFaintEffect: the codec checks each kind itself). */
-interface LooseEffect {
-  readonly kind: string;
-  readonly weather?: number;
-  readonly terrain?: number;
-  readonly maxHpFraction?: number;
-  readonly hazard?: string;
-  readonly layers?: number;
-  readonly tagType?: string;
-  readonly turns?: number;
-  readonly excludeAttackerTypes?: readonly number[];
-  readonly stats?: readonly StatChange[];
-  readonly allyStats?: readonly StatChange[];
-}
-
-export const onFaintEffectCodec: ParamCodec = {
-  toCtor: value => {
-    const text = String(value).trim();
-    if (text === PREFIX.pp) {
-      return { kind: "attacker-pp-drain" };
-    }
-    if (text.startsWith(PREFIX.weather)) {
-      const name = nameFromWord(WeatherType, text.slice(PREFIX.weather.length), "weather");
-      if (!WEATHER_NAMES.includes(name)) {
-        throw new Error("Pick a real weather");
-      }
-      return { kind: "set-weather", weather: WeatherType[name as keyof typeof WeatherType] };
-    }
-    if (text.startsWith(PREFIX.terrain)) {
-      const name = nameFromWord(TerrainType, text.slice(PREFIX.terrain.length), "terrain");
-      return { kind: "set-terrain", terrain: TerrainType[name as keyof typeof TerrainType] };
-    }
-    if (text.startsWith(PREFIX.damage)) {
-      const match = /^(\d+(?:\.\d+)?)%\s+of\s+its\s+max\s+HP$/.exec(text.slice(PREFIX.damage.length).trim());
-      if (match === null) {
-        throw new Error("Write the damage like: 25% of its max HP");
-      }
-      return { kind: "attacker-damage-flat", maxHpFraction: Number(match[1]) / 100 };
-    }
-    if (text.startsWith(PREFIX.hazard)) {
-      const match = /^(.+?)(?:\s+x(\d+))?$/.exec(text.slice(PREFIX.hazard.length).trim());
-      if (match === null) {
-        throw new Error("Write the hazard like: Stealth rock x1");
-      }
-      const name = nameFromWord(ArenaTagType, match[1], "hazard");
-      const hazard = ArenaTagType[name as keyof typeof ArenaTagType];
-      return match[2] === undefined
-        ? { kind: "set-hazard", hazard }
-        : { kind: "set-hazard", hazard, layers: Number(match[2]) };
-    }
-    if (text.startsWith(PREFIX.tag)) {
-      const match = /^(.+?)(?:\s+for\s+(\d+)\s+turns)?(?:,\s*not\s+against\s+(.+))?$/.exec(
-        text.slice(PREFIX.tag.length).trim(),
-      );
-      if (match === null) {
-        throw new Error("Write the effect like: Cursed, or Cursed for 3 turns, not against Ghost");
-      }
-      const name = nameFromWord(BattlerTagType, match[1], "lasting effect");
-      // A part that is not written stays absent, so an effect built without it equals the original (no turns key, no list).
-      const effect: Record<string, unknown> = {
-        kind: "attacker-battler-tag",
-        tagType: BattlerTagType[name as keyof typeof BattlerTagType],
-      };
-      if (match[2] !== undefined) {
-        effect.turns = Number(match[2]);
-      }
-      if (match[3] !== undefined) {
-        effect.excludeAttackerTypes = match[3]
-          .split("/")
-          .filter(part => part.trim().length > 0)
-          .map(part => PokemonType[nameFromWord(PokemonType, part, "type") as keyof typeof PokemonType]);
-      }
-      return effect;
-    }
-    if (text.startsWith(PREFIX.stats)) {
-      const [own, allies] = text.slice(PREFIX.stats.length).split(/;\s*its allies:\s*/);
-      const stats = parseStatChanges(own);
-      return allies === undefined
-        ? { kind: "attacker-stat-change", stats }
-        : { kind: "attacker-stat-change", stats, allyStats: parseStatChanges(allies) };
-    }
-    throw new Error(`"${text}" is not one of the faint effects; start it like "${PREFIX.weather}Sandstorm"`);
-  },
-  fromInstance: raw => {
-    const effect = raw as LooseEffect | undefined;
-    if (effect === undefined || effect === null) {
-      return;
-    }
-    switch (effect.kind) {
-      case "attacker-pp-drain":
-        return PREFIX.pp;
-      case "set-weather": {
-        const name = memberNameOf(WeatherType, effect.weather);
-        return name === undefined ? undefined : `${PREFIX.weather}${wordOf(name)}`;
-      }
-      case "set-terrain": {
-        const name = memberNameOf(TerrainType, effect.terrain);
-        return name === undefined ? undefined : `${PREFIX.terrain}${wordOf(name)}`;
-      }
-      case "attacker-damage-flat":
-        return effect.maxHpFraction === undefined
-          ? undefined
-          : `${PREFIX.damage}${Number((effect.maxHpFraction * 100).toFixed(4))}% of its max HP`;
-      case "set-hazard": {
-        const name = memberNameOf(ArenaTagType, effect.hazard);
-        return name === undefined
-          ? undefined
-          : `${PREFIX.hazard}${wordOf(name)}${effect.layers === undefined ? "" : ` x${effect.layers}`}`;
-      }
-      case "attacker-battler-tag": {
-        const name = memberNameOf(BattlerTagType, effect.tagType);
-        if (name === undefined) {
-          return;
-        }
-        const excluded = (effect.excludeAttackerTypes ?? []).map(type => {
-          const typeName = memberNameOf(PokemonType, type);
-          return typeName === undefined ? "?" : wordOf(typeName);
-        });
-        const turns = effect.turns === undefined ? "" : ` for ${effect.turns} turns`;
-        const tail = excluded.length === 0 ? "" : `, not against ${excluded.join("/")}`;
-        return `${PREFIX.tag}${wordOf(name)}${turns}${tail}`;
-      }
-      case "attacker-stat-change": {
-        if (effect.stats === undefined) {
-          return;
-        }
-        const allies =
-          effect.allyStats === undefined || effect.allyStats.length === 0
-            ? ""
-            : `; its allies: ${statChangesText(effect.allyStats)}`;
-        return `${PREFIX.stats}${statChangesText(effect.stats)}${allies}`;
-      }
-      default:
-        return;
-    }
-  },
-};
-
-// ---------------------------------------------------------------------------------------------------------------
 // Options-object helpers: the class keeps `{ n, stages }` or `{ moveId, power }` in ONE private field, so the declared
 // path reads that object and the codec picks its key back out.
 
@@ -304,33 +62,6 @@ export function optionNumber(key: string): ParamCodec {
     fromInstance: raw => {
       const value = (raw as Record<string, unknown> | undefined)?.[key];
       return typeof value === "number" ? value : undefined;
-    },
-  };
-}
-
-/**
- * The scripted move of a constructor `{ moveId, power? }` as one sentence: "Pursuit" or "Pursuit at 20 power". One param
- * builds the whole options object, so a move without a power override has no `power` key at all (a separate power param
- * would add the key as undefined and the rebuilt attr would not equal the original).
- */
-export function scriptedMoveCodec(moves: EnumTable): ParamCodec {
-  return {
-    toCtor: value => {
-      const match = /^(.+?)(?:\s+at\s+(\d+)\s+power)?$/.exec(String(value).trim());
-      if (match === null) {
-        throw new Error("Write the move like: Pursuit, or Pursuit at 20 power");
-      }
-      const name = nameFromWord(moves, match[1], "move");
-      const moveId = moves[name];
-      return match[2] === undefined ? { moveId } : { moveId, power: Number(match[2]) };
-    },
-    fromInstance: raw => {
-      const options = raw as { moveId?: unknown; power?: unknown } | undefined;
-      const name = memberNameOf(moves, options?.moveId);
-      if (name === undefined) {
-        return;
-      }
-      return typeof options?.power === "number" ? `${wordOf(name)} at ${options.power} power` : wordOf(name);
     },
   };
 }
@@ -563,3 +294,262 @@ export const auraAlliesCodec: ParamCodec = {
       : undefined;
   },
 };
+
+// ---------------------------------------------------------------------------------------------------------------
+// Chunk 1: structured settings (the owner requirement: every number, type, stat and status is its own setting).
+
+/** A codec for a setting that is only ever built by `assembleCtorArg`: `toCtor` is not used, `fromInstance` reads one field back. */
+function readBack(read: (raw: unknown) => ParamValue | undefined): ParamCodec {
+  return { toCtor: value => value, fromInstance: read };
+}
+
+function fieldOf(raw: unknown): Record<string, unknown> | undefined {
+  return typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : undefined;
+}
+
+function enumValue(table: EnumTable, name: unknown, what: string): number | string {
+  const value = table[String(name)];
+  if (value === undefined) {
+    throw new Error(`"${String(name)}" is not a known ${what}`);
+  }
+  return value;
+}
+
+/** Percent shown to staff for a stored fraction (0.25 -> 25), without float noise. */
+function asPercent(fraction: unknown): number | undefined {
+  return typeof fraction === "number" ? Number((fraction * 100).toPrecision(12)) : undefined;
+}
+
+// ---- Type matchup (OffensiveTypeChartOverrideAbAttr): { rules: [{ attackType, defenderType, newMultiplier }] } ----
+
+/** The "no second/third type" choice of an optional type setting. */
+export const NO_TYPE = "NONE";
+
+/** The rule list of a live instance, when every rule shares one move type and one multiplier (all live users do). */
+function sharedRules(raw: unknown): { attackType: number; multiplier: number; targets: number[] } | undefined {
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > 3) {
+    return;
+  }
+  const first = raw[0] as { attackType: number; newMultiplier: number };
+  if (!raw.every(rule => rule.attackType === first.attackType && rule.newMultiplier === first.newMultiplier)) {
+    return;
+  }
+  return {
+    attackType: first.attackType,
+    multiplier: first.newMultiplier,
+    targets: raw.map(rule => (rule as { defenderType: number }).defenderType),
+  };
+}
+
+export const matchupAttackTypeCodec: ParamCodec = readBack(raw => {
+  const shared = sharedRules(raw);
+  return shared === undefined ? undefined : memberNameOf(PokemonType, shared.attackType);
+});
+
+export const matchupMultiplierCodec: ParamCodec = readBack(raw => sharedRules(raw)?.multiplier);
+
+/** The n-th (0-based) target type of the rule list; "NONE" past the end. */
+export function matchupTargetCodec(position: number): ParamCodec {
+  return readBack(raw => {
+    const shared = sharedRules(raw);
+    if (shared === undefined) {
+      return;
+    }
+    const target = shared.targets[position];
+    return target === undefined ? NO_TYPE : memberNameOf(PokemonType, target);
+  });
+}
+
+/** The constructor argument `{ rules }`: one rule per chosen target type, all with the same move type and multiplier. */
+export function buildMatchupRules(params: ParamValues): unknown {
+  const attackType = enumValue(PokemonType, params.attackType, "type");
+  const targets = [params.targetType, params.targetType2, params.targetType3].filter(
+    (name): name is string => typeof name === "string" && name !== NO_TYPE,
+  );
+  if (targets.length === 0) {
+    throw new Error("Choose at least one target type");
+  }
+  return {
+    rules: targets.map(name => ({
+      attackType,
+      defenderType: enumValue(PokemonType, name, "type"),
+      newMultiplier: Number(params.multiplier),
+    })),
+  };
+}
+
+// ---- A free scripted move ({ moveId, power? }) ----
+
+/** Power 0 means "the move's own power": the `power` key is then absent, exactly as in the live users. */
+export function buildScriptedMove(params: ParamValues): unknown {
+  const moveId = MoveId[nameFromWord(MoveId, String(params.moveId), "move") as keyof typeof MoveId];
+  const power = Number(params.power);
+  return power > 0 ? { moveId, power } : { moveId };
+}
+
+export const scriptedMoveIdCodec: ParamCodec = readBack(raw => memberNameOf(MoveId, fieldOf(raw)?.moveId));
+
+export const scriptedMovePowerCodec: ParamCodec = readBack(raw => {
+  const power = fieldOf(raw)?.power;
+  return typeof power === "number" ? power : 0;
+});
+
+// ---- When I faint (OnFaintEffectAbAttr): { effect: one of seven payloads } ----
+
+export const FAINT_KIND_WEATHER = "Set the weather";
+export const FAINT_KIND_TERRAIN = "Set the terrain";
+export const FAINT_KIND_HURT = "Hurt the Pokemon that knocked me out";
+export const FAINT_KIND_HAZARD = "Set a hazard on the foe's side";
+export const FAINT_KIND_TAG = "Put a lasting effect on the Pokemon that knocked me out";
+export const FAINT_KIND_STATS = "Change the stats of the Pokemon that knocked me out";
+export const FAINT_KIND_PP = "Drain the PP of the move that knocked me out";
+
+export const FAINT_KINDS = [
+  FAINT_KIND_WEATHER,
+  FAINT_KIND_TERRAIN,
+  FAINT_KIND_HURT,
+  FAINT_KIND_HAZARD,
+  FAINT_KIND_TAG,
+  FAINT_KIND_STATS,
+  FAINT_KIND_PP,
+] as const;
+
+const FAINT_KIND_OF: Readonly<Record<string, string>> = {
+  "set-weather": FAINT_KIND_WEATHER,
+  "set-terrain": FAINT_KIND_TERRAIN,
+  "attacker-damage-flat": FAINT_KIND_HURT,
+  "set-hazard": FAINT_KIND_HAZARD,
+  "attacker-battler-tag": FAINT_KIND_TAG,
+  "attacker-stat-change": FAINT_KIND_STATS,
+  "attacker-pp-drain": FAINT_KIND_PP,
+};
+
+/** Hazards a staff member can choose (the class takes any field effect; these are the entry hazards). */
+export const FAINT_HAZARDS = ["SPIKES", "TOXIC_SPIKES", "STEALTH_ROCK", "STICKY_WEB"] as const;
+
+/** Lasting effects a staff member can choose (the class takes any; these are the ones that make sense on a Pokemon that knocked me out). */
+export const FAINT_TAGS = [
+  "CURSED",
+  "CONFUSED",
+  "INFATUATED",
+  "SEEDED",
+  "NIGHTMARE",
+  "TAUNT",
+  "TORMENT",
+  "ENCORE",
+  "HEAL_BLOCK",
+  "DROWSY",
+  "TRAPPED",
+  "PERISH_SONG",
+  "DISABLED",
+  "SALT_CURED",
+] as const;
+
+export const NO_STAT = "NONE";
+export const FAINT_STATS = ["ATK", "DEF", "SPATK", "SPDEF", "SPD", "ACC", "EVA"] as const;
+
+interface FaintStatChange {
+  readonly stat: number;
+  readonly stages: number;
+}
+
+function faintStats(raw: unknown, key: "stats" | "allyStats"): readonly FaintStatChange[] | undefined {
+  const list = fieldOf(raw)?.[key];
+  return Array.isArray(list) ? (list as FaintStatChange[]) : undefined;
+}
+
+/** A codec that answers only for effects of one kind (a setting of another kind reads back as nothing). */
+function faintOnly(kind: string, read: (effect: Record<string, unknown>) => ParamValue | undefined): ParamCodec {
+  return readBack(raw => {
+    const effect = fieldOf(raw);
+    return effect?.kind === kind ? read(effect) : undefined;
+  });
+}
+
+export const faintKindCodec: ParamCodec = readBack(raw => FAINT_KIND_OF[String(fieldOf(raw)?.kind)]);
+export const faintWeatherCodec = faintOnly("set-weather", effect => memberNameOf(WeatherType, effect.weather));
+export const faintTerrainCodec = faintOnly("set-terrain", effect => memberNameOf(TerrainType, effect.terrain));
+export const faintHurtPercentCodec = faintOnly("attacker-damage-flat", effect => asPercent(effect.maxHpFraction));
+export const faintHazardCodec = faintOnly("set-hazard", effect => memberNameOf(ArenaTagType, effect.hazard));
+export const faintLayersCodec = faintOnly("set-hazard", effect =>
+  typeof effect.layers === "number" ? effect.layers : 1,
+);
+export const faintTagCodec = faintOnly("attacker-battler-tag", effect => memberNameOf(BattlerTagType, effect.tagType));
+export const faintTurnsCodec = faintOnly("attacker-battler-tag", effect =>
+  typeof effect.turns === "number" ? effect.turns : 0,
+);
+/** The one skipped type (more than one is not representable and reads back as nothing). */
+export const faintSkipTypeCodec = faintOnly("attacker-battler-tag", effect => {
+  const excluded = effect.excludeAttackerTypes;
+  if (!Array.isArray(excluded) || excluded.length === 0) {
+    return NO_TYPE;
+  }
+  return excluded.length === 1 ? memberNameOf(PokemonType, excluded[0]) : undefined;
+});
+
+/** Which stat is the first (0) or second (1) stat change of the attacker. */
+export function faintStatCodec(position: 0 | 1): ParamCodec {
+  return faintOnly("attacker-stat-change", effect => {
+    const change = faintStats(effect, "stats")?.[position];
+    return change === undefined ? NO_STAT : memberNameOf(Stat, change.stat);
+  });
+}
+
+export function faintStagesCodec(position: 0 | 1): ParamCodec {
+  return faintOnly("attacker-stat-change", effect => faintStats(effect, "stats")?.[position]?.stages ?? 0);
+}
+
+/** The same stat for the attacker's allies: only the stages are a setting, the stat is the one chosen for the attacker. */
+export function faintAllyStagesCodec(position: 0 | 1): ParamCodec {
+  return faintOnly("attacker-stat-change", effect => {
+    const own = faintStats(effect, "stats")?.[position];
+    const ally = faintStats(effect, "allyStats")?.find(change => change.stat === own?.stat);
+    return ally?.stages ?? 0;
+  });
+}
+
+/** The constructor argument `{ effect }`, built from the settings of the kind that is chosen (the other settings are ignored). */
+export function buildFaintEffect(params: ParamValues): unknown {
+  switch (params.kind) {
+    case FAINT_KIND_WEATHER:
+      return { effect: { kind: "set-weather", weather: enumValue(WeatherType, params.weather, "weather") } };
+    case FAINT_KIND_TERRAIN:
+      return { effect: { kind: "set-terrain", terrain: enumValue(TerrainType, params.terrain, "terrain") } };
+    case FAINT_KIND_HURT:
+      return { effect: { kind: "attacker-damage-flat", maxHpFraction: Number(params.hurtPercent) / 100 } };
+    case FAINT_KIND_HAZARD: {
+      const hazard = enumValue(ArenaTagType, params.hazard, "hazard");
+      return Number(params.layers) === 1
+        ? { effect: { kind: "set-hazard", hazard } }
+        : { effect: { kind: "set-hazard", hazard, layers: Number(params.layers) } };
+    }
+    case FAINT_KIND_TAG: {
+      const effect: Record<string, unknown> = {
+        kind: "attacker-battler-tag",
+        tagType: enumValue(BattlerTagType, params.tag, "lasting effect"),
+      };
+      if (Number(params.turns) > 0) {
+        effect.turns = Number(params.turns);
+      }
+      if (params.skipType !== NO_TYPE) {
+        effect.excludeAttackerTypes = [enumValue(PokemonType, params.skipType, "type")];
+      }
+      return { effect };
+    }
+    case FAINT_KIND_STATS: {
+      const picks = [
+        { stat: params.stat, stages: Number(params.stages), ally: Number(params.allyStages) },
+        { stat: params.stat2, stages: Number(params.stages2), ally: Number(params.allyStages2) },
+      ].filter(pick => pick.stat !== NO_STAT);
+      const stats = picks.map(pick => ({ stat: enumValue(Stat, pick.stat, "stat") as number, stages: pick.stages }));
+      const allyStats = picks
+        .filter(pick => pick.ally !== 0)
+        .map(pick => ({ stat: enumValue(Stat, pick.stat, "stat") as number, stages: pick.ally }));
+      return { effect: { kind: "attacker-stat-change", stats, ...(allyStats.length > 0 ? { allyStats } : {}) } };
+    }
+    case FAINT_KIND_PP:
+      return { effect: { kind: "attacker-pp-drain" } };
+    default:
+      throw new Error(`"${String(params.kind)}" is not something this can do when I faint`);
+  }
+}

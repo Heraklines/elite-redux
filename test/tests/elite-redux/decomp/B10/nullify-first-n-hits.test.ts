@@ -4,11 +4,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// B10 chunk 1, NullifyFirstNHitsAbAttr (memory per Pokemon and per battle).
-// The L1 grid and the L2 twin never see the charge memory (a fresh battle has none), so it is proven here on the ORIGINAL attr
-// and on its REBUILD side by side: the first n real hits are set to 0 and use a charge, the next one is not touched, a preview
-// shows 0 but keeps the charge, a hit that does no damage keeps it, and a new battle brings the charges back.
-import { recomposeAttr } from "#data/elite-redux/ability-studio/build-attr";
 import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
 import type { DeclModule } from "#data/elite-redux/ability-studio/define-decl";
 import type { NullifyFirstNHitsAbAttr } from "#data/elite-redux/archetypes/nullify-first-n-hits";
@@ -18,6 +13,7 @@ import { allAttrSites } from "#test/tests/elite-redux/decomp/harness/sites";
 import { NumberHolder } from "#utils/common";
 import Phaser from "phaser";
 import { beforeAll, describe, expect, it } from "vitest";
+import { rebuildWithClassGate } from "./rebuild-with-class-gate";
 
 const module = declRegistry.get("NullifyFirstNHitsAbAttr") as DeclModule;
 
@@ -44,7 +40,7 @@ describe("B10: first hits do nothing (NullifyFirstNHitsAbAttr)", () => {
       sites.map(site => `${site.abilityName}:${(site.attr as unknown as NullifyFirstNHitsAbAttr).getN()}`).sort(),
     ).toEqual(["Cheating Death:2", "Gallantry:1"]);
     for (const site of sites) {
-      const rebuilt = recomposeAttr(
+      const rebuilt = rebuildWithClassGate(
         module,
         site.attr,
         site.abilityId,
@@ -60,7 +56,7 @@ describe("B10: first hits do nothing (NullifyFirstNHitsAbAttr)", () => {
     for (const site of sitesOf()) {
       const n = (site.attr as unknown as NullifyFirstNHitsAbAttr).getN();
       const original = site.attr as unknown as NullifyFirstNHitsAbAttr;
-      const rebuilt = recomposeAttr(
+      const rebuilt = rebuildWithClassGate(
         module,
         site.attr,
         site.abilityId,
@@ -78,7 +74,7 @@ describe("B10: first hits do nothing (NullifyFirstNHitsAbAttr)", () => {
   it("a preview shows 0 without using a charge, and a hit that already does nothing keeps the charge", async () => {
     const { holder } = await startWorld(phaserGame);
     const site = sitesOf().find(candidate => candidate.abilityName === "Gallantry")!;
-    const rebuilt = recomposeAttr(
+    const rebuilt = rebuildWithClassGate(
       module,
       site.attr,
       site.abilityId,
@@ -96,7 +92,7 @@ describe("B10: first hits do nothing (NullifyFirstNHitsAbAttr)", () => {
   it("the charges come back in a new battle (the memory is keyed by the battle)", async () => {
     const { holder } = await startWorld(phaserGame);
     const site = sitesOf().find(candidate => candidate.abilityName === "Cheating Death")!;
-    const rebuilt = recomposeAttr(
+    const rebuilt = rebuildWithClassGate(
       module,
       site.attr,
       site.abilityId,
