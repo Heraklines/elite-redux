@@ -24,7 +24,7 @@ export default defineDecl(HeartbreakAbAttr, {
   when: "event.on-entry",
   label: "Link to my nearest ally and rage when it faints",
   summary: params =>
-    `When I enter I link to my nearest living ally. When that ally faints I gain ${params.boostStages} stage(s) in Speed and my higher attacking stat and lose ${params.dropStages} in Defense and Sp. Def. No ally, no effect.`,
+    `When I enter I link to my nearest living ally. When that ally faints I gain ${params.boostStages} stages in Speed and my higher attacking stat and lose ${params.dropStages} stages in Defense and Sp. Def. No ally, no effect.`,
   synonyms: [
     "heartbreak",
     "link to ally",

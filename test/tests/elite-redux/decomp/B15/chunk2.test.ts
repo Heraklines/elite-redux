@@ -167,6 +167,40 @@ describe("B15 chunk 2", () => {
     });
   });
 
+  describe("Dandelion Burst phase order", () => {
+    it("with two foes the queue is [seeded message, stat phase] per foe, which a split into all seeds then all stat drops would change", async () => {
+      const { holder, foe } = await startWorld(phaserGame);
+      const attr = liveAbility(DANDELION_BURST).attrs[0] as DandelionBurstAbAttr;
+      const foe2 = Object.create(foe) as typeof foe;
+      foe2.isActive = () => true;
+      foe2.getBattlerIndex = () => 3 as never;
+      // SeedTag.onAdd (battler-tags.ts) queues its message exactly like this; the real foe does it through the real tag.
+      foe2.addTag = (() => {
+        globalScene.phaseManager.queueMessage("seeded-foe2");
+        return true;
+      }) as never;
+      vi.spyOn(holder, "getOpponents").mockReturnValue([foe, foe2]);
+      const trace: string[] = [];
+      const queueSpy = vi.spyOn(globalScene.phaseManager, "queueMessage").mockImplementation(((message: string) => {
+        trace.push(`message:${message === "seeded-foe2" ? "foe2" : "foe1"}`);
+      }) as never);
+      const unshiftSpy = vi.spyOn(globalScene.phaseManager, "unshiftNew").mockImplementation(((
+        phase: string,
+        index: number,
+      ) => {
+        trace.push(`${phase}:${index === 3 ? "foe2" : "foe1"}`);
+      }) as never);
+      attr.apply({ pokemon: holder, source: foe, damage: 5, simulated: false } as never);
+      queueSpy.mockRestore();
+      unshiftSpy.mockRestore();
+      vi.restoreAllMocks();
+      expect(trace).toEqual(["message:foe1", "StatStageChangePhase:foe1", "message:foe2", "StatStageChangePhase:foe2"]);
+      // A split (all seeds, then all stat drops) would queue the two messages first, a different order.
+      const split = [...trace.filter(t => t.startsWith("message")), ...trace.filter(t => !t.startsWith("message"))];
+      expect(split).not.toEqual(trace);
+    });
+  });
+
   describe("Crosscut", () => {
     it("the second strike needs a single hit, a damaging slicing or pulse move and a splittable move; the residual stays in the class", async () => {
       const { holder, foe } = await startWorld(phaserGame);
