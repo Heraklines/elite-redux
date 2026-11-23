@@ -1,8 +1,43 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "09d4328dd354d2",
+  "hash": "1f362cfea14084",
   "blocks": [
+    {
+      "id": "block.always-hit",
+      "className": "AlwaysHitAbAttr",
+      "label": "Moves I use and moves aimed at me never miss",
+      "summary": "While I have this, my moves never miss and foes' moves aimed at me never miss, even against a foe that is flying or underground. Example: Thunder always hits.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "no guard",
+        "never miss",
+        "perfect accuracy",
+        "always hit",
+        "100 percent accuracy",
+        "sure hit",
+        "cannot dodge"
+      ],
+      "examples": [
+        "Every move that involves me always hits, like No Guard"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing while a field effect that restores normal accuracy is active (the ER Dust Cloud field effect)"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 5
+    },
     {
       "id": "block.attack-type-immunity",
       "className": "AttackTypeImmunityAbAttr",
@@ -1619,6 +1654,45 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.terrain-event-type-change",
+      "className": "TerrainEventTypeChangeAbAttr",
+      "label": "Change my type to match the terrain",
+      "summary": "When I enter or the terrain changes, I take the terrain's type: Electric, Fairy (Misty), Grass or Psychic. With no terrain I go back to my own types.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.terrain-changed",
+      "whenLabel": "When the terrain changes",
+      "synonyms": [
+        "mimicry",
+        "terrain type",
+        "become the terrain's type",
+        "type follows terrain",
+        "change type with terrain",
+        "terrain adaptation"
+      ],
+      "examples": [
+        "Become a Grass type on Grassy Terrain, like Mimicry"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing while I am Terastallized: a Terastallized Pokemon keeps its type",
+        "On a terrain with no matching type (no terrain, or the Toxic terrain) I go back to the types I was born with, which also drops a type that Soak-like moves gave me"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.weight-multiplier",
