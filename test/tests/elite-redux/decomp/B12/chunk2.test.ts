@@ -17,7 +17,6 @@ import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import { getBinding } from "#data/elite-redux/ability-studio/bindings";
 import { buildAttr, recomposeAttr } from "#data/elite-redux/ability-studio/build-attr";
-import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
 import {
   formatHighestStatRules,
   formatStatusList,
@@ -25,8 +24,9 @@ import {
   parseHighestStatRules,
   parseStatusList,
 } from "#data/elite-redux/ability-studio/decl/B12/b12-chunk2-codecs";
+import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
+import type { StatusChanceMultiplierAbAttr } from "#data/elite-redux/archetypes/status-chance-multiplier";
 import { StatusEffectImmunityAbAttrEr } from "#data/elite-redux/archetypes/status-immunity";
-import { StatusChanceMultiplierAbAttr } from "#data/elite-redux/archetypes/status-chance-multiplier";
 import { TargetHighestStatDropAbAttr } from "#data/elite-redux/archetypes/target-highest-stat-drop";
 import { ActivateOncePerBattleEntryWindowAbAttr } from "#data/elite-redux/archetypes/time-limited-effectiveness-floor";
 import { MoveId } from "#enums/move-id";
@@ -127,10 +127,12 @@ describe("B12 chunk 2: status, effectiveness and entry-window classes", () => {
             attr.status === StatusEffect.FREEZE
             && move.getAttrs("AddBattlerTagAttr").some(a => String(a.tagType).includes("FROSTBITE"));
           const expected =
-            !(chance <= 0 || move.id === MoveId.ORDER_UP || move.id === MoveId.ELECTRO_SHOT) && (hasStatus || hasFrostbite);
-          expect((attr as unknown as AnyAttr).canApply(params), `${site.abilityName} ${MoveId[move.id]} ${chance}`).toBe(
-            expected,
-          );
+            !(chance <= 0 || move.id === MoveId.ORDER_UP || move.id === MoveId.ELECTRO_SHOT)
+            && (hasStatus || hasFrostbite);
+          expect(
+            (attr as unknown as AnyAttr).canApply(params),
+            `${site.abilityName} ${MoveId[move.id]} ${chance}`,
+          ).toBe(expected);
           compared++;
           passes += expected ? 1 : 0;
         }
@@ -162,7 +164,13 @@ describe("B12 chunk 2: status, effectiveness and entry-window classes", () => {
       for (const value of [0, 0.25, 0.5, 1, 1.99, 2, 4]) {
         vi.spyOn(foe, "getMoveEffectiveness").mockReturnValue(value);
         for (const move of moves) {
-          const params = { pokemon: holder, opponent: foe, move, power: new NumberHolder(move.power), simulated: false };
+          const params = {
+            pokemon: holder,
+            opponent: foe,
+            move,
+            power: new NumberHolder(move.power),
+            simulated: false,
+          };
           expect(copy.canApply(params as never), `${site.abilityName} ${MoveId[move.id]} ${value}`).toBe(
             (site.attr as AnyAttr).canApply(params as never),
           );
@@ -185,7 +193,13 @@ describe("B12 chunk 2: status, effectiveness and entry-window classes", () => {
     const site = sitesOf("SuperEffectiveMultiplierBoostAbAttr")[0];
     const move = allMoves[MoveId.TACKLE];
     expect(
-      (site.attr as AnyAttr).canApply({ pokemon: holder, opponent: foe, move, power: new NumberHolder(40), simulated: false } as never),
+      (site.attr as AnyAttr).canApply({
+        pokemon: holder,
+        opponent: foe,
+        move,
+        power: new NumberHolder(40),
+        simulated: false,
+      } as never),
     ).toBe(false);
   });
 
@@ -221,7 +235,8 @@ describe("B12 chunk 2: status, effectiveness and entry-window classes", () => {
           for (const value of [0, 0.25, 0.5, 1, 2, 4]) {
             for (const moveId of [MoveId.TACKLE, MoveId.SEISMIC_TOSS, MoveId.DRAGON_RAGE]) {
               for (const holderKind of ["number", "plain"]) {
-                const typeMultiplier = holderKind === "number" ? new NumberHolder(value) : ({ value } as unknown as NumberHolder);
+                const typeMultiplier =
+                  holderKind === "number" ? new NumberHolder(value) : ({ value } as unknown as NumberHolder);
                 const params = {
                   pokemon: holder,
                   opponent: foe,
@@ -292,7 +307,11 @@ describe("B12 chunk 2: status, effectiveness and entry-window classes", () => {
     const { holder } = await startWorld(phaserGame);
     const module = declRegistry.get("ActivateOncePerBattleEntryWindowAbAttr")!;
     const key = "b12-test-window-2";
-    const attr = buildAttr(module, { key }, { gate: { block: "time.once-per", params: { scope: "wave", key } } as never }) as AnyAttr;
+    const attr = buildAttr(
+      module,
+      { key },
+      { gate: { block: "time.once-per", params: { scope: "wave", key } } as never },
+    ) as AnyAttr;
     holder.waveData.entryEffectsFired.delete(key);
     holder.tempSummonData.abilityEntryWindows.delete(key);
     const params = { pokemon: holder, simulated: false } as never;
@@ -313,8 +332,11 @@ describe("B12 chunk 2: status, effectiveness and entry-window classes", () => {
       for (const effect of statuses) {
         for (const already of [false, true]) {
           const make = () => ({ pokemon: holder, effect, cancelled: new BooleanHolder(already), simulated: false });
-          const expected = !already && ((listed.length === 0 && effect !== StatusEffect.FAINT) || listed.includes(effect));
-          expect((site.attr as AnyAttr).canApply(make() as never), `${site.abilityName} ${StatusEffect[effect]}`).toBe(expected);
+          const expected =
+            !already && ((listed.length === 0 && effect !== StatusEffect.FAINT) || listed.includes(effect));
+          expect((site.attr as AnyAttr).canApply(make() as never), `${site.abilityName} ${StatusEffect[effect]}`).toBe(
+            expected,
+          );
           expect(copy.canApply(make() as never)).toBe(expected);
         }
       }
@@ -408,5 +430,26 @@ describe("B12 chunk 2: status, effectiveness and entry-window classes", () => {
     expect(optionalTextCodec.toCtor("abc")).toBe("abc");
     expect(optionalTextCodec.fromInstance(undefined)).toBe("");
     expect(optionalTextCodec.fromInstance("abc")).toBe("abc");
+  });
+  it("TimeLimitedEffectivenessFloor: the ceiling option (default 0.5) is read by residual and apply", async () => {
+    const { holder } = await startWorld(phaserGame);
+    const { TimeLimitedEffectivenessFloorAbAttr } = await import(
+      "#data/elite-redux/archetypes/time-limited-effectiveness-floor"
+    );
+    const dflt = new TimeLimitedEffectivenessFloorAbAttr({ turns: 3 });
+    const quarter = new TimeLimitedEffectivenessFloorAbAttr({ turns: 3, ceiling: 0.25 });
+    const mk = (v: number) =>
+      ({ pokemon: holder, typeMultiplier: new NumberHolder(v), move: undefined, simulated: false }) as never;
+    expect(dflt.residual(mk(2))).toBe(true);
+    expect(dflt.residual(mk(0.5))).toBe(false);
+    expect(quarter.residual(mk(0.5))).toBe(true);
+    expect(quarter.residual(mk(0.25))).toBe(false);
+    const p = mk(4) as { typeMultiplier: NumberHolder };
+    dflt.apply(p as never);
+    expect(p.typeMultiplier.value).toBe(0.5);
+    const q = mk(4) as { typeMultiplier: NumberHolder };
+    quarter.apply(q as never);
+    expect(q.typeMultiplier.value).toBe(0.25);
+    expect(() => new TimeLimitedEffectivenessFloorAbAttr({ turns: 3, ceiling: -1 })).toThrow();
   });
 });

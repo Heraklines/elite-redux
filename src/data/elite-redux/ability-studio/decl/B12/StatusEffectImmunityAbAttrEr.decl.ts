@@ -48,7 +48,7 @@ export default defineDecl(StatusEffectImmunityAbAttrEr, {
       path: "configuredStatuses",
       control: "text",
       label:
-        "Status conditions I am immune to, like 'Paralysis, Burn' (empty = every status)",
+        "Status conditions I resist, comma separated: Poison, Bad poison, Paralysis, Sleep, Freeze, Burn (empty = all)",
       editable: true,
       default: "Paralysis",
       codec: statusListCodec,

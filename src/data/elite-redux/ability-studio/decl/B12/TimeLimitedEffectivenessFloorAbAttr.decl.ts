@@ -33,7 +33,7 @@ export default defineDecl(TimeLimitedEffectivenessFloorAbAttr, {
   when: "calc.type-matchup",
   label: "Resist every attack for my first turns on the field",
   summary: params =>
-    `For my first ${params.turns} turns after I enter, no attack counts as more effective than not very effective (x0.5). Weaker matchups are left alone. Fixed-damage moves are skipped.`,
+    `For my first ${params.turns} turns after I enter, no attack counts as more effective than not very effective (x${params.ceiling}). Weaker matchups are left alone. Fixed-damage moves are skipped.`,
   synonyms: [
     "no super effective hits for a few turns",
     "temporary tera shell",
@@ -63,6 +63,22 @@ export default defineDecl(TimeLimitedEffectivenessFloorAbAttr, {
       default: 3,
     },
     {
+      id: "ceiling",
+      ...IN_PAYLOAD,
+      ctorOption: "ceiling",
+      path: "ceiling",
+      control: "number",
+      min: 0,
+      max: 4,
+      step: 0.25,
+      label:
+        "Strongest matchup multiplier an attack may keep (0.5 = not very effective, 0.25 = barely effective, 0 = no effect)",
+      editable: true,
+      // Only the effect reads it; the gate (window and turn count) never repeats it.
+      gateIndependent: true,
+      default: 0.5,
+    },
+    {
       id: "activeWindowKey",
       ...IN_PAYLOAD,
       ctorOption: "activeWindowKey",
@@ -89,8 +105,8 @@ export default defineDecl(TimeLimitedEffectivenessFloorAbAttr, {
     "Not used for status moves, and not when the attacker's move ignores abilities",
     "The turn count starts at 1 on the turn I enter and starts again when I switch out and back in",
   ],
-  // No library effect caps the type matchup yet (R-B01-15); it is shown as one piece until it exists. The floor is fixed at 0.5.
-  effect: { id: "effect.package", params: ["turns"] },
+  // No library effect caps the type matchup yet (R-B01-15); it is shown as one piece until it exists. Its number is the editable `ceiling` param (default 0.5), read by residual and apply; at B01 merge map it onto the parent's `matchupCeiling`.
+  effect: { id: "effect.package", params: ["ceiling"] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "entry", simulated: "respects" },
   probes: [
@@ -102,5 +118,5 @@ export default defineDecl(TimeLimitedEffectivenessFloorAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "Tier B, 2 attrs. Soothsayer (5474 attr 0, 3 turns, no window) is bound to time.turn-count { lte 3 } with `turns` in gateParams. Forewarn (108 attr 2, 2 turns, window 'upgrade:forewarn:two-turn-soothsayer', opened by ActivateOncePerBattleEntryWindowAbAttr at attr 1) needs 'the window is open' as well, which has no atom (request R-B12-16), so its gate is a legacy-closure. `activeWindowKey` is not editable because it decides the shape of the gate. Effect is shown as effect.package because no library effect caps the type matchup (R-B01-15); the 0.5 floor is a literal of the inherited `apply` (and, after B01 lands, the parent's `matchupCeiling` default), so there is no setting for it here. The old canApply is split into guards (3, 4), gate (1, 2) and residual (5); the guards moved ahead of the gate, which is safe because every clause is pure and total (the only access that could fail, `tempSummonData.abilityEntryWindows`, is on an object the engine always creates). Oddities, not fixed: (a) the turn count lives in `tempSummonData.turnCount`, which starts at 1, goes up at the end of every turn (turn-end-phase.ts:153) and is lowered by one on a mid-turn switch-in (switch-summon-phase.ts:439), so '3 turns' means the entry turn plus the next two; (b) the inherited trigger message is overridden to an empty text, so no text shows besides the banner.",
+    "Tier B, 2 attrs. Soothsayer (5474 attr 0, 3 turns, no window) is bound to time.turn-count { lte 3 } with `turns` in gateParams. Forewarn (108 attr 2, 2 turns, window 'upgrade:forewarn:two-turn-soothsayer', opened by ActivateOncePerBattleEntryWindowAbAttr at attr 1) needs 'the window is open' as well, which has no atom (request R-B12-16), so its gate is a legacy-closure. `activeWindowKey` is not editable because it decides the shape of the gate. Effect is shown as effect.package because no library effect caps the type matchup (R-B01-15); the cap number is the `ceiling` constructor option (default 0.5, added in review: residual and an overridden apply read it, so shipped behaviour is unchanged); at B01 merge it should map onto the parent's `matchupCeiling` / B01 decl `ceiling`. The old canApply is split into guards (3, 4), gate (1, 2) and residual (5); the guards moved ahead of the gate, which is safe because every clause is pure and total (the only access that could fail, `tempSummonData.abilityEntryWindows`, is on an object the engine always creates). Oddities, not fixed: (a) the turn count lives in `tempSummonData.turnCount`, which starts at 1, goes up at the end of every turn (turn-end-phase.ts:153) and is lowered by one on a mid-turn switch-in (switch-summon-phase.ts:439), so '3 turns' means the entry turn plus the next two; (b) the inherited trigger message is overridden to an empty text, so no text shows besides the banner.",
 });

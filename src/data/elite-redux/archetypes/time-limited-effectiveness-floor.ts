@@ -37,6 +37,8 @@ export interface TimeLimitedEffectivenessFloorOptions {
   readonly turns: number;
   /** Optional entry-window token required for the floor to apply. */
   readonly activeWindowKey?: string;
+  /** Highest type-effectiveness multiplier an attack may keep while the floor is active. Defaults to 0.5 (not very effective). */
+  readonly ceiling?: number;
 }
 
 /** Opens an entry-local window only on the holder's first summon of a battle. */
@@ -79,6 +81,7 @@ export class TimeLimitedEffectivenessFloorAbAttr
   public declare gateOverride: ((params: TypeMultiplierAbAttrParams) => boolean) | undefined;
   private readonly turns: number;
   private readonly activeWindowKey: string | undefined;
+  private readonly ceiling: number;
 
   constructor(options: TimeLimitedEffectivenessFloorOptions) {
     super();
@@ -87,6 +90,11 @@ export class TimeLimitedEffectivenessFloorAbAttr
     }
     this.turns = options.turns;
     this.activeWindowKey = options.activeWindowKey;
+    const ceiling = options.ceiling ?? 0.5;
+    if (!(ceiling >= 0)) {
+      throw new Error("[TimeLimitedEffectivenessFloorAbAttr] ceiling must be zero or more");
+    }
+    this.ceiling = ceiling;
   }
 
   override canApply(params: TypeMultiplierAbAttrParams): boolean {
@@ -117,12 +125,16 @@ export class TimeLimitedEffectivenessFloorAbAttr
     );
   }
 
-  /** Feasibility (old clause 5): only a matchup above the floor is lowered, a weaker one is never raised. */
+  /** Feasibility (old clause 5): only a matchup above the ceiling (default 0.5) is lowered, a weaker one is never raised. */
   public residual({ typeMultiplier }: TypeMultiplierAbAttrParams): boolean {
-    return typeMultiplier.value > 0.5;
+    return typeMultiplier.value > this.ceiling;
   }
 
-  // `apply` inherited: floors typeMultiplier to 0.5 and caches it on turnData.
+  /** Same as the inherited apply, but with the editable ceiling (default 0.5, so the shipped behaviour is unchanged). */
+  override apply({ typeMultiplier, pokemon }: TypeMultiplierAbAttrParams): void {
+    typeMultiplier.value = this.ceiling;
+    pokemon.turnData.moveEffectiveness = this.ceiling;
+  }
 
   // Suppress the Tera-Shell flavour message — the ability popup is enough.
   override getTriggerMessage(): string {
