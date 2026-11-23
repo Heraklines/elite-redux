@@ -64,11 +64,14 @@ function ledgerFor(holder: Pokemon): Map<Pokemon, Set<PokemonType>> {
   return map;
 }
 
-/** Whether `pokemon` carries an unsuppressed, active Bad Splice. */
-function hasBadSplice(pokemon: Pokemon): boolean {
-  return (
-    pokemon.isActive(true) && pokemon.getAllActiveAbilityAttrs().some(a => a?.constructor?.name === "BadSpliceAbAttr")
-  );
+/** The unsuppressed Bad Splice attr of an active `pokemon`, if it carries one (its settings drive every splice it makes). */
+function badSpliceAttrOf(pokemon: Pokemon): BadSpliceAbAttr | undefined {
+  if (!pokemon.isActive(true)) {
+    return;
+  }
+  return pokemon
+    .getAllActiveAbilityAttrs()
+    .find((a): a is BadSpliceAbAttr => a?.constructor?.name === "BadSpliceAbAttr");
 }
 
 /** The opponent's OWN living party members other than the opponent itself. */
@@ -81,7 +84,11 @@ function otherLivingPartyMembers(foe: Pokemon): Pokemon[] {
  * Splice `foe` from its own party per `BAD_SPLICE_CONFIG`, recording the grafted
  * types under `holder` so they can be undone precisely on the holder's exit.
  */
-function spliceFoe(holder: Pokemon, foe: Pokemon): void {
+function spliceFoe(
+  holder: Pokemon,
+  foe: Pokemon,
+  sourceMemberCount: number = BAD_SPLICE_CONFIG.sourceMemberCount,
+): void {
   const candidates = otherLivingPartyMembers(foe);
   if (candidates.length === 0) {
     return;
@@ -89,7 +96,7 @@ function spliceFoe(holder: Pokemon, foe: Pokemon): void {
   // Pick `sourceMemberCount` distinct seeded-random members (DEFAULT 1).
   const pool = [...candidates];
   const donors: Pokemon[] = [];
-  const wanted = Math.min(BAD_SPLICE_CONFIG.sourceMemberCount, pool.length);
+  const wanted = Math.min(sourceMemberCount, pool.length);
   for (let i = 0; i < wanted; i++) {
     const idx = globalScene.randBattleSeedInt(pool.length);
     donors.push(pool.splice(idx, 1)[0]);
@@ -130,8 +137,12 @@ function spliceFoe(holder: Pokemon, foe: Pokemon): void {
 
 /** PostSummon half: on entry, splice every currently-active opponent. */
 export class BadSpliceAbAttr extends PostSummonAbAttr {
-  constructor() {
+  /** How many OTHER living party members of each foe lend their types (ability studio param; the default is the original 1). */
+  public readonly sourceMemberCount: number;
+
+  constructor(sourceMemberCount: number = BAD_SPLICE_CONFIG.sourceMemberCount) {
     super(false);
+    this.sourceMemberCount = sourceMemberCount;
   }
 
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
@@ -139,7 +150,7 @@ export class BadSpliceAbAttr extends PostSummonAbAttr {
       return;
     }
     for (const foe of pokemon.getOpponents()) {
-      spliceFoe(pokemon, foe);
+      spliceFoe(pokemon, foe, this.sourceMemberCount);
     }
   }
 }
@@ -150,8 +161,9 @@ export class BadSpliceAbAttr extends PostSummonAbAttr {
  */
 export function erBadSpliceOnOpponentSummon(foe: Pokemon): void {
   for (const holder of foe.getOpponents()) {
-    if (hasBadSplice(holder)) {
-      spliceFoe(holder, foe);
+    const attr = badSpliceAttrOf(holder);
+    if (attr) {
+      spliceFoe(holder, foe, attr.sourceMemberCount);
     }
   }
 }

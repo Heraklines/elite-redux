@@ -10,7 +10,6 @@ import {
   MovePowerBoostAbAttr,
   MoveTypeChangeAbAttr,
   PostSummonAbAttr,
-  type PreAttackModifyPowerAbAttrParams,
 } from "#abilities/ab-attrs";
 import type { AbBuilder } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
@@ -23,6 +22,7 @@ import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { type EffectiveStat, Stat } from "#enums/stat";
 import type { Move } from "#moves/move";
+import type { PokemonAttackCondition } from "#types/ability-types";
 import {
   ER_BRAIN_OVER_BRAWN_ABILITY_ID,
   ER_MAGIC_TOUCH_ABILITY_ID,
@@ -68,17 +68,29 @@ export function getSwirlyRoomMoveCategory(move: Move, active = isSwirlyRoomActiv
 
 /** Swirlify's independent three-turn entry effect. */
 export class SwirlifyAbAttr extends PostSummonAbAttr {
+  /** Turns the field effect lasts (ability studio param; the default is the original 3). */
+  public readonly turnCount: number;
+  /** The field effect that is set (ability studio param; the default is the original Swirly Room). */
+  public readonly tagType: ArenaTagType;
+  /** Which side gets it (ability studio param; the default is the original both sides). */
+  public readonly side: ArenaTagSide;
+
+  constructor(
+    turnCount: number = getSwirlyRoomDuration("ability"),
+    tagType: ArenaTagType = ArenaTagType.SWIRLY_ROOM,
+    side: ArenaTagSide = ArenaTagSide.BOTH,
+  ) {
+    super();
+    this.turnCount = turnCount;
+    this.tagType = tagType;
+    this.side = side;
+  }
+
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
     if (simulated) {
       return;
     }
-    globalScene.arena.addTag(
-      ArenaTagType.SWIRLY_ROOM,
-      getSwirlyRoomDuration("ability"),
-      MoveId.NONE,
-      pokemon.id,
-      ArenaTagSide.BOTH,
-    );
+    globalScene.arena.addTag(this.tagType, this.turnCount, MoveId.NONE, pokemon.id, this.side);
   }
 }
 
@@ -99,19 +111,30 @@ export function resolveBrainOverBrawnPower(power: number, type: PokemonType): nu
 
 /** Runtime MoveTypeChange attr for Brain Over Brawn. */
 export class BrainOverBrawnTypeAbAttr extends MoveTypeChangeAbAttr {
-  constructor() {
-    super(PokemonType.PSYCHIC, (_pokemon, _target, move) => move.type === PokemonType.FIGHTING);
+  /**
+   * Both arguments are ability studio params; the defaults are the original wiring (Fighting moves become Psychic).
+   * The condition reads the move's own printed type, never a type another ability changed.
+   */
+  constructor(
+    newType: PokemonType = PokemonType.PSYCHIC,
+    condition: PokemonAttackCondition = (_pokemon, _target, move) => move.type === PokemonType.FIGHTING,
+  ) {
+    super(newType, condition);
   }
 }
 
 /** Runtime power rider for Brain Over Brawn. */
 export class BrainOverBrawnPowerAbAttr extends MovePowerBoostAbAttr {
-  constructor() {
-    super((_pokemon, _target, move) => move.type === PokemonType.FIGHTING, BRAIN_OVER_BRAWN_POWER_MULTIPLIER);
-  }
-
-  override apply(params: PreAttackModifyPowerAbAttrParams): void {
-    params.power.value = resolveBrainOverBrawnPower(params.power.value, params.move.type);
+  /**
+   * Both arguments are ability studio params; the defaults are the original wiring (native Fighting moves, x1.2).
+   * The apply step is the inherited `power *= multiplier`: the old override tested the move type a second time and
+   * gave the same result for every move the condition lets through (see resolveBrainOverBrawnPower).
+   */
+  constructor(
+    condition: PokemonAttackCondition = (_pokemon, _target, move) => move.type === PokemonType.FIGHTING,
+    powerMultiplier: number = BRAIN_OVER_BRAWN_POWER_MULTIPLIER,
+  ) {
+    super(condition, powerMultiplier);
   }
 }
 
@@ -147,14 +170,21 @@ export function getMultiHeadedPreviewScale(attrs: readonly AbAttr[], headCount: 
 
 /** Bidirectional Hunter's Horn ↔ Keen Edge flag injection used by Rapier. */
 export class RapierFlagInjectionAbAttr extends AbAttr {
-  constructor() {
+  /** One of the two move properties that count as each other (ability studio param; the default is the original Horn based). */
+  public readonly firstFlag: MoveFlags;
+  /** The other property (ability studio param; the default is the original Slicing move). */
+  public readonly secondFlag: MoveFlags;
+
+  constructor(firstFlag: MoveFlags = MoveFlags.HORN_BASED, secondFlag: MoveFlags = MoveFlags.SLICING_MOVE) {
     super(false);
+    this.firstFlag = firstFlag;
+    this.secondFlag = secondFlag;
   }
 
   public injects(flag: MoveFlags, move: Move): boolean {
     return (
-      (flag === MoveFlags.HORN_BASED && move.hasFlag(MoveFlags.SLICING_MOVE))
-      || (flag === MoveFlags.SLICING_MOVE && move.hasFlag(MoveFlags.HORN_BASED))
+      (flag === this.firstFlag && move.hasFlag(this.secondFlag))
+      || (flag === this.secondFlag && move.hasFlag(this.firstFlag))
     );
   }
 }

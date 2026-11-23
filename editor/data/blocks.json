@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "096ef32b703c2f",
+  "hash": "02cf0b7efbf200",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -83,6 +83,62 @@
       "uses": 21
     },
     {
+      "id": "block.bad-splice",
+      "className": "BadSpliceAbAttr",
+      "label": "Give each foe extra types from its own team (Bad Splice)",
+      "summary": "When I enter, every foe gains the types of 1 other living teammate(s) of its own team, as extra types. Foes that come in later are changed too, and it is undone when I leave.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "bad splice",
+        "extra types",
+        "add types to foes",
+        "type mixing",
+        "borrow teammate types",
+        "dual type foes",
+        "splice types"
+      ],
+      "examples": [
+        "When I enter, each foe gets extra types from a random teammate of its own, until I leave the field"
+      ],
+      "params": [
+        {
+          "id": "sourceMemberCount",
+          "label": "Teammates of each foe that lend their types (1 = one random teammate)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A foe with no other living teammate is left alone",
+        "Only types the foe does not already have are added; nothing is added in a preview",
+        "Foes that switch in while I am out are changed too, and the added types are taken back exactly when I leave the field (both are built into the game, not part of this block)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "sourceMemberCount"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified (see the header): seeded donor pick + type graft + a ledger shared with two engine hooks (opponent switch-in, leave field) that find the attr by constructor name. The trigger is a separate WHEN and there is no condition in the class. Constructor change (behaviour-neutral, spec 3.1 spirit): the ctor now takes sourceMemberCount (default BAD_SPLICE_CONFIG.sourceMemberCount = 1) and the opponent-summon half reads it from the holder's live attr, so a rebuilt rule with another count also changes the later splices. Users: Bad Splice (5932 attr 0) only. Suspected oddities, NOT fixed: (1) the ledger is only cleared when the holder leaves the field, so a holder whose ability is later suppressed keeps its grafts while it stays out (the later-switch-in half stops, because hasBadSplice-style lookup reads active attrs); (2) a foe that was spliced and then faints or leaves keeps a stale ledger entry until the holder leaves (harmless, WeakMap keyed by the holder). Requested nothing from the library for this class.",
+      "uses": 1
+    },
+    {
       "id": "block.berserk-on-threshold",
       "className": "BerserkOnThresholdAbAttr",
       "label": "Raise my best attack once when a hit drops me to half HP",
@@ -124,6 +180,308 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.borrowed-time-decay",
+      "className": "BorrowedTimeDecayAbAttr",
+      "label": "Fade a Speed swap back a step at the end of each turn",
+      "summary": "At the end of every turn, a Speed swap I started when I entered returns one more step, until both Pokemon have their own base Speed back. It does nothing if no swap is running.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "speed swap fades",
+        "return borrowed speed",
+        "decay speed swap",
+        "borrowed time ending",
+        "restore speed"
+      ],
+      "examples": [
+        "Each turn end, give back a third of the Speed that was swapped when I entered"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A Speed swap started by the entry half must still be running on me",
+        "After the last step both Pokemon get exactly their own base Speed back, even if the other one has left the field",
+        "Nothing changes in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified (see the header). 1 attr in 1 ability: Borrowed Time (5910 attr 1). Only meaningful together with BorrowedTimeSummonAbAttr (attr 0), which writes the state. No params and no constructor change: the fade length is read from the stored state (new `turns` field written by the entry half). Whether this half should be separately reusable is a design question for the owner; as built, a rule with only this block never finds a state and does nothing (the class is safe on its own).",
+      "uses": 1
+    },
+    {
+      "id": "block.borrowed-time-summon",
+      "className": "BorrowedTimeSummonAbAttr",
+      "label": "Swap Speed with the fastest foe (Borrowed Time)",
+      "summary": "When I enter, my base Speed and the fastest foe's base Speed are swapped. At the end of each of the next 3 turns, a share of the original gap returns, until both are back to normal.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "borrowed time",
+        "speed swap",
+        "swap speed with foe",
+        "steal speed",
+        "trade speed stat",
+        "speed gap fades"
+      ],
+      "examples": [
+        "When I enter, trade Speed with the fastest foe, then let it fade back over 3 turns"
+      ],
+      "params": [
+        {
+          "id": "decayTurns",
+          "label": "Turns until both Speeds are back to normal",
+          "control": "number",
+          "default": 3,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one foe must be on the field",
+        "It swaps base Speed (before stat stages and held items), so those still apply on top; the partner is the foe with the highest base Speed, and the first foe wins a tie",
+        "Nothing changes in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "decayTurns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified (see the header). 1 attr in 1 ability: Borrowed Time (5910 attr 0). The ability is TWO attrs that share a WeakMap: this entry half and BorrowedTimeDecayAbAttr (attr 1); a rule that uses only one half does nothing useful. Constructor change (behaviour-neutral): the ctor takes decayTurns (default BORROWED_TIME_DECAY_TURNS = 3) and the state remembers it (a new `turns` field), so the decay half and applyDecay follow the number; 3 gives the original arithmetic exactly (diff * remaining / 3). decayTurns must be at least 1 (0 would divide by zero). The swapped stat (Speed) is fixed: the partner is chosen by Speed too, so it is not a free param. Suspected oddity, NOT fixed: the source comment says ties are broken by battler index, but the strict `>` in reduce keeps the first foe in getOpponents() order, which is the same only when that order is the battler order. Another: the swap writes the permanent stat, and a foe that leaves the field keeps decaying off-field by design (documented in the header of borrowed-time.ts).",
+      "uses": 1
+    },
+    {
+      "id": "block.brain-over-brawn-power",
+      "className": "BrainOverBrawnPowerAbAttr",
+      "label": "Boost the power of my Fighting moves (Brain Over Brawn)",
+      "summary": "While the game calculates my move's power, a move that passes the condition gets its power multiplied by 1.2. By default Fighting moves get x1.2 (100 power becomes 120).",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "brain over brawn",
+        "fighting move boost",
+        "power boost",
+        "boost fighting moves",
+        "stronger fighting moves",
+        "base power multiplier"
+      ],
+      "examples": [
+        "My Fighting moves hit 20% harder",
+        "Boost Water moves by 30%, like a custom Torrent-style bonus"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.2 = 20% more power)",
+          "control": "number",
+          "default": 1.2,
+          "editable": true,
+          "min": 0,
+          "max": 10,
+          "step": 0.05
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "lib": "move.type",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Moves that deal a fixed amount of damage are not changed"
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.brain-over-brawn-type",
+      "className": "BrainOverBrawnTypeAbAttr",
+      "label": "Turn my Fighting moves into another type (Brain Over Brawn)",
+      "summary": "While the game decides the type of my move, a move that passes the condition becomes Psychic type. By default Fighting moves become Psychic moves.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-type",
+      "whenLabel": "While the game decides a move's type",
+      "synonyms": [
+        "brain over brawn",
+        "fighting becomes psychic",
+        "convert fighting moves",
+        "change move type",
+        "type conversion",
+        "psychic punches"
+      ],
+      "examples": [
+        "My Fighting moves become Psychic moves",
+        "Turn Water moves into Ice moves, like a custom Refrigerate"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Moves become this type",
+          "control": "select",
+          "default": "PSYCHIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:1",
+          "lib": "move.type",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.change-move-type",
+        "params": [
+          "type"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.chivalry",
+      "className": "ChivalryAbAttr",
+      "label": "Take part of the damage meant for my ally or my replacement",
+      "summary": "While I have this, in doubles I take 50% of the direct damage aimed at my ally. In singles, after I switch out on purpose, my replacement sends 25% of direct damage to me for 1 turn(s).",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "chivalry",
+        "protect ally",
+        "share damage",
+        "take hits for a partner",
+        "damage transfer",
+        "knight",
+        "guardian"
+      ],
+      "examples": [
+        "I take half of the damage my ally would take in doubles",
+        "My replacement sends a quarter of its damage to me after I switch out"
+      ],
+      "params": [
+        {
+          "id": "allyShare",
+          "label": "Share of damage to my ally that I take (0.5 = half)",
+          "control": "number",
+          "default": 0.5,
+          "editable": true,
+          "min": 0.05,
+          "max": 1,
+          "step": 0.05
+        },
+        {
+          "id": "switchShare",
+          "label": "Share of damage to my replacement that I take after switching out (0.25 = a quarter)",
+          "control": "number",
+          "default": 0.25,
+          "editable": true,
+          "min": 0.05,
+          "max": 1,
+          "step": 0.05
+        },
+        {
+          "id": "redirectTurns",
+          "label": "Turns the switch redirect lasts (1 = the rest of this turn and the whole next turn)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only direct damage from a Pokemon counts; recoil, weather, poison and other indirect damage never moves to me",
+        "The part I take is dealt as raw HP loss: my defenses, damage reduction and resistances do not lower it; if I am off the field I just lose the HP and never trigger a faint",
+        "The doubles part needs a living ally of the target on the field; the switch part only starts after a switch I chose in the menu, not a forced one",
+        "The amount moved is removed from the damage my ally or replacement takes"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.float",
@@ -565,6 +923,106 @@
       "uses": 7
     },
     {
+      "id": "block.rapier-flag-injection",
+      "className": "RapierFlagInjectionAbAttr",
+      "label": "Two kinds of my moves count as each other (Rapier)",
+      "summary": "While I have this, my moves with the \"Horn based\" property also count as \"Slicing move\", and the reverse, for anything that checks those properties. The moves do not change.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "rapier",
+        "slicing counts as horn",
+        "horn counts as slicing",
+        "keen edge and hunter's horn",
+        "swap move property",
+        "counts as another kind of move"
+      ],
+      "examples": [
+        "My slicing moves also count as horn moves and my horn moves also count as slicing moves, like Rapier"
+      ],
+      "params": [
+        {
+          "id": "firstFlag",
+          "label": "First move property (for example Horn based)",
+          "control": "select",
+          "default": "HORN_BASED",
+          "editable": true,
+          "options": [
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        },
+        {
+          "id": "secondFlag",
+          "label": "Second move property (for example Slicing move)",
+          "control": "select",
+          "default": "SLICING_MOVE",
+          "editable": true,
+          "options": [
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only abilities and effects that ask the game whether a move counts as that property notice it; anything that reads the move's own printed property does not",
+        "Which of my moves qualify is decided from the move's own printed properties, never from a property another ability added"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.received-move-damage-multiplier",
       "className": "ReceivedMoveDamageMultiplierAbAttr",
       "label": "Take less (or more) damage",
@@ -628,6 +1086,124 @@
         "do": true
       },
       "uses": 64
+    },
+    {
+      "id": "block.swirlify",
+      "className": "SwirlifyAbAttr",
+      "label": "Set Swirly Room (or another field effect) when I enter",
+      "summary": "When I enter the battle, Swirly room starts on Both sides for 3 turn(s). Swirly Room makes physical moves count as special and special moves count as physical.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "swirlify",
+        "swirly room",
+        "swap physical and special",
+        "category swap",
+        "room on entry",
+        "field effect on entry"
+      ],
+      "examples": [
+        "Start Swirly Room for 3 turns when I enter",
+        "Set a field effect for a few turns as I come in"
+      ],
+      "params": [
+        {
+          "id": "turnCount",
+          "label": "Number of turns it lasts",
+          "control": "number",
+          "default": 3,
+          "editable": true,
+          "min": 1,
+          "max": 99,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "arenaTag",
+          "label": "Field effect to set",
+          "control": "select",
+          "default": "SWIRLY_ROOM",
+          "editable": true,
+          "options": [
+            "MUD_SPORT",
+            "WATER_SPORT",
+            "SPIKES",
+            "TOXIC_SPIKES",
+            "MIST",
+            "ER_SMOKESCREEN",
+            "STEALTH_ROCK",
+            "STICKY_WEB",
+            "TRICK_ROOM",
+            "INVERSE_ROOM",
+            "MAGIC_ROOM",
+            "WONDER_ROOM",
+            "SWIRLY_ROOM",
+            "GRAVITY",
+            "REFLECT",
+            "LIGHT_SCREEN",
+            "AURORA_VEIL",
+            "QUICK_GUARD",
+            "WIDE_GUARD",
+            "MAT_BLOCK",
+            "CRAFTY_SHIELD",
+            "TAILWIND",
+            "HAPPY_HOUR",
+            "SAFEGUARD",
+            "NO_CRIT",
+            "IMPRISON",
+            "ION_DELUGE",
+            "FIRE_GRASS_PLEDGE",
+            "WATER_FIRE_PLEDGE",
+            "GRASS_WATER_PLEDGE",
+            "FAIRY_LOCK",
+            "NEUTRALIZING_GAS",
+            "PENDING_HEAL",
+            "HOT_COALS",
+            "FOAMY_WEB",
+            "CREEPING_THORNS",
+            "ER_WEATHER_LOCK",
+            "ER_INFESTATION_TRAP",
+            "SEDIMENT_BLOOM",
+            "GRAVE_MARKER",
+            "ER_DRILL_BITS"
+          ]
+        },
+        {
+          "id": "side",
+          "label": "Which side gets it",
+          "control": "select",
+          "default": "BOTH_SIDES",
+          "editable": true,
+          "options": [
+            "BOTH_SIDES",
+            "PLAYER_SIDE",
+            "ENEMY_SIDE"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A field effect of that kind already on that side is not added a second time",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.arena-tag",
+        "params": [
+          "arenaTag",
+          "side",
+          "turnCount"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     }
   ]
 }

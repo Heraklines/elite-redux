@@ -44,10 +44,24 @@ export const CHIVALRY_ALLY_TRANSFER_FRACTION = 0.5;
 /** Share of a direct hit on the switch-in redirected to the off-field holder (singles). */
 export const CHIVALRY_SWITCH_REDIRECT_FRACTION = 0.25;
 
-/** Marker attribute; the transfer/redirect are applied by the `erApplyChivalry*` helpers. */
+/** Marker attribute; the transfer/redirect are applied by the `erApplyChivalry*` helpers, which read the settings below. */
 export class ChivalryAbAttr extends AbAttr {
-  constructor() {
+  /** Share of a direct hit on the ally that the holder takes (ability studio param; the default is the original 0.5). */
+  public readonly allyShare: number;
+  /** Share of a direct hit on the switch-in that goes to the off-field holder (ability studio param; the default is the original 0.25). */
+  public readonly switchShare: number;
+  /** Full turns after the switch the redirect lasts (ability studio param; the default is the original 1). */
+  public readonly redirectTurns: number;
+
+  constructor(
+    allyShare: number = CHIVALRY_ALLY_TRANSFER_FRACTION,
+    switchShare: number = CHIVALRY_SWITCH_REDIRECT_FRACTION,
+    redirectTurns = 1,
+  ) {
     super(false);
+    this.allyShare = allyShare;
+    this.switchShare = switchShare;
+    this.redirectTurns = redirectTurns;
   }
 
   override apply(_params: AbAttrBaseParams): void {}
@@ -61,6 +75,11 @@ export function pokemonCarriesChivalry(pokemon: Pokemon): boolean {
 /** Whether a living, active pokemon carries an unsuppressed Chivalry. */
 function hasChivalry(pokemon: Pokemon): boolean {
   return pokemon.isActive(true) && pokemonCarriesChivalry(pokemon);
+}
+
+/** The unsuppressed Chivalry attr of `pokemon` (its settings drive the transfer), if it carries one. */
+function chivalryAttrOf(pokemon: Pokemon): ChivalryAbAttr | undefined {
+  return pokemon.getAllActiveAbilityAttrs().find((a): a is ChivalryAbAttr => a?.constructor?.name === "ChivalryAbAttr");
 }
 
 /** Deduct `share` from `holder` as raw HP: `damageAndUpdate` on-field (so it can
@@ -91,7 +110,7 @@ export function erApplyChivalryAllyTransfer(victim: Pokemon, incomingDamage: num
   if (!holder) {
     return 0;
   }
-  const share = toDmgValue(incomingDamage * CHIVALRY_ALLY_TRANSFER_FRACTION, 1);
+  const share = toDmgValue(incomingDamage * (chivalryAttrOf(holder)?.allyShare ?? CHIVALRY_ALLY_TRANSFER_FRACTION), 1);
   if (share <= 0) {
     return 0;
   }
@@ -105,6 +124,8 @@ interface ChivalryRedirect {
   holder: Pokemon;
   /** Battle turn at/through which the redirect stays active (end of the incoming mon's next full turn). */
   expiryTurn: number;
+  /** Share of each direct hit that goes to the holder (read from the holder's Chivalry when the switch was marked). */
+  share: number;
 }
 
 const CHIVALRY_REDIRECT = new WeakMap<Pokemon, ChivalryRedirect>();
@@ -115,9 +136,11 @@ const CHIVALRY_REDIRECT = new WeakMap<Pokemon, ChivalryRedirect>();
  * `SwitchSummonPhase` when a Chivalry holder voluntarily switches out.
  */
 export function markChivalryRedirect(incoming: Pokemon, holder: Pokemon): void {
+  const attr = chivalryAttrOf(holder);
   CHIVALRY_REDIRECT.set(incoming, {
     holder,
-    expiryTurn: (globalScene.currentBattle?.turn ?? 0) + 1,
+    expiryTurn: (globalScene.currentBattle?.turn ?? 0) + (attr?.redirectTurns ?? 1),
+    share: attr?.switchShare ?? CHIVALRY_SWITCH_REDIRECT_FRACTION,
   });
 }
 
@@ -138,7 +161,7 @@ export function erApplyChivalrySwitchRedirect(victim: Pokemon, incomingDamage: n
     CHIVALRY_REDIRECT.delete(victim);
     return 0;
   }
-  const share = toDmgValue(incomingDamage * CHIVALRY_SWITCH_REDIRECT_FRACTION, 1);
+  const share = toDmgValue(incomingDamage * state.share, 1);
   if (share <= 0) {
     return 0;
   }

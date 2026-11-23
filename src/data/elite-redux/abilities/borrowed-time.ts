@@ -50,16 +50,18 @@ interface BorrowedTimeState {
   partnerBase: number;
   /** `holderBase - partnerBase` — the fixed amount that decays back over 3 turns. */
   diff: number;
-  /** Number of end-of-turn decay steps applied so far (0..3). */
+  /** Number of end-of-turn decay steps applied so far (0..turns). */
   elapsed: number;
+  /** How many end-of-turn decay steps the swap lasts (set by the Summon half; the original is 3). */
+  turns: number;
 }
 
 const BORROWED_TIME_STATE = new WeakMap<Pokemon, BorrowedTimeState>();
 
 /** Apply the current-turn Speed values for both sides given `remaining` (3..0). */
 function applyDecay(state: BorrowedTimeState, holder: Pokemon): void {
-  const remaining = BORROWED_TIME_DECAY_TURNS - state.elapsed;
-  const share = (state.diff * remaining) / BORROWED_TIME_DECAY_TURNS;
+  const remaining = state.turns - state.elapsed;
+  const share = (state.diff * remaining) / state.turns;
   // holder trails its own base by `share`; partner leads its own base by `share`.
   holder.setStat(Stat.SPD, Math.max(1, Math.round(state.holderBase - share)));
   state.partner.setStat(Stat.SPD, Math.max(1, Math.round(state.partnerBase + share)));
@@ -67,8 +69,12 @@ function applyDecay(state: BorrowedTimeState, holder: Pokemon): void {
 
 /** PostSummon half: find the fastest opponent, swap raw Speed, seed decay state. */
 export class BorrowedTimeSummonAbAttr extends PostSummonAbAttr {
-  constructor() {
+  /** How many end-of-turn steps the swap takes to unwind (ability studio param; the default is the original 3). */
+  public readonly decayTurns: number;
+
+  constructor(decayTurns: number = BORROWED_TIME_DECAY_TURNS) {
     super(true);
+    this.decayTurns = decayTurns;
   }
 
   override canApply({ pokemon }: AbAttrBaseParams): boolean {
@@ -93,6 +99,7 @@ export class BorrowedTimeSummonAbAttr extends PostSummonAbAttr {
       partnerBase,
       diff: holderBase - partnerBase,
       elapsed: 0,
+      turns: this.decayTurns,
     };
     BORROWED_TIME_STATE.set(pokemon, state);
     // Full swap at elapsed 0 (remaining = 3 → share = diff).
@@ -115,7 +122,7 @@ export class BorrowedTimeDecayAbAttr extends PostTurnAbAttr {
       return;
     }
     state.elapsed += 1;
-    if (state.elapsed >= BORROWED_TIME_DECAY_TURNS) {
+    if (state.elapsed >= state.turns) {
       // Restore both sides EXACTLY to their originals, then clear.
       pokemon.setStat(Stat.SPD, Math.max(1, state.holderBase));
       state.partner.setStat(Stat.SPD, Math.max(1, state.partnerBase));
