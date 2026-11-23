@@ -28,6 +28,7 @@
 // =============================================================================
 
 import { type AbAttrBaseParams, FullHpResistTypeAbAttr, PostSummonAbAttr } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { TypeMultiplierAbAttrParams } from "#types/ability-types";
 import { NumberHolder } from "#utils/common";
 
@@ -39,7 +40,9 @@ export interface TimeLimitedEffectivenessFloorOptions {
 }
 
 /** Opens an entry-local window only on the holder's first summon of a battle. */
-export class ActivateOncePerBattleEntryWindowAbAttr extends PostSummonAbAttr {
+export class ActivateOncePerBattleEntryWindowAbAttr extends PostSummonAbAttr implements GatedAttr<AbAttrBaseParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
   private readonly key: string;
 
   constructor(key: string) {
@@ -50,7 +53,12 @@ export class ActivateOncePerBattleEntryWindowAbAttr extends PostSummonAbAttr {
     this.key = key;
   }
 
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** Tier B (ability studio spec 3.1): the whole rule is the replaceable condition, "the window has not been opened in this wave yet". */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     return !pokemon.waveData.entryEffectsFired.has(this.key);
   }
 
@@ -63,7 +71,12 @@ export class ActivateOncePerBattleEntryWindowAbAttr extends PostSummonAbAttr {
   }
 }
 
-export class TimeLimitedEffectivenessFloorAbAttr extends FullHpResistTypeAbAttr {
+export class TimeLimitedEffectivenessFloorAbAttr
+  extends FullHpResistTypeAbAttr
+  implements GatedAttr<TypeMultiplierAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: TypeMultiplierAbAttrParams) => boolean) | undefined;
   private readonly turns: number;
   private readonly activeWindowKey: string | undefined;
 
@@ -76,7 +89,24 @@ export class TimeLimitedEffectivenessFloorAbAttr extends FullHpResistTypeAbAttr 
     this.activeWindowKey = options.activeWindowKey;
   }
 
-  override canApply({ typeMultiplier, move, pokemon }: TypeMultiplierAbAttrParams): boolean {
+  override canApply(params: TypeMultiplierAbAttrParams): boolean {
+    return gatedCanApply<TypeMultiplierAbAttrParams>(this, params);
+  }
+
+  /**
+   * Tier B (ability studio spec 3.1), the safety clauses: the engine passed a real number holder, and the move is not a
+   * fixed-damage move (it has no matchup to floor). They were clauses 3 and 4 of the old `canApply`; they are pure and cannot
+   * throw, so asking them before the window and turn clauses gives the same answer.
+   */
+  public guards({ typeMultiplier, move }: TypeMultiplierAbAttrParams): boolean {
+    return typeMultiplier instanceof NumberHolder && !move?.hasAttr("FixedDamageAttr");
+  }
+
+  /**
+   * The replaceable conditions (old clauses 1 and 2): the entry window named by `activeWindowKey` is open (when one is
+   * named), and the holder is still within its first `turns` turns on the field.
+   */
+  public gate({ pokemon }: TypeMultiplierAbAttrParams): boolean {
     // `tempSummonData.turnCount` starts at 1 on the entry turn and increments each
     // turn (resets on switch), so the entry turn is turn 1. `<= turns` therefore
     // covers turns 1..turns inclusive — i.e. a full `turns`-turn window from entry.
@@ -84,10 +114,12 @@ export class TimeLimitedEffectivenessFloorAbAttr extends FullHpResistTypeAbAttr 
     return (
       (this.activeWindowKey === undefined || pokemon.tempSummonData.abilityEntryWindows.has(this.activeWindowKey))
       && turnNumber <= this.turns
-      && typeMultiplier instanceof NumberHolder
-      && !move?.hasAttr("FixedDamageAttr")
-      && typeMultiplier.value > 0.5
     );
+  }
+
+  /** Feasibility (old clause 5): only a matchup above the floor is lowered, a weaker one is never raised. */
+  public residual({ typeMultiplier }: TypeMultiplierAbAttrParams): boolean {
+    return typeMultiplier.value > 0.5;
   }
 
   // `apply` inherited: floors typeMultiplier to 0.5 and caches it on turnData.

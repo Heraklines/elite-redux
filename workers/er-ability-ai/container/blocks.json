@@ -1,8 +1,74 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "004c9b4ab67198",
+  "hash": "06ae3db423f663",
   "blocks": [
+    {
+      "id": "block.activate-once-per-battle-entry-window",
+      "className": "ActivateOncePerBattleEntryWindowAbAttr",
+      "label": "Open a timed window the first time I enter",
+      "summary": "The first time I enter in a wave, a window named \"entry-window\" opens for as long as I stay out. Other abilities can check for that window. It does not open again in the same wave.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "entry window",
+        "first entry only",
+        "start a timer on entry",
+        "open a time window",
+        "once per wave on entry",
+        "temporary shield window",
+        "forewarn"
+      ],
+      "examples": [
+        "The first time I enter, start a window that a shield ability can use, like Forewarn"
+      ],
+      "params": [
+        {
+          "id": "key",
+          "label": "Name of the window (any short text; abilities that read the window use the same name)",
+          "control": "text",
+          "default": "entry-window",
+          "editable": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "time.once-per",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens when the game only previews the move",
+        "The window closes when I leave the field and cannot reopen in the same wave"
+      ],
+      "gateParams": [
+        {
+          "param": "key",
+          "block": "time.once-per",
+          "field": "key"
+        }
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "key"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "legacy-closure-pending-request. Package for the effect only: opening a NAMED window (an entry-local flag in `tempSummonData.abilityEntryWindows` that resets on switch, plus the per-wave 'already opened' memory) has no library effect (R-B12-15) and the window has no reading atom (R-B12-16: `time.in-entry-window{key}`). 1 attr: Forewarn (108 attr 1, key 'upgrade:forewarn:two-turn-soothsayer', the shipped upgrade that gives Forewarn a two-turn Soothsayer; attr 0 is EntryEffectAbAttr, attr 2 TimeLimitedEffectivenessFloorAbAttr). The gate is `canApply` moved into `gate` (Tier B split, pure move of code). Its natural library form is time.once-per { wave, key }, which reads and writes the same Set (`waveData.entryEffectsFired`), BUT the carrier writes the key right BEFORE this class's `apply` runs, and `apply` returns early when the key is already present, so the window would never open (a test in B12/chunk2.test.ts proves it). So the user's gate stays a legacy-closure until the library offers either the window effect (R-B12-15) or a once-per whose write waits until after the effect. Oddities, not fixed: (a) the name says 'once per battle' but the memory is `waveData`, which is reset every wave, so the window opens once per WAVE; (b) `apply` re-tests the key although the dispatcher already ran `canApply`, which is harmless but is what makes the library atom unusable; (c) a simulated call neither opens the window nor remembers the key.",
+      "uses": 1
+    },
     {
       "id": "block.attack-type-immunity",
       "className": "AttackTypeImmunityAbAttr",
@@ -354,6 +420,46 @@
         "do": true
       },
       "uses": 1
+    },
+    {
+      "id": "block.intimidate-immunity-ab-attr-er",
+      "className": "IntimidateImmunityAbAttrEr",
+      "label": "Stay unaffected by Intimidate and Scare",
+      "summary": "While the game checks whether a foe's Intimidate lands on me, it does not. Example: a foe enters with Intimidate and my Attack stays the same.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.intimidate",
+      "whenLabel": "While the game checks if Intimidate lands on me",
+      "synonyms": [
+        "immune to intimidate",
+        "ignore intimidate",
+        "no attack drop on entry",
+        "inner focus",
+        "oblivious",
+        "discipline",
+        "overwhelm"
+      ],
+      "examples": [
+        "Intimidate and Scare no longer lower my stats, like Overwhelm",
+        "Immune to Intimidate like Inner Focus"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Nothing else has already blocked the same Intimidate"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.per-faint-stat-multiplier",
@@ -1154,6 +1260,341 @@
         "do": true
       },
       "uses": 1
+    },
+    {
+      "id": "block.status-chance-multiplier",
+      "className": "StatusChanceMultiplierAbAttr",
+      "label": "Make my moves inflict one status more often",
+      "summary": "Moves of mine that can inflict Burn do it 5 times as often, never above 100%. Example: 5 = five times the chance. Other moves are left alone.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.effect-chance",
+      "whenLabel": "While the game calculates my move's effect chance",
+      "synonyms": [
+        "burn more often",
+        "freeze more often",
+        "frostbite chance",
+        "status chance boost",
+        "inflict status more often",
+        "serene grace for one status",
+        "pyromancy",
+        "cryomancy"
+      ],
+      "examples": [
+        "Moves inflict burn 5 times as often, like Pyromancy",
+        "Moves inflict frostbite 5 times as often, like Cryomancy"
+      ],
+      "params": [
+        {
+          "id": "status",
+          "label": "Status condition that becomes more likely (Freeze also covers frostbite)",
+          "control": "select",
+          "default": "BURN",
+          "editable": true,
+          "options": [
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Chance multiplier (5 = five times as often, 0 = never)",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 0,
+          "max": 10,
+          "step": 0.5,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must already have an extra effect with a chance above 0 (a guaranteed or missing effect is left alone)",
+        "Order Up and Electro Shot are never changed",
+        "The new chance never goes above 100%"
+      ],
+      "gateParams": [
+        {
+          "param": "status",
+          "block": "move.inflicts-status",
+          "field": "status"
+        }
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 6
+    },
+    {
+      "id": "block.status-effect-immunity-ab-attr-er",
+      "className": "StatusEffectImmunityAbAttrEr",
+      "label": "Block chosen status conditions from landing on me",
+      "summary": "Paralysis cannot land on me. Example: choose Paralysis and no foe can paralyse me.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.status-immunity",
+      "whenLabel": "While the game checks my status immunity",
+      "synonyms": [
+        "immune to paralysis",
+        "immune to status",
+        "cannot be statused",
+        "status immunity",
+        "limber",
+        "insomnia",
+        "comatose",
+        "never sleep"
+      ],
+      "examples": [
+        "Immune to paralysis, like Juggernaut",
+        "Immune to every status condition, like Hyper Cleanse"
+      ],
+      "params": [
+        {
+          "id": "statuses",
+          "label": "Status conditions I am immune to, like 'Paralysis, Burn' (empty = every status)",
+          "control": "text",
+          "default": "Paralysis",
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A status that another ability or effect already blocked is left alone",
+        "Leaving the list empty blocks every status condition except fainting; fainting itself can never be blocked"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": [
+          "statuses"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 6
+    },
+    {
+      "id": "block.super-effective-multiplier-boost",
+      "className": "SuperEffectiveMultiplierBoostAbAttr",
+      "label": "Make my super effective moves stronger",
+      "summary": "When my move is super effective, its power is multiplied by 1.33. Example: 1.33 = 33% more power. Other moves are left alone.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "stronger super effective hits",
+        "boost super effective",
+        "weakness exploit",
+        "super effective damage bonus",
+        "type advantage bonus",
+        "winged king",
+        "iron serpent"
+      ],
+      "examples": [
+        "Super effective moves deal 33% more damage, like Winged King",
+        "Super effective moves get 10% more power"
+      ],
+      "params": [
+        {
+          "id": "factor",
+          "label": "Power multiplier (1.33 = 33% more power, 1 = no change)",
+          "control": "number",
+          "default": 1.33,
+          "editable": true,
+          "min": 0,
+          "max": 4,
+          "step": 0.01,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.effectiveness",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A move without a target is never boosted",
+        "If the game cannot work out the matchup, the move counts as not super effective"
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "factor"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 5
+    },
+    {
+      "id": "block.target-highest-stat-drop",
+      "className": "TargetHighestStatDropAbAttr",
+      "label": "Lower each foe's highest stat of a group when I enter",
+      "summary": "When I enter, each foe nearby loses stages in its highest stat of each group: Attack or Sp. Atk -1; Defense or Sp. Def -1. Example: the higher of Attack and Sp. Atk goes down by 1.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "lower highest stat",
+        "intimidate on the best stat",
+        "drop the strongest stat",
+        "weaken foe's best stat",
+        "entry stat drop",
+        "malicious",
+        "break their best stat"
+      ],
+      "examples": [
+        "Lower the higher of the foe's Attack and Sp. Atk, and the higher of its Defense and Sp. Def, by one stage each when I enter, like Malicious",
+        "Lower the foe's highest of Attack, Sp. Atk and Speed by two stages when I enter"
+      ],
+      "params": [
+        {
+          "id": "rules",
+          "label": "Rules separated by ';', like 'Attack or Sp. Atk -1; Defense or Sp. Def -1' (stages -6 to 6)",
+          "control": "text",
+          "default": "Attack or Sp. Atk -1; Defense or Sp. Def -1",
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Needs at least one opposing Pokemon",
+        "Only foes next to me are affected (in a triple battle the far foe is not), and a fainted foe is skipped",
+        "The highest stat is compared by its real value with no stat stages; on a tie the first stat named wins",
+        "A stat that is already at its limit does not move further",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "rules"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package for the effect only, justified: the library's stat-stage effect has a fixed stat chosen by staff (one stat, one number of stages), and the library has no 'foe's highest stat of this group' choice; the stat is picked from the foe's live values at the moment of the effect, so it cannot be a fixed block (request R-B12-14: `effect.stat-stage` with `stat: highest-of-group`, target 'each foe next to me'). The effect still has a typed setting (the rule list, with a codec) and the trigger is the swappable shared WHEN `event.on-entry`; there is no condition inside. Tier C, 1 attr: Malicious (5305 attr 0): rules [Attack or Sp. Atk, -1] then [Defense or Sp. Def, -1] (read from the live attr). Oddities, not fixed: (0) the dispatcher comment and the archetype file header say 'the higher of Attack vs Defense and of Sp. Atk vs Sp. Def', but the live rules compare Attack with Sp. Atk and Defense with Sp. Def, which matches the ability text 'highest Attack and Defense stat'; (a) `canApply` counts ALL opponents (`getOpponents`) while `apply` walks only the adjacent ones, so in a triple battle with only a far foe the ability flashes and does nothing; (b) `apply` has no random draw but queues one phase per rule per foe, so the order of the rules is the order of the drops; (c) a tie between two candidates keeps the first listed because the comparison is strictly greater than; (d) the highest stat is measured without stat stages, so a foe whose Defense was raised by stages can still lose its (higher by base value) Attack.",
+      "uses": 1
+    },
+    {
+      "id": "block.time-limited-effectiveness-floor",
+      "className": "TimeLimitedEffectivenessFloorAbAttr",
+      "label": "Resist every attack for my first turns on the field",
+      "summary": "For my first 3 turns after I enter, no attack counts as more effective than not very effective (x0.5). Weaker matchups are left alone. Fixed-damage moves are skipped.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.type-matchup",
+      "whenLabel": "While the game calculates type matchup against me",
+      "synonyms": [
+        "no super effective hits for a few turns",
+        "temporary tera shell",
+        "early game shield",
+        "entry resistance",
+        "turns after entry shield",
+        "soothsayer",
+        "forewarn"
+      ],
+      "examples": [
+        "For three turns after I enter, every attack counts as not very effective, like Soothsayer",
+        "For my first two turns on the field, super effective hits count as resisted"
+      ],
+      "params": [
+        {
+          "id": "turns",
+          "label": "Number of turns after I enter (1 = only the entry turn)",
+          "control": "number",
+          "default": 3,
+          "editable": true,
+          "min": 1,
+          "max": 99,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "activeWindowKey",
+          "label": "Name of the timed window that must be open (empty = no window needed)",
+          "control": "text",
+          "default": "",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "time.turn-count",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Fixed-damage moves (Seismic Toss, Dragon Rage) are not affected",
+        "Only a matchup above x0.5 is lowered; an already weaker one (x0.25 or no effect) is never raised",
+        "Not used for status moves, and not when the attacker's move ignores abilities",
+        "The turn count starts at 1 on the turn I enter and starts again when I switch out and back in"
+      ],
+      "gateParams": [
+        {
+          "param": "turns",
+          "block": "time.turn-count",
+          "field": "n"
+        }
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
     }
   ]
 }

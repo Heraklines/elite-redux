@@ -154,3 +154,53 @@ bindEach(LOWERED, [
 // StatusCascadeAbAttr (1 attr). `opponent.status?.effect === trigger` with trigger POISON.
 // =============================================================================================
 bindEach({ id: "status.has", who: "other", status: "POISON" }, [[5451, 0, "Neurotoxin"]]);
+
+// =============================================================================================
+// CHUNK 2. Classes of this chunk and what they bind:
+//   StatusChanceMultiplierAbAttr            gate  legacy (no atom for "the move inflicts a status"; R-B12-11)
+//   SuperEffectiveMultiplierBoostAbAttr     gate  move.effectiveness { gte 2 }
+//   TimeLimitedEffectivenessFloorAbAttr     gate  time.turn-count { lte turns }, or legacy when a window must be open (R-B12-16)
+//   ActivateOncePerBattleEntryWindowAbAttr  gate  legacy (the library once-per writes before this class's apply; R-B12-15)
+//   StatusEffectImmunityAbAttrEr, IntimidateImmunityAbAttrEr, TargetHighestStatDropAbAttr: nothing to bind (no closure, no gate)
+//   StatusMoveTypeImmunityBypassAbAttr: parked (decl/B12/pending), nothing to bind
+// =============================================================================================
+
+// StatusChanceMultiplierAbAttr (6 attrs). The gate is `move.getAttrs("StatusEffectAttr").some(a => a.effect === status)`, plus for
+// FREEZE the frostbite battler-tag effect. Every user needs it and the library has no such atom.
+legacyEach(
+  "needs an atom for 'the move inflicts <status>' (a StatusEffectAttr of that status, for freeze also the frostbite tag effect); request R-B12-11",
+  [
+    [5008, 0, "Pyromancy"],
+    [5187, 0, "Cryomancy"],
+    [5564, 0, "Thermomancy (burn)"],
+    [5564, 1, "Thermomancy (freeze)"],
+    [5665, 2, "Chandelier"],
+    [5682, 0, "Cryostasis"],
+  ],
+);
+
+// SuperEffectiveMultiplierBoostAbAttr (5 attrs). `target.getMoveEffectiveness(user, move) >= 2` is the atom move.effectiveness
+// (defender = the other Pokemon when the move user is the holder).
+bindEach({ id: "move.effectiveness", cmp: "gte", n: 2 }, [
+  [5224, 1, "Arcane Force"],
+  [5294, 0, "Winged King"],
+  [5295, 0, "Iron Serpent"],
+  [5936, 1, "Brain Food"],
+  [20000, 1, "Psychic Supremacy"],
+]);
+
+// TimeLimitedEffectivenessFloorAbAttr (2 attrs). Soothsayer has no window: the gate is `turnCount <= 3`. `n` is rewritten from the
+// `turns` setting (gateParams), 3 is only its shipped value.
+bindEach({ id: "time.turn-count", cmp: "lte", n: 3 }, [[5474, 0, "Soothsayer"]]);
+legacyEach(
+  "needs an atom for 'my named entry window is open' (tempSummonData.abilityEntryWindows.has(key)) next to the turn count; request R-B12-16",
+  [[108, 2, "Forewarn (two-turn Soothsayer upgrade)"]],
+);
+
+// ActivateOncePerBattleEntryWindowAbAttr (1 attr). `!waveData.entryEffectsFired.has(key)` is time.once-per { wave, key }, but that atom
+// writes the key BEFORE this class's apply runs and the apply returns early on a present key, so the window would never open (proved
+// in test B12/chunk2.test.ts). Needs the library effect that opens the window or an atom whose write waits; request R-B12-15.
+legacyEach(
+  "time.once-per {wave} would write the key before this class's apply runs, and apply then returns early without opening the window; needs the window effect or a deferred-write memory; request R-B12-15",
+  [[108, 1, "Forewarn (opens the window)"]],
+);
