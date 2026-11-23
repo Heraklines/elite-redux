@@ -383,6 +383,15 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
   }),
   // Added by B09 chunk 2 (request R-B09-08). MoveEffectPhase (move-effect-phase.ts:455) passes only the user.
   "event.my-move-starts": ({ holder }) => ({ pokemon: holder }),
+  // Added by B09 chunk 1 (request R-B09-27). StatStageChangePhase (stat-stage-change-phase.ts:357): the holder is the Pokemon whose
+  // stat changed, `stats` is the filtered list, `stages` the requested amount, `selfTarget` false (a foe caused it).
+  "event.stat-changed": ({ holder }) => ({
+    pokemon: holder,
+    stats: [Stat.ATK],
+    stages: 1,
+    selfTarget: false,
+    simulated: false,
+  }),
   // Added by B09 chunk 3 (request R-B09-15). MoveEffectPhase (move-effect-phase.ts:257-259) hands the user, the move, the running
   // hit count (starts at 1) and the first target to the AddSecondStrikeAbAttr dispatch.
   "calc.hit-count": ctx => ({

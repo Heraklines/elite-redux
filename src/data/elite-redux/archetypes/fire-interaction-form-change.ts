@@ -27,6 +27,7 @@
 
 import { PostAttackAbAttr, PostDefendAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { SpeciesFormChangeManualTrigger } from "#data/pokemon-forms/form-change-triggers";
 import { PokemonType } from "#enums/pokemon-type";
 import type { Pokemon } from "#field/pokemon";
@@ -79,13 +80,30 @@ export class FireUseFormChangeAbAttr extends PostAttackAbAttr {
     return this.targetFormKey;
   }
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1): `guards`, then `gate`. The original order was fainted, in the form, last
+   * strike, Fire type. The split evaluates fainted and last strike first, then in the form and Fire type; every one of
+   * the four is a side-effect-free read, so the conjunction (and the absence of any draw) is unchanged.
+   */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { pokemon, move } = params;
-    if (pokemon.isFainted() || isInForm(pokemon, this.targetFormKey)) {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Safety rules: a fainted holder never changes form, and the change waits for the last strike of a multi-hit move. */
+  public guards({ pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    if (pokemon.isFainted()) {
       return false;
     }
     // Fire once per move use (not once per multi-hit strike).
-    if (pokemon.turnData.hitsLeft > 1) {
+    return !(pokemon.turnData.hitsLeft > 1);
+  }
+
+  /** The replaceable condition: I am not in the form yet AND the move I used is Fire type (after type-changing abilities). */
+  public gate({ pokemon, move }: PostMoveInteractionAbAttrParams): boolean {
+    if (isInForm(pokemon, this.targetFormKey)) {
       return false;
     }
     return pokemon.getMoveType(move) === PokemonType.FIRE;
@@ -121,9 +139,22 @@ export class FireHitFormChangeAbAttr extends PostDefendAbAttr {
     return this.targetFormKey;
   }
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): `guards` (not fainted), then `gate`, in the original clause order. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { pokemon, opponent: attacker, move } = params;
-    if (pokemon.isFainted() || isInForm(pokemon, this.targetFormKey)) {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Safety rule: a fainted holder never changes form. Moved verbatim from `canApply`. */
+  public guards({ pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    return !pokemon.isFainted();
+  }
+
+  /** The replaceable condition: I am not in the form yet AND the attacker's move is Fire type (after its type-changing abilities). */
+  public gate({ pokemon, opponent: attacker, move }: PostMoveInteractionAbAttrParams): boolean {
+    if (isInForm(pokemon, this.targetFormKey)) {
       return false;
     }
     // The move's resolved type from the ATTACKER's perspective (honors the

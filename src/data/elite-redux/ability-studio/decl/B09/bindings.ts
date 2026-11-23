@@ -192,3 +192,33 @@ bindCondition(
 ); // Flurry
 bindCondition(6094, 1, { id: "move.flag", flag: "PUNCHING_MOVE" }, "gate"); // Twin Lion Fists
 bindCondition(6103, 2, { id: "move.flag", flag: "BITING_MOVE" }, "gate"); // World-Eater
+
+// =============================================================================================
+// B09 chunk 1. The Tier B gates of FieldStatShareAbAttr, FireUseFormChangeAbAttr and FireHitFormChangeAbAttr.
+// Every line was written by hand after reading archetypes/field-stat-share.ts and archetypes/fire-interaction-form-change.ts and the
+// live attrs of all users. The other five classes of the chunk (the two hazard markers, EntryTailwindClearWeatherAbAttr,
+// EntryTrapOnFoeSideAbAttr and FieldCritBoostAbAttr) have no condition slot, so they have nothing to bind.
+// =============================================================================================
+
+// ---------------------------------------------------------------------------------------------
+// FieldStatShareAbAttr. Slot gate: `params.stages !== 0` (the reentrancy memory is the class's guards() stage, not part of the gate).
+// ---------------------------------------------------------------------------------------------
+// stage.just-changed with direction "any" is `frame.stages !== 0` (evaluate/conditions.ts), the same test.
+bindCondition(5290, 0, { id: "stage.just-changed", direction: "any" }, "gate"); // Sharing Is Caring
+
+// ---------------------------------------------------------------------------------------------
+// FireUseFormChangeAbAttr and FireHitFormChangeAbAttr. Slot gate: `!isInForm(pokemon, targetFormKey)` AND the move type is Fire.
+//   - mon.in-form is `pokemon.getFormKey() === key`; the class reads `species.forms[formIndex]?.formKey === key`. Same for any
+//     non-empty key (the key of the one user is "engulfed").
+//   - move.type with effective on is `moveUser.getMoveType(move) === FIRE`. The frame's moveUser is the holder for my own attack
+//     (event.after-my-hit) and the attacker for a hit on me (event.after-hit), exactly the pokemon whose getMoveType the class calls.
+// The fainted test and the last-strike test are the guards() stage of the class, not part of the gate.
+// ---------------------------------------------------------------------------------------------
+const notEngulfedAndFire = () => ({
+  all: [
+    { not: { id: "mon.in-form", who: "holder", key: "engulfed" } },
+    { id: "move.type", type: "FIRE", effective: true },
+  ],
+});
+bindCondition(5373, 0, notEngulfedAndFire(), "gate"); // Flammable Coat, using a Fire move
+bindCondition(5373, 1, notEngulfedAndFire(), "gate"); // Flammable Coat, hit by a Fire move
