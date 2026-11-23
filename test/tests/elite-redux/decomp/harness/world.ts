@@ -426,4 +426,24 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     moveType: new NumberHolder(ctx.move.type),
     simulated: false,
   }),
+  // Added by B12 chunk 4 (request R-B12-34). The extra-effect chance moment (Move.getMoveChance): the user, the move and the move's own chance
+  // (a percent, -1 for a move without an extra effect) in a NumberHolder.
+  "calc.effect-chance": ctx => ({
+    pokemon: ctx.holder,
+    move: ctx.move,
+    chance: new NumberHolder(ctx.move.chance),
+    simulated: false,
+  }),
+  // The wake-up moment (MovePhase.checkSleep): only the woken Pokemon.
+  "event.wake-up": ({ holder }) => ({ pokemon: holder, simulated: false }),
+  // The PreDefend family as the by-name walk of Pokemon.getMoveEffectiveness passes it (Noise Cancel): the checked Pokemon, the attacker, the move
+  // and the matchup holder.
+  "calc.incoming-move": ctx => ({
+    pokemon: ctx.holder,
+    opponent: ctx.foe,
+    move: ctx.move,
+    typeMultiplier: new NumberHolder(1),
+    cancelled: new BooleanHolder(false),
+    simulated: false,
+  }),
 };

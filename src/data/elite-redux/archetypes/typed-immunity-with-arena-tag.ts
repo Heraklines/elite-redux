@@ -17,6 +17,7 @@
 
 import { TypeImmunityAbAttr, type TypeMultiplierAbAttrParams } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { ArenaTagType } from "#enums/arena-tag-type";
 import type { PokemonType } from "#enums/pokemon-type";
@@ -32,7 +33,12 @@ export interface TypedImmunityWithArenaTagOptions {
 // `instanceof TypeImmunityAbAttr`. A sibling PreDefendAbAttr subclass is never collected,
 // so the immunity silently did nothing (Mega Tyranitar's Evaporate took full Water damage).
 // Mirrors TypeImmunityHealAbAttr (immunity via super.apply + its own on-trigger side effect).
-export class TypedImmunityWithArenaTagAbAttr extends TypeImmunityAbAttr {
+export class TypedImmunityWithArenaTagAbAttr
+  extends TypeImmunityAbAttr
+  implements GatedAttr<TypeMultiplierAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: TypeMultiplierAbAttrParams) => boolean) | undefined;
   private readonly arenaTag: ArenaTagType;
   private readonly tagTurns: number;
 
@@ -43,8 +49,20 @@ export class TypedImmunityWithArenaTagAbAttr extends TypeImmunityAbAttr {
   }
 
   override canApply(params: TypeMultiplierAbAttrParams): boolean {
-    // Only damaging moves of the immune type ("Takes no damage … if hit by water").
-    return params.move.is("AttackMove") && super.canApply(params);
+    return gatedCanApply<TypeMultiplierAbAttrParams>(this, params);
+  }
+
+  /**
+   * Tier B (ability studio spec 3.1), the old `canApply` in its old order. The replaceable condition: only damaging moves of the
+   * immune type ("Takes no damage … if hit by water"), so this is the attack-move test.
+   */
+  public gate(params: TypeMultiplierAbAttrParams): boolean {
+    return params.move.is("AttackMove");
+  }
+
+  /** Effect-side feasibility that stays in the class: the parent's immunity test (the move can target me, it is not mine, its type is the immune type). */
+  public residual(params: TypeMultiplierAbAttrParams): boolean {
+    return super.canApply(params);
   }
 
   override apply(params: TypeMultiplierAbAttrParams): void {

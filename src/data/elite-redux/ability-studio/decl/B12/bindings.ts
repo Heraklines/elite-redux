@@ -432,3 +432,70 @@ bindEach(recoilGate("DARK"), [
   [5458, 1, "Doom Blast"],
   [5486, 7, "Two-Faced"],
 ]);
+
+// =============================================================================================
+// Chunk 4: the type-gated archetype classes. Every gate is read from the live attr (the dump showed the fields), in the original clause order.
+//
+//   OffensiveTypeMultiplierAbAttr          gate  mon.has-type { other }: `opponent.isOfType(type)` (the other Pokemon of "while the game calculates a move's power" is the foe)
+//   TypeFilteredEffectChanceMultiplierAbAttr gate move.type { effective }   (legacy until R-B12-30)
+//   TypeGatedStatTriggerOnAttackAbAttr     gate  move.type { effective }: `pokemon.getMoveType(move) === type`
+//   TypedImmunityWithArenaTagAbAttr        gate  move.damaging                (legacy until R-B12-30)
+//   UserFieldFlagImmunityAbAttr            gate  move.flag { flag }: `move.doesFlagEffectApply({ flag, user: attacker, target: pokemon })`
+//   WakeStatBoostAbAttr                    gate  legacy (the flag atom, R-B12-33)
+//   WeatherBasedMoveBlockAbAttr            gate  any of 15 move.is-move
+//   TypeImmunityHighestAttackStatStageAbAttr: nothing to bind (no closure, no gate)
+// =============================================================================================
+const defenderIs = (type: string): unknown => ({ id: "mon.has-type", who: "other", type });
+bindEach(defenderIs("DRAGON"), [[5051, 0, "Dragonslayer"]]);
+bindEach(defenderIs("FAIRY"), [[5178, 0, "Fae Hunter"]]);
+bindEach(defenderIs("GRASS"), [
+  [5181, 0, "Lumberjack"],
+  [5729, 1, "King of the Jungle"],
+]);
+bindEach(defenderIs("DARK"), [[5255, 0, "Monster Hunter"]]);
+bindEach(defenderIs("FIRE"), [[5505, 0, "Firefighter"]]);
+
+legacyEach(
+  "Corrupted Mind: the gate is move.type { PSYCHIC, effective } but the effect-chance moment gives the library no move user (WHEN_MOVE_USER has no entry for calc.effect-chance), so the atom reads false; needs that entry (request R-B12-30)",
+  [[5475, 1, "Corrupted Mind"]],
+);
+
+bindEach({ id: "move.type", type: "FIGHTING", effective: true }, [
+  [5142, 0, "Spinning Top"],
+  [20021, 0, "Spin To Win"],
+]);
+
+legacyEach(
+  "Evaporate: the gate is move.damaging (the attack-move test), but the type-immunity moment gives the library no move user (WHEN_MOVE_USER has no entry for calc.move-immunity), so the atom reads false for every move; needs that entry (request R-B12-30)",
+  [[5180, 0, "Evaporate"]],
+);
+
+bindEach({ id: "move.flag", flag: "SOUND_BASED" }, [[5302, 0, "Noise Cancel"]]);
+
+legacyEach(
+  "Rude Awakening wake-up boost: the gate reads battleData.rudeAwakeningTriggered, which the library once-per atom (its own WeakMap) neither reads nor writes; needs an atom that reads this named battle flag (request R-B12-33)",
+  [[5440, 1, "Rude Awakening"]],
+);
+
+// The 15 weather-based moves of the class (a curated copy of the dex list), in the class's own order.
+const WEATHER_MOVES = [
+  "WEATHER_BALL",
+  "SOLAR_BEAM",
+  "SOLAR_BLADE",
+  "HURRICANE",
+  "THUNDER",
+  "BLIZZARD",
+  "SILVER_WIND",
+  "WILDBOLT_STORM",
+  "BLEAKWIND_STORM",
+  "SANDSEAR_STORM",
+  "SPRINGTIDE_STORM",
+  "SHEER_COLD",
+  "FIRE_PLEDGE",
+  "WATER_PLEDGE",
+  "GRASS_PLEDGE",
+];
+bindEach({ any: WEATHER_MOVES.map(moveId => ({ id: "move.is-move", moveId })) }, [
+  [5092, 0, "Weather Control"],
+  [5540, 1, "Neutralizing Fog"],
+]);
