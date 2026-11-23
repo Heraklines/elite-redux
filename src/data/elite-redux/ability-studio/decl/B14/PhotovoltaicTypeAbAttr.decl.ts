@@ -25,7 +25,7 @@ export default defineDecl(PhotovoltaicTypeAbAttr, {
   tier: "C",
   kind: "package",
   when: "event.on-entry",
-  label: "Gain an extra type when I enter",
+  label: "Gain an extra type",
   summary: params =>
     `When I enter the battle, I gain the ${params.type} type in addition to my own types. Example: a Water type that gains Electric becomes Water and Electric.`,
   synonyms: [

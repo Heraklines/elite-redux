@@ -31,9 +31,9 @@ export default defineDecl(SouthernCrossPunchAbAttr, {
   tier: "B",
   kind: "package",
   when: "event.after-my-hit",
-  label: "Re-aim queued attacks at the next foe after my punch",
+  label: "Re-aim queued attacks at the next foe",
   summary: () =>
-    "After my punching move hits, every move still queued this turn that aims at a foe is re-aimed at the next foe over. Example: with two foes, the targets swap.",
+    "Every move still queued this turn that aims at a foe is re-aimed at the next foe over. Example: with two foes, the targets swap.",
   synonyms: [
     "southern cross punch",
     "retarget",

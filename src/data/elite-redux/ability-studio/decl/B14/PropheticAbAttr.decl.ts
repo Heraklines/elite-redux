@@ -23,14 +23,37 @@
 // requests/B14.md). The trigger (on entry) is already a separate block, and the class has no IF.
 import { PropheticAbAttr } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
-import { enumListCodec } from "#data/elite-redux/ability-studio/param-codecs";
+import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
 import { MoveId } from "#enums/move-id";
+
+// Staff pick attack names; the class wants a list of move ids. The first move in the list is the main one.
+const ATTACK_SETS: Readonly<Record<string, readonly MoveId[]>> = {
+  "Future Sight and Doom Desire": [MoveId.FUTURE_SIGHT, MoveId.DOOM_DESIRE],
+  "Future Sight only": [MoveId.FUTURE_SIGHT],
+  "Doom Desire only": [MoveId.DOOM_DESIRE],
+  "Doom Desire and Future Sight": [MoveId.DOOM_DESIRE, MoveId.FUTURE_SIGHT],
+};
+
+const attackSetCodec: ParamCodec = {
+  toCtor: value => {
+    if (!Object.hasOwn(ATTACK_SETS, String(value))) {
+      throw new Error(`"${String(value)}" is not a known set of delayed attacks`);
+    }
+    return [...ATTACK_SETS[String(value)]];
+  },
+  fromInstance: raw =>
+    Array.isArray(raw)
+      ? Object.keys(ATTACK_SETS).find(
+          key => ATTACK_SETS[key].length === raw.length && ATTACK_SETS[key].every((id, i) => id === raw[i]),
+        )
+      : undefined,
+};
 
 export default defineDecl(PropheticAbAttr, {
   tier: "C",
   kind: "package",
   when: "event.on-entry",
-  label: "Set up a delayed attack on a foe when I enter",
+  label: "Set up a delayed attack on a foe",
   summary: params =>
     `When I enter, I set a delayed attack on the first foe still standing. It hits ${params.turns} turns later using the stronger of: ${params.moves}.`,
   synonyms: [
@@ -48,11 +71,12 @@ export default defineDecl(PropheticAbAttr, {
       id: "moves",
       ctorIndex: 0,
       path: "moves",
-      control: "text",
-      label: "Attacks to choose from (names, comma separated; the first is the main one)",
+      control: "select",
+      label: "Which delayed attacks to choose from (the first one named is the main one)",
       editable: true,
-      default: "FUTURE_SIGHT,DOOM_DESIRE",
-      codec: enumListCodec(MoveId, "move"),
+      default: "Future Sight and Doom Desire",
+      options: Object.keys(ATTACK_SETS),
+      codec: attackSetCodec,
       gateIndependent: true,
     },
     {
