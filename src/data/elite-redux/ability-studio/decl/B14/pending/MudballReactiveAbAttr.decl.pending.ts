@@ -64,7 +64,7 @@ export default defineDecl(MudballReactiveAbAttr, {
       max: 250,
       step: 1,
       integer: true,
-      label: "Power of the free move",
+      label: "Base power of the free move",
       editable: true,
       default: 20,
       gateIndependent: true,
@@ -78,7 +78,7 @@ export default defineDecl(MudballReactiveAbAttr, {
   feasibility: [
     "Only while the foe that entered is still standing",
     "Only while I am still standing",
-    "The free move is used on the foe that entered, as an indirect move (it cannot set off another free move)",
+    "The free move is used on the foe that entered, as an indirect move (it is not a normal move choice)",
   ],
   effect: { id: "effect.scripted-move", params: ["moveId", "power"] },
   reusableAlone: { when: true, if: true, do: true },

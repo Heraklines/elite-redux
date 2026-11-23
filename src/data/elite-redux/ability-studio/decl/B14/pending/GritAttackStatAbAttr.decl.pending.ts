@@ -65,7 +65,7 @@ export default defineDecl(GritAttackStatAbAttr, {
     },
   ],
   conditions: [
-    // Gate = a non-volatile status (legacy until the atom status.has-major exists, bindings.chunk4.pending.ts). Removable.
+    // Gate = a non-volatile status (legacy until the atom status.has-non-volatile exists, bindings.chunk4.pending.ts). Removable.
     { slot: "gate", ctx: "params", removable: true, editable: true },
   ],
   guards: [],

@@ -36,7 +36,7 @@ export default defineDecl(SharingIsScaringAbAttr, {
   when: "cancel.stat-protect",
   label: "Pass my own stat drops on to the foes",
   summary: () =>
-    "When my own move would lower my stats, I take no drop and every foe still standing is lowered by the same amount. Example: Close Combat lowers each foe's Defense and Sp. Def by 1.",
+    "When my own move lowers my stats, I take no drop and every foe still standing gets it instead. This pass-on always happens and cannot be conditioned.",
   synonyms: [
     "sharing is scaring",
     "give my stat drops to the foes",
@@ -65,6 +65,7 @@ export default defineDecl(SharingIsScaringAbAttr, {
   conditions: [],
   guards: [],
   feasibility: [
+    "The pass-on to the foes always happens together with the block and cannot be limited by an extra condition (the game does not ask conditions before passing it on), so no IF can be added to this block",
     "Only drops I cause myself are handled here (a drop from another Pokemon is the job of the other stat-protection block)",
     "Only stat drops are blocked and passed on (a boost I give myself always lands)",
     "A drop that another ability or effect already blocked is left alone and is not passed on",
@@ -72,7 +73,7 @@ export default defineDecl(SharingIsScaringAbAttr, {
     "Foes that already fainted are skipped",
   ],
   effect: { id: "effect.negate", params: ["stat"] },
-  reusableAlone: { when: true, if: true, do: true },
+  reusableAlone: { when: true, if: false, do: true },
   flags: { rng: "none", state: "none", simulated: "respects" },
   probes: [
     {
