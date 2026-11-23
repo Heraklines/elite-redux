@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "03ef54e0d0a23c",
-  "hash": "12d46999825eaf",
+  "hash": "0c8c3f14b0ee64",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -1777,6 +1777,980 @@
       "uses": 1
     },
     {
+      "id": "block.post-attack-change-target-type",
+      "className": "PostAttackChangeTargetTypeAbAttr",
+      "label": "Turn the target into one type after my attack",
+      "summary": "After my attack hits, the target becomes a pure Water type and loses its other types. Example: Water makes any target a pure Water type.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "change the target's type",
+        "make the foe a type",
+        "type swap on hit",
+        "retype the target",
+        "damp",
+        "magical dust",
+        "paint shot"
+      ],
+      "examples": [
+        "When my contact move hits, the target becomes a Water type, like Damp",
+        "My pulse moves turn the target into the type of the move, like Paint Shot"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Type the target becomes (Move type = the type of the move I used)",
+          "control": "select",
+          "default": "WATER",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR",
+            "MOVE_TYPE"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "contactOnly",
+          "label": "Built-in rule: only moves that make contact count (replaced by the condition block you set)",
+          "control": "boolean",
+          "default": true,
+          "editable": false
+        },
+        {
+          "id": "requireFlag",
+          "label": "Built-in rule: property the move must have (None = no requirement; replaced by the condition block you set)",
+          "control": "select",
+          "default": "NONE",
+          "editable": false,
+          "options": [
+            "NONE",
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "There must be a target",
+        "All of the target's types are replaced by the one type, so a dual-type target becomes a single type",
+        "Nothing happens in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "type"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.post-attack-contact-suppress-target-ability",
+      "className": "PostAttackContactSuppressTargetAbilityAbAttr",
+      "label": "Switch off the target's ability after my attack",
+      "summary": "After my attack hits, the target's ability stops working for as long as it stays in. It does nothing if the ability is already switched off.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "suppress the target's ability",
+        "disable the foe's ability",
+        "ability removal on hit",
+        "gastro acid on hit",
+        "neutralize the ability",
+        "hemotoxin"
+      ],
+      "examples": [
+        "When my contact move hits a poisoned target, its ability is switched off, like Hemotoxin",
+        "Every attack I land turns the target's ability off"
+      ],
+      "params": [
+        {
+          "id": "contactOnly",
+          "label": "Built-in rule: only moves that make contact count (replaced by the condition block you set)",
+          "control": "boolean",
+          "default": true,
+          "editable": false
+        },
+        {
+          "id": "status",
+          "label": "Built-in rule: status the target must have (None = any; replaced by the condition block you set)",
+          "control": "select",
+          "default": "NONE",
+          "editable": false,
+          "options": [
+            "NONE",
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN"
+          ]
+        },
+        {
+          "id": "status2",
+          "label": "Built-in rule: a second status that also counts (None = only the first; replaced by the condition block you set)",
+          "control": "select",
+          "default": "NONE",
+          "editable": false,
+          "options": [
+            "NONE",
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "There must be a target and it must still be standing",
+        "Nothing happens if the target's ability is already switched off",
+        "Nothing happens in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.post-attack-remove-target-type",
+      "className": "PostAttackRemoveTargetTypeAbAttr",
+      "label": "Strip one type from the target after my attack",
+      "summary": "After my attack hits a target that has the Ghost type, it loses that type and keeps its others. A target with no type left becomes typeless. A Terastallized target keeps its Tera type.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "remove a type from the target",
+        "strip the ghost type",
+        "lose a typing on hit",
+        "type removal",
+        "illuminate",
+        "refrigerator",
+        "foresight on hit"
+      ],
+      "examples": [
+        "When I hit a Ghost type, it loses the Ghost type so Normal and Fighting moves can hit it, like Illuminate",
+        "My attacks remove the Ground type from the target"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Type to remove from the target",
+          "control": "select",
+          "default": "GHOST",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The target must be a different Pokemon from me",
+        "A target that is Terastallized into that type keeps it",
+        "Nothing happens in a preview"
+      ],
+      "gateParams": [
+        {
+          "param": "type",
+          "block": "mon.has-type",
+          "field": "type"
+        }
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "type"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 6
+    },
+    {
+      "id": "block.post-attack-scripted-move",
+      "className": "PostAttackScriptedMoveAbAttr",
+      "label": "Follow up my attack with a free extra move",
+      "summary": "After my attack, I use Thunderbolt on a foe for free with 50 power. It uses no PP and does not set off another follow-up. Example: 50 power Surf after a Water move.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "follow up move",
+        "extra attack after attacking",
+        "free second move",
+        "bonus move",
+        "combo move",
+        "after a move use another",
+        "high tide",
+        "thunder clouds",
+        "volcano rage",
+        "aftershock"
+      ],
+      "examples": [
+        "After I use a Water move, I also use a 50 power Surf, like High Tide",
+        "After I use a special move, I launch a 35 power Thunderbolt, like Thunder Clouds",
+        "After any damaging move I also use Magnitude, like Aftershock"
+      ],
+      "params": [
+        {
+          "id": "moveId",
+          "label": "Move to use (type its name, for example Ice Beam)",
+          "control": "text",
+          "default": "THUNDERBOLT",
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "power",
+          "label": "Power of the move (0 = the move's own power)",
+          "control": "number",
+          "default": 50,
+          "editable": true,
+          "min": 0,
+          "max": 250,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "magnitudeLow",
+          "label": "Lowest Magnitude level when the move is Magnitude (4 to 10; 0 = not used)",
+          "control": "number",
+          "default": 0,
+          "editable": true,
+          "min": 0,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "magnitudeHigh",
+          "label": "Highest Magnitude level when the move is Magnitude (4 to 10; 0 = not used)",
+          "control": "number",
+          "default": 0,
+          "editable": true,
+          "min": 0,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "hpScaledPower",
+          "label": "Base power that grows with my remaining HP, for Eruption (0 = not used)",
+          "control": "number",
+          "default": 0,
+          "editable": true,
+          "min": 0,
+          "max": 250,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "category",
+          "label": "Built-in rule: category of the move that sets it off (None = any; replaced by the condition block you set)",
+          "control": "select",
+          "default": "NONE",
+          "editable": false,
+          "options": [
+            "NONE",
+            "PHYSICAL",
+            "SPECIAL",
+            "STATUS"
+          ]
+        },
+        {
+          "id": "type",
+          "label": "Built-in rule: type of the move that sets it off (None = any; replaced by the condition block you set)",
+          "control": "select",
+          "default": "NONE",
+          "editable": false,
+          "options": [
+            "NONE",
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "type2",
+          "label": "Built-in rule: a second type that also sets it off (None = only the first; replaced by the condition block you set)",
+          "control": "select",
+          "default": "NONE",
+          "editable": false,
+          "options": [
+            "NONE",
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "flag",
+          "label": "Built-in rule: property the move must have, like dance or sound (None = any; replaced by the condition block you set)",
+          "control": "select",
+          "default": "NONE",
+          "editable": false,
+          "options": [
+            "NONE",
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        },
+        {
+          "id": "triggerMove",
+          "label": "Built-in rule: the only move that sets it off (None = any; replaced by the condition block you set)",
+          "control": "text",
+          "default": "NONE",
+          "editable": false
+        },
+        {
+          "id": "triggerMove2",
+          "label": "Built-in rule: a second move that also sets it off (None = only the first; replaced by the condition block you set)",
+          "control": "text",
+          "default": "NONE",
+          "editable": false
+        },
+        {
+          "id": "targetStatsDecreased",
+          "label": "Built-in rule: the target must have lost a stat stage this turn (replaced by the condition block you set)",
+          "control": "boolean",
+          "default": false,
+          "editable": false
+        },
+        {
+          "id": "allowVirtualMove",
+          "label": "Built-in rule: one free extra move that may set it off despite the follow-up safety rule (None = no such move)",
+          "control": "text",
+          "default": "NONE",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "There must be a target and at least one foe still standing",
+        "Safety rule: a follow-up never sets off another follow-up (not while a multi-hit move still has hits left, and not after a free extra move)",
+        "The move is aimed at a living foe; a move that hits several targets hits every valid one",
+        "Nothing happens in a preview"
+      ],
+      "effect": {
+        "id": "effect.scripted-move",
+        "params": [
+          "moveId",
+          "power",
+          "magnitudeLow",
+          "magnitudeHigh",
+          "hpScaledPower"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 19
+    },
+    {
+      "id": "block.post-attack-set-hazard-by-move-type",
+      "className": "PostAttackSetHazardByMoveTypeAbAttr",
+      "label": "Sometimes lay a hazard on the foe's side with one move type",
+      "summary": "After my Rock move hits, there is a 30% chance that Stealth rock is laid on the foe's side. Example: Rock moves lay Stealth rock.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "set stealth rock on hit",
+        "hazard on hit",
+        "entry hazard after attacking",
+        "spikes after attacking",
+        "rock moves lay stealth rock",
+        "archmage",
+        "familiar"
+      ],
+      "examples": [
+        "30% chance that my Rock moves set Stealth Rock on the foe's side, like Archmage",
+        "My Poison moves sometimes lay Toxic Spikes"
+      ],
+      "params": [
+        {
+          "id": "chance",
+          "label": "Chance (%)",
+          "control": "slider",
+          "default": 30,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "moveType",
+          "label": "Type of move that lays the hazard",
+          "control": "select",
+          "default": "ROCK",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "hazard",
+          "label": "Hazard to lay on the foe's side",
+          "control": "select",
+          "default": "STEALTH_ROCK",
+          "editable": true,
+          "options": [
+            "SPIKES",
+            "TOXIC_SPIKES",
+            "STEALTH_ROCK",
+            "STICKY_WEB"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really have landed (not missed and not blocked by an immunity)",
+        "The hazard is laid on the side opposite me; the field decides what happens when it is already there",
+        "Nothing happens in a preview"
+      ],
+      "gateParams": [
+        {
+          "param": "chance",
+          "block": "rng.chance",
+          "field": "pct"
+        },
+        {
+          "param": "moveType",
+          "block": "move.type",
+          "field": "type"
+        }
+      ],
+      "effect": {
+        "id": "effect.arena-tag",
+        "params": [
+          "hazard"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.post-attack-set-terrain-by-move-type",
+      "className": "PostAttackSetTerrainByMoveTypeAbAttr",
+      "label": "Sometimes set a terrain that matches my move's type",
+      "summary": "After my damaging move hits, there is a 30% chance the terrain changes to the one linked to the move's type. Example: Electric moves set Electric terrain.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "set terrain on hit",
+        "terrain by move type",
+        "electric moves make electric terrain",
+        "terrain after attacking",
+        "field change on hit",
+        "archmage",
+        "familiar"
+      ],
+      "examples": [
+        "30% chance that my Electric moves set Electric Terrain and my Grass moves set Grassy Terrain, like Archmage",
+        "My Psychic moves sometimes set Psychic Terrain"
+      ],
+      "params": [
+        {
+          "id": "chance",
+          "label": "Chance (%)",
+          "control": "slider",
+          "default": 30,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "type1",
+          "label": "Built-in rule: move type number 1 that sets a terrain (None = not used; replaced by the condition block you set)",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": false,
+          "options": [
+            "NONE",
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "terrain1",
+          "label": "Terrain that move type number 1 sets (None = not used)",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NONE",
+            "MISTY",
+            "ELECTRIC",
+            "GRASSY",
+            "PSYCHIC",
+            "TOXIC"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "type2",
+          "label": "Built-in rule: move type number 2 that sets a terrain (None = not used; replaced by the condition block you set)",
+          "control": "select",
+          "default": "NONE",
+          "editable": false,
+          "options": [
+            "NONE",
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "terrain2",
+          "label": "Terrain that move type number 2 sets (None = not used)",
+          "control": "select",
+          "default": "NONE",
+          "editable": true,
+          "options": [
+            "NONE",
+            "MISTY",
+            "ELECTRIC",
+            "GRASSY",
+            "PSYCHIC",
+            "TOXIC"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "type3",
+          "label": "Built-in rule: move type number 3 that sets a terrain (None = not used; replaced by the condition block you set)",
+          "control": "select",
+          "default": "NONE",
+          "editable": false,
+          "options": [
+            "NONE",
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "terrain3",
+          "label": "Terrain that move type number 3 sets (None = not used)",
+          "control": "select",
+          "default": "NONE",
+          "editable": true,
+          "options": [
+            "NONE",
+            "MISTY",
+            "ELECTRIC",
+            "GRASSY",
+            "PSYCHIC",
+            "TOXIC"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "type4",
+          "label": "Built-in rule: move type number 4 that sets a terrain (None = not used; replaced by the condition block you set)",
+          "control": "select",
+          "default": "NONE",
+          "editable": false,
+          "options": [
+            "NONE",
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "terrain4",
+          "label": "Terrain that move type number 4 sets (None = not used)",
+          "control": "select",
+          "default": "NONE",
+          "editable": true,
+          "options": [
+            "NONE",
+            "MISTY",
+            "ELECTRIC",
+            "GRASSY",
+            "PSYCHIC",
+            "TOXIC"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really have landed (not missed and not blocked by an immunity)",
+        "The terrain only changes if the field accepts it (terrain priority rules apply; a failed change is silent)",
+        "Nothing happens in a preview"
+      ],
+      "gateParams": [
+        {
+          "param": "chance",
+          "block": "rng.chance",
+          "field": "pct"
+        }
+      ],
+      "effect": {
+        "id": "effect.set-terrain",
+        "params": [
+          "terrain1",
+          "terrain2",
+          "terrain3",
+          "terrain4"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.post-damage-force-attacker-out",
+      "className": "PostDamageForceAttackerOutAbAttr",
+      "label": "Force the attacker out once each time I enter the battle",
+      "summary": "The first time a foe's attack hurts me after I enter the battle, that foe is switched out. It comes back again at my next entry.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-taking-damage",
+      "whenLabel": "After I take any damage",
+      "synonyms": [
+        "force the attacker to switch",
+        "dragon tail on hit",
+        "red card",
+        "eject the attacker",
+        "roar when hit",
+        "restraining order",
+        "chuckster"
+      ],
+      "examples": [
+        "The first foe that hits me after I enter is forced out, like Restraining Order",
+        "The first contact hit on me forces the attacker to switch out, like Chuckster"
+      ],
+      "params": [
+        {
+          "id": "contactRequired",
+          "label": "Built-in rule: only contact moves count (replaced by the condition block you set)",
+          "control": "boolean",
+          "default": false,
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A living foe must have hurt me with its own attack (weather, poison and hazards do not count) and I must still be in the battle",
+        "Once each time I enter the battle",
+        "The foe must be able to be switched out (it is not trapped and has a teammate to send in)",
+        "Nothing happens in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
       "id": "block.post-damage-force-switch",
       "className": "PostDamageForceSwitchAbAttr",
       "label": "Switch out when my HP gets low",
@@ -1838,6 +2812,141 @@
       "effect": {
         "id": "effect.force-switch-out",
         "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.post-defend-change-attacker-type",
+      "className": "PostDefendChangeAttackerTypeAbAttr",
+      "label": "Change a type when a foe's attack hits me",
+      "summary": "When a foe's attack hits me, the attacker becomes a pure Water type and loses the other types. Example: Water makes the attacker a pure Water type.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "change the attacker's type",
+        "retype the foe that hits me",
+        "type swap when hit",
+        "make the attacker a type on contact",
+        "damp",
+        "magical dust",
+        "type change on defense"
+      ],
+      "examples": [
+        "When a foe's contact move hits me, the foe becomes a Psychic type, like Magical Dust",
+        "When a foe's move hits me, I become the type of that move"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Type to turn into (Move type = the type of the foe's move)",
+          "control": "select",
+          "default": "WATER",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR",
+            "MOVE_TYPE"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "side",
+          "label": "Who changes type (the attacker, or me)",
+          "control": "select",
+          "default": "THE_ATTACKER",
+          "editable": true,
+          "options": [
+            "THE_ATTACKER",
+            "ME"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "contactOnly",
+          "label": "Built-in rule: only moves that make contact count (replaced by the condition block you set)",
+          "control": "boolean",
+          "default": false,
+          "editable": false
+        },
+        {
+          "id": "requireFlag",
+          "label": "Built-in rule: property the move must have (None = no requirement; replaced by the condition block you set)",
+          "control": "select",
+          "default": "NONE",
+          "editable": false,
+          "options": [
+            "NONE",
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "There must be an attacker",
+        "All of that Pokemon's types are replaced by the one type, so a dual-type Pokemon becomes a single type",
+        "Nothing happens in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "type",
+          "side"
+        ]
       },
       "reusableAlone": {
         "when": true,

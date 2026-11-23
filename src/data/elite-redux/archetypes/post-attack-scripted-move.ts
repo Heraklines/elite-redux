@@ -24,6 +24,7 @@
 
 import { PostAttackAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { canTriggerFollowUpMove } from "#data/elite-redux/ability-upgrades/attrs/follow-up-guard";
 import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
 import type { MoveCategory } from "#enums/move-category";
@@ -70,7 +71,13 @@ export interface PostAttackScriptedMoveOptions {
   readonly allowVirtualTriggerMoveId?: MoveId;
 }
 
-export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
+export class PostAttackScriptedMoveAbAttr
+  extends PostAttackAbAttr
+  implements GatedAttr<PostMoveInteractionAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
   constructor(private readonly opts: PostAttackScriptedMoveOptions) {
     super(undefined, false);
   }
@@ -85,12 +92,22 @@ export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
     return this.opts.power;
   }
 
+  /**
+   * Tier B split (ability studio spec 3.1): `guards`, then `gate`, no `prepare`, no `residual`, in the ORIGINAL clause
+   * order (there is a target, a living foe is left, the follow-up guard; then the allowed move list, the stat-drop test,
+   * the category, the type and the flag). Nothing in either part draws a random number or has a side effect.
+   */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Safety rules that come first. Moved verbatim out of the old `canApply`; the comments are the original ones. */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
     const { pokemon, move, opponent } = params;
     if (!opponent) {
       return false;
     }
-    // The TRIGGERING target may have just FAINTED from the move that landed (e.g.
+    // The TRIGGERING target may have just FAINTED from the move that landed (e.g
     // a High Tide holder KOs one foe with a single-target Water move). That must
     // NOT suppress the follow-up — a spread follow-up (Surf/Blizzard) still has to
     // hit the rest of the field. Bail only when the holder has NO living foe left
@@ -124,6 +141,14 @@ export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
     if (!canTriggerFollowUpMove(pokemon) && move.id !== this.opts.allowVirtualTriggerMoveId) {
       return false;
     }
+    return true;
+  }
+
+  /**
+   * The replaceable condition: the move is on the allowed list, the target lost a stat stage this turn (when asked), and
+   * the move has the wanted category, type and flag. Each clause only applies when its option is set.
+   */
+  public gate({ pokemon, move, opponent }: PostMoveInteractionAbAttrParams): boolean {
     if (this.opts.triggerMoveIds !== undefined && !this.opts.triggerMoveIds.includes(move.id)) {
       return false;
     }

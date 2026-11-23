@@ -2416,20 +2416,38 @@ export class PostAttackAbilityGiveAbAttr extends PostAttackAbAttr {
 export class PostAttackRemoveTargetTypeAbAttr extends PostAttackAbAttr {
   private readonly removedType: PokemonType;
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
   constructor(removedType: PokemonType) {
     super(undefined, false);
     this.removedType = removedType;
   }
 
+  /**
+   * Tier B split (ability studio spec 3.1): `guards` (the target is not me), `gate` (a damaging move, the target has the
+   * type), `residual` (an active Tera type cannot be stripped). No `prepare`, no random draw. The old order was damaging
+   * move, not me, damaging move again, has the type, Tera test; every clause is a pure read, so moving "not me" first
+   * changes nothing observable. Both damaging-move tests are kept, as in the original.
+   */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { pokemon, opponent, move } = params;
-    return (
-      super.canApply(params)
-      && pokemon !== opponent
-      && move.category !== MoveCategory.STATUS
-      && opponent.isOfType(this.removedType)
-      && !(opponent.isTerastallized && opponent.getTeraType() === this.removedType)
-    );
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The attacker and the target are different Pokemon. */
+  public guards({ pokemon, opponent }: PostMoveInteractionAbAttrParams): boolean {
+    return pokemon !== opponent;
+  }
+
+  /** The replaceable condition: a damaging move against a target that has the type. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    const { opponent, move } = params;
+    return super.canApply(params) && move.category !== MoveCategory.STATUS && opponent.isOfType(this.removedType);
+  }
+
+  /** Feasibility that stays in the class: a target Terastallized into the type keeps it. */
+  public residual({ opponent }: PostMoveInteractionAbAttrParams): boolean {
+    return !(opponent.isTerastallized && opponent.getTeraType() === this.removedType);
   }
 
   override apply(params: PostMoveInteractionAbAttrParams): void {

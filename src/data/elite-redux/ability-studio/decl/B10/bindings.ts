@@ -138,3 +138,109 @@ bindLegacyClosure(
 // =============================================================================================
 bindCondition(5706, 0, { id: "move.type", type: "ELECTRIC", effective: true }, "gate"); // Power Outage: boost, Electric moves
 bindCondition(5706, 1, { id: "move.type", type: "ELECTRIC", effective: true }, "gate"); // Power Outage: lose Electric after one
+
+// =============================================================================================
+// Chunk 3 gates (Tier B, slot "gate"). Every class of the chunk split canApply into guards, gate and residual by hand after reading
+// the class and every one of its users; each binding below repeats ONE user's gate with library atoms, in the class's own clause
+// order. The L1 attr differential evaluates the class's own canApply and the rebuild's over the state grid, and the B10 test
+// chunk3-gates.test.ts adds the states the grid cannot reach (pulse, dance and sound moves, a Tera target, a poisoned target,
+// every status, an immune hit).
+// =============================================================================================
+
+// "The move deals damage" is the parent's attack rule (move.category != STATUS), and "makes contact" asks doesFlagEffectApply with the
+// moving Pokemon as the user, like every one of the classes below.
+const damagingContact = (): unknown => ({
+  all: [{ id: "move.damaging" }, { id: "move.flag", flag: "MAKES_CONTACT" }],
+});
+
+// ---- PostAttackChangeTargetTypeAbAttr: damaging move, then contact (contactOnly) and the flag (requireFlag) ----
+bindCondition(6, 2, damagingContact(), "gate"); // Damp (offense half): Water on a contact move
+bindCondition(5042, 1, damagingContact(), "gate"); // Magical Dust (offense half): Psychic on a contact move
+bindCondition(5581, 0, { all: [{ id: "move.damaging" }, { id: "move.flag", flag: "PULSE_MOVE" }] }, "gate"); // Paint Shot: pulse moves, no contact rule
+
+// ---- PostDefendChangeAttackerTypeAbAttr: the attack-move class test is a guard in the class; the gate is contact only ----
+bindCondition(6, 0, { id: "move.flag", flag: "MAKES_CONTACT" }, "gate"); // Damp (defense half)
+bindCondition(5042, 0, { id: "move.flag", flag: "MAKES_CONTACT" }, "gate"); // Magical Dust (defense half)
+
+// ---- PostAttackRemoveTargetTypeAbAttr (the ab-attrs class): damaging move, then the target has the type. The type is the class's
+// `type` setting (gateParams). ----
+const ghostStrip = (): unknown => ({ all: [{ id: "move.damaging" }, { id: "mon.has-type", who: "other", type: "GHOST" }] });
+bindCondition(35, 1, ghostStrip(), "gate"); // Illuminate
+bindCondition(5229, 2, ghostStrip(), "gate"); // Refrigerator (its Illuminate copy)
+bindCondition(5603, 2, ghostStrip(), "gate"); // Depth Explorer
+bindCondition(5665, 1, ghostStrip(), "gate"); // Chandelier
+bindCondition(5960, 3, ghostStrip(), "gate"); // Spectacle
+bindLegacyClosure(
+  5229,
+  3,
+  "Instance of the ARCHETYPE class that shares the name PostAttackRemoveTargetTypeAbAttr with the ab-attrs class this declaration builds (fields stripType and contactOnly, falls back to NORMAL, no Tera exception, no self check): one declaration cannot rebuild both, so this attr is not rebuilt; it strips the same Ghost type as attr 2",
+  "gate",
+); // Refrigerator (the dispatcher's extra copy)
+
+// ---- PostAttackContactSuppressTargetAbilityAbAttr: (the attack-move class test is a guard) contact, then the target's status ----
+bindCondition(
+  5533,
+  0,
+  {
+    all: [
+      { id: "move.flag", flag: "MAKES_CONTACT" },
+      {
+        any: [
+          { id: "status.has", who: "other", status: "POISON" },
+          { id: "status.has", who: "other", status: "TOXIC" },
+        ],
+      },
+    ],
+  },
+  "gate",
+); // Hemotoxin: a contact attack on a poisoned or badly poisoned target
+
+// ---- PostAttackScriptedMoveAbAttr: the clauses move list, stat-drop test, category, type, flag (each only when set) ----
+const noRule = (): unknown => ({ all: [] }); // no filter at all: an empty ALL group is always true
+const hasFlag = (flag: string): unknown => ({ id: "move.flag", flag });
+bindCondition(5221, 0, noRule(), "gate"); // Aftershock: any move (Magnitude)
+bindCondition(5554, 0, noRule(), "gate"); // Purple Haze: any move (Poison Gas)
+bindCondition(5577, 0, noRule(), "gate"); // Sludge Spit: any move (Venom Bolt)
+bindCondition(5673, 0, noRule(), "gate"); // Break it Down: any move (Rapid Spin)
+bindCondition(5694, 0, { id: "move.category", category: "SPECIAL" }, "gate"); // Thunder Clouds: special moves
+bindCondition(5246, 0, hasFlag("DANCE_MOVE"), "gate"); // Two Step: dance moves
+bindCondition(5434, 0, hasFlag("DANCE_MOVE"), "gate"); // Blade Dance: dance moves
+bindCondition(5676, 0, hasFlag("DANCE_MOVE"), "gate"); // Backflip: dance moves
+bindCondition(5345, 0, hasFlag("SOUND_BASED"), "gate"); // Chunky Bass Line: sound moves
+bindCondition(5513, 1, hasFlag("SOUND_BASED"), "gate"); // Reverberate: sound moves
+bindCondition(5134, 0, hasFlag("PULSE_MOVE"), "gate"); // Pyro Shells: pulse moves
+bindCondition(5192, 1, { id: "move.is-move", moveId: "TICKLE" }, "gate"); // Monkey Business: only Tickle
+const TYPE_LIST =
+  "The move's type OR any type another of my abilities lets it count as (getTriggeredMoveTypes, Sea Specter) is on the list: the library move.type atom reads only the move's own type, request R-B10-c3-07 in requests/B10.md";
+bindLegacyClosure(5119, 0, TYPE_LIST, "gate"); // Volcano Rage: Fire moves
+bindLegacyClosure(5206, 0, TYPE_LIST, "gate"); // Frost Burn: Fire moves
+bindLegacyClosure(5233, 0, TYPE_LIST, "gate"); // High Tide: Water moves
+bindLegacyClosure(6073, 1, TYPE_LIST, "gate"); // Ebb and Flow: Water moves
+bindLegacyClosure(5489, 0, TYPE_LIST, "gate"); // Glacial Rage: Ice moves
+bindLegacyClosure(5710, 0, TYPE_LIST, "gate"); // Frost Dragon: Ice moves
+bindLegacyClosure(5596, 0, TYPE_LIST, "gate"); // Lunar Wrath: Ghost moves
+
+// ---- PostAttackSetTerrainByMoveTypeAbAttr and PostAttackSetHazardByMoveTypeAbAttr: damaging move, the move's PRINTED type (move.type,
+// so `effective: false`), then the chance roll LAST (the class's one random draw). The chance and the hazard's type are settings
+// repeated here through gateParams. ----
+const printedType = (type: string): unknown => ({ id: "move.type", type, effective: false });
+const terrainGate = (): unknown => ({
+  all: [
+    { id: "move.damaging" },
+    { any: [printedType("ELECTRIC"), printedType("PSYCHIC"), printedType("GRASS"), printedType("FAIRY")] },
+    { id: "rng.chance", pct: 30 },
+  ],
+});
+const hazardGate = (): unknown => ({
+  all: [{ id: "move.damaging" }, printedType("ROCK"), { id: "rng.chance", pct: 30 }],
+});
+bindCondition(5186, 12, terrainGate(), "gate"); // Archmage: terrain by move type
+bindCondition(5941, 13, terrainGate(), "gate"); // Familiar: terrain by move type
+bindCondition(5186, 13, hazardGate(), "gate"); // Archmage: Stealth Rock on Rock moves
+bindCondition(5941, 14, hazardGate(), "gate"); // Familiar: Stealth Rock on Rock moves
+
+// ---- PostDamageForceAttackerOutAbAttr: the attacker's last move makes contact (contactRequired) ----
+const ATTACKER_MOVE =
+  "The attacker's last move makes contact: the frame of 'after I take any damage' has no move, so the library move.flag atom cannot read it, request R-B10-c3-02 in requests/B10.md";
+bindLegacyClosure(5393, 0, ATTACKER_MOVE, "gate"); // Restraining Order
+bindLegacyClosure(5565, 1, ATTACKER_MOVE, "gate"); // Chuckster

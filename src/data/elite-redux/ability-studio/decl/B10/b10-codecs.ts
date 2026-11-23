@@ -21,10 +21,10 @@ import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
 
-type EnumTable = Readonly<Record<string, string | number>>;
+export type EnumTable = Readonly<Record<string, string | number>>;
 
 /** Member names of an enum (the numeric reverse keys of a TypeScript numeric enum are dropped). */
-function memberNames(table: EnumTable): string[] {
+export function memberNames(table: EnumTable): string[] {
   return Object.keys(table).filter(key => Number.isNaN(Number(key)));
 }
 
@@ -34,7 +34,7 @@ export function wordOf(name: string): string {
 }
 
 /** The member name a typed word stands for ("stealth rock", "Stealth_Rock" and "STEALTH_ROCK" all mean STEALTH_ROCK). */
-function nameFromWord(table: EnumTable, word: string, what: string): string {
+export function nameFromWord(table: EnumTable, word: string, what: string): string {
   const wanted = word
     .trim()
     .toLowerCase()
@@ -47,7 +47,7 @@ function nameFromWord(table: EnumTable, word: string, what: string): string {
   throw new Error(`"${word.trim()}" is not a known ${what}`);
 }
 
-function memberNameOf(table: EnumTable, raw: unknown): string | undefined {
+export function memberNameOf(table: EnumTable, raw: unknown): string | undefined {
   return memberNames(table).find(name => table[name] === raw);
 }
 
@@ -299,15 +299,15 @@ export const auraAlliesCodec: ParamCodec = {
 // Chunk 1: structured settings (the owner requirement: every number, type, stat and status is its own setting).
 
 /** A codec for a setting that is only ever built by `assembleCtorArg`: `toCtor` is not used, `fromInstance` reads one field back. */
-function readBack(read: (raw: unknown) => ParamValue | undefined): ParamCodec {
+export function readBack(read: (raw: unknown) => ParamValue | undefined): ParamCodec {
   return { toCtor: value => value, fromInstance: read };
 }
 
-function fieldOf(raw: unknown): Record<string, unknown> | undefined {
+export function fieldOf(raw: unknown): Record<string, unknown> | undefined {
   return typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : undefined;
 }
 
-function enumValue(table: EnumTable, name: unknown, what: string): number | string {
+export function enumValue(table: EnumTable, name: unknown, what: string): number | string {
   const value = table[String(name)];
   if (value === undefined) {
     throw new Error(`"${String(name)}" is not a known ${what}`);
@@ -316,7 +316,7 @@ function enumValue(table: EnumTable, name: unknown, what: string): number | stri
 }
 
 /** Percent shown to staff for a stored fraction (0.25 -> 25), without float noise. */
-function asPercent(fraction: unknown): number | undefined {
+export function asPercent(fraction: unknown): number | undefined {
   return typeof fraction === "number" ? Number((fraction * 100).toPrecision(12)) : undefined;
 }
 
