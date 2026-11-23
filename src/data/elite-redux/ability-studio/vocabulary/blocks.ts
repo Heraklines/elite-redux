@@ -46,6 +46,10 @@ export interface BlockGateParamJson {
   readonly block: string;
   readonly field: string;
   readonly scale?: number;
+  /** Which one of several atoms of the same block gets the value (0 = first); absent = all of them. */
+  readonly occurrence?: number;
+  /** A value of the param that means "slot not used": the tied atom then never matches. */
+  readonly unusedValue?: string;
 }
 
 export interface BlockConditionJson {

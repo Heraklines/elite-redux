@@ -155,6 +155,17 @@ export interface DeclGateParam {
   readonly block: string;
   readonly field: string;
   readonly scale?: number | undefined;
+  /**
+   * Which one of several atoms of the same block gets the value (0 = the first such atom in the gate, reading order).
+   * Needed when the gate repeats one block once per setting (for example one move-type test per type/terrain pair).
+   * Absent = every atom of the block gets the value.
+   */
+  readonly occurrence?: number | undefined;
+  /**
+   * A value of the param that means "this slot is not used" (for example "NONE"). The atom it is tied to then never
+   * matches (it is replaced by an empty any-of group) instead of receiving the value.
+   */
+  readonly unusedValue?: string | undefined;
 }
 
 export interface ClassDecl {

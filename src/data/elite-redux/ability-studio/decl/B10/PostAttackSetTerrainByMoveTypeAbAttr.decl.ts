@@ -22,7 +22,8 @@
 //
 // Clause classification: "a damaging move of one of these types" and "the chance" are the rules staff would change, so they are
 // the replaceable gate (the chance is repeated in the gate through `gateParams`). The hit-landed test is a guard. Each pair "this
-// move type sets that terrain" is split into a non-editable type setting (it IS the gate's type test) and an editable terrain.
+// move type sets that terrain" is two editable settings: the type (kept equal to the gate's n-th move-type test through
+// `gateParams` with `occurrence`) and the terrain (effect side).
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 import { TERRAIN_OPTIONS, TYPE_OPTIONS } from "#data/elite-redux/ability-studio/vocabulary/enums";
 import { PostAttackSetTerrainByMoveTypeAbAttr } from "#data/elite-redux/archetypes/post-attack-set-field-by-type";
@@ -34,7 +35,7 @@ export default defineDecl(PostAttackSetTerrainByMoveTypeAbAttr, {
   tier: "B",
   kind: "event-effect",
   when: "event.after-my-hit",
-  label: "Sometimes set a terrain that matches my move's type",
+  label: "Set a terrain (sometimes) that matches my move's type",
   summary: params =>
     `After my damaging move hits, there is a ${params.chance}% chance the terrain changes to the one linked to the move's type. Example: ${params.type1} moves set ${params.terrain1} terrain.`,
   synonyms: [
@@ -71,8 +72,8 @@ export default defineDecl(PostAttackSetTerrainByMoveTypeAbAttr, {
         ctorOption: `type${position}`,
         path: "terrainByType",
         control: "select" as const,
-        label: `Built-in rule: move type number ${position} that sets a terrain (None = not used; replaced by the condition block you set)`,
-        editable: false,
+        label: `Moves of this type set a terrain (slot ${position}; None = slot not used)`,
+        editable: true,
         default: position === 1 ? "ELECTRIC" : NOTHING,
         options: [NOTHING, ...TYPE_OPTIONS],
         codec: terrainPairTypeCodec(position - 1),
@@ -83,7 +84,7 @@ export default defineDecl(PostAttackSetTerrainByMoveTypeAbAttr, {
         ctorOption: `terrain${position}`,
         path: "terrainByType",
         control: "select" as const,
-        label: `Terrain that move type number ${position} sets (None = not used)`,
+        label: `Terrain set by the moves of slot ${position}`,
         editable: true,
         gateIndependent: true,
         default: position === 1 ? "ELECTRIC" : NOTHING,
@@ -93,7 +94,18 @@ export default defineDecl(PostAttackSetTerrainByMoveTypeAbAttr, {
     ]),
   ],
   assembleCtorArg: { index: 1, build: buildTerrainByType },
-  gateParams: [{ param: "chance", block: "rng.chance", field: "pct" }],
+  gateParams: [
+    { param: "chance", block: "rng.chance", field: "pct" },
+    // The n-th move-type test of the gate is the type of pair n: the gate and the type -> terrain map stay equal, so a
+    // changed type can never pass the gate and then find no terrain to set (a None slot never matches any move).
+    ...PAIRS.map(position => ({
+      param: `type${position}`,
+      block: "move.type",
+      field: "type",
+      occurrence: position - 1,
+      unusedValue: NOTHING,
+    })),
+  ],
   conditions: [
     // The gate: all[ move.damaging, any[ move.type <type of pair> (raw type) ... ], rng.chance pct ], in that order (bindings.ts).
     { slot: "gate", ctx: "params", removable: true, editable: true },

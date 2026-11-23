@@ -39,13 +39,14 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 const moduleOf = (name: string): DeclModule => declRegistry.get(name) as DeclModule;
 const sitesOf = (name: string) => allAttrSites().filter(site => site.className === name);
-const everyMove = (): Move[] => (allMoves as (Move | undefined)[]).filter((m): m is Move => m !== undefined && m.id !== MoveId.NONE);
+const everyMove = (): Move[] =>
+  (allMoves as (Move | undefined)[]).filter((m): m is Move => m !== undefined && m.id !== MoveId.NONE);
 type Any = Record<string, any>; // biome-ignore lint/suspicious/noExplicitAny: reads private fields of the attrs under test
 
 /** The rebuild of a site, or undefined when its gate is a written legacy binding. */
 function rebuildOf(name: string, site: ReturnType<typeof sitesOf>[number]) {
   if (getBinding(site.abilityId, site.attrIndex, "gate")?.spec === undefined) {
-    return undefined;
+    return;
   }
   return recomposeAttr(moduleOf(name), site.attr, site.abilityId, site.attrIndex);
 }
@@ -103,7 +104,10 @@ describe("B10 chunk 3: the gates of the eight Tier B classes", () => {
       if (!p.opponent) {
         return false;
       }
-      if (a.contactOnly && !p.move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: p.pokemon, target: p.opponent })) {
+      if (
+        a.contactOnly
+        && !p.move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: p.pokemon, target: p.opponent })
+      ) {
         return false;
       }
       if (a.requireFlag !== undefined && !p.move.hasFlag(a.requireFlag)) {
@@ -130,7 +134,8 @@ describe("B10 chunk 3: the gates of the eight Tier B classes", () => {
       for (const attr of [site.attr, rebuilt!]) {
         setTypesOf(foe, [PokemonType.NORMAL, PokemonType.FLYING]);
         attr.apply({ pokemon: holder, opponent: foe, move: tackle, hitResult: 1, simulated: false } as never);
-        const expected = (site.attr as Any).newType === "moveType" ? holder.getMoveType(tackle) : (site.attr as Any).newType;
+        const expected =
+          (site.attr as Any).newType === "moveType" ? holder.getMoveType(tackle) : (site.attr as Any).newType;
         expect(foe.summonData.types, site.abilityName).toEqual([expected]);
       }
     }
@@ -149,7 +154,10 @@ describe("B10 chunk 3: the gates of the eight Tier B classes", () => {
       if (!move.is("AttackMove")) {
         return false;
       }
-      if (a.contactOnly && !move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: pokemon, target: opponent })) {
+      if (
+        a.contactOnly
+        && !move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: pokemon, target: opponent })
+      ) {
         return false;
       }
       if (a.requireTargetStatus !== null) {
@@ -163,7 +171,14 @@ describe("B10 chunk 3: the gates of the eight Tier B classes", () => {
       }
       return true;
     };
-    const statuses = [StatusEffect.NONE, StatusEffect.POISON, StatusEffect.TOXIC, StatusEffect.PARALYSIS, StatusEffect.BURN, StatusEffect.SLEEP];
+    const statuses = [
+      StatusEffect.NONE,
+      StatusEffect.POISON,
+      StatusEffect.TOXIC,
+      StatusEffect.PARALYSIS,
+      StatusEffect.BURN,
+      StatusEffect.SLEEP,
+    ];
     for (const status of statuses) {
       for (const suppressed of [false, true]) {
         for (const fainted of [false, true]) {
@@ -181,11 +196,31 @@ describe("B10 chunk 3: the gates of the eight Tier B classes", () => {
         }
       }
     }
-    expect(site.attr.canApply({ pokemon: holder, opponent: undefined, move: allMoves[MoveId.TACKLE], hitResult: 1, simulated: false } as never)).toBe(false);
+    expect(
+      site.attr.canApply({
+        pokemon: holder,
+        opponent: undefined,
+        move: allMoves[MoveId.TACKLE],
+        hitResult: 1,
+        simulated: false,
+      } as never),
+    ).toBe(false);
     foe.summonData.abilitySuppressed = false;
-    site.attr.apply({ pokemon: holder, opponent: foe, move: allMoves[MoveId.TACKLE], hitResult: 1, simulated: true } as never);
+    site.attr.apply({
+      pokemon: holder,
+      opponent: foe,
+      move: allMoves[MoveId.TACKLE],
+      hitResult: 1,
+      simulated: true,
+    } as never);
     expect(foe.summonData.abilitySuppressed).toBe(false);
-    rebuilt.apply({ pokemon: holder, opponent: foe, move: allMoves[MoveId.TACKLE], hitResult: 1, simulated: false } as never);
+    rebuilt.apply({
+      pokemon: holder,
+      opponent: foe,
+      move: allMoves[MoveId.TACKLE],
+      hitResult: 1,
+      simulated: false,
+    } as never);
     expect(foe.summonData.abilitySuppressed).toBe(true);
   });
 
@@ -205,7 +240,12 @@ describe("B10 chunk 3: the gates of the eight Tier B classes", () => {
     const sites = sitesOf(name).filter(site => site.attr instanceof PostAttackRemoveTargetTypeAbAttr);
     for (const site of sites) {
       const rebuilt = rebuildOf(name, site)!;
-      for (const types of [[PokemonType.GHOST], [PokemonType.GHOST, PokemonType.NORMAL], [PokemonType.NORMAL], [PokemonType.FIRE, PokemonType.FLYING]]) {
+      for (const types of [
+        [PokemonType.GHOST],
+        [PokemonType.GHOST, PokemonType.NORMAL],
+        [PokemonType.NORMAL],
+        [PokemonType.FIRE, PokemonType.FLYING],
+      ]) {
         for (const tera of [false, true]) {
           setTypesOf(foe, types);
           foe.isTerastallized = tera;
@@ -264,10 +304,16 @@ describe("B10 chunk 3: the gates of the eight Tier B classes", () => {
       if (o.categoryFilter !== undefined && move.category !== o.categoryFilter) {
         return false;
       }
-      if (o.typeFilter !== undefined && !o.typeFilter.some((t: PokemonType) => t === move.type || extraTypes.includes(t))) {
+      if (
+        o.typeFilter !== undefined
+        && !o.typeFilter.some((t: PokemonType) => t === move.type || extraTypes.includes(t))
+      ) {
         return false;
       }
-      if (o.flagFilter !== undefined && !move.doesFlagEffectApply({ flag: o.flagFilter, user: pokemon, target: opponent })) {
+      if (
+        o.flagFilter !== undefined
+        && !move.doesFlagEffectApply({ flag: o.flagFilter, user: pokemon, target: opponent })
+      ) {
         return false;
       }
       return true;
@@ -275,9 +321,28 @@ describe("B10 chunk 3: the gates of the eight Tier B classes", () => {
     const sites = sitesOf(name);
     const states: { name: string; set: () => void }[] = [
       { name: "normal", set: () => {} },
-      { name: "hits left", set: () => { holder.turnData.hitsLeft = 2; } },
-      { name: "after a free move", set: () => { holder.summonData.moveHistory.push({ move: MoveId.TACKLE, targets: [], useMode: MoveUseMode.INDIRECT } as never); } },
-      { name: "foe lost a stage", set: () => { foe.turnData.statStagesDecreased = true; } },
+      {
+        name: "hits left",
+        set: () => {
+          holder.turnData.hitsLeft = 2;
+        },
+      },
+      {
+        name: "after a free move",
+        set: () => {
+          holder.summonData.moveHistory.push({
+            move: MoveId.TACKLE,
+            targets: [],
+            useMode: MoveUseMode.INDIRECT,
+          } as never);
+        },
+      },
+      {
+        name: "foe lost a stage",
+        set: () => {
+          foe.turnData.statStagesDecreased = true;
+        },
+      },
     ];
     for (const state of states) {
       holder.turnData.hitsLeft = 0;
@@ -302,17 +367,39 @@ describe("B10 chunk 3: the gates of the eight Tier B classes", () => {
     const tackle = allMoves[MoveId.TACKLE];
     vi.spyOn(foe, "isFainted").mockReturnValue(true);
     for (const site of sites) {
-      expect(site.attr.canApply({ pokemon: holder, opponent: foe, move: tackle, hitResult: 1, simulated: false } as never), site.abilityName).toBe(false);
+      expect(
+        site.attr.canApply({ pokemon: holder, opponent: foe, move: tackle, hitResult: 1, simulated: false } as never),
+        site.abilityName,
+      ).toBe(false);
     }
     vi.restoreAllMocks();
     for (const site of sites) {
-      expect(site.attr.canApply({ pokemon: holder, opponent: undefined, move: tackle, hitResult: 1, simulated: false } as never), site.abilityName).toBe(false);
+      expect(
+        site.attr.canApply({
+          pokemon: holder,
+          opponent: undefined,
+          move: tackle,
+          hitResult: 1,
+          simulated: false,
+        } as never),
+        site.abilityName,
+      ).toBe(false);
     }
     // Monkey Business lets the free Tickle through the safety rule, but only Tickle
     const monkey = sites.find(site => site.abilityName === "Monkey Business")!;
     holder.summonData.moveHistory.push({ move: MoveId.TICKLE, targets: [], useMode: MoveUseMode.INDIRECT } as never);
-    expect(monkey.attr.canApply({ pokemon: holder, opponent: foe, move: allMoves[MoveId.TICKLE], hitResult: 1, simulated: false } as never)).toBe(true);
-    expect(monkey.attr.canApply({ pokemon: holder, opponent: foe, move: tackle, hitResult: 1, simulated: false } as never)).toBe(false);
+    expect(
+      monkey.attr.canApply({
+        pokemon: holder,
+        opponent: foe,
+        move: allMoves[MoveId.TICKLE],
+        hitResult: 1,
+        simulated: false,
+      } as never),
+    ).toBe(true);
+    expect(
+      monkey.attr.canApply({ pokemon: holder, opponent: foe, move: tackle, hitResult: 1, simulated: false } as never),
+    ).toBe(false);
     holder.summonData.moveHistory.length = 0;
   });
 
@@ -322,23 +409,36 @@ describe("B10 chunk 3: the gates of the eight Tier B classes", () => {
     const highTide = sitesOf(name).find(site => site.abilityName === "High Tide")!;
     expect(getBinding(highTide.abilityId, highTide.attrIndex, "gate")?.legacyClosure).toBeDefined();
     const tackle = allMoves[MoveId.TACKLE];
-    const ghostMove = everyMove().find(move => move.type === PokemonType.GHOST && move.category !== MoveCategory.STATUS)!;
+    const ghostMove = everyMove().find(
+      move => move.type === PokemonType.GHOST && move.category !== MoveCategory.STATUS,
+    )!;
     const params = { pokemon: holder, opponent: foe, move: ghostMove, hitResult: 1, simulated: false } as never;
     expect(highTide.attr.canApply(params)).toBe(false);
     vi.spyOn(holder, "getAllActiveAbilityAttrs").mockReturnValue([
-      { getTriggeredMoveTypes: (move: Move) => (move.type === PokemonType.GHOST ? [PokemonType.GHOST, PokemonType.WATER] : [move.type]) },
+      {
+        getTriggeredMoveTypes: (move: Move) =>
+          move.type === PokemonType.GHOST ? [PokemonType.GHOST, PokemonType.WATER] : [move.type],
+      },
     ] as never);
     expect(highTide.attr.canApply(params), "a Ghost move counts as Water with Sea Specter").toBe(true);
     vi.restoreAllMocks();
     // the setting for "the target lost a stat stage" builds and reads back
     const module = moduleOf(name);
-    const attr = buildAttr(module, { moveId: "THUNDERBOLT", power: 35, targetStatsDecreased: true }, { gate: { all: [] } }) as PostAttackScriptedMoveAbAttr;
+    const attr = buildAttr(
+      module,
+      { moveId: "THUNDERBOLT", power: 35, targetStatsDecreased: true },
+      { gate: { all: [] } },
+    ) as PostAttackScriptedMoveAbAttr;
     expect((attr as Any).opts).toEqual({ moveId: MoveId.THUNDERBOLT, power: 35, targetStatsDecreased: true });
     const own = new PostAttackScriptedMoveAbAttr({ moveId: MoveId.THUNDERBOLT, targetStatsDecreased: true });
     foe.turnData.statStagesDecreased = false;
-    expect(own.canApply({ pokemon: holder, opponent: foe, move: tackle, hitResult: 1, simulated: false } as never)).toBe(false);
+    expect(
+      own.canApply({ pokemon: holder, opponent: foe, move: tackle, hitResult: 1, simulated: false } as never),
+    ).toBe(false);
     foe.turnData.statStagesDecreased = true;
-    expect(own.canApply({ pokemon: holder, opponent: foe, move: tackle, hitResult: 1, simulated: false } as never)).toBe(true);
+    expect(
+      own.canApply({ pokemon: holder, opponent: foe, move: tackle, hitResult: 1, simulated: false } as never),
+    ).toBe(true);
     foe.turnData.statStagesDecreased = false;
   });
 
@@ -347,7 +447,8 @@ describe("B10 chunk 3: the gates of the eight Tier B classes", () => {
     const site = sitesOf("PostAttackScriptedMoveAbAttr").find(s => s.abilityName === "Thunder Clouds")!;
     const rebuilt = rebuildOf("PostAttackScriptedMoveAbAttr", site)!;
     const spy = vi.spyOn(globalScene.phaseManager, "unshiftNew").mockImplementation((() => {}) as never);
-    const params = (simulated: boolean) => ({ pokemon: holder, opponent: foe, move: allMoves[MoveId.TACKLE], hitResult: 1, simulated }) as never;
+    const params = (simulated: boolean) =>
+      ({ pokemon: holder, opponent: foe, move: allMoves[MoveId.TACKLE], hitResult: 1, simulated }) as never;
     site.attr.apply(params(true));
     expect(spy).not.toHaveBeenCalled();
     site.attr.apply(params(false));
@@ -385,7 +486,14 @@ describe("B10 chunk 3: the gates of the eight Tier B classes", () => {
             draws++;
             return roll;
           });
-          for (const hitResult of [HitResult.EFFECTIVE, HitResult.SUPER_EFFECTIVE, HitResult.NOT_VERY_EFFECTIVE, HitResult.NO_EFFECT, HitResult.MISS, HitResult.STATUS]) {
+          for (const hitResult of [
+            HitResult.EFFECTIVE,
+            HitResult.SUPER_EFFECTIVE,
+            HitResult.NOT_VERY_EFFECTIVE,
+            HitResult.NO_EFFECT,
+            HitResult.MISS,
+            HitResult.STATUS,
+          ]) {
             for (const move of everyMove()) {
               const params = { pokemon: holder, opponent: foe, move, hitResult, simulated: false } as never;
               const want = frozen(site.attr as Any, params, roll);
@@ -404,6 +512,30 @@ describe("B10 chunk 3: the gates of the eight Tier B classes", () => {
     });
   }
 
+  it("terrain: editing a move type setting moves the gate and the map together (no dead ability)", async () => {
+    const { holder, foe } = await startWorld(phaserGame);
+    const site = sitesOf("PostAttackSetTerrainByMoveTypeAbAttr")[0];
+    const module = moduleOf("PostAttackSetTerrainByMoveTypeAbAttr");
+    const pick = (type: PokemonType) => everyMove().find(m => m.type === type && m.category !== MoveCategory.STATUS)!;
+    const params = (move: Move) => ({ pokemon: holder, opponent: foe, move, hitResult: 1, simulated: false }) as never;
+    // Chance 100 so no random draw is involved: the gate answer is only about the type.
+    const rebuilt = recomposeAttr(module, site.attr, site.abilityId, site.attrIndex, {
+      params: { chance: 100, type1: "WATER", terrain1: "PSYCHIC", type2: "NONE", terrain2: "NONE" },
+    }) as Any;
+    const map: ReadonlyMap<PokemonType, unknown> = rebuilt.terrainByType;
+    expect([...map.keys()].sort()).toEqual([PokemonType.WATER, PokemonType.GRASS, PokemonType.FAIRY].sort());
+    for (const move of everyMove()) {
+      if (move.category === MoveCategory.STATUS) {
+        continue;
+      }
+      // The gate lets a move through exactly when the map has a terrain for its type: never "passes, then sets nothing".
+      expect(rebuilt.canApply(params(move)), move.name).toBe(map.has(move.type));
+    }
+    expect(rebuilt.canApply(params(pick(PokemonType.WATER)))).toBe(true);
+    expect(rebuilt.canApply(params(pick(PokemonType.ELECTRIC)))).toBe(false);
+    expect(rebuilt.canApply(params(pick(PokemonType.PSYCHIC)))).toBe(false);
+  });
+
   it("terrain and hazard apply: the right terrain and the right side, nothing in a preview", async () => {
     const { holder, foe } = await startWorld(phaserGame);
     const terrainSite = sitesOf("PostAttackSetTerrainByMoveTypeAbAttr")[0];
@@ -411,7 +543,8 @@ describe("B10 chunk 3: the gates of the eight Tier B classes", () => {
     const trySet = vi.spyOn(globalScene.arena, "trySetTerrain").mockReturnValue(true as never);
     const addTag = vi.spyOn(globalScene.arena, "addTag").mockReturnValue(true as never);
     const pick = (type: PokemonType) => everyMove().find(m => m.type === type && m.category !== MoveCategory.STATUS)!;
-    const params = (move: Move, simulated: boolean) => ({ pokemon: holder, opponent: foe, move, hitResult: 1, simulated }) as never;
+    const params = (move: Move, simulated: boolean) =>
+      ({ pokemon: holder, opponent: foe, move, hitResult: 1, simulated }) as never;
     for (const attr of [terrainSite.attr, rebuildOf("PostAttackSetTerrainByMoveTypeAbAttr", terrainSite)!]) {
       trySet.mockClear();
       attr.apply(params(pick(PokemonType.ELECTRIC), true));
@@ -449,7 +582,14 @@ describe("B10 chunk 3: the gates of the eight Tier B classes", () => {
       if (!lastMove || lastMove.move === MoveId.NONE || allMoves[lastMove.move]?.category === MoveCategory.STATUS) {
         return false;
       }
-      if (a.contactRequired && !allMoves[lastMove.move]?.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: source, target: pokemon })) {
+      if (
+        a.contactRequired
+        && !allMoves[lastMove.move]?.doesFlagEffectApply({
+          flag: MoveFlags.MAKES_CONTACT,
+          user: source,
+          target: pokemon,
+        })
+      ) {
         return false;
       }
       return switchOk;
@@ -461,7 +601,14 @@ describe("B10 chunk 3: the gates of the eight Tier B classes", () => {
         for (const used of [false, true]) {
           for (const source of [foe, undefined, holder]) {
             for (const holderFainted of [false, true]) {
-              for (const moveId of [undefined, MoveId.NONE, MoveId.TACKLE, MoveId.WATER_GUN, MoveId.SPLASH, MoveId.FLAME_WHEEL]) {
+              for (const moveId of [
+                undefined,
+                MoveId.NONE,
+                MoveId.TACKLE,
+                MoveId.WATER_GUN,
+                MoveId.SPLASH,
+                MoveId.FLAME_WHEEL,
+              ]) {
                 foe.summonData.moveHistory.length = 0;
                 if (moveId !== undefined) {
                   foe.summonData.moveHistory.push({ move: moveId, targets: [], useMode: MoveUseMode.NORMAL } as never);
@@ -469,7 +616,10 @@ describe("B10 chunk 3: the gates of the eight Tier B classes", () => {
                 holder.summonData.forceAttackerOutUsed = used;
                 vi.spyOn(holder, "isFainted").mockReturnValue(holderFainted);
                 const params = { pokemon: holder, source, damage: 10, simulated: false } as never;
-                expect(site.attr.canApply(params), `${site.abilityName} sw=${switchOk} used=${used} src=${source === foe ? "foe" : source === holder ? "self" : "none"} hf=${holderFainted} ${moveId === undefined ? "nomove" : MoveId[moveId]}`).toBe(frozen(site.attr as Any, params, switchOk));
+                expect(
+                  site.attr.canApply(params),
+                  `${site.abilityName} sw=${switchOk} used=${used} src=${source === foe ? "foe" : source === holder ? "self" : "none"} hf=${holderFainted} ${moveId === undefined ? "nomove" : MoveId[moveId]}`,
+                ).toBe(frozen(site.attr as Any, params, switchOk));
                 vi.mocked(holder.isFainted).mockRestore();
               }
             }
@@ -501,24 +651,46 @@ describe("B10 chunk 3: the gates of the eight Tier B classes", () => {
       if (!opponent || !move.is("AttackMove")) {
         return false;
       }
-      if (a.contactOnly && !move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: opponent, target: pokemon })) {
+      if (
+        a.contactOnly
+        && !move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: opponent, target: pokemon })
+      ) {
         return false;
       }
-      if (a.requireFlag !== null && !move.doesFlagEffectApply({ flag: a.requireFlag, user: opponent, target: pokemon })) {
+      if (
+        a.requireFlag !== null
+        && !move.doesFlagEffectApply({ flag: a.requireFlag, user: opponent, target: pokemon })
+      ) {
         return false;
       }
       return true;
     };
-    const attrs = sitesOf(name).map(site => ({ label: site.abilityName, attr: site.attr, rebuilt: rebuildOf(name, site)! }));
+    const attrs = sitesOf(name).map(site => ({
+      label: site.abilityName,
+      attr: site.attr,
+      rebuilt: rebuildOf(name, site)!,
+    }));
     // settings without a live user: a pulse-move rule, and the other side
-    const pulseGate = { all: [{ block: "move.damaging", params: {} }, { block: "move.flag", params: { flag: "PULSE_MOVE" } }] };
-    const pulse = buildAttr(module, { type: "MOVE_TYPE", side: "ME", contactOnly: false, requireFlag: "PULSE_MOVE" }, { gate: pulseGate as never });
+    const pulseGate = {
+      all: [
+        { block: "move.damaging", params: {} },
+        { block: "move.flag", params: { flag: "PULSE_MOVE" } },
+      ],
+    };
+    const pulse = buildAttr(
+      module,
+      { type: "MOVE_TYPE", side: "ME", contactOnly: false, requireFlag: "PULSE_MOVE" },
+      { gate: pulseGate as never },
+    );
     attrs.push({ label: "pulse/me", attr: pulse, rebuilt: pulse });
     for (const { label, attr, rebuilt } of attrs) {
       for (const move of everyMove()) {
         for (const opponent of [foe, undefined]) {
           const params = { pokemon: holder, opponent, move, hitResult: 1, simulated: false } as never;
-          const want = label === "pulse/me" ? move.category !== MoveCategory.STATUS && move.hasFlag(MoveFlags.PULSE_MOVE) && !!opponent : frozen(attr as Any, params);
+          const want =
+            label === "pulse/me"
+              ? move.category !== MoveCategory.STATUS && move.hasFlag(MoveFlags.PULSE_MOVE) && !!opponent
+              : frozen(attr as Any, params);
           expect(attr.canApply(params), `${label} class ${move.name}`).toBe(want);
           expect(rebuilt.canApply(params), `${label} rebuild ${move.name}`).toBe(want);
         }

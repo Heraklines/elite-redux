@@ -96,7 +96,8 @@ export default defineDecl(PostDefendChangeAttackerTypeAbAttr, {
       ctorOption: "requireFlag",
       path: "requireFlag",
       control: "select",
-      label: "Built-in rule: property the move must have (None = no requirement; replaced by the condition block you set)",
+      label:
+        "Built-in rule: property the move must have (None = no requirement; replaced by the condition block you set)",
       editable: false,
       default: NOTHING,
       options: [NOTHING, ...MOVE_FLAG_OPTIONS],
@@ -104,7 +105,8 @@ export default defineDecl(PostDefendChangeAttackerTypeAbAttr, {
     },
   ],
   conditions: [
-    // The gate: all[ move.damaging, move.flag MAKES_CONTACT (when contactOnly), move.flag <flag> (when requireFlag) ], per user (bindings.ts).
+    // The gate: all[ move.flag MAKES_CONTACT (when contactOnly), move.flag <flag> (when requireFlag) ], per user (bindings.ts); there is
+    // no move.damaging atom: the 'is an attack move' test is a class guard (move.is('AttackMove')).
     { slot: "gate", ctx: "params", removable: true, editable: true },
   ],
   guards: [],

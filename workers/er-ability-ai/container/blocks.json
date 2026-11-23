@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "03ef54e0d0a23c",
-  "hash": "0c8c3f14b0ee64",
+  "hash": "1bb7a3473e8b84",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -2123,7 +2123,7 @@
         },
         {
           "id": "magnitudeLow",
-          "label": "Lowest Magnitude level when the move is Magnitude (4 to 10; 0 = not used)",
+          "label": "Lowest Magnitude power level when the move is Magnitude (the game uses 4 to 10; 0 = not used)",
           "control": "number",
           "default": 0,
           "editable": true,
@@ -2135,7 +2135,7 @@
         },
         {
           "id": "magnitudeHigh",
-          "label": "Highest Magnitude level when the move is Magnitude (4 to 10; 0 = not used)",
+          "label": "Highest Magnitude power level when the move is Magnitude (the game uses 4 to 10; 0 = not used)",
           "control": "number",
           "default": 0,
           "editable": true,
@@ -2325,7 +2325,7 @@
     {
       "id": "block.post-attack-set-hazard-by-move-type",
       "className": "PostAttackSetHazardByMoveTypeAbAttr",
-      "label": "Sometimes lay a hazard on the foe's side with one move type",
+      "label": "Lay a hazard (sometimes) when a move of one type hits",
       "summary": "After my Rock move hits, there is a 30% chance that Stealth rock is laid on the foe's side. Example: Rock moves lay Stealth rock.",
       "tier": "B",
       "kind": "event-effect",
@@ -2442,7 +2442,7 @@
     {
       "id": "block.post-attack-set-terrain-by-move-type",
       "className": "PostAttackSetTerrainByMoveTypeAbAttr",
-      "label": "Sometimes set a terrain that matches my move's type",
+      "label": "Set a terrain (sometimes) that matches my move's type",
       "summary": "After my damaging move hits, there is a 30% chance the terrain changes to the one linked to the move's type. Example: Electric moves set Electric terrain.",
       "tier": "B",
       "kind": "event-effect",
@@ -2476,10 +2476,10 @@
         },
         {
           "id": "type1",
-          "label": "Built-in rule: move type number 1 that sets a terrain (None = not used; replaced by the condition block you set)",
+          "label": "Moves of this type set a terrain (slot 1; None = slot not used)",
           "control": "select",
           "default": "ELECTRIC",
-          "editable": false,
+          "editable": true,
           "options": [
             "NONE",
             "NORMAL",
@@ -2505,7 +2505,7 @@
         },
         {
           "id": "terrain1",
-          "label": "Terrain that move type number 1 sets (None = not used)",
+          "label": "Terrain set by the moves of slot 1",
           "control": "select",
           "default": "ELECTRIC",
           "editable": true,
@@ -2521,10 +2521,10 @@
         },
         {
           "id": "type2",
-          "label": "Built-in rule: move type number 2 that sets a terrain (None = not used; replaced by the condition block you set)",
+          "label": "Moves of this type set a terrain (slot 2; None = slot not used)",
           "control": "select",
           "default": "NONE",
-          "editable": false,
+          "editable": true,
           "options": [
             "NONE",
             "NORMAL",
@@ -2550,7 +2550,7 @@
         },
         {
           "id": "terrain2",
-          "label": "Terrain that move type number 2 sets (None = not used)",
+          "label": "Terrain set by the moves of slot 2",
           "control": "select",
           "default": "NONE",
           "editable": true,
@@ -2566,10 +2566,10 @@
         },
         {
           "id": "type3",
-          "label": "Built-in rule: move type number 3 that sets a terrain (None = not used; replaced by the condition block you set)",
+          "label": "Moves of this type set a terrain (slot 3; None = slot not used)",
           "control": "select",
           "default": "NONE",
-          "editable": false,
+          "editable": true,
           "options": [
             "NONE",
             "NORMAL",
@@ -2595,7 +2595,7 @@
         },
         {
           "id": "terrain3",
-          "label": "Terrain that move type number 3 sets (None = not used)",
+          "label": "Terrain set by the moves of slot 3",
           "control": "select",
           "default": "NONE",
           "editable": true,
@@ -2611,10 +2611,10 @@
         },
         {
           "id": "type4",
-          "label": "Built-in rule: move type number 4 that sets a terrain (None = not used; replaced by the condition block you set)",
+          "label": "Moves of this type set a terrain (slot 4; None = slot not used)",
           "control": "select",
           "default": "NONE",
-          "editable": false,
+          "editable": true,
           "options": [
             "NONE",
             "NORMAL",
@@ -2640,7 +2640,7 @@
         },
         {
           "id": "terrain4",
-          "label": "Terrain that move type number 4 sets (None = not used)",
+          "label": "Terrain set by the moves of slot 4",
           "control": "select",
           "default": "NONE",
           "editable": true,
@@ -2674,6 +2674,34 @@
           "param": "chance",
           "block": "rng.chance",
           "field": "pct"
+        },
+        {
+          "param": "type1",
+          "block": "move.type",
+          "field": "type",
+          "occurrence": 0,
+          "unusedValue": "NONE"
+        },
+        {
+          "param": "type2",
+          "block": "move.type",
+          "field": "type",
+          "occurrence": 1,
+          "unusedValue": "NONE"
+        },
+        {
+          "param": "type3",
+          "block": "move.type",
+          "field": "type",
+          "occurrence": 2,
+          "unusedValue": "NONE"
+        },
+        {
+          "param": "type4",
+          "block": "move.type",
+          "field": "type",
+          "occurrence": 3,
+          "unusedValue": "NONE"
         }
       ],
       "effect": {

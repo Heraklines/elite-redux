@@ -31,7 +31,7 @@ export default defineDecl(PostAttackSetHazardByMoveTypeAbAttr, {
   tier: "B",
   kind: "event-effect",
   when: "event.after-my-hit",
-  label: "Sometimes lay a hazard on the foe's side with one move type",
+  label: "Lay a hazard (sometimes) when a move of one type hits",
   summary: params =>
     `After my ${params.moveType} move hits, there is a ${params.chance}% chance that ${params.hazard} is laid on the foe's side. Example: Rock moves lay Stealth rock.`,
   synonyms: [

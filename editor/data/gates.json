@@ -1,3348 +1,5093 @@
 {
- "schemaVersion": 1,
- "vocabularyHash": "1264fa83dbcdc7",
- "gates": {
-  "4:1": {
-   "abilityId": 4,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.8,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.8,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "9:0": {
-   "abilityId": 9,
-   "attrIndex": 0,
-   "className": "PostDefendContactApplyStatusEffectAbAttr",
-   "when": "event.after-hit",
-   "effect": "effect.inflict-status",
-   "unpackable": true,
-   "if": [
-    {
-     "all": [
-      {
-       "block": "move.flag",
-       "params": {
-        "flag": "MAKES_CONTACT"
-       }
-      },
-      {
-       "block": "status.has",
-       "params": {
-        "who": "other",
-        "status": "NONE"
-       }
-      },
-      {
-       "block": "rng.chance",
-       "params": {
-        "pct": 30
-       }
-      }
-     ]
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.inflict-status",
-     "params": {
-      "statuses": "PARALYSIS"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "chance": 30,
-    "statuses": "PARALYSIS"
-   },
-   "paramPaths": {
-    "chance": "chance",
-    "statuses": "effects"
-   }
-  },
-  "26:0": {
-   "abilityId": 26,
-   "attrIndex": 0,
-   "className": "AttackTypeImmunityAbAttr",
-   "when": "calc.move-immunity",
-   "effect": "effect.immune-to-type",
-   "unpackable": true,
-   "if": [
-    {
-     "all": [
-      {
-       "not": {
-        "block": "tag.has",
-        "params": {
-         "who": "holder",
-         "tag": "IGNORE_FLYING"
+  "schemaVersion": 1,
+  "vocabularyHash": "03ef54e0d0a23c",
+  "gates": {
+    "4:1": {
+      "abilityId": 4,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.8,
+            "affectsFixedDamage": false
+          }
         }
-       }
-      },
-      {
-       "not": {
-        "block": "field.gravity",
-        "params": {}
-       }
-      }
-     ]
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.immune-to-type",
-     "params": {
-      "type": "GROUND"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "type": "GROUND"
-   },
-   "paramPaths": {
-    "type": "immuneType"
-   }
-  },
-  "36:0": {
-   "abilityId": 36,
-   "attrIndex": 0,
-   "className": "PostSummonCopyAbilityAbAttr",
-   "when": "event.on-entry",
-   "effect": "effect.package",
-   "unpackable": false,
-   "reason": "its trigger or its effect is not wired into the block builder yet"
-  },
-  "38:0": {
-   "abilityId": 38,
-   "attrIndex": 0,
-   "className": "PostDefendContactApplyStatusEffectAbAttr",
-   "when": "event.after-hit",
-   "effect": "effect.inflict-status",
-   "unpackable": true,
-   "if": [
-    {
-     "all": [
-      {
-       "block": "move.flag",
-       "params": {
-        "flag": "MAKES_CONTACT"
-       }
-      },
-      {
-       "block": "status.has",
-       "params": {
-        "who": "other",
-        "status": "NONE"
-       }
-      },
-      {
-       "block": "rng.chance",
-       "params": {
-        "pct": 30
-       }
-      }
-     ]
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.inflict-status",
-     "params": {
-      "statuses": "POISON"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "chance": 30,
-    "statuses": "POISON"
-   },
-   "paramPaths": {
-    "chance": "chance",
-    "statuses": "effects"
-   }
-  },
-  "49:0": {
-   "abilityId": 49,
-   "attrIndex": 0,
-   "className": "PostDefendContactApplyStatusEffectAbAttr",
-   "when": "event.after-hit",
-   "effect": "effect.inflict-status",
-   "unpackable": true,
-   "if": [
-    {
-     "all": [
-      {
-       "block": "move.flag",
-       "params": {
-        "flag": "MAKES_CONTACT"
-       }
-      },
-      {
-       "block": "status.has",
-       "params": {
-        "who": "other",
-        "status": "NONE"
-       }
-      },
-      {
-       "block": "rng.chance",
-       "params": {
-        "pct": 30
-       }
-      }
-     ]
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.inflict-status",
-     "params": {
-      "statuses": "BURN"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "chance": 30,
-    "statuses": "BURN"
-   },
-   "paramPaths": {
-    "chance": "chance",
-    "statuses": "effects"
-   }
-  },
-  "75:1": {
-   "abilityId": 75,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.8,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.8,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "79:1": {
-   "abilityId": 79,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "mon.opposite-gender",
-     "params": {}
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.75,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.75,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "100:0": {
-   "abilityId": 100,
-   "attrIndex": 0,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "not": {
-      "block": "time.acted",
+      ],
+      "guards": [],
       "params": {
-       "who": "holder"
-      }
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.7,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.7,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "111:0": {
-   "abilityId": 111,
-   "attrIndex": 0,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.effectiveness",
-     "params": {
-      "cmp": "gte",
-      "n": 2
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.65,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.65,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "116:0": {
-   "abilityId": 116,
-   "attrIndex": 0,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.effectiveness",
-     "params": {
-      "cmp": "gte",
-      "n": 2
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.65,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.65,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "134:1": {
-   "abilityId": 134,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "any": [
-      {
-       "block": "move.type",
-       "params": {
-        "type": "GHOST",
-        "effective": true
-       }
+        "multiplier": 0.8,
+        "affectsFixedDamage": false
       },
-      {
-       "block": "move.type",
-       "params": {
-        "type": "DARK",
-        "effective": true
-       }
-      },
-      {
-       "block": "move.flag",
-       "params": {
-        "flag": "SOUND_BASED"
-       }
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
       }
-     ]
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": true
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": true
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "136:0": {
-   "abilityId": 136,
-   "attrIndex": 0,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "hp.full",
-     "params": {
-      "who": "holder"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "142:2": {
-   "abilityId": 142,
-   "attrIndex": 2,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.category",
-     "params": {
-      "category": "SPECIAL"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.8,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.8,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "169:0": {
-   "abilityId": 169,
-   "attrIndex": 0,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.category",
-     "params": {
-      "category": "PHYSICAL"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "189:0": {
-   "abilityId": 189,
-   "attrIndex": 0,
-   "className": "PostSummonWeatherChangeAbAttr",
-   "when": "event.on-entry",
-   "effect": "effect.set-weather",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.set-weather",
-     "params": {
-      "weather": "HEAVY_RAIN"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "weather": "HEAVY_RAIN"
-   },
-   "paramPaths": {
-    "weather": "weatherType"
-   }
-  },
-  "190:0": {
-   "abilityId": 190,
-   "attrIndex": 0,
-   "className": "PostSummonWeatherChangeAbAttr",
-   "when": "event.on-entry",
-   "effect": "effect.set-weather",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.set-weather",
-     "params": {
-      "weather": "HARSH_SUN"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "weather": "HARSH_SUN"
-   },
-   "paramPaths": {
-    "weather": "weatherType"
-   }
-  },
-  "191:0": {
-   "abilityId": 191,
-   "attrIndex": 0,
-   "className": "PostSummonWeatherChangeAbAttr",
-   "when": "event.on-entry",
-   "effect": "effect.set-weather",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.set-weather",
-     "params": {
-      "weather": "STRONG_WINDS"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "weather": "STRONG_WINDS"
-   },
-   "paramPaths": {
-    "weather": "weatherType"
-   }
-  },
-  "193:0": {
-   "abilityId": 193,
-   "attrIndex": 0,
-   "className": "PostDamageForceSwitchAbAttr",
-   "when": "event.after-taking-damage",
-   "effect": "effect.force-switch-out",
-   "unpackable": false,
-   "reason": "the ability also has a condition of its own that blocks cannot express yet"
-  },
-  "194:0": {
-   "abilityId": 194,
-   "attrIndex": 0,
-   "className": "PostDamageForceSwitchAbAttr",
-   "when": "event.after-taking-damage",
-   "effect": "effect.force-switch-out",
-   "unpackable": false,
-   "reason": "the ability also has a condition of its own that blocks cannot express yet"
-  },
-  "201:0": {
-   "abilityId": 201,
-   "attrIndex": 0,
-   "className": "BerserkOnThresholdAbAttr",
-   "when": "event.after-hit",
-   "effect": "effect.stat-stage",
-   "unpackable": false,
-   "reason": "the ability also has a condition of its own that blocks cannot express yet"
-  },
-  "218:0": {
-   "abilityId": 218,
-   "attrIndex": 0,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.flag",
-     "params": {
-      "flag": "MAKES_CONTACT"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "218:1": {
-   "abilityId": 218,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.type",
-     "params": {
-      "type": "FIRE",
-      "effective": true
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 2,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 2,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "231:0": {
-   "abilityId": 231,
-   "attrIndex": 0,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "hp.full",
-     "params": {
-      "who": "holder"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "232:0": {
-   "abilityId": 232,
-   "attrIndex": 0,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.effectiveness",
-     "params": {
-      "cmp": "gte",
-      "n": 2
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.65,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.65,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "244:1": {
-   "abilityId": 244,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.flag",
-     "params": {
-      "flag": "SOUND_BASED"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "246:0": {
-   "abilityId": 246,
-   "attrIndex": 0,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.category",
-     "params": {
-      "category": "SPECIAL"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "309:0": {
-   "abilityId": 309,
-   "attrIndex": 0,
-   "className": "PostSummonWeatherChangeAbAttr",
-   "when": "event.on-entry",
-   "effect": "effect.set-weather",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.set-weather",
-     "params": {
-      "weather": "NONE"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "weather": "NONE"
-   },
-   "paramPaths": {
-    "weather": "weatherType"
-   }
-  },
-  "5050:1": {
-   "abilityId": 5050,
-   "attrIndex": 1,
-   "className": "AttackTypeImmunityAbAttr",
-   "when": "calc.move-immunity",
-   "effect": "effect.immune-to-type",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.immune-to-type",
-     "params": {
-      "type": "GROUND"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "type": "GROUND"
-   },
-   "paramPaths": {
-    "type": "immuneType"
-   }
-  },
-  "5051:1": {
-   "abilityId": 5051,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "mon.has-type",
-     "params": {
-      "who": "other",
-      "type": "DRAGON"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5052:0": {
-   "abilityId": 5052,
-   "attrIndex": 0,
-   "className": "AttackTypeImmunityAbAttr",
-   "when": "calc.move-immunity",
-   "effect": "effect.immune-to-type",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.immune-to-type",
-     "params": {
-      "type": "ROCK"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "type": "ROCK"
-   },
-   "paramPaths": {
-    "type": "immuneType"
-   }
-  },
-  "5158:0": {
-   "abilityId": 5158,
-   "attrIndex": 0,
-   "className": "AttackTypeImmunityAbAttr",
-   "when": "calc.move-immunity",
-   "effect": "effect.immune-to-type",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.immune-to-type",
-     "params": {
-      "type": "DARK"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "type": "DARK"
-   },
-   "paramPaths": {
-    "type": "immuneType"
-   }
-  },
-  "5158:1": {
-   "abilityId": 5158,
-   "attrIndex": 1,
-   "className": "AttackTypeImmunityAbAttr",
-   "when": "calc.move-immunity",
-   "effect": "effect.immune-to-type",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.immune-to-type",
-     "params": {
-      "type": "GHOST"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "type": "GHOST"
-   },
-   "paramPaths": {
-    "type": "immuneType"
-   }
-  },
-  "5158:2": {
-   "abilityId": 5158,
-   "attrIndex": 2,
-   "className": "AttackTypeImmunityAbAttr",
-   "when": "calc.move-immunity",
-   "effect": "effect.immune-to-type",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.immune-to-type",
-     "params": {
-      "type": "BUG"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "type": "BUG"
-   },
-   "paramPaths": {
-    "type": "immuneType"
-   }
-  },
-  "5173:1": {
-   "abilityId": 5173,
-   "attrIndex": 1,
-   "className": "AttackTypeImmunityAbAttr",
-   "when": "calc.move-immunity",
-   "effect": "effect.immune-to-type",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.immune-to-type",
-     "params": {
-      "type": "DARK"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "type": "DARK"
-   },
-   "paramPaths": {
-    "type": "immuneType"
-   }
-  },
-  "5176:2": {
-   "abilityId": 5176,
-   "attrIndex": 2,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5178:1": {
-   "abilityId": 5178,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "mon.has-type",
-     "params": {
-      "who": "other",
-      "type": "FAIRY"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5181:1": {
-   "abilityId": 5181,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "mon.has-type",
-     "params": {
-      "who": "other",
-      "type": "GRASS"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5229:0": {
-   "abilityId": 5229,
-   "attrIndex": 0,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.effectiveness",
-     "params": {
-      "cmp": "gte",
-      "n": 2
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.65,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.65,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5253:3": {
-   "abilityId": 5253,
-   "attrIndex": 3,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.flag",
-     "params": {
-      "flag": "SOUND_BASED"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5255:1": {
-   "abilityId": 5255,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "mon.has-type",
-     "params": {
-      "who": "other",
-      "type": "DARK"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5313:0": {
-   "abilityId": 5313,
-   "attrIndex": 0,
-   "className": "AttackTypeImmunityAbAttr",
-   "when": "calc.move-immunity",
-   "effect": "effect.immune-to-type",
-   "unpackable": true,
-   "if": [
-    {
-     "all": [
-      {
-       "not": {
-        "block": "tag.has",
-        "params": {
-         "who": "holder",
-         "tag": "IGNORE_FLYING"
+    },
+    "6:0": {
+      "abilityId": 6,
+      "attrIndex": 0,
+      "className": "PostDefendChangeAttackerTypeAbAttr",
+      "when": "event.after-hit",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "6:2": {
+      "abilityId": 6,
+      "attrIndex": 2,
+      "className": "PostAttackChangeTargetTypeAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "9:0": {
+      "abilityId": 9,
+      "attrIndex": 0,
+      "className": "PostDefendContactApplyStatusEffectAbAttr",
+      "when": "event.after-hit",
+      "effect": "effect.inflict-status",
+      "unpackable": true,
+      "if": [
+        {
+          "all": [
+            {
+              "block": "move.flag",
+              "params": {
+                "flag": "MAKES_CONTACT"
+              }
+            },
+            {
+              "block": "status.has",
+              "params": {
+                "who": "other",
+                "status": "NONE"
+              }
+            },
+            {
+              "block": "rng.chance",
+              "params": {
+                "pct": 30
+              }
+            }
+          ]
         }
-       }
-      },
-      {
-       "not": {
-        "block": "field.gravity",
-        "params": {}
-       }
-      }
-     ]
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.immune-to-type",
-     "params": {
-      "type": "GROUND"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "type": "GROUND"
-   },
-   "paramPaths": {
-    "type": "immuneType"
-   }
-  },
-  "5317:0": {
-   "abilityId": 5317,
-   "attrIndex": 0,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.category",
-     "params": {
-      "category": "PHYSICAL"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5356:2": {
-   "abilityId": 5356,
-   "attrIndex": 2,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": false,
-   "reason": "a condition has no block yet: Sugar Rush: holderHasUpcycle(holder) || isErFoodPokemon(attacker) read ER food/upcycle state that has no atom yet (request: party.food-pokemon / mon.has-upcycle)"
-  },
-  "5358:0": {
-   "abilityId": 5358,
-   "attrIndex": 0,
-   "className": "PostDefendContactApplyStatusEffectAbAttr",
-   "when": "event.after-hit",
-   "effect": "effect.inflict-status",
-   "unpackable": true,
-   "if": [
-    {
-     "all": [
-      {
-       "block": "move.flag",
-       "params": {
-        "flag": "MAKES_CONTACT"
-       }
-      },
-      {
-       "block": "status.has",
-       "params": {
-        "who": "other",
-        "status": "NONE"
-       }
-      },
-      {
-       "block": "rng.chance",
-       "params": {
-        "pct": 30
-       }
-      }
-     ]
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.inflict-status",
-     "params": {
-      "statuses": "PARALYSIS"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "chance": 30,
-    "statuses": "PARALYSIS"
-   },
-   "paramPaths": {
-    "chance": "chance",
-    "statuses": "effects"
-   }
-  },
-  "5365:3": {
-   "abilityId": 5365,
-   "attrIndex": 3,
-   "className": "BerserkOnThresholdAbAttr",
-   "when": "event.after-hit",
-   "effect": "effect.stat-stage",
-   "unpackable": false,
-   "reason": "the ability also has a condition of its own that blocks cannot express yet"
-  },
-  "5391:1": {
-   "abilityId": 5391,
-   "attrIndex": 1,
-   "className": "AttackTypeImmunityAbAttr",
-   "when": "calc.move-immunity",
-   "effect": "effect.immune-to-type",
-   "unpackable": true,
-   "if": [
-    {
-     "all": [
-      {
-       "not": {
-        "block": "tag.has",
-        "params": {
-         "who": "holder",
-         "tag": "IGNORE_FLYING"
+      ],
+      "do": [
+        {
+          "block": "effect.inflict-status",
+          "params": {
+            "statuses": "PARALYSIS"
+          }
         }
-       }
-      },
-      {
-       "not": {
-        "block": "field.gravity",
-        "params": {}
-       }
-      }
-     ]
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.immune-to-type",
-     "params": {
-      "type": "GROUND"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "type": "GROUND"
-   },
-   "paramPaths": {
-    "type": "immuneType"
-   }
-  },
-  "5418:1": {
-   "abilityId": 5418,
-   "attrIndex": 1,
-   "className": "AttackTypeImmunityAbAttr",
-   "when": "calc.move-immunity",
-   "effect": "effect.immune-to-type",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.immune-to-type",
-     "params": {
-      "type": "GROUND"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "type": "GROUND"
-   },
-   "paramPaths": {
-    "type": "immuneType"
-   }
-  },
-  "5428:4": {
-   "abilityId": 5428,
-   "attrIndex": 4,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.flag",
-     "params": {
-      "flag": "SOUND_BASED"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5442:1": {
-   "abilityId": 5442,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "not": {
-      "block": "time.acted",
+      ],
+      "guards": [],
       "params": {
-       "who": "holder"
+        "chance": 30,
+        "statuses": "PARALYSIS"
+      },
+      "paramPaths": {
+        "chance": "chance",
+        "statuses": "effects"
       }
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.7,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.7,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5447:0": {
-   "abilityId": 5447,
-   "attrIndex": 0,
-   "className": "PostSummonWeatherChangeAbAttr",
-   "when": "event.on-entry",
-   "effect": "effect.set-weather",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.set-weather",
-     "params": {
-      "weather": "HARSH_SUN"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "weather": "HARSH_SUN"
-   },
-   "paramPaths": {
-    "weather": "weatherType"
-   }
-  },
-  "5460:1": {
-   "abilityId": 5460,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.8,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.8,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5479:0": {
-   "abilityId": 5479,
-   "attrIndex": 0,
-   "className": "PostDefendContactApplyStatusEffectAbAttr",
-   "when": "event.after-hit",
-   "effect": "effect.inflict-status",
-   "unpackable": true,
-   "if": [
-    {
-     "all": [
-      {
-       "block": "move.flag",
-       "params": {
-        "flag": "MAKES_CONTACT"
-       }
-      },
-      {
-       "block": "status.has",
-       "params": {
-        "who": "other",
-        "status": "NONE"
-       }
-      },
-      {
-       "block": "rng.chance",
-       "params": {
-        "pct": 30
-       }
-      }
-     ]
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.inflict-status",
-     "params": {
-      "statuses": "POISON"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "chance": 30,
-    "statuses": "POISON"
-   },
-   "paramPaths": {
-    "chance": "chance",
-    "statuses": "effects"
-   }
-  },
-  "5480:0": {
-   "abilityId": 5480,
-   "attrIndex": 0,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "hp.full",
-     "params": {
-      "who": "holder"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5480:1": {
-   "abilityId": 5480,
-   "attrIndex": 1,
-   "className": "PostDefendContactApplyStatusEffectAbAttr",
-   "when": "event.after-hit",
-   "effect": "effect.inflict-status",
-   "unpackable": true,
-   "if": [
-    {
-     "all": [
-      {
-       "block": "move.flag",
-       "params": {
-        "flag": "MAKES_CONTACT"
-       }
-      },
-      {
-       "block": "status.has",
-       "params": {
-        "who": "other",
-        "status": "NONE"
-       }
-      },
-      {
-       "block": "rng.chance",
-       "params": {
-        "pct": 30
-       }
-      }
-     ]
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.inflict-status",
-     "params": {
-      "statuses": "POISON"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "chance": 30,
-    "statuses": "POISON"
-   },
-   "paramPaths": {
-    "chance": "chance",
-    "statuses": "effects"
-   }
-  },
-  "5505:1": {
-   "abilityId": 5505,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "mon.has-type",
-     "params": {
-      "who": "other",
-      "type": "FIRE"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5518:0": {
-   "abilityId": 5518,
-   "attrIndex": 0,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": false,
-   "reason": "a condition has no block yet: Madness Enhancement: the ER_ENRAGE tag OR any fog weather (isFogWeather covers more than one weather type); needs an any-fog field.weather atom"
-  },
-  "5523:2": {
-   "abilityId": 5523,
-   "attrIndex": 2,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "hp.full",
-     "params": {
-      "who": "holder"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5541:1": {
-   "abilityId": 5541,
-   "attrIndex": 1,
-   "className": "PostDefendContactApplyStatusEffectAbAttr",
-   "when": "event.after-hit",
-   "effect": "effect.inflict-status",
-   "unpackable": true,
-   "if": [
-    {
-     "all": [
-      {
-       "block": "move.flag",
-       "params": {
-        "flag": "MAKES_CONTACT"
-       }
-      },
-      {
-       "block": "status.has",
-       "params": {
-        "who": "other",
-        "status": "NONE"
-       }
-      },
-      {
-       "block": "rng.chance",
-       "params": {
-        "pct": 30
-       }
-      }
-     ]
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.inflict-status",
-     "params": {
-      "statuses": "POISON"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "chance": 30,
-    "statuses": "POISON"
-   },
-   "paramPaths": {
-    "chance": "chance",
-    "statuses": "effects"
-   }
-  },
-  "5544:1": {
-   "abilityId": 5544,
-   "attrIndex": 1,
-   "className": "AttackTypeImmunityAbAttr",
-   "when": "calc.move-immunity",
-   "effect": "effect.immune-to-type",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.immune-to-type",
-     "params": {
-      "type": "GROUND"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "type": "GROUND"
-   },
-   "paramPaths": {
-    "type": "immuneType"
-   }
-  },
-  "5549:6": {
-   "abilityId": 5549,
-   "attrIndex": 6,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "any": [
-      {
-       "block": "move.type",
-       "params": {
-        "type": "GHOST",
-        "effective": true
-       }
-      },
-      {
-       "block": "move.type",
-       "params": {
-        "type": "DARK",
-        "effective": true
-       }
-      },
-      {
-       "block": "move.flag",
-       "params": {
-        "flag": "SOUND_BASED"
-       }
-      }
-     ]
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": true
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": true
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5561:0": {
-   "abilityId": 5561,
-   "attrIndex": 0,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "not": {
-      "block": "time.acted",
-      "params": {
-       "who": "holder"
-      }
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.7,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.7,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5570:0": {
-   "abilityId": 5570,
-   "attrIndex": 0,
-   "className": "PostSummonWeatherChangeAbAttr",
-   "when": "event.on-entry",
-   "effect": "effect.set-weather",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.set-weather",
-     "params": {
-      "weather": "HARSH_SUN"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "weather": "HARSH_SUN"
-   },
-   "paramPaths": {
-    "weather": "weatherType"
-   }
-  },
-  "5572:0": {
-   "abilityId": 5572,
-   "attrIndex": 0,
-   "className": "PostSummonWeatherChangeAbAttr",
-   "when": "event.on-entry",
-   "effect": "effect.set-weather",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.set-weather",
-     "params": {
-      "weather": "HARSH_SUN"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "weather": "HARSH_SUN"
-   },
-   "paramPaths": {
-    "weather": "weatherType"
-   }
-  },
-  "5625:2": {
-   "abilityId": 5625,
-   "attrIndex": 2,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "mon.opposite-gender",
-     "params": {}
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.75,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.75,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5647:2": {
-   "abilityId": 5647,
-   "attrIndex": 2,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.flag",
-     "params": {
-      "flag": "MAKES_CONTACT"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5647:3": {
-   "abilityId": 5647,
-   "attrIndex": 3,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.type",
-     "params": {
-      "type": "FIRE",
-      "effective": true
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 2,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 2,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5661:3": {
-   "abilityId": 5661,
-   "attrIndex": 3,
-   "className": "AttackTypeImmunityAbAttr",
-   "when": "calc.move-immunity",
-   "effect": "effect.immune-to-type",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.immune-to-type",
-     "params": {
-      "type": "GROUND"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "type": "GROUND"
-   },
-   "paramPaths": {
-    "type": "immuneType"
-   }
-  },
-  "5667:1": {
-   "abilityId": 5667,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.8,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.8,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5667:2": {
-   "abilityId": 5667,
-   "attrIndex": 2,
-   "className": "PostDefendContactApplyStatusEffectAbAttr",
-   "when": "event.after-hit",
-   "effect": "effect.inflict-status",
-   "unpackable": true,
-   "if": [
-    {
-     "all": [
-      {
-       "block": "move.flag",
-       "params": {
-        "flag": "MAKES_CONTACT"
-       }
-      },
-      {
-       "block": "status.has",
-       "params": {
-        "who": "other",
-        "status": "NONE"
-       }
-      },
-      {
-       "block": "rng.chance",
-       "params": {
-        "pct": 30
-       }
-      }
-     ]
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.inflict-status",
-     "params": {
-      "statuses": "POISON"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "chance": 30,
-    "statuses": "POISON"
-   },
-   "paramPaths": {
-    "chance": "chance",
-    "statuses": "effects"
-   }
-  },
-  "5669:2": {
-   "abilityId": 5669,
-   "attrIndex": 2,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.8,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.8,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5693:0": {
-   "abilityId": 5693,
-   "attrIndex": 0,
-   "className": "BerserkOnThresholdAbAttr",
-   "when": "event.after-hit",
-   "effect": "effect.stat-stage",
-   "unpackable": false,
-   "reason": "the ability also has a condition of its own that blocks cannot express yet"
-  },
-  "5698:1": {
-   "abilityId": 5698,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.8,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.8,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5703:0": {
-   "abilityId": 5703,
-   "attrIndex": 0,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.effectiveness",
-     "params": {
-      "cmp": "gte",
-      "n": 2
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.65,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.65,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5703:2": {
-   "abilityId": 5703,
-   "attrIndex": 2,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.8,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.8,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5716:4": {
-   "abilityId": 5716,
-   "attrIndex": 4,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.8,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.8,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5733:2": {
-   "abilityId": 5733,
-   "attrIndex": 2,
-   "className": "PostDefendContactApplyStatusEffectAbAttr",
-   "when": "event.after-hit",
-   "effect": "effect.inflict-status",
-   "unpackable": true,
-   "if": [
-    {
-     "all": [
-      {
-       "block": "move.flag",
-       "params": {
-        "flag": "MAKES_CONTACT"
-       }
-      },
-      {
-       "block": "status.has",
-       "params": {
-        "who": "other",
-        "status": "NONE"
-       }
-      },
-      {
-       "block": "rng.chance",
-       "params": {
-        "pct": 30
-       }
-      }
-     ]
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.inflict-status",
-     "params": {
-      "statuses": "BURN"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "chance": 30,
-    "statuses": "BURN"
-   },
-   "paramPaths": {
-    "chance": "chance",
-    "statuses": "effects"
-   }
-  },
-  "5938:4": {
-   "abilityId": 5938,
-   "attrIndex": 4,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "hp.full",
-     "params": {
-      "who": "holder"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5946:0": {
-   "abilityId": 5946,
-   "attrIndex": 0,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.flag",
-     "params": {
-      "flag": "MAKES_CONTACT"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5946:1": {
-   "abilityId": 5946,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.type",
-     "params": {
-      "type": "FIRE",
-      "effective": true
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 2,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 2,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5958:2": {
-   "abilityId": 5958,
-   "attrIndex": 2,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.8,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.8,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5960:0": {
-   "abilityId": 5960,
-   "attrIndex": 0,
-   "className": "AttackTypeImmunityAbAttr",
-   "when": "calc.move-immunity",
-   "effect": "effect.immune-to-type",
-   "unpackable": true,
-   "if": [
-    {
-     "all": [
-      {
-       "not": {
-        "block": "tag.has",
-        "params": {
-         "who": "holder",
-         "tag": "IGNORE_FLYING"
+    },
+    "26:0": {
+      "abilityId": 26,
+      "attrIndex": 0,
+      "className": "AttackTypeImmunityAbAttr",
+      "when": "calc.move-immunity",
+      "effect": "effect.immune-to-type",
+      "unpackable": true,
+      "if": [
+        {
+          "all": [
+            {
+              "not": {
+                "block": "tag.has",
+                "params": {
+                  "who": "holder",
+                  "tag": "IGNORE_FLYING"
+                }
+              }
+            },
+            {
+              "not": {
+                "block": "field.gravity",
+                "params": {}
+              }
+            }
+          ]
         }
-       }
-      },
-      {
-       "not": {
-        "block": "field.gravity",
-        "params": {}
-       }
-      }
-     ]
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.immune-to-type",
-     "params": {
-      "type": "GROUND"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "type": "GROUND"
-   },
-   "paramPaths": {
-    "type": "immuneType"
-   }
-  },
-  "5961:0": {
-   "abilityId": 5961,
-   "attrIndex": 0,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "hp.full",
-     "params": {
-      "who": "holder"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "5962:3": {
-   "abilityId": 5962,
-   "attrIndex": 3,
-   "className": "AttackTypeImmunityAbAttr",
-   "when": "calc.move-immunity",
-   "effect": "effect.immune-to-type",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.immune-to-type",
-     "params": {
-      "type": "ROCK"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "type": "ROCK"
-   },
-   "paramPaths": {
-    "type": "immuneType"
-   }
-  },
-  "5995:0": {
-   "abilityId": 5995,
-   "attrIndex": 0,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.effectiveness",
-     "params": {
-      "cmp": "gte",
-      "n": 2
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.65,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.65,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "6001:0": {
-   "abilityId": 6001,
-   "attrIndex": 0,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.flag",
-     "params": {
-      "flag": "MAKES_CONTACT"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "6001:1": {
-   "abilityId": 6001,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.type",
-     "params": {
-      "type": "FIRE",
-      "effective": true
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 2,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 2,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "6013:1": {
-   "abilityId": 6013,
-   "attrIndex": 1,
-   "className": "AttackTypeImmunityAbAttr",
-   "when": "calc.move-immunity",
-   "effect": "effect.immune-to-type",
-   "unpackable": true,
-   "if": [
-    {
-     "all": [
-      {
-       "not": {
-        "block": "tag.has",
-        "params": {
-         "who": "holder",
-         "tag": "IGNORE_FLYING"
+      ],
+      "do": [
+        {
+          "block": "effect.immune-to-type",
+          "params": {
+            "type": "GROUND"
+          }
         }
-       }
-      },
-      {
-       "not": {
-        "block": "field.gravity",
-        "params": {}
-       }
-      }
-     ]
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.immune-to-type",
-     "params": {
-      "type": "GROUND"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "type": "GROUND"
-   },
-   "paramPaths": {
-    "type": "immuneType"
-   }
-  },
-  "6018:1": {
-   "abilityId": 6018,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "any": [
-      {
-       "block": "move.type",
-       "params": {
-        "type": "PSYCHIC",
-        "effective": true
-       }
-      },
-      {
-       "block": "move.type",
-       "params": {
-        "type": "DARK",
-        "effective": true
-       }
-      }
-     ]
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "6041:0": {
-   "abilityId": 6041,
-   "attrIndex": 0,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "not": {
-      "block": "move.flag",
+      ],
+      "guards": [],
       "params": {
-       "flag": "MAKES_CONTACT"
+        "type": "GROUND"
+      },
+      "paramPaths": {
+        "type": "immuneType"
       }
-     }
+    },
+    "35:1": {
+      "abilityId": 35,
+      "attrIndex": 1,
+      "className": "PostAttackRemoveTargetTypeAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "36:0": {
+      "abilityId": 36,
+      "attrIndex": 0,
+      "className": "PostSummonCopyAbilityAbAttr",
+      "when": "event.on-entry",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "38:0": {
+      "abilityId": 38,
+      "attrIndex": 0,
+      "className": "PostDefendContactApplyStatusEffectAbAttr",
+      "when": "event.after-hit",
+      "effect": "effect.inflict-status",
+      "unpackable": true,
+      "if": [
+        {
+          "all": [
+            {
+              "block": "move.flag",
+              "params": {
+                "flag": "MAKES_CONTACT"
+              }
+            },
+            {
+              "block": "status.has",
+              "params": {
+                "who": "other",
+                "status": "NONE"
+              }
+            },
+            {
+              "block": "rng.chance",
+              "params": {
+                "pct": 30
+              }
+            }
+          ]
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.inflict-status",
+          "params": {
+            "statuses": "POISON"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "chance": 30,
+        "statuses": "POISON"
+      },
+      "paramPaths": {
+        "chance": "chance",
+        "statuses": "effects"
+      }
+    },
+    "49:0": {
+      "abilityId": 49,
+      "attrIndex": 0,
+      "className": "PostDefendContactApplyStatusEffectAbAttr",
+      "when": "event.after-hit",
+      "effect": "effect.inflict-status",
+      "unpackable": true,
+      "if": [
+        {
+          "all": [
+            {
+              "block": "move.flag",
+              "params": {
+                "flag": "MAKES_CONTACT"
+              }
+            },
+            {
+              "block": "status.has",
+              "params": {
+                "who": "other",
+                "status": "NONE"
+              }
+            },
+            {
+              "block": "rng.chance",
+              "params": {
+                "pct": 30
+              }
+            }
+          ]
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.inflict-status",
+          "params": {
+            "statuses": "BURN"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "chance": 30,
+        "statuses": "BURN"
+      },
+      "paramPaths": {
+        "chance": "chance",
+        "statuses": "effects"
+      }
+    },
+    "75:1": {
+      "abilityId": 75,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.8,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.8,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "79:1": {
+      "abilityId": 79,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "mon.opposite-gender",
+          "params": {}
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.75,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.75,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "100:0": {
+      "abilityId": 100,
+      "attrIndex": 0,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "not": {
+            "block": "time.acted",
+            "params": {
+              "who": "holder"
+            }
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.7,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.7,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "111:0": {
+      "abilityId": 111,
+      "attrIndex": 0,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.effectiveness",
+          "params": {
+            "cmp": "gte",
+            "n": 2
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.65,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.65,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "116:0": {
+      "abilityId": 116,
+      "attrIndex": 0,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.effectiveness",
+          "params": {
+            "cmp": "gte",
+            "n": 2
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.65,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.65,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "134:1": {
+      "abilityId": 134,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "any": [
+            {
+              "block": "move.type",
+              "params": {
+                "type": "GHOST",
+                "effective": true
+              }
+            },
+            {
+              "block": "move.type",
+              "params": {
+                "type": "DARK",
+                "effective": true
+              }
+            },
+            {
+              "block": "move.flag",
+              "params": {
+                "flag": "SOUND_BASED"
+              }
+            }
+          ]
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": true
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": true
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "136:0": {
+      "abilityId": 136,
+      "attrIndex": 0,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "hp.full",
+          "params": {
+            "who": "holder"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "142:2": {
+      "abilityId": 142,
+      "attrIndex": 2,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.category",
+          "params": {
+            "category": "SPECIAL"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.8,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.8,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "169:0": {
+      "abilityId": 169,
+      "attrIndex": 0,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.category",
+          "params": {
+            "category": "PHYSICAL"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "189:0": {
+      "abilityId": 189,
+      "attrIndex": 0,
+      "className": "PostSummonWeatherChangeAbAttr",
+      "when": "event.on-entry",
+      "effect": "effect.set-weather",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.set-weather",
+          "params": {
+            "weather": "HEAVY_RAIN"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "weather": "HEAVY_RAIN"
+      },
+      "paramPaths": {
+        "weather": "weatherType"
+      }
+    },
+    "190:0": {
+      "abilityId": 190,
+      "attrIndex": 0,
+      "className": "PostSummonWeatherChangeAbAttr",
+      "when": "event.on-entry",
+      "effect": "effect.set-weather",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.set-weather",
+          "params": {
+            "weather": "HARSH_SUN"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "weather": "HARSH_SUN"
+      },
+      "paramPaths": {
+        "weather": "weatherType"
+      }
+    },
+    "191:0": {
+      "abilityId": 191,
+      "attrIndex": 0,
+      "className": "PostSummonWeatherChangeAbAttr",
+      "when": "event.on-entry",
+      "effect": "effect.set-weather",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.set-weather",
+          "params": {
+            "weather": "STRONG_WINDS"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "weather": "STRONG_WINDS"
+      },
+      "paramPaths": {
+        "weather": "weatherType"
+      }
+    },
+    "193:0": {
+      "abilityId": 193,
+      "attrIndex": 0,
+      "className": "PostDamageForceSwitchAbAttr",
+      "when": "event.after-taking-damage",
+      "effect": "effect.force-switch-out",
+      "unpackable": false,
+      "reason": "the ability also has a condition of its own that blocks cannot express yet"
+    },
+    "194:0": {
+      "abilityId": 194,
+      "attrIndex": 0,
+      "className": "PostDamageForceSwitchAbAttr",
+      "when": "event.after-taking-damage",
+      "effect": "effect.force-switch-out",
+      "unpackable": false,
+      "reason": "the ability also has a condition of its own that blocks cannot express yet"
+    },
+    "201:0": {
+      "abilityId": 201,
+      "attrIndex": 0,
+      "className": "BerserkOnThresholdAbAttr",
+      "when": "event.after-hit",
+      "effect": "effect.stat-stage",
+      "unpackable": false,
+      "reason": "the ability also has a condition of its own that blocks cannot express yet"
+    },
+    "218:0": {
+      "abilityId": 218,
+      "attrIndex": 0,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.flag",
+          "params": {
+            "flag": "MAKES_CONTACT"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "218:1": {
+      "abilityId": 218,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.type",
+          "params": {
+            "type": "FIRE",
+            "effective": true
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 2,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 2,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "231:0": {
+      "abilityId": 231,
+      "attrIndex": 0,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "hp.full",
+          "params": {
+            "who": "holder"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "232:0": {
+      "abilityId": 232,
+      "attrIndex": 0,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.effectiveness",
+          "params": {
+            "cmp": "gte",
+            "n": 2
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.65,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.65,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "244:1": {
+      "abilityId": 244,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.flag",
+          "params": {
+            "flag": "SOUND_BASED"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "246:0": {
+      "abilityId": 246,
+      "attrIndex": 0,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.category",
+          "params": {
+            "category": "SPECIAL"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "309:0": {
+      "abilityId": 309,
+      "attrIndex": 0,
+      "className": "PostSummonWeatherChangeAbAttr",
+      "when": "event.on-entry",
+      "effect": "effect.set-weather",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.set-weather",
+          "params": {
+            "weather": "NONE"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "weather": "NONE"
+      },
+      "paramPaths": {
+        "weather": "weatherType"
+      }
+    },
+    "5042:0": {
+      "abilityId": 5042,
+      "attrIndex": 0,
+      "className": "PostDefendChangeAttackerTypeAbAttr",
+      "when": "event.after-hit",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5042:1": {
+      "abilityId": 5042,
+      "attrIndex": 1,
+      "className": "PostAttackChangeTargetTypeAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5045:0": {
+      "abilityId": 5045,
+      "attrIndex": 0,
+      "className": "PassiveRecoveryAbAttr",
+      "when": "event.end-of-turn",
+      "effect": "effect.heal-percent",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.heal-percent",
+          "params": {
+            "percent": 6.25
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "percent": 6.25,
+        "when": "Always"
+      },
+      "paramPaths": {
+        "percent": "healFractionValue",
+        "when": "conditionSpec"
+      }
+    },
+    "5050:1": {
+      "abilityId": 5050,
+      "attrIndex": 1,
+      "className": "AttackTypeImmunityAbAttr",
+      "when": "calc.move-immunity",
+      "effect": "effect.immune-to-type",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.immune-to-type",
+          "params": {
+            "type": "GROUND"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "type": "GROUND"
+      },
+      "paramPaths": {
+        "type": "immuneType"
+      }
+    },
+    "5051:1": {
+      "abilityId": 5051,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "mon.has-type",
+          "params": {
+            "who": "other",
+            "type": "DRAGON"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5052:0": {
+      "abilityId": 5052,
+      "attrIndex": 0,
+      "className": "AttackTypeImmunityAbAttr",
+      "when": "calc.move-immunity",
+      "effect": "effect.immune-to-type",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.immune-to-type",
+          "params": {
+            "type": "ROCK"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "type": "ROCK"
+      },
+      "paramPaths": {
+        "type": "immuneType"
+      }
+    },
+    "5071:0": {
+      "abilityId": 5071,
+      "attrIndex": 0,
+      "className": "PassiveRecoveryAbAttr",
+      "when": "event.end-of-turn",
+      "effect": "effect.heal-percent",
+      "unpackable": false,
+      "reason": "a condition has no block yet: Asleep OR Comatose-like (isComatoseLike): the library has no atom for the Comatose half, request R-B10-23 in requests/B10.md"
+    },
+    "5082:2": {
+      "abilityId": 5082,
+      "attrIndex": 2,
+      "className": "PassiveRecoveryAbAttr",
+      "when": "event.end-of-turn",
+      "effect": "effect.heal-percent",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "field.terrain",
+          "params": {
+            "terrain": "TOXIC"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.heal-percent",
+          "params": {
+            "percent": 12.5
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "percent": 12.5,
+        "when": "While the terrain is Toxic"
+      },
+      "paramPaths": {
+        "percent": "healFractionValue",
+        "when": "conditionSpec"
+      }
+    },
+    "5119:0": {
+      "abilityId": 5119,
+      "attrIndex": 0,
+      "className": "PostAttackScriptedMoveAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.scripted-move",
+      "unpackable": false,
+      "reason": "a condition has no block yet: The move's type OR any type another of my abilities lets it count as (getTriggeredMoveTypes, Sea Specter) is on the list: the library move.type atom reads only the move's own type, request R-B10-c3-07 in requests/B10.md"
+    },
+    "5134:0": {
+      "abilityId": 5134,
+      "attrIndex": 0,
+      "className": "PostAttackScriptedMoveAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.scripted-move",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.flag",
+          "params": {
+            "flag": "PULSE_MOVE"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.scripted-move",
+          "params": {
+            "moveId": "OUTBURST",
+            "power": 50,
+            "magnitudeLow": 0,
+            "magnitudeHigh": 0,
+            "hpScaledPower": 0
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "moveId": "OUTBURST",
+        "power": 50,
+        "magnitudeLow": 0,
+        "magnitudeHigh": 0,
+        "hpScaledPower": 0,
+        "category": "NONE",
+        "type": "NONE",
+        "type2": "NONE",
+        "flag": "PULSE_MOVE",
+        "triggerMove": "NONE",
+        "triggerMove2": "NONE",
+        "targetStatsDecreased": false,
+        "allowVirtualMove": "NONE"
+      },
+      "paramPaths": {
+        "moveId": "opts",
+        "power": "opts",
+        "magnitudeLow": "opts",
+        "magnitudeHigh": "opts",
+        "hpScaledPower": "opts",
+        "category": "opts",
+        "type": "opts",
+        "type2": "opts",
+        "flag": "opts",
+        "triggerMove": "opts",
+        "triggerMove2": "opts",
+        "targetStatsDecreased": "opts",
+        "allowVirtualMove": "opts"
+      }
+    },
+    "5143:0": {
+      "abilityId": 5143,
+      "attrIndex": 0,
+      "className": "OnOpponentStatRaiseScriptedMoveAbAttr",
+      "when": "event.foe-raised-stat",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5151:0": {
+      "abilityId": 5151,
+      "attrIndex": 0,
+      "className": "PassiveRecoveryAbAttr",
+      "when": "event.end-of-turn",
+      "effect": "effect.heal-percent",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.heal-percent",
+          "params": {
+            "percent": 6.25
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "percent": 6.25,
+        "when": "Always"
+      },
+      "paramPaths": {
+        "percent": "healFractionValue",
+        "when": "conditionSpec"
+      }
+    },
+    "5158:0": {
+      "abilityId": 5158,
+      "attrIndex": 0,
+      "className": "AttackTypeImmunityAbAttr",
+      "when": "calc.move-immunity",
+      "effect": "effect.immune-to-type",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.immune-to-type",
+          "params": {
+            "type": "DARK"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "type": "DARK"
+      },
+      "paramPaths": {
+        "type": "immuneType"
+      }
+    },
+    "5158:1": {
+      "abilityId": 5158,
+      "attrIndex": 1,
+      "className": "AttackTypeImmunityAbAttr",
+      "when": "calc.move-immunity",
+      "effect": "effect.immune-to-type",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.immune-to-type",
+          "params": {
+            "type": "GHOST"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "type": "GHOST"
+      },
+      "paramPaths": {
+        "type": "immuneType"
+      }
+    },
+    "5158:2": {
+      "abilityId": 5158,
+      "attrIndex": 2,
+      "className": "AttackTypeImmunityAbAttr",
+      "when": "calc.move-immunity",
+      "effect": "effect.immune-to-type",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.immune-to-type",
+          "params": {
+            "type": "BUG"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "type": "BUG"
+      },
+      "paramPaths": {
+        "type": "immuneType"
+      }
+    },
+    "5163:0": {
+      "abilityId": 5163,
+      "attrIndex": 0,
+      "className": "NullifyFirstNHitsAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.negate",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5173:1": {
+      "abilityId": 5173,
+      "attrIndex": 1,
+      "className": "AttackTypeImmunityAbAttr",
+      "when": "calc.move-immunity",
+      "effect": "effect.immune-to-type",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.immune-to-type",
+          "params": {
+            "type": "DARK"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "type": "DARK"
+      },
+      "paramPaths": {
+        "type": "immuneType"
+      }
+    },
+    "5176:2": {
+      "abilityId": 5176,
+      "attrIndex": 2,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5178:1": {
+      "abilityId": 5178,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "mon.has-type",
+          "params": {
+            "who": "other",
+            "type": "FAIRY"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5181:1": {
+      "abilityId": 5181,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "mon.has-type",
+          "params": {
+            "who": "other",
+            "type": "GRASS"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5186:12": {
+      "abilityId": 5186,
+      "attrIndex": 12,
+      "className": "PostAttackSetTerrainByMoveTypeAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.set-terrain",
+      "unpackable": true,
+      "if": [
+        {
+          "all": [
+            {
+              "block": "move.damaging",
+              "params": {}
+            },
+            {
+              "any": [
+                {
+                  "block": "move.type",
+                  "params": {
+                    "type": "ELECTRIC",
+                    "effective": false
+                  }
+                },
+                {
+                  "block": "move.type",
+                  "params": {
+                    "type": "PSYCHIC",
+                    "effective": false
+                  }
+                },
+                {
+                  "block": "move.type",
+                  "params": {
+                    "type": "GRASS",
+                    "effective": false
+                  }
+                },
+                {
+                  "block": "move.type",
+                  "params": {
+                    "type": "FAIRY",
+                    "effective": false
+                  }
+                }
+              ]
+            },
+            {
+              "block": "rng.chance",
+              "params": {
+                "pct": 30
+              }
+            }
+          ]
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.set-terrain",
+          "params": {
+            "terrain1": "ELECTRIC",
+            "terrain2": "PSYCHIC",
+            "terrain3": "GRASSY",
+            "terrain4": "MISTY"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "chance": 30,
+        "type1": "ELECTRIC",
+        "terrain1": "ELECTRIC",
+        "type2": "PSYCHIC",
+        "terrain2": "PSYCHIC",
+        "type3": "GRASS",
+        "terrain3": "GRASSY",
+        "type4": "FAIRY",
+        "terrain4": "MISTY"
+      },
+      "paramPaths": {
+        "chance": "chance",
+        "type1": "terrainByType",
+        "terrain1": "terrainByType",
+        "type2": "terrainByType",
+        "terrain2": "terrainByType",
+        "type3": "terrainByType",
+        "terrain3": "terrainByType",
+        "type4": "terrainByType",
+        "terrain4": "terrainByType"
+      }
+    },
+    "5186:13": {
+      "abilityId": 5186,
+      "attrIndex": 13,
+      "className": "PostAttackSetHazardByMoveTypeAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.arena-tag",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5192:1": {
+      "abilityId": 5192,
+      "attrIndex": 1,
+      "className": "PostAttackScriptedMoveAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.scripted-move",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.is-move",
+          "params": {
+            "moveId": "TICKLE"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.scripted-move",
+          "params": {
+            "moveId": "COVET",
+            "power": 20,
+            "magnitudeLow": 0,
+            "magnitudeHigh": 0,
+            "hpScaledPower": 0
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "moveId": "COVET",
+        "power": 20,
+        "magnitudeLow": 0,
+        "magnitudeHigh": 0,
+        "hpScaledPower": 0,
+        "category": "NONE",
+        "type": "NONE",
+        "type2": "NONE",
+        "flag": "NONE",
+        "triggerMove": "TICKLE",
+        "triggerMove2": "NONE",
+        "targetStatsDecreased": false,
+        "allowVirtualMove": "TICKLE"
+      },
+      "paramPaths": {
+        "moveId": "opts",
+        "power": "opts",
+        "magnitudeLow": "opts",
+        "magnitudeHigh": "opts",
+        "hpScaledPower": "opts",
+        "category": "opts",
+        "type": "opts",
+        "type2": "opts",
+        "flag": "opts",
+        "triggerMove": "opts",
+        "triggerMove2": "opts",
+        "targetStatsDecreased": "opts",
+        "allowVirtualMove": "opts"
+      }
+    },
+    "5206:0": {
+      "abilityId": 5206,
+      "attrIndex": 0,
+      "className": "PostAttackScriptedMoveAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.scripted-move",
+      "unpackable": false,
+      "reason": "a condition has no block yet: The move's type OR any type another of my abilities lets it count as (getTriggeredMoveTypes, Sea Specter) is on the list: the library move.type atom reads only the move's own type, request R-B10-c3-07 in requests/B10.md"
+    },
+    "5220:0": {
+      "abilityId": 5220,
+      "attrIndex": 0,
+      "className": "PassiveRecoveryAbAttr",
+      "when": "event.end-of-turn",
+      "effect": "effect.heal-percent",
+      "unpackable": false,
+      "reason": "a condition has no block yet: Asleep OR Comatose-like (isComatoseLike): the library has no atom for the Comatose half, request R-B10-23 in requests/B10.md"
+    },
+    "5220:2": {
+      "abilityId": 5220,
+      "attrIndex": 2,
+      "className": "PassiveRecoveryAbAttr",
+      "when": "event.end-of-turn",
+      "effect": "effect.heal-percent",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.heal-percent",
+          "params": {
+            "percent": 6.25
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "percent": 6.25,
+        "when": "Always"
+      },
+      "paramPaths": {
+        "percent": "healFractionValue",
+        "when": "conditionSpec"
+      }
+    },
+    "5221:0": {
+      "abilityId": 5221,
+      "attrIndex": 0,
+      "className": "PostAttackScriptedMoveAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.scripted-move",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.scripted-move",
+          "params": {
+            "moveId": "MAGNITUDE",
+            "power": 0,
+            "magnitudeLow": 4,
+            "magnitudeHigh": 7,
+            "hpScaledPower": 0
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "moveId": "MAGNITUDE",
+        "power": 0,
+        "magnitudeLow": 4,
+        "magnitudeHigh": 7,
+        "hpScaledPower": 0,
+        "category": "NONE",
+        "type": "NONE",
+        "type2": "NONE",
+        "flag": "NONE",
+        "triggerMove": "NONE",
+        "triggerMove2": "NONE",
+        "targetStatsDecreased": false,
+        "allowVirtualMove": "NONE"
+      },
+      "paramPaths": {
+        "moveId": "opts",
+        "power": "opts",
+        "magnitudeLow": "opts",
+        "magnitudeHigh": "opts",
+        "hpScaledPower": "opts",
+        "category": "opts",
+        "type": "opts",
+        "type2": "opts",
+        "flag": "opts",
+        "triggerMove": "opts",
+        "triggerMove2": "opts",
+        "targetStatsDecreased": "opts",
+        "allowVirtualMove": "opts"
+      }
+    },
+    "5229:0": {
+      "abilityId": 5229,
+      "attrIndex": 0,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.effectiveness",
+          "params": {
+            "cmp": "gte",
+            "n": 2
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.65,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.65,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5229:2": {
+      "abilityId": 5229,
+      "attrIndex": 2,
+      "className": "PostAttackRemoveTargetTypeAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5229:3": {
+      "abilityId": 5229,
+      "attrIndex": 3,
+      "className": "PostAttackRemoveTargetTypeAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5233:0": {
+      "abilityId": 5233,
+      "attrIndex": 0,
+      "className": "PostAttackScriptedMoveAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.scripted-move",
+      "unpackable": false,
+      "reason": "a condition has no block yet: The move's type OR any type another of my abilities lets it count as (getTriggeredMoveTypes, Sea Specter) is on the list: the library move.type atom reads only the move's own type, request R-B10-c3-07 in requests/B10.md"
+    },
+    "5246:0": {
+      "abilityId": 5246,
+      "attrIndex": 0,
+      "className": "PostAttackScriptedMoveAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.scripted-move",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.flag",
+          "params": {
+            "flag": "DANCE_MOVE"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.scripted-move",
+          "params": {
+            "moveId": "REVELATION_DANCE",
+            "power": 50,
+            "magnitudeLow": 0,
+            "magnitudeHigh": 0,
+            "hpScaledPower": 0
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "moveId": "REVELATION_DANCE",
+        "power": 50,
+        "magnitudeLow": 0,
+        "magnitudeHigh": 0,
+        "hpScaledPower": 0,
+        "category": "NONE",
+        "type": "NONE",
+        "type2": "NONE",
+        "flag": "DANCE_MOVE",
+        "triggerMove": "NONE",
+        "triggerMove2": "NONE",
+        "targetStatsDecreased": false,
+        "allowVirtualMove": "NONE"
+      },
+      "paramPaths": {
+        "moveId": "opts",
+        "power": "opts",
+        "magnitudeLow": "opts",
+        "magnitudeHigh": "opts",
+        "hpScaledPower": "opts",
+        "category": "opts",
+        "type": "opts",
+        "type2": "opts",
+        "flag": "opts",
+        "triggerMove": "opts",
+        "triggerMove2": "opts",
+        "targetStatsDecreased": "opts",
+        "allowVirtualMove": "opts"
+      }
+    },
+    "5253:3": {
+      "abilityId": 5253,
+      "attrIndex": 3,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.flag",
+          "params": {
+            "flag": "SOUND_BASED"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5255:1": {
+      "abilityId": 5255,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "mon.has-type",
+          "params": {
+            "who": "other",
+            "type": "DARK"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5276:0": {
+      "abilityId": 5276,
+      "attrIndex": 0,
+      "className": "OnOpponentStatRaiseAbAttr",
+      "when": "event.foe-raised-stat",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5277:0": {
+      "abilityId": 5277,
+      "attrIndex": 0,
+      "className": "OutgoingStatDropMultiplierAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5292:0": {
+      "abilityId": 5292,
+      "attrIndex": 0,
+      "className": "NullifyFirstNHitsAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.negate",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5298:0": {
+      "abilityId": 5298,
+      "attrIndex": 0,
+      "className": "PassiveRecoveryAbAttr",
+      "when": "event.end-of-turn",
+      "effect": "effect.heal-percent",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "field.terrain",
+          "params": {
+            "terrain": "MISTY"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.heal-percent",
+          "params": {
+            "percent": 12.5
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "percent": 12.5,
+        "when": "While the terrain is Misty"
+      },
+      "paramPaths": {
+        "percent": "healFractionValue",
+        "when": "conditionSpec"
+      }
+    },
+    "5299:0": {
+      "abilityId": 5299,
+      "attrIndex": 0,
+      "className": "PartyCountMultiHitAbAttr",
+      "when": "calc.hit-count",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5310:1": {
+      "abilityId": 5310,
+      "attrIndex": 1,
+      "className": "PassiveRecoveryAbAttr",
+      "when": "event.end-of-turn",
+      "effect": "effect.heal-percent",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "field.terrain",
+          "params": {
+            "terrain": "GRASSY"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.heal-percent",
+          "params": {
+            "percent": 12.5
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "percent": 12.5,
+        "when": "While the terrain is Grassy"
+      },
+      "paramPaths": {
+        "percent": "healFractionValue",
+        "when": "conditionSpec"
+      }
+    },
+    "5313:0": {
+      "abilityId": 5313,
+      "attrIndex": 0,
+      "className": "AttackTypeImmunityAbAttr",
+      "when": "calc.move-immunity",
+      "effect": "effect.immune-to-type",
+      "unpackable": true,
+      "if": [
+        {
+          "all": [
+            {
+              "not": {
+                "block": "tag.has",
+                "params": {
+                  "who": "holder",
+                  "tag": "IGNORE_FLYING"
+                }
+              }
+            },
+            {
+              "not": {
+                "block": "field.gravity",
+                "params": {}
+              }
+            }
+          ]
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.immune-to-type",
+          "params": {
+            "type": "GROUND"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "type": "GROUND"
+      },
+      "paramPaths": {
+        "type": "immuneType"
+      }
+    },
+    "5317:0": {
+      "abilityId": 5317,
+      "attrIndex": 0,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.category",
+          "params": {
+            "category": "PHYSICAL"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5345:0": {
+      "abilityId": 5345,
+      "attrIndex": 0,
+      "className": "PostAttackScriptedMoveAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.scripted-move",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.flag",
+          "params": {
+            "flag": "SOUND_BASED"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.scripted-move",
+          "params": {
+            "moveId": "EARTHQUAKE",
+            "power": 40,
+            "magnitudeLow": 0,
+            "magnitudeHigh": 0,
+            "hpScaledPower": 0
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "moveId": "EARTHQUAKE",
+        "power": 40,
+        "magnitudeLow": 0,
+        "magnitudeHigh": 0,
+        "hpScaledPower": 0,
+        "category": "NONE",
+        "type": "NONE",
+        "type2": "NONE",
+        "flag": "SOUND_BASED",
+        "triggerMove": "NONE",
+        "triggerMove2": "NONE",
+        "targetStatsDecreased": false,
+        "allowVirtualMove": "NONE"
+      },
+      "paramPaths": {
+        "moveId": "opts",
+        "power": "opts",
+        "magnitudeLow": "opts",
+        "magnitudeHigh": "opts",
+        "hpScaledPower": "opts",
+        "category": "opts",
+        "type": "opts",
+        "type2": "opts",
+        "flag": "opts",
+        "triggerMove": "opts",
+        "triggerMove2": "opts",
+        "targetStatsDecreased": "opts",
+        "allowVirtualMove": "opts"
+      }
+    },
+    "5355:0": {
+      "abilityId": 5355,
+      "attrIndex": 0,
+      "className": "PassiveRecoveryAbAttr",
+      "when": "event.end-of-turn",
+      "effect": "effect.heal-percent",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "field.terrain",
+          "params": {
+            "terrain": "MISTY"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.heal-percent",
+          "params": {
+            "percent": 12.5
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "percent": 12.5,
+        "when": "While the terrain is Misty"
+      },
+      "paramPaths": {
+        "percent": "healFractionValue",
+        "when": "conditionSpec"
+      }
+    },
+    "5356:2": {
+      "abilityId": 5356,
+      "attrIndex": 2,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": false,
+      "reason": "a condition has no block yet: Sugar Rush: holderHasUpcycle(holder) || isErFoodPokemon(attacker) read ER food/upcycle state that has no atom yet (request: party.food-pokemon / mon.has-upcycle)"
+    },
+    "5357:0": {
+      "abilityId": 5357,
+      "attrIndex": 0,
+      "className": "PassiveRecoveryAbAttr",
+      "when": "event.end-of-turn",
+      "effect": "effect.heal-percent",
+      "unpackable": true,
+      "if": [
+        {
+          "any": [
+            {
+              "block": "field.weather",
+              "params": {
+                "weather": "FOG"
+              }
+            },
+            {
+              "block": "field.weather",
+              "params": {
+                "weather": "EERIE_FOG"
+              }
+            }
+          ]
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.heal-percent",
+          "params": {
+            "percent": 12.5
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "percent": 12.5,
+        "when": "While the weather is Fog or Eerie fog"
+      },
+      "paramPaths": {
+        "percent": "healFractionValue",
+        "when": "conditionSpec"
+      }
+    },
+    "5358:0": {
+      "abilityId": 5358,
+      "attrIndex": 0,
+      "className": "PostDefendContactApplyStatusEffectAbAttr",
+      "when": "event.after-hit",
+      "effect": "effect.inflict-status",
+      "unpackable": true,
+      "if": [
+        {
+          "all": [
+            {
+              "block": "move.flag",
+              "params": {
+                "flag": "MAKES_CONTACT"
+              }
+            },
+            {
+              "block": "status.has",
+              "params": {
+                "who": "other",
+                "status": "NONE"
+              }
+            },
+            {
+              "block": "rng.chance",
+              "params": {
+                "pct": 30
+              }
+            }
+          ]
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.inflict-status",
+          "params": {
+            "statuses": "PARALYSIS"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "chance": 30,
+        "statuses": "PARALYSIS"
+      },
+      "paramPaths": {
+        "chance": "chance",
+        "statuses": "effects"
+      }
+    },
+    "5358:4": {
+      "abilityId": 5358,
+      "attrIndex": 4,
+      "className": "PassiveRecoveryAbAttr",
+      "when": "event.end-of-turn",
+      "effect": "effect.heal-percent",
+      "unpackable": true,
+      "if": [
+        {
+          "any": [
+            {
+              "block": "field.weather",
+              "params": {
+                "weather": "FOG"
+              }
+            },
+            {
+              "block": "field.weather",
+              "params": {
+                "weather": "EERIE_FOG"
+              }
+            }
+          ]
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.heal-percent",
+          "params": {
+            "percent": 12.5
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "percent": 12.5,
+        "when": "While the weather is Fog or Eerie fog"
+      },
+      "paramPaths": {
+        "percent": "healFractionValue",
+        "when": "conditionSpec"
+      }
+    },
+    "5360:0": {
+      "abilityId": 5360,
+      "attrIndex": 0,
+      "className": "OnOpponentSwitchOutAbAttr",
+      "when": "event.foe-switches-out",
+      "effect": "effect.scripted-move",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5365:3": {
+      "abilityId": 5365,
+      "attrIndex": 3,
+      "className": "BerserkOnThresholdAbAttr",
+      "when": "event.after-hit",
+      "effect": "effect.stat-stage",
+      "unpackable": false,
+      "reason": "the ability also has a condition of its own that blocks cannot express yet"
+    },
+    "5391:1": {
+      "abilityId": 5391,
+      "attrIndex": 1,
+      "className": "AttackTypeImmunityAbAttr",
+      "when": "calc.move-immunity",
+      "effect": "effect.immune-to-type",
+      "unpackable": true,
+      "if": [
+        {
+          "all": [
+            {
+              "not": {
+                "block": "tag.has",
+                "params": {
+                  "who": "holder",
+                  "tag": "IGNORE_FLYING"
+                }
+              }
+            },
+            {
+              "not": {
+                "block": "field.gravity",
+                "params": {}
+              }
+            }
+          ]
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.immune-to-type",
+          "params": {
+            "type": "GROUND"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "type": "GROUND"
+      },
+      "paramPaths": {
+        "type": "immuneType"
+      }
+    },
+    "5393:0": {
+      "abilityId": 5393,
+      "attrIndex": 0,
+      "className": "PostDamageForceAttackerOutAbAttr",
+      "when": "event.after-taking-damage",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5417:0": {
+      "abilityId": 5417,
+      "attrIndex": 0,
+      "className": "PassiveRecoveryAbAttr",
+      "when": "event.end-of-turn",
+      "effect": "effect.heal-percent",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.heal-percent",
+          "params": {
+            "percent": 6.25
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "percent": 6.25,
+        "when": "Always"
+      },
+      "paramPaths": {
+        "percent": "healFractionValue",
+        "when": "conditionSpec"
+      }
+    },
+    "5418:1": {
+      "abilityId": 5418,
+      "attrIndex": 1,
+      "className": "AttackTypeImmunityAbAttr",
+      "when": "calc.move-immunity",
+      "effect": "effect.immune-to-type",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.immune-to-type",
+          "params": {
+            "type": "GROUND"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "type": "GROUND"
+      },
+      "paramPaths": {
+        "type": "immuneType"
+      }
+    },
+    "5428:4": {
+      "abilityId": 5428,
+      "attrIndex": 4,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.flag",
+          "params": {
+            "flag": "SOUND_BASED"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5434:0": {
+      "abilityId": 5434,
+      "attrIndex": 0,
+      "className": "PostAttackScriptedMoveAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.scripted-move",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.flag",
+          "params": {
+            "flag": "DANCE_MOVE"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.scripted-move",
+          "params": {
+            "moveId": "LEAF_BLADE",
+            "power": 50,
+            "magnitudeLow": 0,
+            "magnitudeHigh": 0,
+            "hpScaledPower": 0
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "moveId": "LEAF_BLADE",
+        "power": 50,
+        "magnitudeLow": 0,
+        "magnitudeHigh": 0,
+        "hpScaledPower": 0,
+        "category": "NONE",
+        "type": "NONE",
+        "type2": "NONE",
+        "flag": "DANCE_MOVE",
+        "triggerMove": "NONE",
+        "triggerMove2": "NONE",
+        "targetStatsDecreased": false,
+        "allowVirtualMove": "NONE"
+      },
+      "paramPaths": {
+        "moveId": "opts",
+        "power": "opts",
+        "magnitudeLow": "opts",
+        "magnitudeHigh": "opts",
+        "hpScaledPower": "opts",
+        "category": "opts",
+        "type": "opts",
+        "type2": "opts",
+        "flag": "opts",
+        "triggerMove": "opts",
+        "triggerMove2": "opts",
+        "targetStatsDecreased": "opts",
+        "allowVirtualMove": "opts"
+      }
+    },
+    "5442:1": {
+      "abilityId": 5442,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "not": {
+            "block": "time.acted",
+            "params": {
+              "who": "holder"
+            }
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.7,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.7,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5447:0": {
+      "abilityId": 5447,
+      "attrIndex": 0,
+      "className": "PostSummonWeatherChangeAbAttr",
+      "when": "event.on-entry",
+      "effect": "effect.set-weather",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.set-weather",
+          "params": {
+            "weather": "HARSH_SUN"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "weather": "HARSH_SUN"
+      },
+      "paramPaths": {
+        "weather": "weatherType"
+      }
+    },
+    "5460:1": {
+      "abilityId": 5460,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.8,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.8,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5479:0": {
+      "abilityId": 5479,
+      "attrIndex": 0,
+      "className": "PostDefendContactApplyStatusEffectAbAttr",
+      "when": "event.after-hit",
+      "effect": "effect.inflict-status",
+      "unpackable": true,
+      "if": [
+        {
+          "all": [
+            {
+              "block": "move.flag",
+              "params": {
+                "flag": "MAKES_CONTACT"
+              }
+            },
+            {
+              "block": "status.has",
+              "params": {
+                "who": "other",
+                "status": "NONE"
+              }
+            },
+            {
+              "block": "rng.chance",
+              "params": {
+                "pct": 30
+              }
+            }
+          ]
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.inflict-status",
+          "params": {
+            "statuses": "POISON"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "chance": 30,
+        "statuses": "POISON"
+      },
+      "paramPaths": {
+        "chance": "chance",
+        "statuses": "effects"
+      }
+    },
+    "5480:0": {
+      "abilityId": 5480,
+      "attrIndex": 0,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "hp.full",
+          "params": {
+            "who": "holder"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5480:1": {
+      "abilityId": 5480,
+      "attrIndex": 1,
+      "className": "PostDefendContactApplyStatusEffectAbAttr",
+      "when": "event.after-hit",
+      "effect": "effect.inflict-status",
+      "unpackable": true,
+      "if": [
+        {
+          "all": [
+            {
+              "block": "move.flag",
+              "params": {
+                "flag": "MAKES_CONTACT"
+              }
+            },
+            {
+              "block": "status.has",
+              "params": {
+                "who": "other",
+                "status": "NONE"
+              }
+            },
+            {
+              "block": "rng.chance",
+              "params": {
+                "pct": 30
+              }
+            }
+          ]
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.inflict-status",
+          "params": {
+            "statuses": "POISON"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "chance": 30,
+        "statuses": "POISON"
+      },
+      "paramPaths": {
+        "chance": "chance",
+        "statuses": "effects"
+      }
+    },
+    "5483:0": {
+      "abilityId": 5483,
+      "attrIndex": 0,
+      "className": "PoisonedFoePurgeAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5489:0": {
+      "abilityId": 5489,
+      "attrIndex": 0,
+      "className": "PostAttackScriptedMoveAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.scripted-move",
+      "unpackable": false,
+      "reason": "a condition has no block yet: The move's type OR any type another of my abilities lets it count as (getTriggeredMoveTypes, Sea Specter) is on the list: the library move.type atom reads only the move's own type, request R-B10-c3-07 in requests/B10.md"
+    },
+    "5505:1": {
+      "abilityId": 5505,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "mon.has-type",
+          "params": {
+            "who": "other",
+            "type": "FIRE"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5507:2": {
+      "abilityId": 5507,
+      "attrIndex": 2,
+      "className": "OnOpponentSwitchOutAbAttr",
+      "when": "event.foe-switches-out",
+      "effect": "effect.scripted-move",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5513:1": {
+      "abilityId": 5513,
+      "attrIndex": 1,
+      "className": "PostAttackScriptedMoveAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.scripted-move",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.flag",
+          "params": {
+            "flag": "SOUND_BASED"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.scripted-move",
+          "params": {
+            "moveId": "ROUND",
+            "power": 20,
+            "magnitudeLow": 0,
+            "magnitudeHigh": 0,
+            "hpScaledPower": 0
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "moveId": "ROUND",
+        "power": 20,
+        "magnitudeLow": 0,
+        "magnitudeHigh": 0,
+        "hpScaledPower": 0,
+        "category": "NONE",
+        "type": "NONE",
+        "type2": "NONE",
+        "flag": "SOUND_BASED",
+        "triggerMove": "NONE",
+        "triggerMove2": "NONE",
+        "targetStatsDecreased": false,
+        "allowVirtualMove": "NONE"
+      },
+      "paramPaths": {
+        "moveId": "opts",
+        "power": "opts",
+        "magnitudeLow": "opts",
+        "magnitudeHigh": "opts",
+        "hpScaledPower": "opts",
+        "category": "opts",
+        "type": "opts",
+        "type2": "opts",
+        "flag": "opts",
+        "triggerMove": "opts",
+        "triggerMove2": "opts",
+        "targetStatsDecreased": "opts",
+        "allowVirtualMove": "opts"
+      }
+    },
+    "5518:0": {
+      "abilityId": 5518,
+      "attrIndex": 0,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": false,
+      "reason": "a condition has no block yet: Madness Enhancement: the ER_ENRAGE tag OR any fog weather (isFogWeather covers more than one weather type); needs an any-fog field.weather atom"
+    },
+    "5523:2": {
+      "abilityId": 5523,
+      "attrIndex": 2,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "hp.full",
+          "params": {
+            "who": "holder"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5533:0": {
+      "abilityId": 5533,
+      "attrIndex": 0,
+      "className": "PostAttackContactSuppressTargetAbilityAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5541:1": {
+      "abilityId": 5541,
+      "attrIndex": 1,
+      "className": "PostDefendContactApplyStatusEffectAbAttr",
+      "when": "event.after-hit",
+      "effect": "effect.inflict-status",
+      "unpackable": true,
+      "if": [
+        {
+          "all": [
+            {
+              "block": "move.flag",
+              "params": {
+                "flag": "MAKES_CONTACT"
+              }
+            },
+            {
+              "block": "status.has",
+              "params": {
+                "who": "other",
+                "status": "NONE"
+              }
+            },
+            {
+              "block": "rng.chance",
+              "params": {
+                "pct": 30
+              }
+            }
+          ]
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.inflict-status",
+          "params": {
+            "statuses": "POISON"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "chance": 30,
+        "statuses": "POISON"
+      },
+      "paramPaths": {
+        "chance": "chance",
+        "statuses": "effects"
+      }
+    },
+    "5544:1": {
+      "abilityId": 5544,
+      "attrIndex": 1,
+      "className": "AttackTypeImmunityAbAttr",
+      "when": "calc.move-immunity",
+      "effect": "effect.immune-to-type",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.immune-to-type",
+          "params": {
+            "type": "GROUND"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "type": "GROUND"
+      },
+      "paramPaths": {
+        "type": "immuneType"
+      }
+    },
+    "5549:6": {
+      "abilityId": 5549,
+      "attrIndex": 6,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "any": [
+            {
+              "block": "move.type",
+              "params": {
+                "type": "GHOST",
+                "effective": true
+              }
+            },
+            {
+              "block": "move.type",
+              "params": {
+                "type": "DARK",
+                "effective": true
+              }
+            },
+            {
+              "block": "move.flag",
+              "params": {
+                "flag": "SOUND_BASED"
+              }
+            }
+          ]
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": true
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": true
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5554:0": {
+      "abilityId": 5554,
+      "attrIndex": 0,
+      "className": "PostAttackScriptedMoveAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.scripted-move",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.scripted-move",
+          "params": {
+            "moveId": "POISON_GAS",
+            "power": 20,
+            "magnitudeLow": 0,
+            "magnitudeHigh": 0,
+            "hpScaledPower": 0
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "moveId": "POISON_GAS",
+        "power": 20,
+        "magnitudeLow": 0,
+        "magnitudeHigh": 0,
+        "hpScaledPower": 0,
+        "category": "NONE",
+        "type": "NONE",
+        "type2": "NONE",
+        "flag": "NONE",
+        "triggerMove": "NONE",
+        "triggerMove2": "NONE",
+        "targetStatsDecreased": false,
+        "allowVirtualMove": "NONE"
+      },
+      "paramPaths": {
+        "moveId": "opts",
+        "power": "opts",
+        "magnitudeLow": "opts",
+        "magnitudeHigh": "opts",
+        "hpScaledPower": "opts",
+        "category": "opts",
+        "type": "opts",
+        "type2": "opts",
+        "flag": "opts",
+        "triggerMove": "opts",
+        "triggerMove2": "opts",
+        "targetStatsDecreased": "opts",
+        "allowVirtualMove": "opts"
+      }
+    },
+    "5561:0": {
+      "abilityId": 5561,
+      "attrIndex": 0,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "not": {
+            "block": "time.acted",
+            "params": {
+              "who": "holder"
+            }
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.7,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.7,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5565:0": {
+      "abilityId": 5565,
+      "attrIndex": 0,
+      "className": "OncePerEntryContactDamageReductionAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.flag",
+          "params": {
+            "flag": "MAKES_CONTACT"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier"
+      }
+    },
+    "5565:1": {
+      "abilityId": 5565,
+      "attrIndex": 1,
+      "className": "PostDamageForceAttackerOutAbAttr",
+      "when": "event.after-taking-damage",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5570:0": {
+      "abilityId": 5570,
+      "attrIndex": 0,
+      "className": "PostSummonWeatherChangeAbAttr",
+      "when": "event.on-entry",
+      "effect": "effect.set-weather",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.set-weather",
+          "params": {
+            "weather": "HARSH_SUN"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "weather": "HARSH_SUN"
+      },
+      "paramPaths": {
+        "weather": "weatherType"
+      }
+    },
+    "5570:5": {
+      "abilityId": 5570,
+      "attrIndex": 5,
+      "className": "PersistentFieldAuraAbAttr",
+      "when": "calc.ally-stat-aura",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5572:0": {
+      "abilityId": 5572,
+      "attrIndex": 0,
+      "className": "PostSummonWeatherChangeAbAttr",
+      "when": "event.on-entry",
+      "effect": "effect.set-weather",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.set-weather",
+          "params": {
+            "weather": "HARSH_SUN"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "weather": "HARSH_SUN"
+      },
+      "paramPaths": {
+        "weather": "weatherType"
+      }
+    },
+    "5575:1": {
+      "abilityId": 5575,
+      "attrIndex": 1,
+      "className": "PassiveRecoveryAbAttr",
+      "when": "event.end-of-turn",
+      "effect": "effect.heal-percent",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "mon.has-type",
+          "params": {
+            "who": "holder",
+            "type": "ICE"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.heal-percent",
+          "params": {
+            "percent": 12.5
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "percent": 12.5,
+        "when": "While I have the Ice type"
+      },
+      "paramPaths": {
+        "percent": "healFractionValue",
+        "when": "conditionSpec"
+      }
+    },
+    "5577:0": {
+      "abilityId": 5577,
+      "attrIndex": 0,
+      "className": "PostAttackScriptedMoveAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.scripted-move",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.scripted-move",
+          "params": {
+            "moveId": "VENOM_BOLT",
+            "power": 35,
+            "magnitudeLow": 0,
+            "magnitudeHigh": 0,
+            "hpScaledPower": 0
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "moveId": "VENOM_BOLT",
+        "power": 35,
+        "magnitudeLow": 0,
+        "magnitudeHigh": 0,
+        "hpScaledPower": 0,
+        "category": "NONE",
+        "type": "NONE",
+        "type2": "NONE",
+        "flag": "NONE",
+        "triggerMove": "NONE",
+        "triggerMove2": "NONE",
+        "targetStatsDecreased": false,
+        "allowVirtualMove": "NONE"
+      },
+      "paramPaths": {
+        "moveId": "opts",
+        "power": "opts",
+        "magnitudeLow": "opts",
+        "magnitudeHigh": "opts",
+        "hpScaledPower": "opts",
+        "category": "opts",
+        "type": "opts",
+        "type2": "opts",
+        "flag": "opts",
+        "triggerMove": "opts",
+        "triggerMove2": "opts",
+        "targetStatsDecreased": "opts",
+        "allowVirtualMove": "opts"
+      }
+    },
+    "5581:0": {
+      "abilityId": 5581,
+      "attrIndex": 0,
+      "className": "PostAttackChangeTargetTypeAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5592:0": {
+      "abilityId": 5592,
+      "attrIndex": 0,
+      "className": "PersistentFieldAuraAbAttr",
+      "when": "calc.ally-stat-aura",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5596:0": {
+      "abilityId": 5596,
+      "attrIndex": 0,
+      "className": "PostAttackScriptedMoveAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.scripted-move",
+      "unpackable": false,
+      "reason": "a condition has no block yet: The move's type OR any type another of my abilities lets it count as (getTriggeredMoveTypes, Sea Specter) is on the list: the library move.type atom reads only the move's own type, request R-B10-c3-07 in requests/B10.md"
+    },
+    "5603:2": {
+      "abilityId": 5603,
+      "attrIndex": 2,
+      "className": "PostAttackRemoveTargetTypeAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5604:2": {
+      "abilityId": 5604,
+      "attrIndex": 2,
+      "className": "PassiveRecoveryAbAttr",
+      "when": "event.end-of-turn",
+      "effect": "effect.heal-percent",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.heal-percent",
+          "params": {
+            "percent": 6.25
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "percent": 6.25,
+        "when": "Always"
+      },
+      "paramPaths": {
+        "percent": "healFractionValue",
+        "when": "conditionSpec"
+      }
+    },
+    "5615:0": {
+      "abilityId": 5615,
+      "attrIndex": 0,
+      "className": "OnCritStatBoostLowestAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5625:2": {
+      "abilityId": 5625,
+      "attrIndex": 2,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "mon.opposite-gender",
+          "params": {}
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.75,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.75,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5647:2": {
+      "abilityId": 5647,
+      "attrIndex": 2,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.flag",
+          "params": {
+            "flag": "MAKES_CONTACT"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5647:3": {
+      "abilityId": 5647,
+      "attrIndex": 3,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.type",
+          "params": {
+            "type": "FIRE",
+            "effective": true
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 2,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 2,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5661:3": {
+      "abilityId": 5661,
+      "attrIndex": 3,
+      "className": "AttackTypeImmunityAbAttr",
+      "when": "calc.move-immunity",
+      "effect": "effect.immune-to-type",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.immune-to-type",
+          "params": {
+            "type": "GROUND"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "type": "GROUND"
+      },
+      "paramPaths": {
+        "type": "immuneType"
+      }
+    },
+    "5665:1": {
+      "abilityId": 5665,
+      "attrIndex": 1,
+      "className": "PostAttackRemoveTargetTypeAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5667:1": {
+      "abilityId": 5667,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.8,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.8,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5667:2": {
+      "abilityId": 5667,
+      "attrIndex": 2,
+      "className": "PostDefendContactApplyStatusEffectAbAttr",
+      "when": "event.after-hit",
+      "effect": "effect.inflict-status",
+      "unpackable": true,
+      "if": [
+        {
+          "all": [
+            {
+              "block": "move.flag",
+              "params": {
+                "flag": "MAKES_CONTACT"
+              }
+            },
+            {
+              "block": "status.has",
+              "params": {
+                "who": "other",
+                "status": "NONE"
+              }
+            },
+            {
+              "block": "rng.chance",
+              "params": {
+                "pct": 30
+              }
+            }
+          ]
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.inflict-status",
+          "params": {
+            "statuses": "POISON"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "chance": 30,
+        "statuses": "POISON"
+      },
+      "paramPaths": {
+        "chance": "chance",
+        "statuses": "effects"
+      }
+    },
+    "5669:2": {
+      "abilityId": 5669,
+      "attrIndex": 2,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.8,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.8,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5673:0": {
+      "abilityId": 5673,
+      "attrIndex": 0,
+      "className": "PostAttackScriptedMoveAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.scripted-move",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.scripted-move",
+          "params": {
+            "moveId": "RAPID_SPIN",
+            "power": 20,
+            "magnitudeLow": 0,
+            "magnitudeHigh": 0,
+            "hpScaledPower": 0
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "moveId": "RAPID_SPIN",
+        "power": 20,
+        "magnitudeLow": 0,
+        "magnitudeHigh": 0,
+        "hpScaledPower": 0,
+        "category": "NONE",
+        "type": "NONE",
+        "type2": "NONE",
+        "flag": "NONE",
+        "triggerMove": "NONE",
+        "triggerMove2": "NONE",
+        "targetStatsDecreased": false,
+        "allowVirtualMove": "NONE"
+      },
+      "paramPaths": {
+        "moveId": "opts",
+        "power": "opts",
+        "magnitudeLow": "opts",
+        "magnitudeHigh": "opts",
+        "hpScaledPower": "opts",
+        "category": "opts",
+        "type": "opts",
+        "type2": "opts",
+        "flag": "opts",
+        "triggerMove": "opts",
+        "triggerMove2": "opts",
+        "targetStatsDecreased": "opts",
+        "allowVirtualMove": "opts"
+      }
+    },
+    "5676:0": {
+      "abilityId": 5676,
+      "attrIndex": 0,
+      "className": "PostAttackScriptedMoveAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.scripted-move",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.flag",
+          "params": {
+            "flag": "DANCE_MOVE"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.scripted-move",
+          "params": {
+            "moveId": "CHIP_AWAY",
+            "power": 50,
+            "magnitudeLow": 0,
+            "magnitudeHigh": 0,
+            "hpScaledPower": 0
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "moveId": "CHIP_AWAY",
+        "power": 50,
+        "magnitudeLow": 0,
+        "magnitudeHigh": 0,
+        "hpScaledPower": 0,
+        "category": "NONE",
+        "type": "NONE",
+        "type2": "NONE",
+        "flag": "DANCE_MOVE",
+        "triggerMove": "NONE",
+        "triggerMove2": "NONE",
+        "targetStatsDecreased": false,
+        "allowVirtualMove": "NONE"
+      },
+      "paramPaths": {
+        "moveId": "opts",
+        "power": "opts",
+        "magnitudeLow": "opts",
+        "magnitudeHigh": "opts",
+        "hpScaledPower": "opts",
+        "category": "opts",
+        "type": "opts",
+        "type2": "opts",
+        "flag": "opts",
+        "triggerMove": "opts",
+        "triggerMove2": "opts",
+        "targetStatsDecreased": "opts",
+        "allowVirtualMove": "opts"
+      }
+    },
+    "5691:0": {
+      "abilityId": 5691,
+      "attrIndex": 0,
+      "className": "PersistentFieldAuraAbAttr",
+      "when": "calc.ally-stat-aura",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5692:0": {
+      "abilityId": 5692,
+      "attrIndex": 0,
+      "className": "PassiveRecoveryAbAttr",
+      "when": "event.end-of-turn",
+      "effect": "effect.heal-percent",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "hp.at-most",
+          "params": {
+            "who": "holder",
+            "pct": 50,
+            "rounding": "floor-half"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.heal-percent",
+          "params": {
+            "percent": 25
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "percent": 25,
+        "when": "While my HP is at most 50% of my max HP"
+      },
+      "paramPaths": {
+        "percent": "healFractionValue",
+        "when": "conditionSpec"
+      }
+    },
+    "5693:0": {
+      "abilityId": 5693,
+      "attrIndex": 0,
+      "className": "BerserkOnThresholdAbAttr",
+      "when": "event.after-hit",
+      "effect": "effect.stat-stage",
+      "unpackable": false,
+      "reason": "the ability also has a condition of its own that blocks cannot express yet"
+    },
+    "5694:0": {
+      "abilityId": 5694,
+      "attrIndex": 0,
+      "className": "PostAttackScriptedMoveAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.scripted-move",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.category",
+          "params": {
+            "category": "SPECIAL"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.scripted-move",
+          "params": {
+            "moveId": "THUNDERBOLT",
+            "power": 35,
+            "magnitudeLow": 0,
+            "magnitudeHigh": 0,
+            "hpScaledPower": 0
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "moveId": "THUNDERBOLT",
+        "power": 35,
+        "magnitudeLow": 0,
+        "magnitudeHigh": 0,
+        "hpScaledPower": 0,
+        "category": "SPECIAL",
+        "type": "NONE",
+        "type2": "NONE",
+        "flag": "NONE",
+        "triggerMove": "NONE",
+        "triggerMove2": "NONE",
+        "targetStatsDecreased": false,
+        "allowVirtualMove": "NONE"
+      },
+      "paramPaths": {
+        "moveId": "opts",
+        "power": "opts",
+        "magnitudeLow": "opts",
+        "magnitudeHigh": "opts",
+        "hpScaledPower": "opts",
+        "category": "opts",
+        "type": "opts",
+        "type2": "opts",
+        "flag": "opts",
+        "triggerMove": "opts",
+        "triggerMove2": "opts",
+        "targetStatsDecreased": "opts",
+        "allowVirtualMove": "opts"
+      }
+    },
+    "5698:1": {
+      "abilityId": 5698,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.8,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.8,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5703:0": {
+      "abilityId": 5703,
+      "attrIndex": 0,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.effectiveness",
+          "params": {
+            "cmp": "gte",
+            "n": 2
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.65,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.65,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5703:2": {
+      "abilityId": 5703,
+      "attrIndex": 2,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.8,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.8,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5706:0": {
+      "abilityId": 5706,
+      "attrIndex": 0,
+      "className": "OneShotTypeBoostAbAttr",
+      "when": "calc.move-power",
+      "effect": "effect.multiply-power",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.type",
+          "params": {
+            "type": "ELECTRIC",
+            "effective": true
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-power",
+          "params": {
+            "multiplier": 2
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "type": "ELECTRIC",
+        "multiplier": 2
+      },
+      "paramPaths": {
+        "type": "opts",
+        "multiplier": "opts"
+      }
+    },
+    "5706:1": {
+      "abilityId": 5706,
+      "attrIndex": 1,
+      "className": "OneShotTypeBoostFollowupAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5710:0": {
+      "abilityId": 5710,
+      "attrIndex": 0,
+      "className": "PostAttackScriptedMoveAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.scripted-move",
+      "unpackable": false,
+      "reason": "a condition has no block yet: The move's type OR any type another of my abilities lets it count as (getTriggeredMoveTypes, Sea Specter) is on the list: the library move.type atom reads only the move's own type, request R-B10-c3-07 in requests/B10.md"
+    },
+    "5716:4": {
+      "abilityId": 5716,
+      "attrIndex": 4,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.8,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.8,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5733:2": {
+      "abilityId": 5733,
+      "attrIndex": 2,
+      "className": "PostDefendContactApplyStatusEffectAbAttr",
+      "when": "event.after-hit",
+      "effect": "effect.inflict-status",
+      "unpackable": true,
+      "if": [
+        {
+          "all": [
+            {
+              "block": "move.flag",
+              "params": {
+                "flag": "MAKES_CONTACT"
+              }
+            },
+            {
+              "block": "status.has",
+              "params": {
+                "who": "other",
+                "status": "NONE"
+              }
+            },
+            {
+              "block": "rng.chance",
+              "params": {
+                "pct": 30
+              }
+            }
+          ]
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.inflict-status",
+          "params": {
+            "statuses": "BURN"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "chance": 30,
+        "statuses": "BURN"
+      },
+      "paramPaths": {
+        "chance": "chance",
+        "statuses": "effects"
+      }
+    },
+    "5938:4": {
+      "abilityId": 5938,
+      "attrIndex": 4,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "hp.full",
+          "params": {
+            "who": "holder"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5941:13": {
+      "abilityId": 5941,
+      "attrIndex": 13,
+      "className": "PostAttackSetTerrainByMoveTypeAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.set-terrain",
+      "unpackable": true,
+      "if": [
+        {
+          "all": [
+            {
+              "block": "move.damaging",
+              "params": {}
+            },
+            {
+              "any": [
+                {
+                  "block": "move.type",
+                  "params": {
+                    "type": "ELECTRIC",
+                    "effective": false
+                  }
+                },
+                {
+                  "block": "move.type",
+                  "params": {
+                    "type": "PSYCHIC",
+                    "effective": false
+                  }
+                },
+                {
+                  "block": "move.type",
+                  "params": {
+                    "type": "GRASS",
+                    "effective": false
+                  }
+                },
+                {
+                  "block": "move.type",
+                  "params": {
+                    "type": "FAIRY",
+                    "effective": false
+                  }
+                }
+              ]
+            },
+            {
+              "block": "rng.chance",
+              "params": {
+                "pct": 30
+              }
+            }
+          ]
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.set-terrain",
+          "params": {
+            "terrain1": "ELECTRIC",
+            "terrain2": "PSYCHIC",
+            "terrain3": "GRASSY",
+            "terrain4": "MISTY"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "chance": 30,
+        "type1": "ELECTRIC",
+        "terrain1": "ELECTRIC",
+        "type2": "PSYCHIC",
+        "terrain2": "PSYCHIC",
+        "type3": "GRASS",
+        "terrain3": "GRASSY",
+        "type4": "FAIRY",
+        "terrain4": "MISTY"
+      },
+      "paramPaths": {
+        "chance": "chance",
+        "type1": "terrainByType",
+        "terrain1": "terrainByType",
+        "type2": "terrainByType",
+        "terrain2": "terrainByType",
+        "type3": "terrainByType",
+        "terrain3": "terrainByType",
+        "type4": "terrainByType",
+        "terrain4": "terrainByType"
+      }
+    },
+    "5941:14": {
+      "abilityId": 5941,
+      "attrIndex": 14,
+      "className": "PostAttackSetHazardByMoveTypeAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.arena-tag",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5946:0": {
+      "abilityId": 5946,
+      "attrIndex": 0,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.flag",
+          "params": {
+            "flag": "MAKES_CONTACT"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5946:1": {
+      "abilityId": 5946,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.type",
+          "params": {
+            "type": "FIRE",
+            "effective": true
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 2,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 2,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5951:0": {
+      "abilityId": 5951,
+      "attrIndex": 0,
+      "className": "PassiveRecoveryAbAttr",
+      "when": "event.end-of-turn",
+      "effect": "effect.heal-percent",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.heal-percent",
+          "params": {
+            "percent": 6.25
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "percent": 6.25,
+        "when": "Always"
+      },
+      "paramPaths": {
+        "percent": "healFractionValue",
+        "when": "conditionSpec"
+      }
+    },
+    "5958:2": {
+      "abilityId": 5958,
+      "attrIndex": 2,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.8,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.8,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5960:0": {
+      "abilityId": 5960,
+      "attrIndex": 0,
+      "className": "AttackTypeImmunityAbAttr",
+      "when": "calc.move-immunity",
+      "effect": "effect.immune-to-type",
+      "unpackable": true,
+      "if": [
+        {
+          "all": [
+            {
+              "not": {
+                "block": "tag.has",
+                "params": {
+                  "who": "holder",
+                  "tag": "IGNORE_FLYING"
+                }
+              }
+            },
+            {
+              "not": {
+                "block": "field.gravity",
+                "params": {}
+              }
+            }
+          ]
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.immune-to-type",
+          "params": {
+            "type": "GROUND"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "type": "GROUND"
+      },
+      "paramPaths": {
+        "type": "immuneType"
+      }
+    },
+    "5960:3": {
+      "abilityId": 5960,
+      "attrIndex": 3,
+      "className": "PostAttackRemoveTargetTypeAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "5961:0": {
+      "abilityId": 5961,
+      "attrIndex": 0,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "hp.full",
+          "params": {
+            "who": "holder"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "5962:3": {
+      "abilityId": 5962,
+      "attrIndex": 3,
+      "className": "AttackTypeImmunityAbAttr",
+      "when": "calc.move-immunity",
+      "effect": "effect.immune-to-type",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.immune-to-type",
+          "params": {
+            "type": "ROCK"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "type": "ROCK"
+      },
+      "paramPaths": {
+        "type": "immuneType"
+      }
+    },
+    "5995:0": {
+      "abilityId": 5995,
+      "attrIndex": 0,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.effectiveness",
+          "params": {
+            "cmp": "gte",
+            "n": 2
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.65,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.65,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "6001:0": {
+      "abilityId": 6001,
+      "attrIndex": 0,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.flag",
+          "params": {
+            "flag": "MAKES_CONTACT"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "6001:1": {
+      "abilityId": 6001,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.type",
+          "params": {
+            "type": "FIRE",
+            "effective": true
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 2,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 2,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "6013:1": {
+      "abilityId": 6013,
+      "attrIndex": 1,
+      "className": "AttackTypeImmunityAbAttr",
+      "when": "calc.move-immunity",
+      "effect": "effect.immune-to-type",
+      "unpackable": true,
+      "if": [
+        {
+          "all": [
+            {
+              "not": {
+                "block": "tag.has",
+                "params": {
+                  "who": "holder",
+                  "tag": "IGNORE_FLYING"
+                }
+              }
+            },
+            {
+              "not": {
+                "block": "field.gravity",
+                "params": {}
+              }
+            }
+          ]
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.immune-to-type",
+          "params": {
+            "type": "GROUND"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "type": "GROUND"
+      },
+      "paramPaths": {
+        "type": "immuneType"
+      }
+    },
+    "6018:1": {
+      "abilityId": 6018,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "any": [
+            {
+              "block": "move.type",
+              "params": {
+                "type": "PSYCHIC",
+                "effective": true
+              }
+            },
+            {
+              "block": "move.type",
+              "params": {
+                "type": "DARK",
+                "effective": true
+              }
+            }
+          ]
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "6041:0": {
+      "abilityId": 6041,
+      "attrIndex": 0,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "not": {
+            "block": "move.flag",
+            "params": {
+              "flag": "MAKES_CONTACT"
+            }
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "6041:1": {
+      "abilityId": 6041,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.type",
+          "params": {
+            "type": "ELECTRIC",
+            "effective": true
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 2,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 2,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "6042:1": {
+      "abilityId": 6042,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "mon.has-type",
+          "params": {
+            "who": "other",
+            "type": "STEEL"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "6047:3": {
+      "abilityId": 6047,
+      "attrIndex": 3,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": false,
+      "reason": "a condition has no block yet: Oracle: oracleGuardActive(target) is a bespoke state machine of the Oracle ability, not a game rule staff could recombine"
+    },
+    "6057:2": {
+      "abilityId": 6057,
+      "attrIndex": 2,
+      "className": "PassiveRecoveryAbAttr",
+      "when": "event.end-of-turn",
+      "effect": "effect.heal-percent",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.heal-percent",
+          "params": {
+            "percent": 12.5
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "percent": 12.5,
+        "when": "Always"
+      },
+      "paramPaths": {
+        "percent": "healFractionValue",
+        "when": "conditionSpec"
+      }
+    },
+    "6062:2": {
+      "abilityId": 6062,
+      "attrIndex": 2,
+      "className": "AttackTypeImmunityAbAttr",
+      "when": "calc.move-immunity",
+      "effect": "effect.immune-to-type",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.immune-to-type",
+          "params": {
+            "type": "GROUND"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "type": "GROUND"
+      },
+      "paramPaths": {
+        "type": "immuneType"
+      }
+    },
+    "6069:0": {
+      "abilityId": 6069,
+      "attrIndex": 0,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.flag",
+          "params": {
+            "flag": "MAKES_CONTACT"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "6069:1": {
+      "abilityId": 6069,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "move.type",
+          "params": {
+            "type": "FIRE",
+            "effective": true
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 2,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 2,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "6073:1": {
+      "abilityId": 6073,
+      "attrIndex": 1,
+      "className": "PostAttackScriptedMoveAbAttr",
+      "when": "event.after-my-hit",
+      "effect": "effect.scripted-move",
+      "unpackable": false,
+      "reason": "a condition has no block yet: The move's type OR any type another of my abilities lets it count as (getTriggeredMoveTypes, Sea Specter) is on the list: the library move.type atom reads only the move's own type, request R-B10-c3-07 in requests/B10.md"
+    },
+    "6098:1": {
+      "abilityId": 6098,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.8,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.8,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "20004:2": {
+      "abilityId": 20004,
+      "attrIndex": 2,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.8,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.8,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "20005:1": {
+      "abilityId": 20005,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.8,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.8,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "20006:1": {
+      "abilityId": 20006,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.8,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.8,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "20011:1": {
+      "abilityId": 20011,
+      "attrIndex": 1,
+      "className": "AttackTypeImmunityAbAttr",
+      "when": "calc.move-immunity",
+      "effect": "effect.immune-to-type",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.immune-to-type",
+          "params": {
+            "type": "GROUND"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "type": "GROUND"
+      },
+      "paramPaths": {
+        "type": "immuneType"
+      }
+    },
+    "20016:1": {
+      "abilityId": 20016,
+      "attrIndex": 1,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [
+        {
+          "block": "hp.full",
+          "params": {
+            "who": "holder"
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.5,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.5,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
+    },
+    "20019:1": {
+      "abilityId": 20019,
+      "attrIndex": 1,
+      "className": "AttackTypeImmunityAbAttr",
+      "when": "calc.move-immunity",
+      "effect": "effect.immune-to-type",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.immune-to-type",
+          "params": {
+            "type": "DARK"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "type": "DARK"
+      },
+      "paramPaths": {
+        "type": "immuneType"
+      }
+    },
+    "20020:2": {
+      "abilityId": 20020,
+      "attrIndex": 2,
+      "className": "AttackTypeImmunityAbAttr",
+      "when": "calc.move-immunity",
+      "effect": "effect.immune-to-type",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.immune-to-type",
+          "params": {
+            "type": "DARK"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "type": "DARK"
+      },
+      "paramPaths": {
+        "type": "immuneType"
+      }
+    },
+    "20020:3": {
+      "abilityId": 20020,
+      "attrIndex": 3,
+      "className": "AttackTypeImmunityAbAttr",
+      "when": "calc.move-immunity",
+      "effect": "effect.immune-to-type",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.immune-to-type",
+          "params": {
+            "type": "GHOST"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "type": "GHOST"
+      },
+      "paramPaths": {
+        "type": "immuneType"
+      }
+    },
+    "20020:4": {
+      "abilityId": 20020,
+      "attrIndex": 4,
+      "className": "AttackTypeImmunityAbAttr",
+      "when": "calc.move-immunity",
+      "effect": "effect.immune-to-type",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.immune-to-type",
+          "params": {
+            "type": "BUG"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "type": "BUG"
+      },
+      "paramPaths": {
+        "type": "immuneType"
+      }
+    },
+    "20021:2": {
+      "abilityId": 20021,
+      "attrIndex": 2,
+      "className": "ReceivedMoveDamageMultiplierAbAttr",
+      "when": "calc.damage-taken",
+      "effect": "effect.multiply-damage-taken",
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.multiply-damage-taken",
+          "params": {
+            "multiplier": 0.8,
+            "affectsFixedDamage": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "multiplier": 0.8,
+        "affectsFixedDamage": false
+      },
+      "paramPaths": {
+        "multiplier": "damageMultiplier",
+        "affectsFixedDamage": "affectsFixedDamage"
+      }
     }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "6041:1": {
-   "abilityId": 6041,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.type",
-     "params": {
-      "type": "ELECTRIC",
-      "effective": true
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 2,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 2,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "6042:1": {
-   "abilityId": 6042,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "mon.has-type",
-     "params": {
-      "who": "other",
-      "type": "STEEL"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "6047:3": {
-   "abilityId": 6047,
-   "attrIndex": 3,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": false,
-   "reason": "a condition has no block yet: Oracle: oracleGuardActive(target) is a bespoke state machine of the Oracle ability, not a game rule staff could recombine"
-  },
-  "6062:2": {
-   "abilityId": 6062,
-   "attrIndex": 2,
-   "className": "AttackTypeImmunityAbAttr",
-   "when": "calc.move-immunity",
-   "effect": "effect.immune-to-type",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.immune-to-type",
-     "params": {
-      "type": "GROUND"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "type": "GROUND"
-   },
-   "paramPaths": {
-    "type": "immuneType"
-   }
-  },
-  "6069:0": {
-   "abilityId": 6069,
-   "attrIndex": 0,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.flag",
-     "params": {
-      "flag": "MAKES_CONTACT"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "6069:1": {
-   "abilityId": 6069,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "move.type",
-     "params": {
-      "type": "FIRE",
-      "effective": true
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 2,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 2,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "6098:1": {
-   "abilityId": 6098,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.8,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.8,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "20004:2": {
-   "abilityId": 20004,
-   "attrIndex": 2,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.8,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.8,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "20005:1": {
-   "abilityId": 20005,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.8,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.8,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "20006:1": {
-   "abilityId": 20006,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.8,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.8,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "20011:1": {
-   "abilityId": 20011,
-   "attrIndex": 1,
-   "className": "AttackTypeImmunityAbAttr",
-   "when": "calc.move-immunity",
-   "effect": "effect.immune-to-type",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.immune-to-type",
-     "params": {
-      "type": "GROUND"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "type": "GROUND"
-   },
-   "paramPaths": {
-    "type": "immuneType"
-   }
-  },
-  "20016:1": {
-   "abilityId": 20016,
-   "attrIndex": 1,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [
-    {
-     "block": "hp.full",
-     "params": {
-      "who": "holder"
-     }
-    }
-   ],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.5,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.5,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
-  },
-  "20019:1": {
-   "abilityId": 20019,
-   "attrIndex": 1,
-   "className": "AttackTypeImmunityAbAttr",
-   "when": "calc.move-immunity",
-   "effect": "effect.immune-to-type",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.immune-to-type",
-     "params": {
-      "type": "DARK"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "type": "DARK"
-   },
-   "paramPaths": {
-    "type": "immuneType"
-   }
-  },
-  "20020:2": {
-   "abilityId": 20020,
-   "attrIndex": 2,
-   "className": "AttackTypeImmunityAbAttr",
-   "when": "calc.move-immunity",
-   "effect": "effect.immune-to-type",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.immune-to-type",
-     "params": {
-      "type": "DARK"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "type": "DARK"
-   },
-   "paramPaths": {
-    "type": "immuneType"
-   }
-  },
-  "20020:3": {
-   "abilityId": 20020,
-   "attrIndex": 3,
-   "className": "AttackTypeImmunityAbAttr",
-   "when": "calc.move-immunity",
-   "effect": "effect.immune-to-type",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.immune-to-type",
-     "params": {
-      "type": "GHOST"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "type": "GHOST"
-   },
-   "paramPaths": {
-    "type": "immuneType"
-   }
-  },
-  "20020:4": {
-   "abilityId": 20020,
-   "attrIndex": 4,
-   "className": "AttackTypeImmunityAbAttr",
-   "when": "calc.move-immunity",
-   "effect": "effect.immune-to-type",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.immune-to-type",
-     "params": {
-      "type": "BUG"
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "type": "BUG"
-   },
-   "paramPaths": {
-    "type": "immuneType"
-   }
-  },
-  "20021:2": {
-   "abilityId": 20021,
-   "attrIndex": 2,
-   "className": "ReceivedMoveDamageMultiplierAbAttr",
-   "when": "calc.damage-taken",
-   "effect": "effect.multiply-damage-taken",
-   "unpackable": true,
-   "if": [],
-   "do": [
-    {
-     "block": "effect.multiply-damage-taken",
-     "params": {
-      "multiplier": 0.8,
-      "affectsFixedDamage": false
-     }
-    }
-   ],
-   "guards": [],
-   "params": {
-    "multiplier": 0.8,
-    "affectsFixedDamage": false
-   },
-   "paramPaths": {
-    "multiplier": "damageMultiplier",
-    "affectsFixedDamage": "affectsFixedDamage"
-   }
   }
- }
 }
