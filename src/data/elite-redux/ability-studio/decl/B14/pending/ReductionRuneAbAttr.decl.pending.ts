@@ -16,7 +16,7 @@
 // so a 2x weakness counts as 1.5x and 4x or more counts as 2x. `source` is the ATTACKER and the check runs over EVERY active
 // Pokemon, so the cap applies to every attacker except the holder itself, whoever is being hit (the holder's allies and
 // foes are all affected). The 1.5 and 2 are literals in the engine reader, not in the class: they cannot be class params without
-// editing the reader (outside this batch's remit), so they are requested (R-B14-3.4) and the declaration has no params.
+// editing the reader (outside this batch's remit), so they are requested (R-B14-3.7) and the declaration has no params.
 // No constructor, no closure, no random draw, no state, no `simulated` test. The check is by class name: it must never be renamed.
 import { ReductionRuneAbAttr } from "#data/elite-redux/abilities/bernerd-roster-mechanics";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";

@@ -62,7 +62,7 @@ export default defineDecl(LowTideWaterSurfAbAttr, {
   when: "event.after-hit",
   label: "Answer a hit by using a free move of my own",
   summary: params =>
-    `After I am hit, I use ${params.moveId} at ${params.power} power on the foes, for free. Example: a damaging Water move hits me and a 50 power Surf comes back.`,
+    `After I am hit, I use ${params.moveId} at ${params.power} power on the targets that move would normally have, for free. Example: a damaging Water move hits me and a 50 power Surf comes back.`,
   synonyms: [
     "low tide",
     "counter attack",

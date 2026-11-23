@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "18beb684ebc5e7",
+  "hash": "14c964a188eb09",
   "blocks": [
     {
       "id": "block.astral-project-star-marker",
@@ -686,7 +686,7 @@
       "id": "block.low-tide-water-surf",
       "className": "LowTideWaterSurfAbAttr",
       "label": "Answer a hit by using a free move of my own",
-      "summary": "After I am hit, I use Surf at 50 power on the foes, for free. Example: a damaging Water move hits me and a 50 power Surf comes back.",
+      "summary": "After I am hit, I use Surf at 50 power on the targets that move would normally have, for free. Example: a damaging Water move hits me and a 50 power Surf comes back.",
       "tier": "B",
       "kind": "event-effect",
       "status": "decomposed",

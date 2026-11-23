@@ -13,7 +13,7 @@
 // dispatches it. The only reader is RageFistPowerAttr.apply (src/data/moves/move.ts:6129, by class NAME):
 //   hitCount = user.battleData.hitCount * (marker ? 2 : 1);   power = 50 * (1 + min(hitCount, 6))
 // so without the marker the power tops out at 350 after 6 hits taken, and with it after 3 hits (the counter is doubled BEFORE the
-// cap of 6). The factor 2 is a literal in the move, not in the class, so there is no class param (requested R-B14-3.4).
+// cap of 6). The factor 2 is a literal in the move, not in the class, so there is no class param (requested R-B14-3.7).
 // No constructor, no closure, no random draw, no state. The check is by class name: it must never be renamed.
 import { RagingFistAbAttr } from "#data/elite-redux/abilities/bernerd-roster-mechanics";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";

@@ -13,7 +13,7 @@
 // Nothing dispatches it. The only reader is the Elite Redux Focus Punch patch (init-elite-redux-vanilla-move-patches.ts:1397): it
 // removes the interrupt, then adds a power multiplier `40 / move.power` whenever `user.turnData.attacksReceived.some(r => r.damage > 0)`
 // AND the user does NOT have the marker (checked by class NAME). So without the marker Focus Punch drops from 150 to 40 power after I
-// took damage this turn; with it, it stays at 150. The 40 is a literal in the patch, not in the class (requested R-B14-3.4).
+// took damage this turn; with it, it stays at 150. The 40 is a literal in the patch, not in the class (requested R-B14-3.7).
 // No constructor, no closure, no random draw, no state. The check is by class name: it must never be renamed.
 import { MonkFocusPunchAbAttr } from "#data/elite-redux/abilities/bernerd-roster-mechanics";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
