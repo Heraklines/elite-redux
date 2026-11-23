@@ -60,13 +60,13 @@ export default defineDecl(BitterDrillAbAttr, {
   tier: "B",
   kind: "event-effect",
   when: "event.after-my-hit",
-  label: "Lay Drill Bits on the foes' side after my drill move",
+  label: "Lay a field effect on a side after my hit",
   summary: params =>
-    `After a drill move of mine hits, I lay ${params.tag} on ${String(params.side).toLowerCase()}${
+    `After my move hits, I lay ${params.tag} on ${String(params.side).toLowerCase()}${
       Number(params.duration) > 0 ? `, lasting ${params.duration} turns` : ", until it is removed"
-    }. Example: Drill Bits on the foes' side.`,
-  synonyms: ["bitter drill", "entry hazard", "set a hazard", "drill hazard", "spikes", "field effect after hit"],
-  examples: ["After a drill move hits, leave a hazard on the opposing side"],
+    }. Example: Drill Bits on the foes' side after a drill move.`,
+  synonyms: ["bitter drill", "drill bits", "entry hazard", "set a hazard", "drill hazard", "spikes", "field effect after hit"],
+  examples: ["After a drill move hits, leave Drill Bits (a hazard) on the opposing side"],
   params: [
     {
       id: "tag",
@@ -114,7 +114,7 @@ export default defineDecl(BitterDrillAbAttr, {
   guards: [],
   feasibility: [
     "The move must really have hurt the target (it dealt damage and was not blocked), and the game must not be only previewing",
-    "Only one set of Drill Bits can be on a side at a time",
+    "A field effect that is already on that side may not stack",
   ],
   effect: { id: "effect.arena-tag", params: ["tag", "side"] },
   reusableAlone: { when: true, if: true, do: true },

@@ -24,8 +24,8 @@ export default defineDecl(PerpetualMotionPowerAbAttr, {
   kind: "package",
   when: "calc.move-power",
   label: "Raise power for each free follow-up hit in a row",
-  summary: () =>
-    "While my free follow-up move is queued, its power is multiplied by 1 plus 0.1 for each hit in a row. Example: after 3 hits in a row, power x1.3.",
+  summary: params =>
+    `While my free follow-up move is queued, its power is multiplied by 1 plus ${params.step} for each hit in a row. Example: after 3 hits in a row, power x${Number((1 + 3 * Number(params.step)).toFixed(2))}.`,
   synonyms: ["combo power", "power per hit", "streak bonus", "escalating power", "rollout", "perpetual motion"],
   examples: ["Each free Rollout that lands in a row hits 10% harder"],
   params: [
@@ -51,7 +51,7 @@ export default defineDecl(PerpetualMotionPowerAbAttr, {
   guards: [],
   feasibility: [
     "Only while my free follow-up is waiting to resolve (the streak is armed)",
-    "The bonus is 10% of the power for each hit in a row that landed so far",
+    "The bonus grows by the extra-power-per-hit setting for each hit in a row that landed so far",
   ],
   effect: { id: "effect.package", params: ["step"] },
   reusableAlone: { when: true, if: true, do: true },
