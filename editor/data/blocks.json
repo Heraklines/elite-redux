@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "0cf948f52108b7",
+  "hash": "18beb684ebc5e7",
   "blocks": [
     {
       "id": "block.astral-project-star-marker",
@@ -312,8 +312,8 @@
     {
       "id": "block.booby-trap",
       "className": "BoobyTrapAbAttr",
-      "label": "Curse the first foe that hurts me and heal off its pain",
-      "summary": "The first foe that damages me after I enter gets Curse. While it lasts, I heal half of any damage that foe takes. Only one foe per entry.",
+      "label": "Curse one foe per entry and feed on its pain",
+      "summary": "The foe gets Curse. While it lasts, I heal half of any damage that foe takes. Only one foe per entry.",
       "tier": "B",
       "kind": "event-effect",
       "status": "decomposed",
@@ -375,8 +375,8 @@
     {
       "id": "block.booby-trap-item-lost",
       "className": "BoobyTrapItemLostAbAttr",
-      "label": "Curse the foe that takes or knocks off my item",
-      "summary": "When a foe takes or knocks off my held item, that foe gets Curse. While it lasts, I heal half of any damage that foe takes.",
+      "label": "Curse a foe and feed on its pain",
+      "summary": "The foe gets Curse. While it lasts, I heal half of any damage that foe takes.",
       "tier": "B",
       "kind": "event-effect",
       "status": "decomposed",
@@ -431,6 +431,72 @@
         "if": true,
         "do": true
       },
+      "uses": 1
+    },
+    {
+      "id": "block.celestial-jelly",
+      "className": "CelestialJellyAbAttr",
+      "label": "Survive a knockout once per battle and cure my status",
+      "summary": "A hit that would knock me out leaves me with 25% of my max HP instead, and cures my status. Works once per battle. Example: 25% left.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.damage-taken",
+      "whenLabel": "While the game calculates damage I take",
+      "synonyms": [
+        "survive a hit",
+        "endure",
+        "sturdy",
+        "second chance",
+        "revive once",
+        "cheat death",
+        "last stand",
+        "celestial jelly"
+      ],
+      "examples": [
+        "Once per battle, in Misty Terrain or Rain, survive a lethal hit with a quarter of my HP"
+      ],
+      "params": [
+        {
+          "id": "hpPercent",
+          "label": "HP left after the saved hit (% of max HP)",
+          "control": "number",
+          "default": 25,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Works only once per battle: it is spent the first time it saves me",
+        "Needs more than 1 max HP",
+        "Only when the hit would really knock me out (a smaller hit is left alone)",
+        "Cures any status condition, except a burn that nothing can cure (an Amaterasu burn)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "hpPercent"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B + package. Users (1): Celestial Jelly (6078) attr 0 (its only attr). The 0.25 was a literal in apply; it is now constructor argument 0 (a fraction, default 0.25) shown to staff as a percent through a codec. Package, reason: no library effect leaves a Pokemon at X% HP in place of a knockout, and the class pushes its once-per-battle memory (battleData.erAbilityProvenance, key celestial-jelly:spent) and cures status in the same apply, in a fixed order, so splitting it in the declaration would re-implement it; requested as effect.survive-lethal-hit plus the memory in time.once-per. The gate cannot be bound yet: field.weather reads arena.weatherType (not suppression aware) and field.terrain reads arena.terrainType (hidden by Clueless), while the class reads the raw terrain and asks weather.isEffectSuppressed(); requests R-B14-3.2 and R-B14-3.3. Oddities, not fixed: (1) the cure is resetStatus, which refuses to cure an Amaterasu burn; (2) Heavy Rain counts as Rain here; (3) the flyout is shown by the engine around apply, and the preview rewrites the damage without remembering anything; (4) SUSPECTED BUG: the gate reads `weather !== null` and then `weather.isEffectSuppressed()`, but a fresh arena holds `undefined` (a weather that was set and cleared holds `null`), so on a lethal hit with no weather ever set the gate throws a TypeError inside the damage calculation (seen in a battle, and pinned in B14/chunk3.test.ts); `weather != null` would be the fix.",
       "uses": 1
     },
     {
@@ -617,10 +683,82 @@
       "uses": 1
     },
     {
+      "id": "block.low-tide-water-surf",
+      "className": "LowTideWaterSurfAbAttr",
+      "label": "Answer a hit by using a free move of my own",
+      "summary": "After I am hit, I use Surf at 50 power on the foes, for free. Example: a damaging Water move hits me and a 50 power Surf comes back.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "low tide",
+        "counter attack",
+        "retaliate",
+        "free move",
+        "answer with a move",
+        "surf back",
+        "follow up attack",
+        "water absorb counter"
+      ],
+      "examples": [
+        "When a damaging Water move hits me, I answer with a 50 power Surf"
+      ],
+      "params": [
+        {
+          "id": "moveId",
+          "label": "Move to use (its name, for example Surf)",
+          "control": "text",
+          "default": "Surf",
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "power",
+          "label": "Power of the free move",
+          "control": "number",
+          "default": 50,
+          "editable": true,
+          "min": 1,
+          "max": 250,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Does nothing while the game is only previewing a hit",
+        "The chosen move needs at least one target; with none, nothing is used"
+      ],
+      "effect": {
+        "id": "effect.scripted-move",
+        "params": [
+          "moveId",
+          "power"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.ofuda",
       "className": "OfudaAbAttr",
-      "label": "Sometimes curse the attacker when I am hit",
-      "summary": "30% chance, each time a move hits me, that its user gets Curse. Contact is not needed. Example: 30% chance to curse the attacker.",
+      "label": "Curse a foe",
+      "summary": "The foe gets Curse. Whether it happens, and how often, is set by the chance and trigger blocks around it.",
       "tier": "B",
       "kind": "event-effect",
       "status": "decomposed",
@@ -1309,8 +1447,8 @@
     {
       "id": "block.slabs-curse",
       "className": "SlabsCurseAbAttr",
-      "label": "Lay a PP-draining curse on the foe that knocked me out",
-      "summary": "Each turn, every move of the foe that knocked me out loses 2 PP, and each move of its neighbouring allies loses 1 PP. It ends when one of those moves has no PP left.",
+      "label": "Drain PP from a foe's moves every turn",
+      "summary": "Every move of the chosen foe loses 2 PP each turn, and each move of its neighbouring allies loses 1 PP. It ends when one of those moves has no PP left.",
       "tier": "B",
       "kind": "event-effect",
       "status": "decomposed",

@@ -1731,21 +1731,46 @@ export class OfudaAbAttr extends PostDefendAbAttr {
 
 /** Low Tide draws in Water moves, absorbs them, and answers with 50 BP Surf. */
 export class LowTideWaterSurfAbAttr extends PostDefendAbAttr {
-  override canApply({ opponent, move, simulated }: PostMoveInteractionAbAttrParams): boolean {
-    return !simulated && move.category !== MoveCategory.STATUS && opponent.getMoveType(move) === PokemonType.WATER;
+  /** The move used as the answer (Surf for the shipped ability). */
+  public readonly moveId: MoveId;
+  /** The power that move is used with (50 for the shipped ability). */
+  public readonly power: number;
+
+  constructor(moveId: MoveId = MoveId.SURF, power = 50) {
+    super();
+    this.moveId = moveId;
+    this.power = power;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `guards`, then `gate`. */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Clause 1: not a preview. Not editable. */
+  public guards({ simulated }: PostMoveInteractionAbAttrParams): boolean {
+    return !simulated;
+  }
+
+  /** Clauses 2 and 3, the replaceable condition: the move deals damage, and its type (after ability changes) is Water. */
+  public gate({ opponent, move }: PostMoveInteractionAbAttrParams): boolean {
+    return move.category !== MoveCategory.STATUS && opponent.getMoveType(move) === PokemonType.WATER;
   }
 
   override apply({ pokemon, simulated }: PostMoveInteractionAbAttrParams): void {
     if (simulated) {
       return;
     }
-    const targets = getMoveTargets(pokemon, MoveId.SURF).targets;
+    const targets = getMoveTargets(pokemon, this.moveId).targets;
     if (targets.length > 0) {
       globalScene.phaseManager.unshiftNew(
         "MovePhase",
         pokemon,
         targets,
-        scriptedPokemonMove(MoveId.SURF, 50),
+        scriptedPokemonMove(this.moveId, this.power),
         MoveUseMode.INDIRECT,
       );
     }
@@ -1754,16 +1779,23 @@ export class LowTideWaterSurfAbAttr extends PostDefendAbAttr {
 
 /** Sea Specter lets Ghost and Water move families trigger one another. */
 export class SeaSpecterAbAttr extends AbAttr {
-  constructor() {
+  /** The first of the two types that trigger one another (Ghost for the shipped ability). */
+  public readonly firstType: PokemonType;
+  /** The second of the two types that trigger one another (Water for the shipped ability). */
+  public readonly secondType: PokemonType;
+
+  constructor(firstType: PokemonType = PokemonType.GHOST, secondType: PokemonType = PokemonType.WATER) {
     super(false);
+    this.firstType = firstType;
+    this.secondType = secondType;
   }
 
   getTriggeredMoveTypes(move: Move): readonly PokemonType[] {
-    if (move.type === PokemonType.GHOST) {
-      return [PokemonType.GHOST, PokemonType.WATER];
+    if (move.type === this.firstType) {
+      return [this.firstType, this.secondType];
     }
-    if (move.type === PokemonType.WATER) {
-      return [PokemonType.WATER, PokemonType.GHOST];
+    if (move.type === this.secondType) {
+      return [this.secondType, this.firstType];
     }
     return [move.type];
   }
@@ -1772,14 +1804,33 @@ export class SeaSpecterAbAttr extends AbAttr {
 /** Celestial Jelly's once-per-battle Misty Terrain OR unsuppressed Rain revival. */
 const CELESTIAL_JELLY_USED = "celestial-jelly:spent";
 export class CelestialJellyAbAttr extends PreDefendFullHpEndureAbAttr {
-  override canApply({ pokemon, damage }: PreDefendModifyDamageAbAttrParams): boolean {
-    if (
+  /** Share of max HP left after the saved hit (a quarter for the shipped ability). */
+  public readonly hpFraction: number;
+
+  constructor(hpFraction = 0.25) {
+    super();
+    this.hpFraction = hpFraction;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreDefendModifyDamageAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `guards`, then `gate`. */
+  override canApply(params: PreDefendModifyDamageAbAttrParams): boolean {
+    return gatedCanApply<PreDefendModifyDamageAbAttrParams>(this, params);
+  }
+
+  /** Clauses 1 to 3: not already used this battle, more than 1 max HP, and the hit would knock me out. Not editable. */
+  public guards({ pokemon, damage }: PreDefendModifyDamageAbAttrParams): boolean {
+    return !(
       pokemon.battleData.erAbilityProvenance.includes(CELESTIAL_JELLY_USED)
       || pokemon.getMaxHp() <= 1
       || damage.value < pokemon.hp
-    ) {
-      return false;
-    }
+    );
+  }
+
+  /** Clauses 4 to 6, the replaceable condition: Misty Terrain, or Rain (or Heavy Rain) that is not negated. */
+  public gate(_params: PreDefendModifyDamageAbAttrParams): boolean {
     const misty = globalScene.arena.terrain?.terrainType === TerrainType.MISTY;
     const weather = globalScene.arena.weather;
     const rain =
@@ -1790,7 +1841,7 @@ export class CelestialJellyAbAttr extends PreDefendFullHpEndureAbAttr {
   }
 
   override apply({ pokemon, damage, simulated }: PreDefendModifyDamageAbAttrParams): void {
-    const targetHp = Math.max(1, Math.floor(pokemon.getMaxHp() * 0.25));
+    const targetHp = Math.max(1, Math.floor(pokemon.getMaxHp() * this.hpFraction));
     damage.value = Math.max(0, pokemon.hp - targetHp);
     if (simulated) {
       return;

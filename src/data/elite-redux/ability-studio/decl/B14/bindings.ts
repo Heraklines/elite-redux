@@ -69,3 +69,20 @@ bindCondition(6067, 1, { id: "side.is", kind: "foe" }, "gate");
 
 // Ofuda (6070), attr 0. Gate = [30% chance]; the chance is repeated from the live `chance` param through gateParams.
 bindCondition(6070, 0, { id: "rng.chance", pct: 30 }, "gate");
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// Chunk 3. attrIndex read from the live game (a throwaway dump of ability.attrs).
+// ---------------------------------------------------------------------------------------------------------------------------
+
+// Low Tide (6071), attr 2 (LowTideWaterSurfAbAttr; attrs 0 and 1 are the redirect and the immunity of other batches).
+// Gate = [the move deals damage (category !== STATUS), the attacker's move type after ability changes is Water], in that order.
+// Guard 1 (not a preview) stays in the class.
+bindCondition(6071, 2, { all: [{ id: "move.damaging" }, { id: "move.type", type: "WATER", effective: true }] }, "gate");
+
+// Celestial Jelly (6078), attr 0. Gate = [Misty Terrain read raw, OR Rain / Heavy Rain whose effect is not suppressed].
+bindLegacyClosure(
+  6078,
+  0,
+  "The gate is arena.terrain?.terrainType === MISTY (raw, not hidden by Clueless) OR a Rain or Heavy Rain weather that is not suppressed (weather.isEffectSuppressed()). The library atoms field.terrain (reads arena.terrainType, hidden by Clueless) and field.weather (reads arena.weatherType, ignores Cloud Nine style suppression) are not the same predicates; field.terrain-unhidden and field.weather-unsuppressed are requested in requests/B14.md.",
+  "gate",
+);
