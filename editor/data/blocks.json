@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "18f66a35212cb5",
+  "hash": "12f8ed7d4d7254",
   "blocks": [
     {
       "id": "block.activate-once-per-battle-entry-window",
@@ -1902,8 +1902,8 @@
     {
       "id": "block.type-conversion",
       "className": "TypeConversionAbAttr",
-      "label": "Change the type of some of my moves",
-      "summary": "My moves that fit \"Normal\" become Fire type when I use them. Example: Normal moves become Fire type, like Immolate. The extra power some of these abilities add is a separate block.",
+      "label": "Turn my moves of one type or kind into another type",
+      "summary": "My Normal moves become Fire type when I use them. Example: Normal moves become Fire type, like Immolate. The extra power some of these abilities add is a separate block.",
       "tier": "B",
       "kind": "calc-modifier",
       "status": "decomposed",
@@ -1992,8 +1992,8 @@
     {
       "id": "block.type-conversion-power-boost",
       "className": "TypeConversionPowerBoostAbAttr",
-      "label": "Make some of my moves stronger by their kind",
-      "summary": "My moves that fit \"Normal\" get 1.1 times their power. Example: 1.2 on sound moves, like Sand Song. It is the power half of the type-changing abilities.",
+      "label": "Make my moves of one type or kind stronger (ate-ability power)",
+      "summary": "My Normal moves get 1.1 times their power. Example: Sound moves get 1.2 times their power, like Sand Song.",
       "tier": "B",
       "kind": "calc-modifier",
       "status": "decomposed",
@@ -2063,7 +2063,7 @@
       "id": "block.type-damage-boost",
       "className": "TypeDamageBoostAbAttr",
       "label": "Make my moves of one type stronger",
-      "summary": "My Fire moves get 1.3 times their power, and 0 times while my HP is at or below 33.3333333333% (0 = no extra boost). Example: Fire 1.3, then 1.8 at one third HP, like Hellblaze.",
+      "summary": "My Fire moves get 1.3 times their power. Example: Electric 1.25, like Electrocytes.",
       "tier": "B",
       "kind": "calc-modifier",
       "status": "decomposed",
@@ -2139,7 +2139,7 @@
         },
         {
           "id": "lowHpLine",
-          "label": "HP line for the extra boost (% of max HP, 33.33 = one third)",
+          "label": "HP line for the extra boost (% of max HP; 33.33 means one third)",
           "control": "number",
           "default": 33.3333333333,
           "editable": true,

@@ -24,9 +24,12 @@ export default defineDecl(TypeConversionPowerBoostAbAttr, {
   tier: "B",
   kind: "calc-modifier",
   when: "calc.move-power",
-  label: "Make some of my moves stronger by their kind",
-  summary: params =>
-    `My moves that fit "${params.source}" get ${params.multiplier} times their power. Example: 1.2 on sound moves, like Sand Song. It is the power half of the type-changing abilities.`,
+  label: "Make my moves of one type or kind stronger (ate-ability power)",
+  summary: params => {
+    const source = String(params.source);
+    const moves = /moves/i.test(source) ? source : `${source} moves`;
+    return `My ${moves} get ${params.multiplier} times their power. Example: Sound moves get 1.2 times their power, like Sand Song.`;
+  },
   synonyms: [
     "aerilate boost",
     "ate boost",

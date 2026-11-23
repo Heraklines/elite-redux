@@ -31,9 +31,12 @@ export default defineDecl(TypeConversionAbAttr, {
   tier: "B",
   kind: "calc-modifier",
   when: "calc.move-type",
-  label: "Change the type of some of my moves",
-  summary: params =>
-    `My moves that fit "${params.source}" become ${params.newType} type when I use them. Example: Normal moves become Fire type, like Immolate. The extra power some of these abilities add is a separate block.`,
+  label: "Turn my moves of one type or kind into another type",
+  summary: params => {
+    const source = String(params.source);
+    const moves = /moves/i.test(source) ? source : `${source} moves`;
+    return `My ${moves} become ${params.newType} type when I use them. Example: Normal moves become Fire type, like Immolate. The extra power some of these abilities add is a separate block.`;
+  },
   synonyms: [
     "aerilate",
     "pixilate",
