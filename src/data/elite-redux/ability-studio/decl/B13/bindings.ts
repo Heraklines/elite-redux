@@ -272,3 +272,69 @@ bindCondition(5983, 0, { id: "move.damaging" }, "ctor:0");
 // Clauses 1 to 3 (base attack condition, damage > 0, hit not blocked) are the class's `guards`, clauses 5 to 8 (a
 // single-hit move, not a follow-up move, a last move record that was not counted yet) its `residual`.
 bindCondition(5983, 0, { id: "move.flag", flag: "PUNCHING_MOVE" }, "gate");
+
+// ---------------------------------------------------------------------------------------------
+// Chunk 5: Eclipse Wing (5971, attr 0), Living Chrome (5980, attr 1), Skyhook (5978), Boot Hill (5985), Encore Set (5988, attr 1)
+// and Reduction (5991). The markers (EclipseWingMarkerAbAttr) and the entry restore (CrackedVesselRestoreTypesAbAttr, Cracked
+// Vessel 5992) have no condition to bind.
+// ---------------------------------------------------------------------------------------------
+
+// EclipseWingPowerAbAttr (Eclipse Wing attr 0), gate = the type clause of the old closure, in the original form:
+// `[DARK, FLYING].includes(holder.getMoveType(move))`. The HP clause (`getHpRatio() < 1 / 3`) is the class's `residual`.
+bindCondition(
+  5971,
+  0,
+  {
+    any: [
+      { id: "move.type", type: "DARK" },
+      { id: "move.type", type: "FLYING" },
+    ],
+  },
+  "gate",
+);
+
+// SkyhookAbAttr (Skyhook attr 0), ctor:0 = the base class's default attack condition `move.category !== STATUS`.
+bindCondition(5978, 0, { id: "move.damaging" }, "ctor:0");
+
+// SkyhookAbAttr (Skyhook attr 0), gate = clause 4 of canApply: `SKYHOOK_TURN.get(holder) !== turnKey()`.
+// Clauses 1 to 3 (base attack condition, damage > 0, the final hit) are the class's `guards`, clause 5 (every foe allows
+// my switch) its `residual`.
+bindLegacyClosure(
+  5978,
+  0,
+  "Skyhook: SKYHOOK_TURN.get(holder) !== 'wave:turn', i.e. I have not pivoted out yet this turn (a private per-Pokemon memory that apply writes); needs the atom time.not-yet-this-turn (R-B13-17)",
+  "gate",
+);
+
+// LivingChromeReductionAbAttr (Living Chrome attr 1), gate = the whole old closure: a shape memory of this wave and this turn
+// exists, and (it is the flat Eevee memory or the attacker's move type is one of the remembered types).
+bindLegacyClosure(
+  5980,
+  1,
+  "Living Chrome: SHAPE_MEMORY[holder] exists, was made this wave and this turn, and (state.flat or its types include the attacker's move type); a private per-Pokemon memory written by recordLivingChromeTransformation; needs the atom for 'I hold a shape memory from this turn that covers the attacker's move type' (R-B13-50)",
+  "gate",
+);
+
+// BootHillAbAttr (Boot Hill attr 0), ctor:0 = the base class's default attack condition `move.category !== STATUS`.
+bindCondition(5985, 0, { id: "move.damaging" }, "ctor:0");
+
+// BootHillAbAttr (Boot Hill attr 0), gate = clause 3 of canApply: `opponent.isFainted()`.
+// Clauses 1 and 2 (base attack condition, damage > 0) are the class's `guards`, clause 4 (not a follow-up move) its `residual`.
+bindLegacyClosure(
+  5985,
+  0,
+  "Boot Hill: opponent.isFainted(), i.e. the target was knocked out by this hit; no library atom reads whether a Pokemon has fainted; needs the atom mon.fainted{who} (R-B13-44)",
+  "gate",
+);
+
+// EncoreSetAbAttr (Encore Set attr 1), ctor:0 = the base class's default attack condition `move.category !== STATUS`.
+// The other clauses stay in canApply (Tier A), see its declaration.
+bindCondition(5988, 1, { id: "move.damaging" }, "ctor:0");
+
+// ReductionPowerAbAttr (Reduction attr 0), gate = the whole old closure: `REDUCTION_ACTIVE[holder].move === move && .turn === turnKey()`.
+bindLegacyClosure(
+  5991,
+  0,
+  "Reduction power: REDUCTION_ACTIVE.get(holder) holds this very move and this turn's key, i.e. prepareReductionMove consumed the field for this move (a private per-Pokemon memory written by an engine call by name); needs the atom for 'the field was consumed for this move' (R-B13-48)",
+  "gate",
+);

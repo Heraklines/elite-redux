@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "154ee2e9860e4f",
-  "hash": "1ad587e5ec451f",
+  "vocabularyHash": "11bb398eec9da8",
+  "hash": "16e96654566fcb",
   "blocks": [
     {
       "id": "block.anneal",
@@ -269,6 +269,63 @@
       "uses": 3
     },
     {
+      "id": "block.boot-hill",
+      "className": "BootHillAbAttr",
+      "label": "Plant a marker on the foe's side when I knock a target out",
+      "summary": "When my damaging move knocks the target out, a one-use marker is planted on the foe's side. The next foe that enters takes 1/8 of its max HP as damage and loses 1 Speed stage.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "grave marker",
+        "knockout hazard",
+        "revenge trap",
+        "entry hazard on kill",
+        "tombstone",
+        "boot hill",
+        "punish the next switch in"
+      ],
+      "examples": [
+        "When I knock out a foe, the next foe to come in takes damage and loses Speed, like Boot Hill"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "lib": "move.damaging",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really deal damage (checked inside the class until the librarian adds that condition, R-B13-3)",
+        "The move must not be one of the ability's own follow-up moves (checked inside the class, R-B13-37)",
+        "Markers do not stack: a second knock-out only changes who owns the one marker on that side",
+        "The marker is spent by the next foe that enters, who takes 1/8 of its max HP and loses 1 Speed (fixed in a separate function)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE for the EFFECT only. The trigger (after my hit) is a normal WHEN, the attack condition is the library atom move.damaging (ctor:0) and 'the target was knocked out' is the editable gate (a legacy-closure binding until R-B13-44 `mon.fainted{who}` exists). Why the effect cannot be split with today's blocks: it plants a field effect of a kind the library does not list (`effect.arena-tag` takes a free text tag name, is not implemented, cannot carry the owner id, the 'quiet' flag or the 0-turn lifetime, and the entry damage and Speed drop live in applyGraveMarkerOnEntry, not in the tag); requested as R-B13-46 `effect.plant-entry-marker`. The 1/8 HP and the 1 stage are fixed literals of that function, which the class cannot read, so the block has no settings (written reason above). Users: Boot Hill (5985, attr 0). ODDITIES (not fixed): (1) apply ignores `simulated`, so a simulated call plants a marker; no engine path simulates PostAttack today; (2) the class is also a plain PostAttack effect, so a knock-out by an ordinary hit of a multi-hit move counts on the hit that kills; (3) the marker is planted even when the foe side has no Pokemon left to enter; it is created with 0 turns and is only ever removed by applyGraveMarkerOnEntry; (4) a second marker does not stack, the existing one only changes owner (GraveMarkerTag.onOverlap), so damage credit goes to the latest planter.",
+      "uses": 1
+    },
+    {
       "id": "block.center-of-attention",
       "className": "CenterOfAttentionAbAttr",
       "label": "Punish a foe that hits my ally instead of me",
@@ -395,6 +452,46 @@
         "if": true,
         "do": true
       },
+      "uses": 1
+    },
+    {
+      "id": "block.cracked-vessel-restore-types",
+      "className": "CrackedVesselRestoreTypesAbAttr",
+      "label": "Get my reduced type list back when I enter",
+      "summary": "When I enter the battle after losing a type earlier, I come in with the shorter type list I had left instead of my full types.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "keep lost type",
+        "remember lost type",
+        "restore broken types",
+        "permanent type loss",
+        "cracked vessel",
+        "type stays removed"
+      ],
+      "examples": [
+        "If I lost my last type earlier, I come back with the reduced types, like Cracked Vessel"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only a Pokemon whose vessel already cracked earlier in the battle has a type list to restore; otherwise nothing happens (a private memory inside the class, R-B13-52)",
+        "The restored list is exactly the one remembered when the vessel cracked (the types except the last one, or Unknown when none are left); it cannot be changed from here"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified: the effect copies a private per-Pokemon list of types back onto the summon data, and the one clause of canApply ('a list was remembered') is the effect's own precondition (apply dereferences the list with `!`, so dropping the clause would crash): it is feasibility, not a condition a rule could change, and the library has no memory-read block for a list of types (requested as R-B13-52 `effect.restore-remembered-types` plus the matching memory write). The trigger is a normal switch-in WHEN. Users: Cracked Vessel (5992, attr 1; attr 0 is the marker CrackedVesselMarkerAbAttr, chunk 6). ODDITIES (not fixed): (1) apply ignores `simulated`; no engine path simulates PostSummon today; (2) the memory is a WeakMap entry keyed by the Pokemon and never cleared, so the shorter list is restored on every later entry in the same battle (the ability text says 'permanently removes its last type'); (3) summonData.types is replaced by a copy, so a type change made in between (Soak, Forest's Curse) is overwritten on entry.",
       "uses": 1
     },
     {
@@ -536,6 +633,103 @@
       "uses": 1
     },
     {
+      "id": "block.eclipse-wing-marker",
+      "className": "EclipseWingMarkerAbAttr",
+      "label": "Survive a knock-out from full HP once a wave and strike back",
+      "summary": "While I have this, once per wave a hit that would knock me out from full HP leaves me at 1 HP and I answer with a 120 power Dark special move against the attacker.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "survive at 1 hp",
+        "endure from full health",
+        "focus sash",
+        "counter attack when nearly knocked out",
+        "revenge strike",
+        "eclipse wing"
+      ],
+      "examples": [
+        "Once per wave I survive a knock-out from full HP and hit back with a Dark move, like Eclipse Wing"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only a direct hit that would knock me out, only while I am at full HP, and only if my max HP is above 1 (tested inside the damage code, not by this ability: R-B13-53 asks for a moment and conditions)",
+        "Once per wave (a private memory kept by that function)",
+        "The counter is a scripted 120 power Dark special move that always hits (fixed in that function)",
+        "At the end of the turn the faint part (the turn-end block of this ability) may knock me out if the counter knocked its target out"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.eclipse-wing-power",
+      "className": "EclipseWingPowerAbAttr",
+      "label": "Boost Dark and Flying moves while my HP is low",
+      "summary": "While the game calculates a move's power, my Dark and Flying moves have 1.5 times their power as long as I am below a third of my HP. Example: 100 power becomes 150.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "low hp boost",
+        "last stand power",
+        "dark and flying boost",
+        "desperation",
+        "blaze style",
+        "pinch power",
+        "eclipse wing"
+      ],
+      "examples": [
+        "Dark and Flying moves get 1.5x power when I am nearly knocked out, like Eclipse Wing"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (times)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0,
+          "max": 8,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "My HP, rounded to a whole percent, must be below a third of my max HP (checked inside the class until the librarian adds a matching condition, R-B13-47)"
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.eclipse-wing-turn-end",
       "className": "EclipseWingTurnEndAbAttr",
       "label": "Faint if my counter-strike knocked out its target",
@@ -582,6 +776,71 @@
         "do": true
       },
       "packageReason": "PACKAGE for the EFFECT only. The trigger (end of every turn) and the conditions are separate: the safety rule is the shared guard not-fainted, the 'my counter target fainted' clause is the editable gate. Why the effect cannot be split with today's blocks: it makes me lose ALL my remaining HP (damageAndUpdate(holder.hp, indirect)) and clears a private per-Pokemon memory; the library has no 'faint myself' effect and no memory-clearing block (requested as R-B13-35 `effect.faint-self` and the shared `effect.reset-memory`, R-B13-23), and `effect.recoil` is a share of damage dealt, not all remaining HP. The gate is a legacy-closure binding until R-B13-35 adds the atom 'the foe I struck back at has fainted' (it reads the WeakMap that tryEclipseWing fills). Users: Eclipse Wing (5971, attr 1; attr 0 is the power boost, attr 2 the marker). ODDITIES (not fixed): (1) apply clears the memory BEFORE its simulated check, so a simulated call spends it; no engine path simulates PostTurn today; (2) the guard now runs before the gate (order swapped, both pure); (3) because the memory is only cleared when this triggers, a counter target that is still alive keeps the memory for later turns, so the faint can happen turns later if that foe is knocked out by someone else.",
+      "uses": 1
+    },
+    {
+      "id": "block.encore-set",
+      "className": "EncoreSetAbAttr",
+      "label": "Replay my previous move as a weaker echo",
+      "summary": "After my damaging move hurts the target, my previous different damaging move is replayed against it at 40% of its power. Example: a 100 power move echoes as 40.",
+      "tier": "A",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "echo the last move",
+        "replay old move",
+        "double strike",
+        "combo follow up",
+        "repeat previous attack",
+        "second hit",
+        "encore set"
+      ],
+      "examples": [
+        "After I use a new attack, my last attack is replayed at 40% power, like Encore Set"
+      ],
+      "params": [
+        {
+          "id": "replayPercent",
+          "label": "Echo power (percent of the replayed move's power)",
+          "control": "number",
+          "default": 40,
+          "editable": true,
+          "min": 1,
+          "max": 200,
+          "step": 5
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "lib": "move.damaging",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really deal damage (checked inside the class until the librarian adds that condition, R-B13-3)",
+        "The move must not be one of the ability's own follow-up moves, so an echo never starts another echo (R-B13-37)",
+        "Each move I use is counted once: a private record of the last counted move stops a move from being counted twice",
+        "Nothing is replayed the first time, when the previous move is the same move, or when the target has already fainted",
+        "The echo is the previous move with its own type and category; it always hits (fixed in the class)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "replayPercent"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE for the EFFECT, Tier A because the only editable condition is the base class's attack condition (ctor:0, library atom move.damaging, bound in bindings.ts). The other four clauses are NOT gates a rule could drop: clauses 4 and 5 are the bookkeeping that stops one move use from being counted twice (removing them would make a single move replay itself and corrupt the memory), clause 3 is a correctness rule (R-B13-37, the guard `not-a-scripted-follow-up`) and clause 2 is R-B13-3 (`hit.dealt-damage`). They stay in canApply untouched and are listed as 'also requires'. Why the effect cannot be split with today's blocks: it replays the PREVIOUS move of a private per-Pokemon memory (move id, power, type and category) as a scripted follow-up with fixed flags; `effect.scripted-move` takes a fixed move id and power (requested as R-B13-43 `effect.replay-previous-move`, a relative of R-B13-40 `effect.echo-move`). The 40% was the literal 0.4, now constructor argument 2 with default 40 (40 / 100 is the very double 0.4). Users: Encore Set (5988, attr 1; attr 0 is the entry reset). ODDITIES (not fixed): (1) apply stores the move record and the previous move BEFORE its simulated, same-move and fainted-target checks, so a simulated call or a KO still spends the memory; (2) a previous move with variable power (-1) or 0 echoes at power max(1, floor(...)) because the helper clamps it; (3) a status move never updates `previous` (clause 1 stops it), so the replayed move is always the last DAMAGING move; (4) the ability text says the echo cannot crit or trigger Encore Set; this class only keeps echoes from starting echoes (clause 3), the rest is not enforced here.",
       "uses": 1
     },
     {
@@ -1512,6 +1771,80 @@
       "uses": 1
     },
     {
+      "id": "block.living-chrome-reduction",
+      "className": "LivingChromeReductionAbAttr",
+      "label": "Take less damage from the types I just changed away from",
+      "summary": "For one turn after I change shape, damage from a type I just left is multiplied by 0.5 (0.75 for all types after leaving the base form). 0.5 = half damage.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.damage-taken",
+      "whenLabel": "While the game calculates damage I take",
+      "synonyms": [
+        "resist old types",
+        "shape memory",
+        "damage reduction after transforming",
+        "adaptive armor",
+        "evolve resistance",
+        "living chrome",
+        "chameleon armor"
+      ],
+      "examples": [
+        "After I change form I take half damage from the types I just left, like Living Chrome"
+      ],
+      "params": [
+        {
+          "id": "typeMultiplier",
+          "label": "Damage multiplier against a type I left (0.5 = half)",
+          "control": "number",
+          "default": 0.5,
+          "editable": true,
+          "min": 0,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        },
+        {
+          "id": "flatMultiplier",
+          "label": "Damage multiplier against every type after leaving the base form (0.75 = a quarter less)",
+          "control": "number",
+          "default": 0.75,
+          "editable": true,
+          "min": 0,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The shape memory is written when I genuinely change form: at most 3 times per wave, and it lasts only for the turn it was made (a private memory kept by the form-change code, not by this block)",
+        "The damage is rounded DOWN (a hit of 1 damage can become 0), unlike the library damage multiplier, which rounds and never goes below 1"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "typeMultiplier",
+          "flatMultiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE for the EFFECT only. The trigger ('while the game calculates damage I take') is the normal WHEN and the whole old closure is the editable gate (a legacy-closure binding until R-B13-50 adds an atom 'I hold a shape memory from this turn and the attacker's move type is one of its types'; the atom must read the SAME memory recordLivingChromeTransformation writes). Why the effect is not the library's `effect.multiply-damage-taken`: apply was overridden, it uses Math.floor instead of toDmgValue (round, at least 1) and it picks 0.75 or 0.5 by a flag of the memory (flat = the holder is Eevee and left form 0). A rebuilt rule with the library effect would round differently, so the effect stays a package (requested as R-B13-51 `effect.multiply-damage-taken` with a rounding choice and a second multiplier for a flagged case). The 0.5 and 0.75 were literals, now constructor arguments 0 and 1 (the base class gets the type multiplier, as before). Users: Living Chrome (5980, attr 1; attr 0 is the marker). ODDITIES (not fixed): (1) apply re-reads the memory instead of the gate's result, so replacing the gate with a different rule still picks the multiplier by the memory's flat flag (and 0.5 when there is no memory); (2) the 'does not stack' text of the ability holds because one memory slot is overwritten; (3) Math.floor can reduce a 1-damage hit to 0.",
+      "uses": 1
+    },
+    {
       "id": "block.porous-charge",
       "className": "PorousChargeAbAttr",
       "label": "Store a charge when a foe's hit damages me",
@@ -2048,6 +2381,67 @@
       "uses": 64
     },
     {
+      "id": "block.reduction-power",
+      "className": "ReductionPowerAbAttr",
+      "label": "Boost a move that just used up the weather or terrain",
+      "summary": "While the game calculates a move's power, the move that just consumed the field has 1.5 times its power. Example: 100 power becomes 150.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "consume the weather",
+        "use up the terrain",
+        "field eater power",
+        "weather boost",
+        "terrain boost",
+        "power from the field",
+        "reduction"
+      ],
+      "examples": [
+        "My next attack is 1.5x stronger when it eats the weather or terrain"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (times)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0,
+          "max": 8,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The field is consumed by a separate step before the move (it needs an active terrain or non-primal weather and a damaging move), not by this block (checked by the game, R-B13-48)",
+        "Only the very move that consumed the field gets the boost, and only on that turn (a private memory inside the class)"
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.ring-general-entry",
       "className": "RingGeneralEntryAbAttr",
       "label": "Remember the turn I came in",
@@ -2345,6 +2739,77 @@
         "do": true
       },
       "packageReason": "PACKAGE, justified: the effect is the reset of a private per-Pokemon record (a four-field state machine) that only the Setlist classes and finishSetlistMove use; the library has no memory block to express a reset of it (requested as `effect.reset-memory`, R-B13-23, the same block Anneal's and Porous' resets need). It is a single assignment, so there is nothing further to split. The trigger is a normal switch-in WHEN and the class has no condition. Users: Setlist (5989, attr 0). ODDITIES (not fixed): (1) apply ignores `simulated`; no engine path simulates PostSummon today. (2) SetlistTrackAbAttr, a fourth Setlist class in the same file, is never attached to any ability (the builder wires only reset, power and accuracy); the recording is done by finishSetlistMove from move-effect-phase.ts, so that class is dead code and is not in the inventory.",
+      "uses": 1
+    },
+    {
+      "id": "block.skyhook",
+      "className": "SkyhookAbAttr",
+      "label": "Switch out after a hit and maybe speed up my replacement",
+      "summary": "After my damaging move hurts the target I switch out, once per turn (on the last hit of a multi-hit move). My replacement has a 20% chance to enter with +1 Speed.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "hit and run",
+        "pivot out",
+        "u-turn style",
+        "switch after attacking",
+        "free switch",
+        "baton pass speed",
+        "skyhook"
+      ],
+      "examples": [
+        "After my attack lands I switch out, and my replacement may come in with a Speed boost"
+      ],
+      "params": [
+        {
+          "id": "speedBoostChancePercent",
+          "label": "Chance my replacement enters with +1 Speed (%)",
+          "control": "number",
+          "default": 20,
+          "editable": true,
+          "min": 0,
+          "max": 100,
+          "step": 5,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "lib": "move.damaging",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really deal damage and must be the final hit of a multi-hit move (checked inside the class until the librarian adds those conditions, R-B13-3 and R-B13-42)",
+        "A switch must be possible against every opponent: nothing traps me or blocks the switch (checked inside the class)",
+        "The Speed boost is given when the next Pokemon enters on my side, once; it is spent even if nobody enters before the battle ends (fixed in the class)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "speedBoostChancePercent"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE for the EFFECT only. The trigger (after my hit) is a normal WHEN; the attack condition (ctor:0, move.damaging) is a library atom; the 'not yet this turn' memory is the editable gate (a legacy-closure binding until R-B13-17 `time.not-yet-this-turn` exists, the library's own once-per-turn atom keeps ITS OWN memory so it would drop the class's write). Why the effect cannot be split: it is 'switch out' (effect.force-switch-out) PLUS a per-side stored flag that a different engine call site (applyPendingSkyhookEntryBoost, switch-summon-phase.ts:464) turns into +1 Speed on the next Pokemon to enter; no library block holds a flag for 'the next Pokemon that enters my side' (requested as R-B13-45 `effect.boost-next-entrant`). The 20 in `randBattleSeedInt(100) < 20` was a literal, now constructor argument 2 (default 20, the very same draw and comparison); the +1 Speed lives in applyPendingSkyhookEntryBoost, which has no access to this attr, so it stays fixed. Users: Skyhook (5978, attr 0). ODDITIES (not fixed): (1) apply writes the once-per-turn memory BEFORE its simulated check, so a simulated call spends it; (2) the boost flag is stored per SIDE and per battle, so a second Skyhook activation on the same side before anyone enters overwrites the first roll, and a flag left over when the switch did not happen (the switch can still fail after canApply) boosts the next entrant of that side; (3) when the switch cannot complete the memory and the flag are already written.",
       "uses": 1
     },
     {

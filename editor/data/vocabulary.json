@@ -1727,6 +1727,7 @@
         "DeadeyeMarkerAbAttr",
         "DoubleSelfInflictedDamageAbAttr",
         "DrenchImmunityAbAttr",
+        "EclipseWingMarkerAbAttr",
         "FloatAbAttr",
         "IgnoreContactAbAttr",
         "IgnoreGenderInfatuationAbAttr",
@@ -5026,5 +5027,5 @@
       ]
     }
   ],
-  "hash": "154ee2e9860e4f"
+  "hash": "11bb398eec9da8"
 }
