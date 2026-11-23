@@ -32,7 +32,7 @@ export default defineDecl(ConsumeFirstFlaggedMoveOnUseAbAttr, {
   when: "event.my-move-starts",
   label: "Spend my first-move bonus when I use a matching move",
   summary: params =>
-    `As soon as I use a move with the property "${params.flag}", even if it misses or fails, my +1 priority bonus is used up.`,
+    `As soon as I use a move of the kind "${params.flag}", even if it misses or fails, my +1 priority bonus is used up.`,
   synonyms: [
     "use up the bonus",
     "spend priority on use",
@@ -48,7 +48,7 @@ export default defineDecl(ConsumeFirstFlaggedMoveOnUseAbAttr, {
       ctorIndex: 0,
       path: "flag",
       control: "select",
-      label: "Move property that spends the bonus",
+      label: "Kind of move that spends the bonus",
       // The gate binding will repeat the property once R-B09-04 exists; editable together with that atom.
       editable: false,
       default: "BITING_MOVE",
@@ -62,7 +62,7 @@ export default defineDecl(ConsumeFirstFlaggedMoveOnUseAbAttr, {
   ],
   guards: [],
   feasibility: ["The bonus must not be spent yet"],
-  effect: { id: "effect.arm-effect", params: [] },
+  effect: { id: "effect.spend-first-move-bonus", params: [] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "entry", simulated: "ignores" },
   probes: [
@@ -73,5 +73,5 @@ export default defineDecl(ConsumeFirstFlaggedMoveOnUseAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "Tier B. 2 users, both gates legacy-closure pending request R-B09-04: Coil Up (5040 attr 1) and Curlipede (5687 attr 2), both biting. The effect has no library word (R-B09-05); effect.arm-effect is the closest. The WHEN event.my-move-starts provides only the holder, so the declaration does not claim the move slot: the move is read from the move history (the engine pushes it just before this trigger). The attr never reads `simulated`.",
+    "Tier B. 2 users, both gates legacy-closure pending request R-B09-04: Coil Up (5040 attr 1) and Curlipede (5687 attr 2), both biting. The effect is the new planned word effect.spend-first-move-bonus (R-B09-05, not wired yet): it sets the used-flag in tempSummonData that the first-move priority family shares. The WHEN event.my-move-starts provides only the holder, so the declaration does not claim the move slot: the move is read from the move history (the engine pushes it just before this trigger). The attr never reads `simulated`.",
 });

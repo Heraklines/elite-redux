@@ -35,7 +35,7 @@ export default defineDecl(FirstFlaggedMovePriorityAbAttr, {
   when: "calc.priority",
   label: "Give +1 priority to my first move of one kind",
   summary: params =>
-    `Until my first-move bonus is spent, my moves with the property "${params.flags}" get +1 priority and go before normal moves. Other blocks spend and restore the bonus.`,
+    `Until my first-move bonus is spent, my moves of the kind "${params.flags}" get +1 priority and go before normal moves. Other blocks spend and restore the bonus.`,
   synonyms: [
     "first bite goes first",
     "first slash goes first",
@@ -58,7 +58,7 @@ export default defineDecl(FirstFlaggedMovePriorityAbAttr, {
       ctorIndex: 0,
       path: "flags",
       control: "text",
-      label: "Move properties that get the bonus (comma separated, any of them counts)",
+      label: "Kinds of move that get the bonus (comma separated, any of them counts)",
       // Decides the SHAPE of the gate (one atom per property): staff replace the whole gate instead. It becomes
       // editable together with request R-B09-01.
       editable: false,
@@ -72,7 +72,7 @@ export default defineDecl(FirstFlaggedMovePriorityAbAttr, {
   ],
   guards: [],
   feasibility: [
-    "The bonus must not be spent yet (it is spent by the move that carries the property, and some abilities give it back); it resets when I switch out",
+    "The bonus must not be spent yet (it is spent by a move of the chosen kind, and some abilities give it back); it resets when I switch out",
   ],
   effect: { id: "effect.change-priority", params: [] },
   reusableAlone: { when: true, if: true, do: true },

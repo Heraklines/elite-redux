@@ -34,7 +34,7 @@ export default defineDecl(ConsumeFirstFlaggedMovePriorityAbAttr, {
   when: "event.after-my-hit",
   label: "Spend my first-move bonus after a matching hit",
   summary: params =>
-    `After my attack lands with a "${params.flags}" move, my +1 priority bonus is used up${params.regainOnKo === true ? ", and knocking the target out gives it back" : ""}.`,
+    `After my attack lands with a move of the kind "${params.flags}", my +1 priority bonus is used up${params.regainOnKo === true ? ", and knocking the target out gives it back" : ""}.`,
   synonyms: [
     "use up the bonus",
     "spend priority",
@@ -55,7 +55,7 @@ export default defineDecl(ConsumeFirstFlaggedMovePriorityAbAttr, {
       ctorIndex: 0,
       path: "flags",
       control: "text",
-      label: "Move properties that spend the bonus (comma separated, any of them counts)",
+      label: "Kinds of move that spend the bonus (comma separated, any of them counts)",
       // Decides the SHAPE of the gate (one atom per property); editable together with request R-B09-01.
       editable: false,
       default: "SLICING_MOVE",
@@ -81,13 +81,13 @@ export default defineDecl(ConsumeFirstFlaggedMovePriorityAbAttr, {
   branches: [
     {
       label: "Use up the bonus",
-      conditions: ["my move has one of the properties"],
-      effect: { id: "effect.arm-effect", params: [] },
+      conditions: ["my move is one of the chosen kinds"],
+      effect: { id: "effect.spend-first-move-bonus", params: [] },
     },
     {
       label: "Give the bonus back",
       conditions: ["the target fainted (only when a knock-out gives it back)"],
-      effect: { id: "effect.arm-effect", params: [] },
+      effect: { id: "effect.restore-first-move-bonus", params: [] },
     },
   ],
   reusableAlone: { when: true, if: true, do: true },
@@ -100,5 +100,5 @@ export default defineDecl(ConsumeFirstFlaggedMovePriorityAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "Tier B. 7 users, all gates legacy-closure pending requests R-B09-01 (move.hasFlag atom) and R-B09-02 (target fainted atom): Sidewinder (5380 attr 1, biting, regain), Cutthroat (5444 attr 1, slicing, no regain), Edgelord (5583 attr 1, slicing, regain), First Serpent (5933 attr 1, biting, regain), Head First (6033 attr 1, reckless, regain), Quick Charge (6092 attr 1, arrow or reckless, no regain), Flicker Jab (6093 attr 1, horn or punching, no regain). The two effects (spend, give back) have no library effect yet (R-B09-05); effect.arm-effect is the closest word. The bonus memory is the Symbol key in tempSummonData that FirstFlaggedMovePriorityAbAttr reads. Oddities, not fixed: (a) the parent's attackCondition is never used; (b) when a flagged move also knocks out the target on a regainOnKo user the same apply spends and then restores the bonus, which is the documented intent; (c) showAbility is true, so the ability name pops up on every matching hit even though the player sees no effect; (d) the hit-result list is the same set as `hitResult < NO_EFFECT`, the test that the composition carrier for this trigger uses.",
+    "Tier B. 7 users, all gates legacy-closure pending requests R-B09-01 (move.hasFlag atom) and R-B09-02 (target fainted atom): Sidewinder (5380 attr 1, biting, regain), Cutthroat (5444 attr 1, slicing, no regain), Edgelord (5583 attr 1, slicing, regain), First Serpent (5933 attr 1, biting, regain), Head First (6033 attr 1, reckless, regain), Quick Charge (6092 attr 1, arrow or reckless, no regain), Flicker Jab (6093 attr 1, horn or punching, no regain). The two effects are the new planned words effect.spend-first-move-bonus and effect.restore-first-move-bonus (R-B09-05, not wired yet); they set and clear the used-flag in tempSummonData. The bonus memory is the Symbol key in tempSummonData that FirstFlaggedMovePriorityAbAttr reads. Oddities, not fixed: (a) the parent's attackCondition is never used; (b) when a flagged move also knocks out the target on a regainOnKo user the same apply spends and then restores the bonus, which is the documented intent; (c) showAbility is true, so the ability name pops up on every matching hit even though the player sees no effect; (d) the hit-result list is the same set as `hitResult < NO_EFFECT`, the test that the composition carrier for this trigger uses.",
 });

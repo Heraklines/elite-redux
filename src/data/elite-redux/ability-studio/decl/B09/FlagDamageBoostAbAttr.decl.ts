@@ -36,9 +36,9 @@ export default defineDecl(FlagDamageBoostAbAttr, {
   tier: "A",
   kind: "calc-modifier",
   when: "calc.move-power",
-  label: "Boost the power of my moves with one property",
+  label: "Boost the power of one kind of my moves",
   summary: params =>
-    `My moves with the property "${params.flag}" have their power multiplied by ${params.multiplier} (1.3 = 30% stronger)${Number(params.lowHpMultiplier) > 0 ? `, or by ${params.lowHpMultiplier} while my HP is below ${Math.round(Number(params.lowHpThreshold) * 100)}%` : ""}.`,
+    `My moves of the kind "${params.flag}" have their power multiplied by ${params.multiplier} (1.3 = 30% stronger)${Number(params.lowHpMultiplier) > 0 ? `, or by ${params.lowHpMultiplier} while my HP is below ${Math.round(Number(params.lowHpThreshold) * 100)}%` : ""}.`,
   synonyms: [
     "iron fist",
     "strong jaw",
@@ -65,7 +65,7 @@ export default defineDecl(FlagDamageBoostAbAttr, {
       ctorOption: "flag",
       path: "flag",
       control: "select",
-      label: "Move property that is boosted",
+      label: "Kind of move that is boosted",
       editable: true,
       default: "SLICING_MOVE",
       options: MOVE_FLAG_OPTIONS,
@@ -107,7 +107,7 @@ export default defineDecl(FlagDamageBoostAbAttr, {
       min: 0.01,
       max: 0.99,
       step: 0.01,
-      label: "Low HP line (0.33 = below a third of max HP)",
+      label: "Low HP line, as a share of max HP (0.33 = below 33% of max HP)",
       editable: true,
       default: 1 / 3,
     },
@@ -119,7 +119,7 @@ export default defineDecl(FlagDamageBoostAbAttr, {
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "none", simulated: "respects" },
   l2StaticReason:
-    "The shared reach table (decomp-l2-reach.json) lists calc.move-power as unreached, although the engine dispatches the moment under the key VariableMovePowerAbAttr. The attrs of this class are proven by the L1 attr differential over the state grid (canApply and the value apply leaves behind) and by B09/flag-damage-boost.test.ts (every user, every flag, with and without a low-HP pair).",
+    "The shared reach table (decomp-l2-reach.json) lists calc.move-power as unreached, although the engine dispatches the moment under the key VariableMovePowerAbAttr. The attrs of this class are proven by the L1 attr differential over the state grid (canApply and the value apply leaves behind) and by the last test of B09/first-move-priority.test.ts (every user, every flag, with and without a low-HP pair).",
   probes: [
     {
       name: "my attack at several HP values against foes that use different move types",
@@ -128,5 +128,5 @@ export default defineDecl(FlagDamageBoostAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "Tier A, 59 attrs in 50 abilities, none needs a binding (the constructor takes the property, not a closure). The flag test is the `flag` setting, the same engine call as the library atom move.flag (doesFlagEffectApply with the holder as user). All 59 live attrs have lowHpMultiplier null and lowHpThreshold 1/3; the low-HP pair is a real, tested behaviour that no ability uses yet, exposed as two settings (0 = off). `resolveMultiplier` uses getHpRatio(true) with a strict `<`, so exactly one third does not count as low; the threshold setting keeps the exact double (no percent rounding) so a rebuild is bit-identical. Constructor throws for a multiplier <= 0, a low-HP multiplier <= 0 or flag NONE; the multiplier setting starts at 0.05. Oddities, not fixed: (a) the doc comment says 'Strong Jaw also flinches composes via CompositeAbAttr' and 'Giant Wings ... wire as multi-instance', both true today (Combat Specialist, Blade's Essence, Spiritual Saber and others carry two instances); (b) MovePowerBoostAbAttr.canApply does not call super, so skipDuringMovesetGen is dead here too; (c) the apply multiplies power.value with no rounding. Subclass relations: this class extends MovePowerBoostAbAttr (B02) and has its own declaration.",
+    "L2 NEVER evaluates this attr (calc.move-power is listed as unreached in decomp-l2-reach.json), so its only proof is the L1 differential plus that test. Tier A, 59 attrs in 50 abilities, none needs a binding (the constructor takes the property, not a closure). The flag test is the `flag` setting, the same engine call as the library atom move.flag (doesFlagEffectApply with the holder as user). All 59 live attrs have lowHpMultiplier null and lowHpThreshold 1/3; the low-HP pair is a real, tested behaviour that no ability uses yet, exposed as two settings (0 = off). `resolveMultiplier` uses getHpRatio(true) with a strict `<`, so exactly one third does not count as low; the threshold setting keeps the exact double (no percent rounding) so a rebuild is bit-identical. Constructor throws for a multiplier <= 0, a low-HP multiplier <= 0 or flag NONE; the multiplier setting starts at 0.05. Oddities, not fixed: (a) the doc comment says 'Strong Jaw also flinches composes via CompositeAbAttr' and 'Giant Wings ... wire as multi-instance', both true today (Combat Specialist, Blade's Essence, Spiritual Saber and others carry two instances); (b) MovePowerBoostAbAttr.canApply does not call super, so skipDuringMovesetGen is dead here too; (c) the apply multiplies power.value with no rounding. Subclass relations: this class extends MovePowerBoostAbAttr (B02) and has its own declaration.",
 });

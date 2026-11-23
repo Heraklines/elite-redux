@@ -433,6 +433,26 @@ export const EFFECT_REGISTRY: readonly EffectDef[] = [
     synonyms: ["delayed effect", "queue effect", "next time"],
     examples: ["Arm a boost for the next move"],
   },
+  {
+    id: "effect.spend-first-move-bonus",
+    kind: "event",
+    label: "Use up my first-move bonus",
+    requires: [],
+    params: [],
+    implemented: false,
+    synonyms: ["spend priority", "lose the bonus", "used up", "one shot bonus", "cutthroat"],
+    examples: ["After my slicing move lands, my +1 priority bonus is gone until it comes back"],
+  },
+  {
+    id: "effect.restore-first-move-bonus",
+    kind: "event",
+    label: "Give me my first-move bonus back",
+    requires: [],
+    params: [],
+    implemented: false,
+    synonyms: ["refill priority", "bonus comes back", "reset priority", "re-arm", "edgelord"],
+    examples: ["When I use Sharpen, my +1 priority bonus is ready again"],
+  },
 
   // ---- Package --------------------------------------------------------------------------
   {

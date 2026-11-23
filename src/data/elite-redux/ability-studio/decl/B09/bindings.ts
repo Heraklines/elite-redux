@@ -9,8 +9,7 @@
 //
 // Every line was written by hand after reading the class (archetypes/first-move-priority.ts,
 // archetypes/first-turn-stat-multiplier.ts) and the live attrs of all users (a throwaway dump of allAttrSites(): flags,
-// regainOnKo, moveId, stat and multiplier of every attr). FlagDamageBoostAbAttr and FlareBoostSelfBurnOnSummonAbAttr have no
-// condition slot, so they have nothing to bind.
+// regainOnKo, moveId, stat and multiplier of every attr). FlagDamageBoostAbAttr has no condition slot, so it has nothing to bind.
 import { bindCondition, bindLegacyClosure } from "#data/elite-redux/ability-studio/bindings";
 
 // =============================================================================================
@@ -81,6 +80,22 @@ bindLegacyClosure(5288, 0, `${NO_MOVE_YET} (Rapid Response, Speed 1.5)`, "gate")
 bindLegacyClosure(5288, 1, `${NO_MOVE_YET} (Rapid Response, Sp. Atk 1.2)`, "gate");
 bindLegacyClosure(5467, 1, `${NO_MOVE_YET} (Champion's Entrance, Speed 1.5)`, "gate");
 bindLegacyClosure(5467, 2, `${NO_MOVE_YET} (Champion's Entrance, Attack 1.2)`, "gate");
+
+// =============================================================================================
+// FlareBoostSelfBurnOnSummonAbAttr. Slot gate: `isFogWeather(arena.weatherType)`, evaluated at the start of apply.
+// =============================================================================================
+// field.weather is `arena.weatherType === WeatherType[weather]`; isFogWeather is `FOG || EERIE_FOG` on the same field.
+bindCondition(
+  138,
+  2,
+  {
+    any: [
+      { id: "field.weather", weather: "FOG" },
+      { id: "field.weather", weather: "EERIE_FOG" },
+    ],
+  },
+  "gate",
+); // Flare Boost
 
 // =============================================================================================
 // B09 chunk 3. The Tier B gates of HealStatusOnMoveTypeAbAttr, HitMultiplierAbAttr and HitMultiplierPowerAbAttr.

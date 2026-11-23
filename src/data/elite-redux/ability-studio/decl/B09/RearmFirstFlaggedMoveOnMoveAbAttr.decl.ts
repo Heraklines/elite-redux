@@ -5,7 +5,7 @@
  */
 
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
-import { enumCodec } from "#data/elite-redux/ability-studio/param-codecs";
+import { enumCodec, enumOptions } from "#data/elite-redux/ability-studio/param-codecs";
 // B09 chunk 2. "When I use a chosen move, my first-move bonus is back" (Cutthroat: Sharpen resets it).
 //
 // Source: src/data/elite-redux/archetypes/first-move-priority.ts, class RearmFirstFlaggedMoveOnMoveAbAttr (extends
@@ -26,7 +26,7 @@ export default defineDecl(RearmFirstFlaggedMoveOnMoveAbAttr, {
   when: "event.my-move-starts",
   label: "Give back my first-move bonus when I use a chosen move",
   summary: params =>
-    `Whenever I use "${params.moveId}", my +1 priority bonus is back, so my next matching move goes first again. Example: Sharpen.`,
+    `Whenever I use "${params.moveId}", my +1 priority bonus is back, so my next matching move goes first again.`,
   synonyms: [
     "reset priority",
     "refresh the bonus",
@@ -41,10 +41,11 @@ export default defineDecl(RearmFirstFlaggedMoveOnMoveAbAttr, {
       id: "moveId",
       ctorIndex: 0,
       path: "moveId",
-      control: "text",
-      label: "Move that gives the bonus back (type its id, for example Sharpen)",
+      control: "select",
+      label: "Move that gives the bonus back (pick it from the list, for example Sharpen)",
       editable: true,
       default: "SHARPEN",
+      options: enumOptions(MoveId),
       codec: enumCodec(MoveId, "move"),
     },
   ],
@@ -52,7 +53,7 @@ export default defineDecl(RearmFirstFlaggedMoveOnMoveAbAttr, {
   conditions: [{ slot: "gate", ctx: "params", lib: "time.last-move", removable: true, editable: true }],
   guards: [],
   feasibility: [],
-  effect: { id: "effect.arm-effect", params: [] },
+  effect: { id: "effect.restore-first-move-bonus", params: [] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "entry", simulated: "ignores" },
   probes: [
@@ -63,5 +64,5 @@ export default defineDecl(RearmFirstFlaggedMoveOnMoveAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "Tier B. 1 user: Cutthroat (5444 attr 2, Sharpen), bound to time.last-move { who: holder, moveId: SHARPEN }. The effect has no library word (R-B09-05); effect.arm-effect is the closest. Proven by B09/first-move-priority.test.ts (the grid has no move history, so the shared L1 only sees the never-matching case): the gate agrees with the original for the empty history, a Sharpen entry, another move and a Sharpen entry older than the last move, and a rebuild with another move id follows the setting.",
+    "Tier B. 1 user: Cutthroat (5444 attr 2, Sharpen), bound to time.last-move { who: holder, moveId: SHARPEN }. The effect is the new planned word effect.restore-first-move-bonus (R-B09-05, not wired yet): it clears the used-flag in tempSummonData that the first-move priority family shares. Proven by B09/first-move-priority.test.ts (the grid has no move history, so the shared L1 only sees the never-matching case): the gate agrees with the original for the empty history, a Sharpen entry, another move and a Sharpen entry older than the last move, and a rebuild with another move follows the setting. The setting is a pick from the list of moves (not free text), because the library atom time.last-move compares the stored name with the move list; the editor cannot show friendly move names for a select yet (request R-B09-19: a move picker with player names for time.last-move).",
 });

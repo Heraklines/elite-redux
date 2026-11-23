@@ -24,18 +24,24 @@ import type { FirstTurnStatMultiplierAbAttr } from "#data/elite-redux/archetypes
 //   3. The legacy-closure classes cannot be rebuilt (they are carried), so a staff rule cannot silently drop the memory.
 //   4. FirstTurnStatMultiplier: the gate is "no move used since I came in", NOT "turn one".
 //   5. FlagDamageBoost: every user rebuilds identically; the low-HP pair reads back and rebuilds exactly.
+//   6. FlareBoost on entry: the fog gate (both fog kinds), an existing status, a Fire type, fainted, simulated, and the popup.
 import { FlagDamageBoostAbAttr } from "#data/elite-redux/archetypes/flag-damage-boost";
+import type { FlareBoostSelfBurnOnSummonAbAttr } from "#data/elite-redux/archetypes/flare-boost-fog-self-burn";
 import { HitResult } from "#enums/hit-result";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
 import { MoveResult } from "#enums/move-result";
 import { MoveUseMode } from "#enums/move-use-mode";
+import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
+import { StatusEffect } from "#enums/status-effect";
+import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import { startWorld } from "#test/tests/elite-redux/decomp/harness/game";
 import { allAttrSites } from "#test/tests/elite-redux/decomp/harness/sites";
 import { liveAbility } from "#test/tests/elite-redux/decomp/harness/twin";
+import { setStatusOf, setTypesOf, setWeatherOf } from "#test/tests/elite-redux/decomp/harness/world";
 import { NumberHolder } from "#utils/common";
 import Phaser from "phaser";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -338,5 +344,68 @@ describe("B09 first-move priority family (memory, history, first turn)", () => {
     const none = buildAttr(module, { ...params, lowHpMultiplier: 0 }) as FlagDamageBoostAbAttr;
     expect(none.getLowHpMultiplier()).toBeNull();
     expect(none.resolveMultiplier(0.01)).toBe(1.2);
+  });
+
+  it("Flare Boost on entry: burns only in fog (both kinds), keeps the popup, skips a status / Fire type / fainted / simulated, and the rebuild follows its settings", async () => {
+    const { game, holder } = await startWorld(phaserGame);
+    const FLARE_BOOST = 138;
+    const original = liveAbility(FLARE_BOOST).attrs[2] as FlareBoostSelfBurnOnSummonAbAttr;
+    expect(original.constructor.name).toBe("FlareBoostSelfBurnOnSummonAbAttr");
+    const module = declRegistry.get("FlareBoostSelfBurnOnSummonAbAttr")!;
+    expect(readDeclParams(module, original)).toEqual({ status: "BURN" });
+    const rebuilt = recomposeAttr(module, original, FLARE_BOOST, 2) as FlareBoostSelfBurnOnSummonAbAttr;
+    const maxHp = holder.getMaxHp();
+
+    const outcome = (
+      attr: FlareBoostSelfBurnOnSummonAbAttr,
+      weather: WeatherType,
+      // Returns the status the attr tried to give the holder (NONE = it gave nothing).
+      options: { status?: StatusEffect; fire?: boolean; fainted?: boolean; simulated?: boolean } = {},
+    ): StatusEffect => {
+      setWeatherOf(game, weather);
+      setStatusOf(holder, options.status ?? StatusEffect.NONE);
+      setTypesOf(holder, options.fire ? [PokemonType.FIRE] : undefined);
+      holder.hp = options.fainted ? 0 : maxHp;
+      // The popup is decided by canApply, which the class does not override: always true.
+      expect(attr.canApply({ pokemon: holder, simulated: false }), "the popup shows on every entry").toBe(true);
+      attr.apply({ pokemon: holder, simulated: options.simulated === true });
+      // trySetStatus does not write the status itself: it records the status as pending and queues the phase that applies it.
+      const result = holder.turnData.pendingStatus ?? StatusEffect.NONE;
+      holder.turnData.pendingStatus = StatusEffect.NONE;
+      setStatusOf(holder, StatusEffect.NONE);
+      setTypesOf(holder, undefined);
+      holder.hp = maxHp;
+      return result;
+    };
+
+    const rows: [string, WeatherType, Parameters<typeof outcome>[2], StatusEffect][] = [
+      ["clear weather", WeatherType.NONE, {}, StatusEffect.NONE],
+      ["rain", WeatherType.RAIN, {}, StatusEffect.NONE],
+      ["Eerie Fog", WeatherType.EERIE_FOG, {}, StatusEffect.BURN],
+      ["normal fog", WeatherType.FOG, {}, StatusEffect.BURN],
+      ["fog with a status already", WeatherType.FOG, { status: StatusEffect.PARALYSIS }, StatusEffect.NONE],
+      ["fog on a Fire type", WeatherType.EERIE_FOG, { fire: true }, StatusEffect.NONE],
+      ["fog on a fainted holder", WeatherType.FOG, { fainted: true }, StatusEffect.NONE],
+      ["fog in a simulated call", WeatherType.EERIE_FOG, { simulated: true }, StatusEffect.NONE],
+    ];
+    for (const [name, weather, options, expected] of rows) {
+      expect(outcome(original, weather, options), `original, ${name}`).toBe(expected);
+      expect(outcome(rebuilt, weather, options), `rebuild, ${name}`).toBe(expected);
+    }
+
+    // A rebuild follows the status setting.
+    const paralysis = recomposeAttr(module, original, FLARE_BOOST, 2, {
+      params: { status: "PARALYSIS" },
+    }) as FlareBoostSelfBurnOnSummonAbAttr;
+    expect(outcome(paralysis, WeatherType.FOG)).toBe(StatusEffect.PARALYSIS);
+    expect(outcome(paralysis, WeatherType.NONE)).toBe(StatusEffect.NONE);
+
+    // A replaced gate (rain instead of fog) decides the weather test; the rest of the rule stays.
+    const rain = recomposeAttr(module, original, FLARE_BOOST, 2, {
+      conds: { gate: { block: "field.weather", params: { weather: "RAIN" } } },
+    }) as FlareBoostSelfBurnOnSummonAbAttr;
+    expect(outcome(rain, WeatherType.RAIN)).toBe(StatusEffect.BURN);
+    expect(outcome(rain, WeatherType.FOG)).toBe(StatusEffect.NONE);
+    expect(outcome(rain, WeatherType.RAIN, { status: StatusEffect.SLEEP })).toBe(StatusEffect.NONE);
   });
 });
