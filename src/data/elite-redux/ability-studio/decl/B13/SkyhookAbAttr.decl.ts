@@ -7,7 +7,7 @@
 // Skyhook (Tier B, package effect). "After I damage a foe I pivot out, once per turn, and my replacement may enter faster."
 //
 // Source: abilities/newcomer-signature-mechanics.ts, SkyhookAbAttr (PostAttackAbAttr; the base class's two arguments
-// (attackCondition, showAbility) are constructor arguments 0 and 1, the Speed chance is now argument 2).
+// (attackCondition, showAbility) are constructor arguments 0 and 1, the Speed chance is argument 2, the Speed stage count argument 3).
 //   canApply, ORIGINAL order, now guards && gate && residual (all clauses pure, no RNG):
 //     guards    1. super.canApply: the base attack condition, by default `move.category !== STATUS` -> constructor slot "ctor:0"
 //               2. params.damage > 0                                    (R-B13-3)
@@ -16,10 +16,10 @@
 //     residual  5. every opponent allows my switch: SKYHOOK_SWITCH.getSwitchOutCondition(holder, opponent)  (feasibility)
 //   apply: SKYHOOK_TURN[holder] = "wave:turn"                           (even when simulated)
 //          simulated: stop
-//          SKYHOOK_BOOST_SIDE[my side] = holder.randBattleSeedInt(100) < speedBoostChancePercent   (the ONE random draw)
+//          SKYHOOK_BOOST_SIDE[my side] = (holder.randBattleSeedInt(100) < speedBoostChancePercent) ? speedBoostStages : 0   (the ONE random draw)
 //          message "<me>'s Skyhook pulled it back!", then holder switches out (ForceSwitchOutHelper SWITCH)
 //   The boost itself is given later by applyPendingSkyhookEntryBoost (called by name from phases/switch-summon-phase.ts:464):
-//   the next Pokemon that enters on my side gets +1 Speed if the stored flag is true (the flag is consumed once).
+//   the next Pokemon that enters on my side gets the stored number of Speed stages if it is above 0 (the value is consumed once).
 import { SkyhookAbAttr } from "#data/elite-redux/abilities/newcomer-signature-mechanics";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 
@@ -29,7 +29,7 @@ export default defineDecl(SkyhookAbAttr, {
   when: "event.after-my-hit",
   label: "Switch out after a hit and maybe speed up my replacement",
   summary: params =>
-    `After my damaging move hurts the target I switch out, once per turn (on the last hit of a multi-hit move). My replacement has a ${params.speedBoostChancePercent}% chance to enter with +1 Speed.`,
+    `After my damaging move hurts the target I switch out, once per turn (on the last hit of a multi-hit move). My replacement has a ${params.speedBoostChancePercent}% chance to enter with +${params.speedBoostStages} Speed stage(s).`,
   synonyms: [
     "hit and run",
     "pivot out",
@@ -57,6 +57,20 @@ export default defineDecl(SkyhookAbAttr, {
       step: 5,
       integer: true,
     },
+    {
+      id: "speedBoostStages",
+      ctorIndex: 3,
+      path: "speedBoostStages",
+      control: "number",
+      label: "Speed stages my replacement gains when the chance succeeds (stages)",
+      editable: true,
+      gateIndependent: true,
+      default: 1,
+      min: 1,
+      max: 6,
+      step: 1,
+      integer: true,
+    },
   ],
   conditions: [
     // Clause 1: the base class's attack condition (a real constructor argument). Every user takes the default.
@@ -68,9 +82,9 @@ export default defineDecl(SkyhookAbAttr, {
   feasibility: [
     "The hit must deal damage and must be the last hit of a multi-hit move",
     "I must be able to switch out: nothing may trap me or block my switch",
-    "The Speed boost goes to the next Pokemon that enters on my side, only once; it is lost if nobody enters before the battle ends",
+    "The Speed stages go to the next Pokemon that enters on my side, only once; it is lost if nobody enters before the battle ends",
   ],
-  effect: { id: "effect.package", params: ["speedBoostChancePercent"] },
+  effect: { id: "effect.package", params: ["speedBoostChancePercent", "speedBoostStages"] },
   reusableAlone: { when: true, if: true, do: true },
   flags: {
     rng: "apply",
@@ -89,5 +103,5 @@ export default defineDecl(SkyhookAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "PACKAGE for the EFFECT only. The trigger (after my hit) is a normal WHEN; the attack condition (ctor:0, move.damaging) is a library atom; the 'not yet this turn' memory is the editable gate (a legacy-closure binding until R-B13-17 `time.not-yet-this-turn` exists, the library's own once-per-turn atom keeps ITS OWN memory so it would drop the class's write). Why the effect cannot be split: it is 'switch out' (effect.force-switch-out) PLUS a per-side stored flag that a different engine call site (applyPendingSkyhookEntryBoost, switch-summon-phase.ts:464) turns into +1 Speed on the next Pokemon to enter; no library block holds a flag for 'the next Pokemon that enters my side' (requested as R-B13-45 `effect.boost-next-entrant`). The 20 in `randBattleSeedInt(100) < 20` was a literal, now constructor argument 2 (default 20, the very same draw and comparison); the +1 Speed lives in applyPendingSkyhookEntryBoost, which has no access to this attr, so it stays fixed. Users: Skyhook (5978, attr 0). ODDITIES (not fixed): (1) apply writes the once-per-turn memory BEFORE its simulated check, so a simulated call spends it; (2) the boost flag is stored per SIDE and per battle, so a second Skyhook activation on the same side before anyone enters overwrites the first roll, and a flag left over when the switch did not happen (the switch can still fail after canApply) boosts the next entrant of that side; (3) when the switch cannot complete the memory and the flag are already written.",
+    "PACKAGE for the EFFECT only. The trigger (after my hit) is a normal WHEN; the attack condition (ctor:0, move.damaging) is a library atom; the 'not yet this turn' memory is the editable gate (a legacy-closure binding until R-B13-17 `time.not-yet-this-turn` exists, the library's own once-per-turn atom keeps ITS OWN memory so it would drop the class's write). Why the effect cannot be split: it is 'switch out' (effect.force-switch-out) PLUS a per-side stored flag that a different engine call site (applyPendingSkyhookEntryBoost, switch-summon-phase.ts:464) turns into +1 Speed on the next Pokemon to enter; no library block holds a flag for 'the next Pokemon that enters my side' (requested as R-B13-45 `effect.boost-next-entrant`). The 20 in `randBattleSeedInt(100) < 20` was a literal, now constructor argument 2 (default 20, the very same draw and comparison). The +1 Speed was a literal in applyPendingSkyhookEntryBoost; the per-side value stored by apply is now the stage count (0 = no boost) taken from constructor argument 3 (default 1), so the entry code reads it from the stored value and behaviour is identical. The boosted stat (Speed) stays fixed. Users: Skyhook (5978, attr 0). ODDITIES (not fixed): (1) apply writes the once-per-turn memory BEFORE its simulated check, so a simulated call spends it; (2) the boost flag is stored per SIDE and per battle, so a second Skyhook activation on the same side before anyone enters overwrites the first roll, and a flag left over when the switch did not happen (the switch can still fail after canApply) boosts the next entrant of that side; (3) when the switch cannot complete the memory and the flag are already written.",
 });

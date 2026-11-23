@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "11bb398eec9da8",
-  "hash": "056e70dc1008b4",
+  "hash": "09d159f293de83",
   "blocks": [
     {
       "id": "block.anneal",
@@ -272,7 +272,7 @@
       "id": "block.boot-hill",
       "className": "BootHillAbAttr",
       "label": "Plant a marker on the foe's side when I knock a target out",
-      "summary": "When my damaging move knocks the target out, a one-use marker is planted on the foe's side. The next foe that enters takes 1/8 of its max HP as damage and loses 1 Speed stage.",
+      "summary": "When my damaging move knocks the target out, a one-use marker is planted on the foe's side. The next foe that enters takes 1 out of 8 parts of its max HP (about 13%) and loses 1 Speed stage(s).",
       "tier": "B",
       "kind": "package",
       "status": "decomposed",
@@ -290,7 +290,32 @@
       "examples": [
         "When I knock out a foe, the next foe to come in takes damage and loses Speed, like Boot Hill"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "damageDivisor",
+          "label": "Marker damage: the foe loses 1 out of this many parts of its max HP (parts)",
+          "control": "number",
+          "default": 8,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "speedStages",
+          "label": "Speed stages the marker takes from the foe (stages)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 0,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
       "conditions": [
         {
           "slot": "ctor:0",
@@ -311,18 +336,21 @@
         "The hit must deal damage",
         "The move must not itself be a follow-up move of this ability",
         "Markers do not stack: a second knock-out only changes who owns the one marker on that side",
-        "The marker is used up by the next foe that enters, who loses 1/8 of its max HP and 1 Speed stage; this cannot be changed here"
+        "The marker is used up by the next foe that enters, who loses the set part of its max HP and the set number of Speed stages"
       ],
       "effect": {
         "id": "effect.package",
-        "params": []
+        "params": [
+          "damageDivisor",
+          "speedStages"
+        ]
       },
       "reusableAlone": {
         "when": true,
         "if": true,
         "do": true
       },
-      "packageReason": "PACKAGE for the EFFECT only. The trigger (after my hit) is a normal WHEN, the attack condition is the library atom move.damaging (ctor:0) and 'the target was knocked out' is the editable gate (a legacy-closure binding until R-B13-44 `mon.fainted{who}` exists). Why the effect cannot be split with today's blocks: it plants a field effect of a kind the library does not list (`effect.arena-tag` takes a free text tag name, is not implemented, cannot carry the owner id, the 'quiet' flag or the 0-turn lifetime, and the entry damage and Speed drop live in applyGraveMarkerOnEntry, not in the tag); requested as R-B13-46 `effect.plant-entry-marker`. The 1/8 HP and the 1 stage are fixed literals of that function, which the class cannot read, so the block has no settings (written reason above). Users: Boot Hill (5985, attr 0). ODDITIES (not fixed): (1) apply ignores `simulated`, so a simulated call plants a marker; no engine path simulates PostAttack today; (2) the class is also a plain PostAttack effect, so a knock-out by an ordinary hit of a multi-hit move counts on the hit that kills; (3) the marker is planted even when the foe side has no Pokemon left to enter; it is created with 0 turns and is only ever removed by applyGraveMarkerOnEntry; (4) a second marker does not stack, the existing one only changes owner (GraveMarkerTag.onOverlap), so damage credit goes to the latest planter.",
+      "packageReason": "PACKAGE for the EFFECT only. The trigger (after my hit) is a normal WHEN, the attack condition is the library atom move.damaging (ctor:0) and 'the target was knocked out' is the editable gate (a legacy-closure binding until R-B13-44 `mon.fainted{who}` exists). Why the effect cannot be split with today's blocks: it plants a field effect of a kind the library does not list (`effect.arena-tag` takes a free text tag name, is not implemented, cannot carry the owner id, the 'quiet' flag or the 0-turn lifetime, and the entry damage and Speed drop live in applyGraveMarkerOnEntry, not in the tag); requested as R-B13-46 `effect.plant-entry-marker`. The 1/8 HP and the 1 stage were literals of that function; they are now constructor arguments 2 and 3 (defaults 8 and 1) and the function reads them from the planter's attr (marker.sourceId -> getPokemonById -> attr; defaults when the planter or attr is gone, so a marker whose planter left the field still behaves as shipped). The base class takes the first two arguments. Users: Boot Hill (5985, attr 0). ODDITIES (not fixed): (1) apply ignores `simulated`, so a simulated call plants a marker; no engine path simulates PostAttack today; (2) the class is also a plain PostAttack effect, so a knock-out by an ordinary hit of a multi-hit move counts on the hit that kills; (3) the marker is planted even when the foe side has no Pokemon left to enter; it is created with 0 turns and is only ever removed by applyGraveMarkerOnEntry; (4) a second marker does not stack, the existing one only changes owner (GraveMarkerTag.onOverlap), so damage credit goes to the latest planter.",
       "uses": 1
     },
     {
@@ -653,13 +681,54 @@
       "examples": [
         "Once per wave I survive a knock-out from full HP and hit back with a Dark move, like Eclipse Wing"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "counterPower",
+          "label": "Power of my counter-strike (power points)",
+          "control": "number",
+          "default": 120,
+          "editable": true,
+          "min": 1,
+          "max": 250,
+          "step": 5,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "counterType",
+          "label": "Type of my counter-strike",
+          "control": "select",
+          "default": "Dark",
+          "editable": true,
+          "options": [
+            "Normal",
+            "Fighting",
+            "Flying",
+            "Poison",
+            "Ground",
+            "Rock",
+            "Bug",
+            "Ghost",
+            "Steel",
+            "Fire",
+            "Water",
+            "Grass",
+            "Electric",
+            "Psychic",
+            "Ice",
+            "Dragon",
+            "Dark",
+            "Fairy"
+          ],
+          "gateIndependent": true
+        }
+      ],
       "conditions": [],
       "guards": [],
       "feasibility": [
         "Only a direct hit that would knock me out, only while I am at full HP, and only if my max HP is above 1",
         "Only once per wave",
-        "The counter is a 120 power Dark special move that always hits; this cannot be changed here",
+        "The counter is a special move that always hits",
         "At the end of the turn I may faint if my counter knocked its target out (the turn-end part of this ability)"
       ],
       "reusableAlone": {
@@ -2745,7 +2814,7 @@
       "id": "block.skyhook",
       "className": "SkyhookAbAttr",
       "label": "Switch out after a hit and maybe speed up my replacement",
-      "summary": "After my damaging move hurts the target I switch out, once per turn (on the last hit of a multi-hit move). My replacement has a 20% chance to enter with +1 Speed.",
+      "summary": "After my damaging move hurts the target I switch out, once per turn (on the last hit of a multi-hit move). My replacement has a 20% chance to enter with +1 Speed stage(s).",
       "tier": "B",
       "kind": "package",
       "status": "decomposed",
@@ -2775,6 +2844,18 @@
           "step": 5,
           "integer": true,
           "gateIndependent": true
+        },
+        {
+          "id": "speedBoostStages",
+          "label": "Speed stages my replacement gains when the chance succeeds (stages)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
         }
       ],
       "conditions": [
@@ -2796,12 +2877,13 @@
       "feasibility": [
         "The hit must deal damage and must be the last hit of a multi-hit move",
         "I must be able to switch out: nothing may trap me or block my switch",
-        "The Speed boost goes to the next Pokemon that enters on my side, only once; it is lost if nobody enters before the battle ends"
+        "The Speed stages go to the next Pokemon that enters on my side, only once; it is lost if nobody enters before the battle ends"
       ],
       "effect": {
         "id": "effect.package",
         "params": [
-          "speedBoostChancePercent"
+          "speedBoostChancePercent",
+          "speedBoostStages"
         ]
       },
       "reusableAlone": {
@@ -2809,7 +2891,7 @@
         "if": true,
         "do": true
       },
-      "packageReason": "PACKAGE for the EFFECT only. The trigger (after my hit) is a normal WHEN; the attack condition (ctor:0, move.damaging) is a library atom; the 'not yet this turn' memory is the editable gate (a legacy-closure binding until R-B13-17 `time.not-yet-this-turn` exists, the library's own once-per-turn atom keeps ITS OWN memory so it would drop the class's write). Why the effect cannot be split: it is 'switch out' (effect.force-switch-out) PLUS a per-side stored flag that a different engine call site (applyPendingSkyhookEntryBoost, switch-summon-phase.ts:464) turns into +1 Speed on the next Pokemon to enter; no library block holds a flag for 'the next Pokemon that enters my side' (requested as R-B13-45 `effect.boost-next-entrant`). The 20 in `randBattleSeedInt(100) < 20` was a literal, now constructor argument 2 (default 20, the very same draw and comparison); the +1 Speed lives in applyPendingSkyhookEntryBoost, which has no access to this attr, so it stays fixed. Users: Skyhook (5978, attr 0). ODDITIES (not fixed): (1) apply writes the once-per-turn memory BEFORE its simulated check, so a simulated call spends it; (2) the boost flag is stored per SIDE and per battle, so a second Skyhook activation on the same side before anyone enters overwrites the first roll, and a flag left over when the switch did not happen (the switch can still fail after canApply) boosts the next entrant of that side; (3) when the switch cannot complete the memory and the flag are already written.",
+      "packageReason": "PACKAGE for the EFFECT only. The trigger (after my hit) is a normal WHEN; the attack condition (ctor:0, move.damaging) is a library atom; the 'not yet this turn' memory is the editable gate (a legacy-closure binding until R-B13-17 `time.not-yet-this-turn` exists, the library's own once-per-turn atom keeps ITS OWN memory so it would drop the class's write). Why the effect cannot be split: it is 'switch out' (effect.force-switch-out) PLUS a per-side stored flag that a different engine call site (applyPendingSkyhookEntryBoost, switch-summon-phase.ts:464) turns into +1 Speed on the next Pokemon to enter; no library block holds a flag for 'the next Pokemon that enters my side' (requested as R-B13-45 `effect.boost-next-entrant`). The 20 in `randBattleSeedInt(100) < 20` was a literal, now constructor argument 2 (default 20, the very same draw and comparison). The +1 Speed was a literal in applyPendingSkyhookEntryBoost; the per-side value stored by apply is now the stage count (0 = no boost) taken from constructor argument 3 (default 1), so the entry code reads it from the stored value and behaviour is identical. The boosted stat (Speed) stays fixed. Users: Skyhook (5978, attr 0). ODDITIES (not fixed): (1) apply writes the once-per-turn memory BEFORE its simulated check, so a simulated call spends it; (2) the boost flag is stored per SIDE and per battle, so a second Skyhook activation on the same side before anyone enters overwrites the first roll, and a flag left over when the switch did not happen (the switch can still fail after canApply) boosts the next entrant of that side; (3) when the switch cannot complete the memory and the flag are already written.",
       "uses": 1
     },
     {

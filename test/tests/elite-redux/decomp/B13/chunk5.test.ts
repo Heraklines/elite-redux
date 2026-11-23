@@ -15,9 +15,11 @@ import { ForceSwitchOutHelper } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import {
+  applyGraveMarkerOnEntry,
   applyPendingSkyhookEntryBoost,
   type BootHillAbAttr,
   type CrackedVesselRestoreTypesAbAttr,
+  type EclipseWingMarkerAbAttr,
   type EclipseWingPowerAbAttr,
   type EncoreSetAbAttr,
   finishReductionMove,
@@ -41,6 +43,7 @@ import { MoveResult } from "#enums/move-result";
 import { MoveUseMode } from "#enums/move-use-mode";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
+import { Stat } from "#enums/stat";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
@@ -314,6 +317,103 @@ describe("B13 chunk 5", () => {
         ArenaTagSide.ENEMY,
         true,
       );
+      vi.restoreAllMocks();
+    });
+  });
+
+  describe("Numbers inside the packages are editable and default to the shipped values", () => {
+    it("Skyhook gives the number of Speed stages in the param (default 1) and none when the roll fails", async () => {
+      const { holder, foe } = await startWorld(phaserGame);
+      const queued = vi.spyOn(globalScene.phaseManager, "unshiftNew").mockImplementation(() => undefined as never);
+      vi.spyOn(globalScene.phaseManager, "queueMessage").mockImplementation(() => undefined);
+      vi.spyOn(ForceSwitchOutHelper.prototype, "switchOutLogic").mockReturnValue(true);
+      const draw = vi.spyOn(holder, "randBattleSeedInt").mockReturnValue(0);
+      const original = liveAbility(SKYHOOK).attrs[0] as SkyhookAbAttr;
+      expect(original.speedBoostStages).toBe(1);
+      original.apply(hit(holder, foe));
+      queued.mockClear();
+      applyPendingSkyhookEntryBoost(holder);
+      expect(queued.mock.calls[0]?.[0]).toBe("StatStageChangePhase");
+      expect(queued.mock.calls[0]?.[3]).toEqual([Stat.SPD]);
+      expect(queued.mock.calls[0]?.[4]).toBe(1);
+      const strong = buildAttr(
+        module("SkyhookAbAttr"),
+        { speedBoostStages: 3 },
+        { "ctor:0": damaging, gate: sameGate(original) },
+      ) as SkyhookAbAttr;
+      strong.apply(hit(holder, foe));
+      queued.mockClear();
+      applyPendingSkyhookEntryBoost(holder);
+      expect(queued.mock.calls[0]?.[4]).toBe(3);
+      draw.mockReturnValue(99);
+      strong.apply(hit(holder, foe));
+      queued.mockClear();
+      applyPendingSkyhookEntryBoost(holder);
+      expect(queued).not.toHaveBeenCalled(); // the roll failed: stored 0 means no boost
+      vi.restoreAllMocks();
+    });
+
+    it("Boot Hill's marker takes the planter's damage share and Speed stages (defaults 1/8 and 1), and the defaults when the planter is gone", async () => {
+      const { holder, foe } = await startWorld(phaserGame);
+      vi.spyOn(globalScene.phaseManager, "queueMessage").mockImplementation(() => undefined);
+      const original = liveAbility(BOOT_HILL).attrs[0] as BootHillAbAttr;
+      expect([original.damageDivisor, original.speedStages]).toEqual([8, 1]);
+      const custom = buildAttr(
+        module("BootHillAbAttr"),
+        { damageDivisor: 4, speedStages: 2 },
+        { "ctor:0": damaging, gate: sameGate(original) },
+      ) as BootHillAbAttr;
+      vi.spyOn(globalScene.arena, "getTagOnSide").mockReturnValue({ sourceId: holder.id } as never);
+      vi.spyOn(globalScene.arena, "removeTagOnSide").mockReturnValue(true);
+      const planter = vi.spyOn(globalScene, "getPokemonById").mockReturnValue(holder);
+      const attrs = vi.spyOn(holder, "getAllActiveAbilityAttrs");
+      vi.spyOn(foe, "getMaxHp").mockReturnValue(100);
+      vi.spyOn(foe, "isFainted").mockReturnValue(false);
+      vi.spyOn(foe, "getStatStage").mockReturnValue(0);
+      const damage = vi.spyOn(foe, "damageAndUpdate").mockReturnValue(0 as never);
+      const stage = vi.spyOn(foe, "setStatStage").mockImplementation(() => undefined);
+      const run = (): [unknown, unknown] => {
+        damage.mockClear();
+        stage.mockClear();
+        applyGraveMarkerOnEntry(foe);
+        return [damage.mock.calls[0]?.[0], stage.mock.calls[0]?.[1]];
+      };
+      attrs.mockReturnValue([original] as never);
+      expect(run()).toEqual([12, -1]); // floor(100 / 8), one stage down: the shipped behaviour
+      attrs.mockReturnValue([custom] as never);
+      expect(run()).toEqual([25, -2]);
+      planter.mockReturnValue(undefined);
+      expect(run()).toEqual([12, -1]); // planter gone: the shipped values
+      planter.mockReturnValue(holder);
+      attrs.mockReturnValue([] as never);
+      expect(run()).toEqual([12, -1]); // planter without the block: the shipped values
+      vi.restoreAllMocks();
+    });
+
+    it("Eclipse Wing's counter-strike reads its power and type from the marker (defaults 120 and Dark)", async () => {
+      const { holder, foe } = await startWorld(phaserGame);
+      const queued = vi.spyOn(globalScene.phaseManager, "unshiftNew").mockImplementation(() => undefined as never);
+      vi.spyOn(globalScene.phaseManager, "queueMessage").mockImplementation(() => undefined);
+      const marker = liveAbility(ECLIPSE_WING).attrs[2] as EclipseWingMarkerAbAttr;
+      expect([marker.counterPower, marker.counterType]).toEqual([120, PokemonType.DARK]);
+      const custom = buildAttr(
+        module("EclipseWingMarkerAbAttr"),
+        { counterPower: 80, counterType: "Fairy" },
+        {},
+      ) as EclipseWingMarkerAbAttr;
+      expect([custom.counterPower, custom.counterType]).toEqual([80, PokemonType.FAIRY]);
+      const counterOf = (): { power: number; type: PokemonType } => {
+        const move = (queued.mock.calls.at(-1)?.[3] as { getMove(): Move }).getMove();
+        return { power: move.power, type: move.type };
+      };
+      vi.spyOn(holder, "getAllActiveAbilityAttrs").mockReturnValue([marker] as never);
+      vi.spyOn(foe, "getAllActiveAbilityAttrs").mockReturnValue([custom] as never);
+      holder.hp = holder.getMaxHp();
+      foe.hp = foe.getMaxHp();
+      expect(tryEclipseWing(holder, foe)).toBe(true);
+      expect(counterOf()).toEqual({ power: 120, type: PokemonType.DARK });
+      expect(tryEclipseWing(foe, holder)).toBe(true);
+      expect(counterOf()).toEqual({ power: 80, type: PokemonType.FAIRY });
       vi.restoreAllMocks();
     });
   });

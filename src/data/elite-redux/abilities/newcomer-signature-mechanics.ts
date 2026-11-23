@@ -1383,6 +1383,9 @@ export function tryEclipseWing(defender: Pokemon, source: Pokemon | undefined): 
   ) {
     return false;
   }
+  const counter = defender
+    .getAllActiveAbilityAttrs()
+    .find(attr => attr?.constructor?.name === "EclipseWingMarkerAbAttr") as EclipseWingMarkerAbAttr | undefined;
   ECLIPSE_USED_WAVE.set(defender, wave);
   ECLIPSE_COUNTER_TARGET.set(defender, source);
   globalScene.phaseManager.queueMessage(`${defender.getNameToRender()}'s Eclipse Wing held it at 1 HP!`);
@@ -1391,7 +1394,12 @@ export function tryEclipseWing(defender: Pokemon, source: Pokemon | undefined): 
     "ErSignatureFollowupPhase",
     defender,
     source,
-    signatureFollowup(MoveId.DARK_PULSE, 120, PokemonType.DARK, MoveCategory.SPECIAL),
+    signatureFollowup(
+      MoveId.DARK_PULSE,
+      counter?.counterPower ?? 120,
+      counter?.counterType ?? PokemonType.DARK,
+      MoveCategory.SPECIAL,
+    ),
   );
   return true;
 }
@@ -1562,7 +1570,7 @@ export class EncoreSetAbAttr extends PostAttackAbAttr {
 }
 
 const SKYHOOK_TURN = new WeakMap<Pokemon, string>();
-const SKYHOOK_BOOST_SIDE = new Map<ArenaTagSide, boolean>();
+const SKYHOOK_BOOST_SIDE = new Map<ArenaTagSide, number>();
 let skyhookBattle: object | undefined;
 function ensureSkyhookBattle(): void {
   if (skyhookBattle !== globalScene.currentBattle) {
@@ -1578,6 +1586,9 @@ export class SkyhookAbAttr extends PostAttackAbAttr implements GatedAttr<PostMov
   /** Chance (percent) that the Pokemon that replaces me enters with +1 Speed (ability studio param; the default is the original 20). */
   public readonly speedBoostChancePercent: number;
 
+  /** Number of Speed stages my replacement gains when the roll succeeds (ability studio param; the default is the original 1). */
+  public readonly speedBoostStages: number;
+
   /**
    * The first two arguments are the base class's (attack condition, show ability); both stay `undefined` for every
    * shipped user so the base defaults apply, exactly as when this class had no constructor.
@@ -1586,9 +1597,11 @@ export class SkyhookAbAttr extends PostAttackAbAttr implements GatedAttr<PostMov
     attackCondition?: ConstructorParameters<typeof PostAttackAbAttr>[0],
     showAbility?: boolean,
     speedBoostChancePercent = 20,
+    speedBoostStages = 1,
   ) {
     super(attackCondition, showAbility);
     this.speedBoostChancePercent = speedBoostChancePercent;
+    this.speedBoostStages = speedBoostStages;
   }
 
   /**
@@ -1619,7 +1632,10 @@ export class SkyhookAbAttr extends PostAttackAbAttr implements GatedAttr<PostMov
       return;
     }
     ensureSkyhookBattle();
-    SKYHOOK_BOOST_SIDE.set(ownSide(pokemon), pokemon.randBattleSeedInt(100) < this.speedBoostChancePercent);
+    SKYHOOK_BOOST_SIDE.set(
+      ownSide(pokemon),
+      pokemon.randBattleSeedInt(100) < this.speedBoostChancePercent ? this.speedBoostStages : 0,
+    );
     globalScene.phaseManager.queueMessage(`${pokemon.getNameToRender()}'s Skyhook pulled it back!`);
     SKYHOOK_SWITCH.switchOutLogic(pokemon);
   }
@@ -1631,13 +1647,31 @@ export function applyPendingSkyhookEntryBoost(pokemon: Pokemon): void {
   const boost = SKYHOOK_BOOST_SIDE.get(side);
   SKYHOOK_BOOST_SIDE.delete(side);
   if (boost) {
-    globalScene.phaseManager.unshiftNew("StatStageChangePhase", pokemon.getBattlerIndex(), true, [Stat.SPD], 1);
+    globalScene.phaseManager.unshiftNew("StatStageChangePhase", pokemon.getBattlerIndex(), true, [Stat.SPD], boost);
   }
 }
 
 export class BootHillAbAttr extends PostAttackAbAttr implements GatedAttr<PostMoveInteractionAbAttrParams> {
   /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
   public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** The marker hurts the next foe by 1 / this many parts of its max HP (ability studio param; the default is the original 8). */
+  public readonly damageDivisor: number;
+
+  /** Speed stages the marker takes from the next foe (ability studio param; the default is the original 1). */
+  public readonly speedStages: number;
+
+  /** The first two arguments are the base class's (attack condition, show ability); both stay `undefined` for every shipped user. */
+  constructor(
+    attackCondition?: ConstructorParameters<typeof PostAttackAbAttr>[0],
+    showAbility?: boolean,
+    damageDivisor = 8,
+    speedStages = 1,
+  ) {
+    super(attackCondition, showAbility);
+    this.damageDivisor = damageDivisor;
+    this.speedStages = speedStages;
+  }
 
   /**
    * Tier B (ability studio spec 3.1), original clause order, all clauses pure, no RNG: `guards` = the base attack
@@ -1677,10 +1711,16 @@ export function applyGraveMarkerOnEntry(pokemon: Pokemon): void {
   const source = globalScene.getPokemonById(marker.sourceId);
   globalScene.arena.removeTagOnSide(ArenaTagType.GRAVE_MARKER, side, true);
   globalScene.phaseManager.queueMessage(`${pokemon.getNameToRender()} was struck by the Grave Marker!`);
-  const damage = Math.max(1, Math.floor(pokemon.getMaxHp() / 8));
+  // The planter's Boot Hill block carries the two numbers; when the planter or its block is gone the shipped values apply.
+  const planter = source?.getAllActiveAbilityAttrs().find(attr => attr instanceof BootHillAbAttr) as
+    | BootHillAbAttr
+    | undefined;
+  const damageDivisor = planter?.damageDivisor ?? 8;
+  const speedStages = planter?.speedStages ?? 1;
+  const damage = Math.max(1, Math.floor(pokemon.getMaxHp() / damageDivisor));
   pokemon.damageAndUpdate(damage, source ? { result: HitResult.INDIRECT, source } : { result: HitResult.INDIRECT });
   if (!pokemon.isFainted()) {
-    pokemon.setStatStage(Stat.SPD, Math.max(-6, pokemon.getStatStage(Stat.SPD) - 1));
+    pokemon.setStatStage(Stat.SPD, Math.max(-6, pokemon.getStatStage(Stat.SPD) - speedStages));
     globalScene.phaseManager.queueMessage(`${pokemon.getNameToRender()}'s Speed fell!`);
   }
 }
@@ -2175,6 +2215,18 @@ export class EclipseWingPowerAbAttr
   }
 }
 export class EclipseWingMarkerAbAttr extends AbAttr {
+  /** Power of the counter-strike (ability studio param; the default is the original 120). */
+  public readonly counterPower: number;
+
+  /** Type of the counter-strike (ability studio param; the default is the original Dark). */
+  public readonly counterType: PokemonType;
+
+  constructor(counterPower = 120, counterType: PokemonType = PokemonType.DARK) {
+    super();
+    this.counterPower = counterPower;
+    this.counterType = counterType;
+  }
+
   override apply(): void {}
 }
 export class LivingChromeMarkerAbAttr extends AbAttr {
