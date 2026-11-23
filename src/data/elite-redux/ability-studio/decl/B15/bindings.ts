@@ -53,3 +53,35 @@ const CROSSCUT_LEGACY_REASON =
   "The gate tests the move's printed slicing or pulse flag (move.hasFlag); the library atom move.flag uses doesFlagEffectApply, which counts ability-injected flags too. Needs a printed-flag atom (R-B15-6).";
 bindLegacyClosure(5908, 0, CROSSCUT_LEGACY_REASON, "gate"); // Crosscut, second strike
 bindLegacyClosure(5908, 1, CROSSCUT_LEGACY_REASON, "gate"); // Crosscut, power rider
+
+// =============================================================================================
+// B15 chunk 3. Tier B gates (slot "gate"), keyed by (abilityId, attrIndex). The other classes of this chunk (Hydrapex, Last Host, Library,
+// Life Preserver, Mycelial Network, Omniform) have no constructor closure and no gate, so they need no binding.
+// =============================================================================================
+
+// PostTurnHurtNonTypedAbAttr, gate, the weather clause: `requiredWeathers === null || requiredWeathers.includes(globalScene.arena.weatherType)`.
+// field.weather is `arena.weatherType === WeatherType[weather]`, the same cached value; a list of weathers is any[...]. Without a weather list the clause is always true, spelled { all: [] }.
+// The target loop (at least one valid, non-spared target) is the residual and stays in the class.
+const NO_WEATHER_NEEDED = { all: [] };
+bindCondition(5314, 0, NO_WEATHER_NEEDED, "gate"); // Parasitic Spores
+bindCondition(5367, 0, NO_WEATHER_NEEDED, "gate"); // Funeral Pyre
+bindCondition(5427, 2, NO_WEATHER_NEEDED, "gate"); // Trash Heap
+bindCondition(5476, 0, NO_WEATHER_NEEDED, "gate"); // Flame Coat
+bindCondition(5575, 0, NO_WEATHER_NEEDED, "gate"); // Winter Throne
+bindCondition(5945, 0, NO_WEATHER_NEEDED, "gate"); // Decomposer
+bindCondition(
+  5643, // Christmas Nightmare: requiredWeathers [HAIL, SNOW]
+  0,
+  {
+    any: [
+      { id: "field.weather", weather: "HAIL" },
+      { id: "field.weather", weather: "SNOW" },
+    ],
+  },
+  "gate",
+);
+
+// PpReductionOnContactAbAttr, gate, the contact clause: `contactRequired && !move.doesFlagEffectApply({ flag: MAKES_CONTACT, user: attacker, target: holder })` -> false.
+// move.flag calls the same Move.doesFlagEffectApply with moveUser = the attacker and the holder as target. The "hit connected" clause (hitResult < NO_EFFECT) is guards() in the class and the
+// "attacker has the move" clause is the residual.
+bindCondition(5247, 0, { id: "move.flag", flag: "MAKES_CONTACT" }, "gate"); // Spiteful

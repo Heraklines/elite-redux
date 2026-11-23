@@ -22,7 +22,8 @@ export const ER_MYCELIAL_NETWORK_ABILITY_ID = 5905;
 
 /** Marker attribute; the effect is applied from the Infestation damage hook. */
 export class MycelialNetworkAbAttr extends AbAttr {
-  constructor() {
+  /** @param healShare - Share of the HP a foe loses to Infestation that the holder recovers (default 0.5, half). */
+  constructor(public readonly healShare: number = 0.5) {
     super(false);
   }
 

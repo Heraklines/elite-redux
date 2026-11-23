@@ -79,8 +79,15 @@ export const OMNIFORM_DERIVED_MOVE_COUNT = 3;
  * {@linkcode erOmniformPreloadTargets}).
  */
 export class OmniformAbAttr extends PostSummonAbAttr {
-  constructor() {
-    super(false);
+  /**
+   * @param derivedMoveCount - How many moves a form without its own stored moveset gets from its learnset (default 3).
+   * @param showAbility - Whether the ability name pops up when it triggers (default false; a studio rule that wraps it shows it).
+   */
+  constructor(
+    public readonly derivedMoveCount: number = OMNIFORM_DERIVED_MOVE_COUNT,
+    showAbility = false,
+  ) {
+    super(showAbility);
   }
 
   override apply(params: AbAttrBaseParams): void {
@@ -155,11 +162,19 @@ function erOmniformHoldForTransform(sequence: ErTransformSequence): void {
   globalScene.phaseManager.unshiftNew("ErOmniformTransformWaitPhase", sequence.whenSettled);
 }
 
+/** The unsuppressed, active Omniform attr `pokemon` carries, if any (found by name, like the engine seams do). */
+function omniformOf(pokemon: Pokemon): OmniformAbAttr | undefined {
+  if (!pokemon.isActive(true)) {
+    return;
+  }
+  return pokemon.getAllActiveAbilityAttrs().find(a => a?.constructor?.name === "OmniformAbAttr") as
+    | OmniformAbAttr
+    | undefined;
+}
+
 /** Whether `pokemon` carries an unsuppressed, active Omniform. */
 function hasOmniform(pokemon: Pokemon): boolean {
-  return (
-    pokemon.isActive(true) && pokemon.getAllActiveAbilityAttrs().some(a => a?.constructor?.name === "OmniformAbAttr")
-  );
+  return omniformOf(pokemon) !== undefined;
 }
 
 /** Resolve the target's `PokemonSpeciesForm` (a specific form, or the species itself). */
@@ -253,7 +268,12 @@ export function erOmniformRevertToBase(holder: Pokemon): void {
  * from `speciesForm`'s learnset, preferring the most recently learned moves the
  * holder's level qualifies for and excluding `excludeMoveId`.
  */
-function deriveMoveset(speciesForm: PokemonSpeciesForm, level: number, excludeMoveId: number): number[] {
+function deriveMoveset(
+  speciesForm: PokemonSpeciesForm,
+  level: number,
+  excludeMoveId: number,
+  count: number,
+): number[] {
   const levelMoves = speciesForm.getLevelMoves();
   // Eligible = learnable at or below the holder's level, distinct, not the used move.
   const eligible: number[] = [];
@@ -272,7 +292,7 @@ function deriveMoveset(speciesForm: PokemonSpeciesForm, level: number, excludeMo
     const j = globalScene.randBattleSeedInt(i + 1);
     [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
   }
-  return eligible.slice(0, OMNIFORM_DERIVED_MOVE_COUNT);
+  return eligible.slice(0, count);
 }
 
 /**
@@ -281,7 +301,8 @@ function deriveMoveset(speciesForm: PokemonSpeciesForm, level: number, excludeMo
  * transform into that target before the move resolves.
  */
 export function erOmniformOnMoveStart(user: Pokemon, move: Move): void {
-  if (!hasOmniform(user)) {
+  const attr = omniformOf(user);
+  if (attr === undefined) {
     return;
   }
   const moveType = user.getMoveType(move);
@@ -356,7 +377,12 @@ export function erOmniformOnMoveStart(user: Pokemon, move: Move): void {
   const usedIndex = currentMoveset.findIndex(m => m?.moveId === move.id);
   const fillMoves: PokemonMove[] = perEvolution
     ? loadOmniformBattleMoveset(user, target)
-    : deriveMoveset(speciesForm, user.level, move.id).map(id => new PokemonMove(id));
+    : deriveMoveset(
+        speciesForm,
+        user.level,
+        move.id,
+        attr.derivedMoveCount ?? OMNIFORM_DERIVED_MOVE_COUNT,
+      ).map(id => new PokemonMove(id));
   let cursor = 0;
   const newMoveset = currentMoveset.map((slot, index) => {
     if (index === usedIndex) {

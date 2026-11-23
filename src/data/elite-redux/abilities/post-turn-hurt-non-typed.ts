@@ -36,6 +36,7 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { allAbilities } from "#data/data-lists";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { AbilityId } from "#enums/ability-id";
 import { HitResult } from "#enums/hit-result";
@@ -95,7 +96,10 @@ export interface PostTurnHurtNonTypedOptions {
  * `damageAndUpdate` with `HitResult.INDIRECT` so the foe's
  * `damageNonDirectDamageAttr` lock still applies.
  */
-export class PostTurnHurtNonTypedAbAttr extends PostTurnAbAttr {
+export class PostTurnHurtNonTypedAbAttr extends PostTurnAbAttr implements GatedAttr<AbAttrBaseParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
   private readonly safeTypes: readonly PokemonType[];
   private readonly damageFraction: number;
   private readonly requiredWeathers: readonly WeatherType[] | null;
@@ -141,16 +145,23 @@ export class PostTurnHurtNonTypedAbAttr extends PostTurnAbAttr {
   }
 
   /**
-   * Check if the proc has at least one valid target. Pure read-only check —
+   * Tier B (ability studio spec 3.1): `canApply = gate && residual`, in the original order. Pure read-only check —
    * matches vanilla `PostTurnHurtIfSleepingAbAttr.canApply` shape.
-   *
-   * If a weather gate is configured, returns false immediately when none of
-   * the listed weathers is active — saves the per-opponent type-check loop.
    */
-  public override canApply({ pokemon }: AbAttrBaseParams): boolean {
-    if (!this.isWeatherActive()) {
-      return false;
-    }
+  public override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /**
+   * The replaceable condition: the weather gate. If one is configured, returns false immediately when none of
+   * the listed weathers is active — saves the per-opponent type-check loop. Always true without a gate.
+   */
+  public gate(_params: AbAttrBaseParams): boolean {
+    return this.isWeatherActive();
+  }
+
+  /** Feasibility that stays in the class: at least one on-field Pokemon is a valid target. */
+  public residual({ pokemon }: AbAttrBaseParams): boolean {
     for (const opp of this.getTargets(pokemon)) {
       if (this.isValidTarget(opp)) {
         return true;

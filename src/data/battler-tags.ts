@@ -1952,20 +1952,23 @@ export abstract class DamagingTrapTag extends TrappedTag {
 
 /**
  * ER Mycelial Network reaction to an INFESTATION HP-loss tick. Heals each
- * opposing Mycelial Network holder by half the amount `victim` lost; any healing
+ * opposing Mycelial Network holder by its `healShare` (half by default) of the amount `victim` lost; any healing
  * beyond the holder's missing HP spills to that holder's lowest-HP living ally
  * (doubles/triples only — in singles the overflow is wasted).
  */
 function applyMycelialNetworkHeal(victim: Pokemon, dealt: number): void {
-  const heal = Math.floor(dealt / 2);
-  if (heal <= 0) {
-    return;
-  }
   for (const holder of victim.getOpponents()) {
-    if (
-      !holder?.isActive(true)
-      || !holder.getAllActiveAbilityAttrs().some(a => a?.constructor?.name === "MycelialNetworkAbAttr")
-    ) {
+    if (!holder?.isActive(true)) {
+      continue;
+    }
+    const attr = holder.getAllActiveAbilityAttrs().find(a => a?.constructor?.name === "MycelialNetworkAbAttr") as
+      | { readonly healShare?: number }
+      | undefined;
+    if (attr === undefined) {
+      continue;
+    }
+    const heal = Math.floor(dealt * (attr.healShare ?? 0.5));
+    if (heal <= 0) {
       continue;
     }
     const holderMissing = holder.getMaxHp() - holder.hp;

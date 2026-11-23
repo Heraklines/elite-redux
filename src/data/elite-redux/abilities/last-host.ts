@@ -35,7 +35,8 @@ export const LAST_HOST_HOST_DAMAGE_FRACTION = 0.25;
 
 /** Marker attribute; the survival effect is applied by {@linkcode erTryLastHost}. */
 export class LastHostAbAttr extends AbAttr {
-  constructor() {
+  /** @param hostDamageShare - Share of the consumed host's max HP it loses when this fires (default 0.25). */
+  constructor(public readonly hostDamageShare: number = LAST_HOST_HOST_DAMAGE_FRACTION) {
     super(false);
   }
 
@@ -59,7 +60,10 @@ export function erTryLastHost(pokemon: Pokemon): boolean {
   if (pokemon.hp < 1) {
     return false;
   }
-  if (!pokemon.getAllActiveAbilityAttrs().some(a => a?.constructor?.name === "LastHostAbAttr")) {
+  const attr = pokemon.getAllActiveAbilityAttrs().find(a => a?.constructor?.name === "LastHostAbAttr") as
+    | LastHostAbAttr
+    | undefined;
+  if (attr === undefined) {
     return false;
   }
   const wave = globalScene.currentBattle?.waveIndex ?? 0;
@@ -77,7 +81,7 @@ export function erTryLastHost(pokemon: Pokemon): boolean {
   host.removeTag(BattlerTagType.INFESTATION);
   globalScene.phaseManager.queueMessage(`${pokemon.getNameToRender()} clung to life through its last host!`);
   // The host loses 25% of its max HP - this can faint it.
-  host.damageAndUpdate(toDmgValue(host.getMaxHp() * LAST_HOST_HOST_DAMAGE_FRACTION, 1), { result: HitResult.INDIRECT });
+  host.damageAndUpdate(toDmgValue(host.getMaxHp() * (attr.hostDamageShare ?? LAST_HOST_HOST_DAMAGE_FRACTION), 1), { result: HitResult.INDIRECT });
   return true;
 }
 

@@ -41,7 +41,16 @@ export const ER_LIBRARY_ABILITY_ID = 5928;
 
 /** Pure marker: Library is driven by the recording / dampener / cast seams. */
 export class LibraryAbAttr extends PostSummonAbAttr {
-  constructor() {
+  /**
+   * @param maxRecordedMoves - How many foe moves the Library keeps, most recent wins (default 3).
+   * @param castPp - Total cast PP per battle shared by every recorded move (default 2).
+   * @param damageMultiplier - Multiplier on damage to the holder's side from a repeated recorded move (default 0.85).
+   */
+  constructor(
+    public readonly maxRecordedMoves: number = LIBRARY_MAX_RECORDED,
+    public readonly castPp: number = LIBRARY_CAST_PP,
+    public readonly damageMultiplier: number = LIBRARY_DAMPENER,
+  ) {
     super(false);
   }
 
@@ -98,17 +107,25 @@ function getState(holder: Pokemon): LibraryState {
     wave,
     entries: [],
     recordedFoeIds: new Set(),
-    castPpRemaining: LIBRARY_CAST_PP,
+    castPpRemaining: libraryOf(holder)?.castPp ?? LIBRARY_CAST_PP,
   };
   LIBRARY_STATE.set(holder, fresh);
   return fresh;
 }
 
+/** The unsuppressed, active Library attr `pokemon` carries, if any (found by name, like the engine seams do). */
+function libraryOf(pokemon: Pokemon): LibraryAbAttr | undefined {
+  if (!pokemon.isActive(true)) {
+    return;
+  }
+  return pokemon.getAllActiveAbilityAttrs().find(a => a?.constructor?.name === "LibraryAbAttr") as
+    | LibraryAbAttr
+    | undefined;
+}
+
 /** Whether `pokemon` carries an unsuppressed, active Library. */
 export function hasLibrary(pokemon: Pokemon): boolean {
-  return (
-    pokemon.isActive(true) && pokemon.getAllActiveAbilityAttrs().some(a => a?.constructor?.name === "LibraryAbAttr")
-  );
+  return libraryOf(pokemon) !== undefined;
 }
 
 /** The moves currently recorded in the holder's Library (oldest → newest). */
@@ -136,7 +153,7 @@ function recordInto(holder: Pokemon, foe: Pokemon, move: Move): void {
   }
   state.recordedFoeIds.add(foe.id);
   state.entries.push({ moveId: move.id, recordedTurnKey: turnKey() });
-  if (state.entries.length > LIBRARY_MAX_RECORDED) {
+  if (state.entries.length > (libraryOf(holder)?.maxRecordedMoves ?? LIBRARY_MAX_RECORDED)) {
     state.entries.shift();
   }
 }
@@ -162,12 +179,13 @@ export function erLibraryDamageMultiplier(defender: Pokemon, move: Move): number
   const now = turnKey();
   const sideMons = [defender, ...defender.getAllies()];
   for (const mon of sideMons) {
-    if (!mon || !hasLibrary(mon)) {
+    const attr = mon ? libraryOf(mon) : undefined;
+    if (!mon || attr === undefined) {
       continue;
     }
     const entry = LIBRARY_STATE.get(mon)?.entries.find(e => e.moveId === move.id);
     if (entry && entry.recordedTurnKey !== now) {
-      return LIBRARY_DAMPENER;
+      return attr.damageMultiplier ?? LIBRARY_DAMPENER;
     }
   }
   return 1;

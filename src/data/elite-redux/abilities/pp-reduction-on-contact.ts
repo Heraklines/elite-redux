@@ -29,6 +29,7 @@
 // =============================================================================
 
 import { PostDefendAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { HitResult } from "#enums/hit-result";
 import { MoveFlags } from "#enums/move-flags";
 
@@ -69,7 +70,13 @@ export interface PpReductionOnContactOptions {
  * trigger because pokerogue's post-defend dispatch is gated on damaging-move
  * resolution.
  */
-export class PpReductionOnContactAbAttr extends PostDefendAbAttr {
+export class PpReductionOnContactAbAttr
+  extends PostDefendAbAttr
+  implements GatedAttr<PostMoveInteractionAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
   private readonly reduction: number;
   private readonly contactRequired: boolean;
   private readonly refundHolder: boolean;
@@ -94,18 +101,26 @@ export class PpReductionOnContactAbAttr extends PostDefendAbAttr {
     return this.contactRequired;
   }
 
+  /** Tier B (ability studio spec 3.1): `canApply = guards && gate && residual`, in the original clause order. */
   public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { move, opponent: attacker, pokemon, hitResult } = params;
-    if (hitResult >= HitResult.NO_EFFECT) {
-      return false;
-    }
-    if (
-      this.contactRequired
-      && !move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
-    ) {
-      return false;
-    }
-    // Only fire if the attacker's moveset has an entry for this move id.
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Safety rule: only a hit that actually connected counts (not a miss, a block or an immunity). */
+  public guards({ hitResult }: PostMoveInteractionAbAttrParams): boolean {
+    return hitResult < HitResult.NO_EFFECT;
+  }
+
+  /** The replaceable condition: the move makes contact (always true when contact is not required). */
+  public gate({ move, opponent: attacker, pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    return (
+      !this.contactRequired
+      || move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
+    );
+  }
+
+  /** Feasibility that stays in the class: the attacker's moveset has an entry for the used move id. */
+  public residual({ move, opponent: attacker }: PostMoveInteractionAbAttrParams): boolean {
     return attacker.moveset.some(m => m.moveId === move.id);
   }
 

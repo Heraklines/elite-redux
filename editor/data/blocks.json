@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "0fab6f28f74017",
+  "vocabularyHash": "1d0a8f2e604b58",
+  "hash": "12131119a1f27d",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -696,7 +696,7 @@
     {
       "id": "block.dandelion-burst",
       "className": "DandelionBurstAbAttr",
-      "label": "Seed every foe and cut its stats once when my HP gets low",
+      "label": "Seed every foe and change a stat once when my HP gets low",
       "summary": "Once per battle, the hit that takes me to 50% HP or less plants Leech Seed on every foe and changes its Speed by -2 stages.",
       "tier": "B",
       "kind": "package",
@@ -793,7 +793,7 @@
         "if": true,
         "do": true
       },
-      "packageReason": "Tier B, PACKAGE for the effect only. 1 attr in 1 ability: Dandelion Burst (5907 attr 0). The trigger (after taking damage), the crossing condition (hp.crossed-below, floor-half, ratio param linked by gateParams) and the not-fainted guard are separate blocks; the effect does two things per foe in one loop (plant Leech Seed with the source move Leech Seed, and a stat-stage phase). Why the effect is a package: effect.apply-tag is not implemented in the library, so the seeding cannot be an existing block; the stat half could be effect.stat-stage on the opposing side but the two are interleaved per foe in one loop and splitting them would change phase order for several foes (see requests R-B15-8). The Leech Seed tag and its source move are fixed (the pair SEEDED + Leech Seed); stat and stages are typed params. LEGACY part: the once-per-battle memory (clause 2) is the ability's own WeakMap keyed by holder with the wave index as value, which the AI snapshot also reads (erDandelionBurstUsedWave); library time.once-per (wave scope) uses waveData.entryEffectsFired, a different memory, and adding a key there would change the AI state, so clause 2 stays in guards() and is listed as feasibility until the librarian adds a scope that can share a caller-owned memory (R-B15-7). Suspected oddities, NOT fixed: (1) Cotton Spore is modelled as a Speed drop to EACH active foe (by design, documented in the source), (2) a foe's stat-stage phase is queued even when the Leech Seed tag was refused (Grass type), by design; (3) the once-per mark is written before any foe is acted on, so a holder whose foes all faint in the loop still uses it up.",
+      "packageReason": "Tier B, PACKAGE for the effect only. 1 attr in 1 ability: Dandelion Burst (5907 attr 0). The trigger (after taking damage), the crossing condition (hp.crossed-below, floor-half, ratio param linked by gateParams) and the not-fainted guard are separate blocks; the effect does two things per foe in one loop (plant Leech Seed with the source move Leech Seed, and a stat-stage phase). Why the effect is a package: effect.apply-tag is not implemented in the library, so the seeding cannot be an existing block; the stat half could be effect.stat-stage on the opposing side but the two are interleaved per foe in one loop and splitting them WOULD change phase order for several foes: SeedTag.onAdd calls phaseManager.queueMessage (not deferred, so it unshifts a MessagePhase), hence per foe the queue gets [seeded message, stat phase] and a split would get [all seeded messages, all stat phases]. This is PROVEN by a phase-order trace in test/tests/elite-redux/decomp/B15/chunk2.test.ts (two foes; the interleaved order differs from the split order). Once effect.apply-tag exists (R-B15-8) and a rule can run two effects per foe in the same loop, the stat drop becomes effect.stat-stage; until then stat and stages stay typed params of this package (see requests R-B15-8). The Leech Seed tag and its source move are fixed (the pair SEEDED + Leech Seed); stat and stages are typed params. LEGACY part: the once-per-battle memory (clause 2) is the ability's own WeakMap keyed by holder with the wave index as value, which the AI snapshot also reads (erDandelionBurstUsedWave); library time.once-per (wave scope) uses waveData.entryEffectsFired, a different memory, and adding a key there would change the AI state, so clause 2 stays in guards() and is listed as feasibility until the librarian adds a scope that can share a caller-owned memory (R-B15-7). Suspected oddities, NOT fixed: (1) Cotton Spore is modelled as a Speed drop to EACH active foe (by design, documented in the source), (2) a foe's stat-stage phase is queued even when the Leech Seed tag was refused (Grass type), by design; (3) the once-per mark is written before any foe is acted on, so a holder whose foes all faint in the loop still uses it up.",
       "uses": 1
     },
     {
@@ -1009,7 +1009,7 @@
       "id": "block.heartbreak",
       "className": "HeartbreakAbAttr",
       "label": "Link to my nearest ally and rage when it faints",
-      "summary": "When I enter I link to my nearest living ally. When that ally faints I gain 1 stage(s) in Speed and my higher attacking stat and lose 1 in Defense and Sp. Def. No ally, no effect.",
+      "summary": "When I enter I link to my nearest living ally. When that ally faints I gain 1 stages in Speed and my higher attacking stat and lose 1 stages in Defense and Sp. Def. No ally, no effect.",
       "tier": "C",
       "kind": "package",
       "status": "decomposed",
@@ -1194,6 +1194,97 @@
       "uses": 2
     },
     {
+      "id": "block.hydrapex",
+      "className": "HydrapexAbAttr",
+      "label": "Side heads hit other foes with a weaker copy of my move",
+      "summary": "While I have this, when I hit one foe with a single-target biting move or a Dragon-type move, up to 2 side heads also hit other Dragon-type foes with it at 35% power and no side effects.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "hydrapex",
+        "extra heads",
+        "side heads",
+        "multi head bite",
+        "hit the other dragon",
+        "splash bite",
+        "hydra"
+      ],
+      "examples": [
+        "My bite also hits the other Dragon-type foe at 35% power",
+        "Three-headed dragon whose side heads strike a second and third foe"
+      ],
+      "params": [
+        {
+          "id": "sidePowerShare",
+          "label": "Side head power (0.35 = 35% of the move's power)",
+          "control": "slider",
+          "default": 0.35,
+          "editable": true,
+          "min": 0.05,
+          "max": 1,
+          "step": 0.05
+        },
+        {
+          "id": "maxSideHeads",
+          "label": "Most side heads per move (extra foes struck)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 4,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "sideType",
+          "label": "Move type that triggers it, and type the extra foes must have",
+          "control": "select",
+          "default": "DRAGON",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only a move that hits one target and has a fixed power above 0 qualifies",
+        "The move must be a biting move (its own printed property) or a move of the chosen type",
+        "It fires once per move use, not once per hit of a multi-hit move",
+        "Needs another living foe that has the chosen type; with none (singles) nothing extra happens",
+        "Side hits copy only the move's type, category and a reduced power: no stat changes, statuses or extra hits, and they cost no PP",
+        "The extra hits are built into the game's hit handling and are not part of this block"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.ignore-contact",
       "className": "IgnoreContactAbAttr",
       "label": "My moves never count as making contact",
@@ -1223,6 +1314,296 @@
         "do": true
       },
       "uses": 1
+    },
+    {
+      "id": "block.last-host",
+      "className": "LastHostAbAttr",
+      "label": "Survive a knockout at 1 HP by using up a foe's Infestation",
+      "summary": "Once per battle, if I would be knocked out by any damage while a foe is infested, I stay at 1 HP; the infested foe with the most HP loses its Infestation and 25% of its max HP.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "last host",
+        "cling to life",
+        "survive at 1 hp",
+        "endure once",
+        "parasite saves me",
+        "sturdy",
+        "focus sash"
+      ],
+      "examples": [
+        "Once per battle I survive a lethal hit at 1 HP if a foe is infested, and that foe loses a quarter of its HP"
+      ],
+      "params": [
+        {
+          "id": "hostDamageShare",
+          "label": "Max HP the infested foe loses (0.25 = 25%)",
+          "control": "slider",
+          "default": 0.25,
+          "editable": true,
+          "min": 0.05,
+          "max": 1,
+          "step": 0.05
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "It works against every kind of damage, including poison, weather and recoil",
+        "It can be used only once per battle, even if I heal afterwards",
+        "At least one foe on the field must be infested; the infested foe with the most HP is chosen",
+        "The foe's loss can knock it out, and a foe that blocks indirect damage is not spared",
+        "It is built into the game's damage handling and is not part of this block"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.library",
+      "className": "LibraryAbAttr",
+      "label": "Record foes' first moves, resist them later, cast them",
+      "summary": "Records the first move each foe uses (the last 3 are kept). A recorded move used again on a later turn does x0.85 damage to my side. I can cast recorded moves, 2 PP per battle shared.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "library",
+        "learn foe moves",
+        "copy moves",
+        "move memory",
+        "scout the foe",
+        "mimic",
+        "resist repeated moves"
+      ],
+      "examples": [
+        "Remember what the foe used first, take 15% less damage from it afterwards and cast it myself"
+      ],
+      "params": [
+        {
+          "id": "maxRecordedMoves",
+          "label": "Moves kept in the memory (the most recent win)",
+          "control": "number",
+          "default": 3,
+          "editable": true,
+          "min": 1,
+          "max": 6,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "castPp",
+          "label": "Cast PP per battle, shared by every recorded move",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 0,
+          "max": 10,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "damageMultiplier",
+          "label": "Damage multiplier against a repeated recorded move (0.85 = 15% less)",
+          "control": "slider",
+          "default": 0.85,
+          "editable": true,
+          "min": 0.1,
+          "max": 2,
+          "step": 0.05
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "It records only while I am on the field, and each foe is recorded once per battle (its first move); status moves count",
+        "The recording turn itself, and any extra hits in it, are not weakened",
+        "The weaker damage applies to me and my ally alike",
+        "A damaging cast is always a special attack (my Sp. Atk against the target's Sp. Def); a status cast works as printed",
+        "Recording, the damage change and casting are built into the game's move handling and fight menu and are not part of this block"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.life-preserver",
+      "className": "LifePreserverAbAttr",
+      "label": "Keep my ally alive at 1 HP and Drench the attacker",
+      "summary": "Once per battle, when an attack would knock out my ally, it stays at 1 HP and the attacker is Drenched for 2 turns (it moves last in its priority bracket).",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "life preserver",
+        "save my ally",
+        "protect partner",
+        "endure for ally",
+        "lifeguard",
+        "doubles bodyguard",
+        "slow the attacker"
+      ],
+      "examples": [
+        "Once per battle my partner survives a lethal attack at 1 HP and the attacker is slowed"
+      ],
+      "params": [
+        {
+          "id": "drenchTurns",
+          "label": "Turns the attacker stays Drenched",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "It protects my ally, not me, so it needs a living ally on the field (doubles)",
+        "It works only against a direct attack, not poison, weather or recoil",
+        "It can be used only once per battle",
+        "Water-type attackers and attackers that resist Drench are not Drenched, but the ally still survives",
+        "It is built into the game's damage handling and is not part of this block"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.mycelial-network",
+      "className": "MycelialNetworkAbAttr",
+      "label": "Heal from foes' Infestation damage and share the extra",
+      "summary": "When a foe loses HP to Infestation, I recover 50% of the HP it lost (rounded down). Healing I cannot use goes to my lowest-HP ally in doubles.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "mycelial network",
+        "infestation heal",
+        "drain from infestation",
+        "share healing with ally",
+        "leech from bugs",
+        "parasite heal",
+        "mushroom network"
+      ],
+      "examples": [
+        "When a foe is hurt by Infestation I heal half of that damage, and any extra heals my partner"
+      ],
+      "params": [
+        {
+          "id": "healShare",
+          "label": "Share of the lost HP I recover (0.5 = half)",
+          "control": "slider",
+          "default": 0.5,
+          "editable": true,
+          "min": 0.05,
+          "max": 1,
+          "step": 0.05
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "It reacts only to HP lost to Infestation, not to other trapping effects or damage",
+        "It does nothing when the Infestation damage is blocked (for example by Magic Guard)",
+        "Healing beyond my missing HP goes to the living ally with the lowest HP percent; in singles it is wasted",
+        "It is built into the game's Infestation damage and is not part of this block"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.omniform",
+      "className": "OmniformAbAttr",
+      "label": "Change form to match the type of the move I use",
+      "summary": "Before I use a move, I change into the form linked to that move's type; a Normal-type move returns me to my base form. A form without its own moves gets 3 from its learnset.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "omniform",
+        "adaptive evolution",
+        "eeveelution",
+        "form by move type",
+        "change form before attacking",
+        "type shifting",
+        "partner eevee"
+      ],
+      "examples": [
+        "Use a Fire move and turn into the Fire form first, a Normal move and go back to the base form",
+        "Shapeshift to match each attack like an eeveelution"
+      ],
+      "params": [
+        {
+          "id": "derivedMoveCount",
+          "label": "Moves a form without its own stored moves gets from its learnset (no form needs it today)",
+          "control": "number",
+          "default": 3,
+          "editable": true,
+          "min": 1,
+          "max": 4,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "showAbility",
+          "label": "Show the ability name when it triggers",
+          "control": "boolean",
+          "default": false,
+          "editable": false
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only a Pokemon whose species and form have a link for the move's type changes; the links are species data, not settings",
+        "A Normal-type move (by its printed type) always returns me to the base form, and does nothing when I am already there",
+        "A link to my own current form does nothing",
+        "My other moves are replaced by the new form's moves, and the move being used keeps its slot",
+        "Everything reverts when I leave the field, and the ability stays with me through the change",
+        "The form change happens in the game's move handling just before the move; on entry the ability only preloads the pictures of the forms",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "derivedMoveCount"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified. 14 attrs in 14 abilities: Omniform (5929 attr 0) and the partner composites Adaptive Fur (5946 attr 2), Water Veil (5947 attr 3), Short Circuit (5948 attr 1), Flash Fire (5949 attr 1), Magic Bounce (5950 attr 1), Self Sufficient (5951 attr 1), Keen Edge (5952 attr 1), Ice Body (5953 attr 3), Pixilate (5954 attr 4), Fluffy (6001 attr 2), Stamina (6002 attr 2), Stainless Steel (6003 attr 6) and the saved studio ability Blase Powder (20012 attr 1, whose Omniform attr is wrapped by the studio rule carrier and carries its own canApply and apply). None of the 14 has a constructor closure, so no binding is needed. The class has no condition or gate of its own and the trigger is separate, so nothing is hidden inside the package. It cannot be split because the library has none of the pieces: a moment 'before I use a move' that this class can hang on (event.before-i-use-move and event.my-move-starts exist, but they are dispatched by other attr classes and the form change is driven straight from MovePhase.start by constructor name), a table-driven form change (effect.change-form is not implemented and takes one fixed form key, not a per-type table), moveset replacement with per-form PP memory, the pinned ability and the revert on leaving; requested as R-B15-23 (effect 'change form by the type of the move I use, from a form table, with its own moves per form'). The only number is typed (derived move count). The registry of links is species data filled by er-newcomer-species.ts and is not a setting. Suspected oddities, NOT fixed: (1) the Normal revert tests the PRINTED type (move.type) while the form lookup uses the EFFECTIVE type (getMoveType), so a Normal move that an ability turns into Fire reverts instead of adapting; (2) the entry half (sprite preload) is cosmetic and is the only thing the class apply does, so the WHEN of the declaration is 'while active' and not 'on entry'; (3) Blase Powder is a studio-built ability whose Omniform attr is an instance carrying overridden canApply and apply and the ability name shown; the non-editable setting 'showAbility' (constructor argument 1, added behaviour-neutral with default false) carries that one difference so L1 finds the rebuilt attr structurally identical. The L2 twin of Blase Powder still differs (the rule's Rage Powder, Powder and Unaware parts are lost) because recomposeAttr rebuilds the studio rule carrier as a plain Omniform attr; that is a harness and build-attr matter for every class that is the hook of a saved studio rule, requested as R-B15-27; (4) DEAD CODE, found while testing the seam: the learnset pick (deriveMoveset, the only user of derivedMoveCount) runs only when isErOmniformMon is false, but a holder can only have a mapping when its family has more than one form, which is exactly what isErOmniformMon tests, so in the game every mapped holder uses the stored per-form moves and the derived move count never matters; it is kept as a typed setting because the code reads it, and proven by a test that forces the legacy path.",
+      "uses": 14
     },
     {
       "id": "block.post-damage-force-switch",
@@ -1479,6 +1860,222 @@
         "do": true
       },
       "uses": 7
+    },
+    {
+      "id": "block.post-turn-hurt-non-typed",
+      "className": "PostTurnHurtNonTypedAbAttr",
+      "label": "Hurt every foe a little at the end of each turn",
+      "summary": "At the end of every turn, each foe that is not of a spared type (Fire) loses 12.5% of its max HP. Magic Guard blocks it.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "chip damage",
+        "residual damage",
+        "flame coat",
+        "funeral pyre",
+        "trash heap",
+        "bad dreams",
+        "hurt non fire types",
+        "damage the field"
+      ],
+      "examples": [
+        "Every foe that is not Fire type loses 1/8 of its HP each turn",
+        "Foes take 1/8 damage each turn while it hails"
+      ],
+      "params": [
+        {
+          "id": "safeTypes",
+          "label": "Types that are spared (comma separated; a foe with any of them takes nothing; empty = none spared)",
+          "control": "text",
+          "default": "FIRE",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "damageFraction",
+          "label": "Damage each turn (share of max HP, 0.125 = 1/8)",
+          "control": "slider",
+          "default": 0.125,
+          "editable": true,
+          "min": 0.01,
+          "max": 1,
+          "step": 0.005,
+          "gateIndependent": true
+        },
+        {
+          "id": "requiredWeathers",
+          "label": "Weather that must be active (comma separated; empty = any weather)",
+          "control": "text",
+          "default": "",
+          "editable": false,
+          "options": [
+            "NONE",
+            "SUNNY",
+            "RAIN",
+            "SANDSTORM",
+            "HAIL",
+            "SNOW",
+            "FOG",
+            "HEAVY_RAIN",
+            "HARSH_SUN",
+            "STRONG_WINDS",
+            "TEMPEST_STORM",
+            "SNOWY_WRATH",
+            "EERIE_FOG"
+          ]
+        },
+        {
+          "id": "fieldWide",
+          "label": "Also hurt my own ally (every other Pokemon on the field)",
+          "control": "boolean",
+          "default": false,
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "poisonHealRecovers",
+          "label": "Targets with Poison Heal recover the amount instead of losing it",
+          "control": "boolean",
+          "default": false,
+          "editable": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "At least one living target on the field that is not of a spared type must exist; foes that switched out or fainted are skipped",
+        "Each target is checked on its own: Magic Guard and other blocks of indirect damage spare that target only",
+        "The damage is not an attack, so it does not set off abilities that react to being hit",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "damageFraction",
+          "safeTypes",
+          "fieldWide",
+          "poisonHealRecovers"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 7
+    },
+    {
+      "id": "block.pp-reduction-on-contact",
+      "className": "PpReductionOnContactAbAttr",
+      "label": "Take PP from the attacker's move when it touches me",
+      "summary": "When a move that makes contact hits me, the attacker's move loses 4 PP.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "spiteful",
+        "spite",
+        "drain pp",
+        "reduce pp",
+        "steal pp",
+        "pp loss on contact",
+        "punish the attacker's move"
+      ],
+      "examples": [
+        "Contact moves that hit me lose 4 PP and I get it back, like Spiteful"
+      ],
+      "params": [
+        {
+          "id": "reduction",
+          "label": "PP the attacker's move loses",
+          "control": "number",
+          "default": 4,
+          "editable": true,
+          "min": 1,
+          "max": 20,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "contactRequired",
+          "label": "Only when the move makes contact",
+          "control": "boolean",
+          "default": true,
+          "editable": false
+        },
+        {
+          "id": "refundHolder",
+          "label": "Give the taken PP back to one of my used-up moves",
+          "control": "boolean",
+          "default": false,
+          "editable": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must have connected: a miss, a block or an immunity does nothing",
+        "The attacker's move list must still contain the move that was used; a move that was called or locked in is left alone",
+        "The PP taken is limited to what the move still has",
+        "When the PP is given back, one of my moves that has used PP is picked at random",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "reduction",
+          "refundHolder"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.rapier-flag-injection",
