@@ -88,3 +88,73 @@ bindLegacyClosure(
 // PorousPowerAbAttr (attr 3), gate = clause 1 of the original closure: `holder.getMoveType(move) === GROUND`.
 // Clause 2 (a charge is stored) is the class's `residual`, see its declaration.
 bindCondition(5974, 3, { id: "move.type", type: "GROUND" }, "gate");
+
+// ---------------------------------------------------------------------------------------------
+// Chunk 2: Glam Rock (5975), Two-Faced Unleashed (5977), Anneal (5979), Vapor Body (5981), Heavyweight (5982) and
+// Meteor Mass (5997). Anneal's reset (attr 0), Sediment Bloom (5976) and the Heavyweight constructor arguments have
+// no condition to bind.
+// ---------------------------------------------------------------------------------------------
+
+// GlamRockAbAttr (Glam Rock attr 1), gate: any of the eight hazards is on the holder's own side, listed in the class's
+// own HAZARDS order: HAZARDS.some(tag => !!arena.getTagOnSide(tag, ownSide(holder))).
+bindCondition(
+  5975,
+  1,
+  {
+    any: [
+      { id: "field.arena-tag", tag: "SPIKES", side: "holder-side" },
+      { id: "field.arena-tag", tag: "TOXIC_SPIKES", side: "holder-side" },
+      { id: "field.arena-tag", tag: "STEALTH_ROCK", side: "holder-side" },
+      { id: "field.arena-tag", tag: "STICKY_WEB", side: "holder-side" },
+      { id: "field.arena-tag", tag: "HOT_COALS", side: "holder-side" },
+      { id: "field.arena-tag", tag: "FOAMY_WEB", side: "holder-side" },
+      { id: "field.arena-tag", tag: "CREEPING_THORNS", side: "holder-side" },
+      { id: "field.arena-tag", tag: "ER_INFESTATION_TRAP", side: "holder-side" },
+    ],
+  },
+  "gate",
+);
+
+// TwoFacedPowerAbAttr (Two-Faced Unleashed attr 0), gate = clause 1 of the original closure: `move.category !== STATUS`.
+// Clause 2 (my other face is out this turn) is the class's `residual`, see its declaration.
+bindCondition(5977, 0, { id: "move.damaging" }, "gate");
+
+// AnnealAbAttr (Anneal attr 1), gate = clauses 3 and 4 of canApply, in order:
+//   holder.getMoveEffectiveness(foe, move) <= 0.5 && holder.getMoveEffectiveness(foe, move) > 0
+// Clauses 1 and 2 (damage > 0, hitResult < NO_EFFECT) are the class's `guards`, clauses 5 and 6 (the raise counter and
+// the once-per-foe-move memory) its `residual`; see its declaration.
+bindCondition(
+  5979,
+  1,
+  {
+    all: [
+      { id: "move.effectiveness", cmp: "lte", n: 0.5 },
+      { id: "move.effectiveness", cmp: "gt", n: 0 },
+    ],
+  },
+  "gate",
+);
+
+// VaporBodyAccuracyAbAttr (Vapor Body attr 0), ctor:0 = the class's own default closure
+//   (holder, attacker, move) => move.doesFlagEffectApply({ MAKES_CONTACT, user: attacker, target: holder }).
+bindCondition(5981, 0, { id: "move.flag", flag: "MAKES_CONTACT" }, "ctor:0");
+
+// HeavyweightPowerAbAttr (Heavyweight attr 0, Meteor Mass attr 1), gate = the original closure `isHeavyweightMove(move)`:
+//   move.id === HEAVY_SLAM || move.id === HEAT_CRASH || move.hasFlag(PUNCHING_MOVE)
+const HEAVYWEIGHT_MOVE = {
+  any: [
+    { id: "move.is-move", moveId: "HEAVY_SLAM" },
+    { id: "move.is-move", moveId: "HEAT_CRASH" },
+    { id: "move.flag", flag: "PUNCHING_MOVE" },
+  ],
+};
+bindCondition(5982, 0, HEAVYWEIGHT_MOVE, "gate");
+bindCondition(5997, 1, HEAVYWEIGHT_MOVE, "gate");
+
+// HeavyweightDropAbAttr (Heavyweight attr 1), ctor:0 = the base class's default attack condition `move.category !== STATUS`.
+bindCondition(5982, 1, { id: "move.damaging" }, "ctor:0");
+
+// HeavyweightDropAbAttr (Heavyweight attr 1), gate = clause 3 of canApply (the heavyweight move test, as above).
+// Clauses 1 and 2 (the base attack condition, damage > 0) are the class's `guards`, clause 4 (not yet used this turn)
+// its `residual`.
+bindCondition(5982, 1, HEAVYWEIGHT_MOVE, "gate");

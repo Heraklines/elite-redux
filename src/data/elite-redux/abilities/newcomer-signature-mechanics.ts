@@ -498,18 +498,56 @@ export class AnnealResetAbAttr extends PostSummonAbAttr {
     ANNEAL.set(pokemon, { gained: 0, lastMoveRecord: undefined });
   }
 }
-export class AnnealAbAttr extends PostDefendAbAttr {
-  override canApply({ pokemon, opponent, move, damage, hitResult }: PostMoveInteractionAbAttrParams): boolean {
+/** How many stat raises this Pokemon has gained since it came in (Anneal's private counter). */
+export function annealGainedCount(pokemon: Pokemon): number {
+  return ANNEAL.get(pokemon)?.gained ?? 0;
+}
+
+export class AnnealAbAttr extends PostDefendAbAttr implements GatedAttr<PostMoveInteractionAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** The most raises I can gain per switch-in (ability studio param; the default is the original 2). */
+  public readonly maxTriggers: number;
+  /** Stages gained per raise (ability studio param; the default is the original 1). */
+  public readonly stages: number;
+  /** The stat raised after a physical move (ability studio param; the default is the original Defense). */
+  public readonly physicalStat: BattleStat;
+  /** The stat raised after any other damaging move (ability studio param; the default is the original Sp. Def). */
+  public readonly specialStat: BattleStat;
+
+  constructor(maxTriggers = 2, stages = 1, physicalStat: BattleStat = Stat.DEF, specialStat: BattleStat = Stat.SPDEF) {
+    super();
+    this.maxTriggers = maxTriggers;
+    this.stages = stages;
+    this.physicalStat = physicalStat;
+    this.specialStat = specialStat;
+  }
+
+  /**
+   * Tier B (ability studio spec 3.1), original clause order: `guards` (the hit really damaged me and was not blocked),
+   * `gate` (the move was resisted but not immune: the two effectiveness clauses, library conditions) and `residual`
+   * (my raise counter is below the cap and this is a move not counted yet: private memory). All clauses are pure.
+   */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  public guards({ damage, hitResult }: PostMoveInteractionAbAttrParams): boolean {
+    return damage > 0 && hitResult < HitResult.NO_EFFECT;
+  }
+
+  public gate({ pokemon, opponent, move }: PostMoveInteractionAbAttrParams): boolean {
+    return pokemon.getMoveEffectiveness(opponent, move) <= 0.5 && pokemon.getMoveEffectiveness(opponent, move) > 0;
+  }
+
+  public residual({ pokemon, opponent }: PostMoveInteractionAbAttrParams): boolean {
     const state = ANNEAL.get(pokemon) ?? { gained: 0, lastMoveRecord: undefined };
     return (
-      damage > 0
-      && hitResult < HitResult.NO_EFFECT
-      && pokemon.getMoveEffectiveness(opponent, move) <= 0.5
-      && pokemon.getMoveEffectiveness(opponent, move) > 0
-      && state.gained < 2
-      && state.lastMoveRecord !== (opponent.getLastXMoves(1)[0] as object | undefined)
+      state.gained < this.maxTriggers && state.lastMoveRecord !== (opponent.getLastXMoves(1)[0] as object | undefined)
     );
   }
+
   override apply({ pokemon, opponent, move, simulated }: PostMoveInteractionAbAttrParams): void {
     const state = ANNEAL.get(pokemon) ?? { gained: 0, lastMoveRecord: undefined };
     state.lastMoveRecord = opponent.getLastXMoves(1)[0] as object | undefined;
@@ -520,14 +558,29 @@ export class AnnealAbAttr extends PostDefendAbAttr {
         "StatStageChangePhase",
         pokemon.getBattlerIndex(),
         true,
-        [move.category === MoveCategory.PHYSICAL ? Stat.DEF : Stat.SPDEF],
-        1,
+        [move.category === MoveCategory.PHYSICAL ? this.physicalStat : this.specialStat],
+        this.stages,
       );
     }
   }
 }
 
 export class VaporBodyAccuracyAbAttr extends AbAttr {
+  /** Which incoming moves are slowed: (holder, attacker, move). Default: the move makes contact. */
+  public readonly condition: (holder: Pokemon, attacker: Pokemon, move: Move) => boolean;
+  /** Accuracy multiplier for those moves (ability studio param; the default is the original 0.7). */
+  public readonly accuracyMultiplier: number;
+
+  constructor(
+    condition: (holder: Pokemon, attacker: Pokemon, move: Move) => boolean = (holder, attacker, move) =>
+      move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: holder }),
+    accuracyMultiplier = 0.7,
+  ) {
+    super();
+    this.condition = condition;
+    this.accuracyMultiplier = accuracyMultiplier;
+  }
+
   override apply(): void {}
 }
 
@@ -545,31 +598,101 @@ function weightClass(weight: number): number {
 function isHeavyweightMove(move: Move): boolean {
   return move.id === MoveId.HEAVY_SLAM || move.id === MoveId.HEAT_CRASH || move.hasFlag(MoveFlags.PUNCHING_MOVE);
 }
-function heavyweightMultiplier(user: Pokemon, target: Pokemon): number {
-  return 1 + Math.min(5, Math.max(0, weightClass(user.getWeight()) - weightClass(target.getWeight()))) * 0.1;
+function heavyweightMultiplier(user: Pokemon, target: Pokemon, percentPerClass = 10, maxClasses = 5): number {
+  return (
+    1
+    + Math.min(maxClasses, Math.max(0, weightClass(user.getWeight()) - weightClass(target.getWeight())))
+      * (percentPerClass / 100)
+  );
 }
-export class HeavyweightPowerAbAttr extends MovePowerBoostAbAttr {
-  constructor() {
+export class HeavyweightPowerAbAttr
+  extends MovePowerBoostAbAttr
+  implements GatedAttr<PreAttackModifyPowerAbAttrParams>
+{
+  /** Extra power per weight class above the target, in percent (ability studio param; the default is the original 10). */
+  public readonly percentPerClass: number;
+  /** The most weight classes that count (ability studio param; the default is the original 5). */
+  public readonly maxClasses: number;
+
+  constructor(percentPerClass = 10, maxClasses = 5) {
     super((_user, _target, move) => isHeavyweightMove(move), 1);
+    this.percentPerClass = percentPerClass;
+    this.maxClasses = maxClasses;
   }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreAttackModifyPowerAbAttrParams) => boolean) | undefined;
+
+  /** Tier B (ability studio spec 3.1): the one clause of the original closure lives in `gate`; there is no residual. */
+  override canApply(params: PreAttackModifyPowerAbAttrParams): boolean {
+    return gatedCanApply<PreAttackModifyPowerAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: Heavy Slam, Heat Crash or a punching move. */
+  public gate({ move }: PreAttackModifyPowerAbAttrParams): boolean {
+    return isHeavyweightMove(move);
+  }
+
   override apply({ pokemon, opponent, power }: PreAttackModifyPowerAbAttrParams): void {
-    power.value *= heavyweightMultiplier(pokemon, opponent);
+    power.value *= heavyweightMultiplier(pokemon, opponent, this.percentPerClass, this.maxClasses);
   }
 }
 const HEAVYWEIGHT_DROP_TURN = new WeakMap<Pokemon, string>();
-export class HeavyweightDropAbAttr extends PostAttackAbAttr {
-  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    return (
-      super.canApply(params)
-      && params.damage > 0
-      && isHeavyweightMove(params.move)
-      && HEAVYWEIGHT_DROP_TURN.get(params.pokemon) !== turnKey()
-    );
+export class HeavyweightDropAbAttr extends PostAttackAbAttr implements GatedAttr<PostMoveInteractionAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** The stat lowered on the target (ability studio param; the default is the original Defense). */
+  public readonly dropStat: BattleStat;
+  /** The stage change (ability studio param; the default is the original -1). */
+  public readonly dropStages: number;
+
+  /**
+   * The first two arguments are the base class's (attack condition, show ability); both stay `undefined` for every
+   * shipped user so the base defaults apply, exactly as when this class had no constructor.
+   */
+  constructor(
+    attackCondition?: ConstructorParameters<typeof PostAttackAbAttr>[0],
+    showAbility?: boolean,
+    dropStat: BattleStat = Stat.DEF,
+    dropStages = -1,
+  ) {
+    super(attackCondition, showAbility);
+    this.dropStat = dropStat;
+    this.dropStages = dropStages;
   }
+
+  /**
+   * Tier B (ability studio spec 3.1), original clause order: `guards` = the base attack condition (a library condition
+   * through the "ctor:0" binding) and "damage was dealt", `gate` = the move is a heavyweight move (library
+   * conditions), `residual` = not yet used this turn (private memory). All clauses are pure.
+   */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    return super.canApply(params) && params.damage > 0;
+  }
+
+  public gate({ move }: PostMoveInteractionAbAttrParams): boolean {
+    return isHeavyweightMove(move);
+  }
+
+  public residual({ pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    return HEAVYWEIGHT_DROP_TURN.get(pokemon) !== turnKey();
+  }
+
   override apply({ pokemon, opponent, simulated }: PostMoveInteractionAbAttrParams): void {
     HEAVYWEIGHT_DROP_TURN.set(pokemon, turnKey());
     if (!simulated) {
-      globalScene.phaseManager.unshiftNew("StatStageChangePhase", opponent.getBattlerIndex(), false, [Stat.DEF], -1);
+      globalScene.phaseManager.unshiftNew(
+        "StatStageChangePhase",
+        opponent.getBattlerIndex(),
+        false,
+        [this.dropStat],
+        this.dropStages,
+      );
     }
   }
 }
@@ -577,10 +700,31 @@ export class HeavyweightDropAbAttr extends PostAttackAbAttr {
 // ---------------------------------------------------------------------------
 // Glam Rock and Sediment Bloom
 
-export class GlamRockAbAttr extends PostTurnAbAttr {
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+export class GlamRockAbAttr extends PostTurnAbAttr implements GatedAttr<AbAttrBaseParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** Layers removed from the hazard each turn (ability studio param; the default is the original 1). */
+  public readonly layersRemoved: number;
+  /** Stages gained by Defense and Sp. Def (ability studio param; the default is the original 1). */
+  public readonly stages: number;
+
+  constructor(layersRemoved = 1, stages = 1) {
+    super();
+    this.layersRemoved = layersRemoved;
+    this.stages = stages;
+  }
+
+  /** Tier B (ability studio spec 3.1): the one clause of the rule lives in `gate`; there is no residual. */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The replaceable condition: at least one entry hazard is on my side of the field. */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     return HAZARDS.some(tag => !!globalScene.arena.getTagOnSide(tag, ownSide(pokemon)));
   }
+
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
     if (simulated) {
       return;
@@ -590,8 +734,8 @@ export class GlamRockAbAttr extends PostTurnAbAttr {
       return;
     }
     const tag = globalScene.arena.getTagOnSide(type, ownSide(pokemon)) as { layers?: number } | undefined;
-    if (tag && (tag.layers ?? 1) > 1) {
-      (tag as { layers: number }).layers--;
+    if (tag && (tag.layers ?? 1) > this.layersRemoved) {
+      (tag as { layers: number }).layers -= this.layersRemoved;
     } else {
       globalScene.arena.removeTagOnSide(type, ownSide(pokemon));
     }
@@ -602,7 +746,7 @@ export class GlamRockAbAttr extends PostTurnAbAttr {
       pokemon.getBattlerIndex(),
       true,
       [Stat.DEF, Stat.SPDEF],
-      1,
+      this.stages,
     );
   }
 }
@@ -617,6 +761,14 @@ export function notifyHazardRemovedBy(pokemon: Pokemon): void {
   globalScene.phaseManager.queueMessage(`${pokemon.getNameToRender()} planted a Sediment Bloom!`);
 }
 export class SedimentBloomMarkerAbAttr extends AbAttr {
+  /** The share of max HP drained each turn is 1/this (ability studio param; the default is the original 16). */
+  public readonly drainDivisor: number;
+
+  constructor(drainDivisor = 16) {
+    super();
+    this.drainDivisor = drainDivisor;
+  }
+
   override apply(): void {}
 }
 export function processSedimentBlooms(): void {
@@ -626,10 +778,15 @@ export function processSedimentBlooms(): void {
       continue;
     }
     const source = globalScene.getPokemonById(bloom.sourceId);
+    // The planter's own Sediment Bloom attr says how much it drains; without one the original 1/16 applies.
+    const planterAttr = source
+      ?.getAllActiveAbilityAttrs()
+      .find(attr => attr?.constructor?.name === "SedimentBloomMarkerAbAttr") as SedimentBloomMarkerAbAttr | undefined;
+    const drainDivisor = planterAttr?.drainDivisor ?? 16;
     let drained = 0;
     const foes = side === ArenaTagSide.PLAYER ? globalScene.getPlayerField() : globalScene.getEnemyField();
     for (const foe of foes.filter(mon => mon.isActive(true))) {
-      const amount = Math.max(1, Math.floor(foe.getMaxHp() / 16));
+      const amount = Math.max(1, Math.floor(foe.getMaxHp() / drainDivisor));
       drained += foe.damageAndUpdate(
         amount,
         source ? { result: HitResult.INDIRECT, source } : { result: HitResult.INDIRECT },
@@ -660,18 +817,62 @@ function twoFacedReady(pokemon: Pokemon): boolean {
   const [priorWave, priorTurn] = prior.split(":").map(Number);
   return wave !== priorWave || turn > priorTurn + 1;
 }
-export class TwoFacedPowerAbAttr extends MovePowerBoostAbAttr {
-  constructor() {
-    super(
-      (pokemon, _target, move) =>
-        move.category !== MoveCategory.STATUS && TWO_FACED_ACTIVE_TURN.get(pokemon) === turnKey(),
-      1,
-    );
+/** The move deals damage (is not a status move). */
+function twoFacedIsDamagingMove(move: Move): boolean {
+  return move.category !== MoveCategory.STATUS;
+}
+
+/** The other face is out this turn (set by prepareTwoFacedMove, cleared by finishTwoFacedMove). */
+function twoFacedIsUnleashed(pokemon: Pokemon): boolean {
+  return TWO_FACED_ACTIVE_TURN.get(pokemon) === turnKey();
+}
+
+export class TwoFacedPowerAbAttr extends MovePowerBoostAbAttr implements GatedAttr<PreAttackModifyPowerAbAttrParams> {
+  /** Power multiplier of an unleashed move (ability studio param; the default is the original 1.5). */
+  public readonly unleashedMultiplier: number;
+  /** Extra multiplier for the two favoured move types (ability studio param; the default is the original 1.4). */
+  public readonly typeBonusMultiplier: number;
+  /** First favoured move type (ability studio param; the default is the original Electric). */
+  public readonly bonusTypeA: PokemonType;
+  /** Second favoured move type (ability studio param; the default is the original Dark). */
+  public readonly bonusTypeB: PokemonType;
+
+  constructor(
+    unleashedMultiplier = 1.5,
+    typeBonusMultiplier = 1.4,
+    bonusTypeA: PokemonType = PokemonType.ELECTRIC,
+    bonusTypeB: PokemonType = PokemonType.DARK,
+  ) {
+    super((pokemon, _target, move) => twoFacedIsDamagingMove(move) && twoFacedIsUnleashed(pokemon), 1);
+    this.unleashedMultiplier = unleashedMultiplier;
+    this.typeBonusMultiplier = typeBonusMultiplier;
+    this.bonusTypeA = bonusTypeA;
+    this.bonusTypeB = bonusTypeB;
   }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreAttackModifyPowerAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B (ability studio spec 3.1), original clause order: `gate` is "the move deals damage" (a library condition),
+   * `residual` is "my other face is out this turn" (private memory, no library condition yet), which stays second.
+   */
+  override canApply(params: PreAttackModifyPowerAbAttrParams): boolean {
+    return gatedCanApply<PreAttackModifyPowerAbAttrParams>(this, params);
+  }
+
+  public gate({ move }: PreAttackModifyPowerAbAttrParams): boolean {
+    return twoFacedIsDamagingMove(move);
+  }
+
+  public residual({ pokemon }: PreAttackModifyPowerAbAttrParams): boolean {
+    return twoFacedIsUnleashed(pokemon);
+  }
+
   override apply({ pokemon, move, power }: PreAttackModifyPowerAbAttrParams): void {
-    power.value *= 1.5;
-    if ([PokemonType.ELECTRIC, PokemonType.DARK].includes(pokemon.getMoveType(move))) {
-      power.value *= 1.4;
+    power.value *= this.unleashedMultiplier;
+    if ([this.bonusTypeA, this.bonusTypeB].includes(pokemon.getMoveType(move))) {
+      power.value *= this.typeBonusMultiplier;
     }
   }
 }
@@ -1310,12 +1511,14 @@ export function applySuperegoAfterBoost(boosted: Pokemon, stat: BattleStat, canB
 }
 
 export function applyVaporBodyAccuracy(user: Pokemon, target: Pokemon, move: Move, accuracy: NumberHolder): void {
-  if (
-    accuracy.value > 0
-    && hasAttr(target, "VaporBodyAccuracyAbAttr")
-    && move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user, target })
-  ) {
-    accuracy.value *= 0.7;
+  if (accuracy.value <= 0) {
+    return;
+  }
+  const vaporBody = target
+    .getAllActiveAbilityAttrs()
+    .find(attr => attr?.constructor?.name === "VaporBodyAccuracyAbAttr") as VaporBodyAccuracyAbAttr | undefined;
+  if (vaporBody?.condition(target, user, move)) {
+    accuracy.value *= vaporBody.accuracyMultiplier;
   }
 }
 

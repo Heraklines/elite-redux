@@ -34,7 +34,7 @@ export default defineDecl(FinalSeasonEntryAbAttr, {
   when: "event.on-entry",
   label: "Make foes move last when I switch in on purpose",
   summary: params =>
-    `When I switch in on purpose, every foe gets the effect "${params.tag}" for ${params.turns} turns (by default it moves after everyone else in its priority group), and my end-of-turn weather effect is made ready.`,
+    `When I switch in on purpose, every foe gets the effect "${params.tag}" for ${params.turns} turns (it moves last in its priority group), and my end-of-turn weather effect is made ready.`,
   synonyms: ["quash", "move last", "slow the foes", "delay the opponent", "switch in debuff", "final season"],
   examples: ["Foes move last for 2 turns when I am switched in by choice"],
   params: [
