@@ -64,7 +64,7 @@ export default defineDecl(IrradiatedFistAbAttr, {
   feasibility: [
     "The hit must really have dealt damage (more than 0)",
     "The foe must be able to be badly poisoned (it has no status and nothing blocks it); this is asked after the chance roll",
-    "The curse (stat boosts wiped and locked once the poison is gone) is only put on the foe if the poisoning really landed",
+    "The mark (stat boosts wiped and locked once the poison is gone) is only put on the foe if the poisoning really landed",
     "Nothing happens while the game only previews a hit",
   ],
   branches: [
