@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "0210c37e7c01a5",
-  "hash": "077b6fe3bfbabc",
+  "hash": "13945fa01b33e1",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -3610,6 +3610,240 @@
         "if": false,
         "do": true
       },
+      "uses": 1
+    },
+    {
+      "id": "block.world-in-pieces-remove-type",
+      "className": "WorldInPiecesRemoveTypeAbAttr",
+      "label": "Lose a random type after a hit (World in Pieces)",
+      "summary": "After the first damaging hit I take each turn, I lose one random type, but never my Normal type. Example: a six-type Pokemon drops to five after the first hit.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "world in pieces",
+        "lose a type",
+        "strip a type",
+        "type loss when hit",
+        "shed a type",
+        "break apart when hit",
+        "remove my type"
+      ],
+      "examples": [
+        "The first hit each turn strips one of my types at random, but I always keep Normal, like World in Pieces",
+        "Lose a random type when I take damage"
+      ],
+      "params": [
+        {
+          "id": "protectedType",
+          "label": "Type that can never be lost",
+          "control": "select",
+          "default": "NORMAL",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.damaging",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must have dealt damage and must not be blocked or have no effect (an immune or missing hit does nothing)",
+        "It happens only once per turn: after one type is lost, further hits that turn do nothing",
+        "I must still have at least one type that is not the protected one",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "protectedType"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B, package effect with a separate trigger, a bound gate and a typed param. 1 attr in 1 ability: World in Pieces (5917 attr 1). The gate binding is move.damaging (the same `move.category !== STATUS` test). The guards (damage above 0, hit not NO_EFFECT or IMMUNE, own once-per-turn memory free) have no registry id and are listed as feasibility: requested as R-B15-47. The residual and the effect are the class code. Constructor change (behaviour neutral, spec 3.1 spirit): the new argument protectedType defaults to NORMAL, the old literal; removableTypes() takes it as a parameter. The lost-types memory and the 'lose a random type' effect are requested as R-B15-46. Suspected oddities, NOT fixed: (1) the once-per-turn key is waveIndex:turn stored in a WeakMap on the Pokemon, never cleared on leave-field, so it only matters until the next summon (the summon half deletes it); (2) the message uses the lowercase enum name and is hard-coded English; (3) the draw is made after the memory write, so a holder that applies at all always spends one draw per hit that applies.",
+      "uses": 1
+    },
+    {
+      "id": "block.world-in-pieces-restore",
+      "className": "WorldInPiecesRestoreAbAttr",
+      "label": "Win back one lost type after a knockout (World in Pieces)",
+      "summary": "When I knock out a foe, one random type I lost comes back. Example: with three types lost, a knockout leaves me with two missing.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-win",
+      "whenLabel": "When I win the fight",
+      "synonyms": [
+        "world in pieces",
+        "regain a type",
+        "restore a lost type",
+        "get a type back on knockout",
+        "heal my typing",
+        "reclaim a type"
+      ],
+      "examples": [
+        "Every knockout gives back one of my lost types, like World in Pieces"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "I must have lost at least one type with this ability, otherwise nothing happens",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified (see the header). 1 attr in 1 ability: World in Pieces (5917 attr 3). No closure, so no binding. Constructor and showAbility untouched. The only clause of canApply (a type is missing) is feasibility, not a replaceable condition; a library atom 'I have lost at least {n} types' would let it be shown as a condition and is requested as part of R-B15-46. Suspected oddities, NOT fixed: (1) apply repeats the 'nothing lost' test that canApply already made (harmless, same answer); (2) the message is hard-coded English with the lowercase enum name.",
+      "uses": 1
+    },
+    {
+      "id": "block.world-in-pieces-speed",
+      "className": "WorldInPiecesSpeedAbAttr",
+      "label": "Raise a stat for every type I have lost (World in Pieces)",
+      "summary": "While my Speed is calculated, it is multiplied by 1 + 0.2 for every type I have lost. Example: 0.2 and three lost types = x1.6 Speed.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "world in pieces",
+        "speed per lost type",
+        "stat boost per missing type",
+        "faster the more I lose",
+        "scale with lost types",
+        "speed up as I break apart"
+      ],
+      "examples": [
+        "+20% Speed for every type I have lost, like World in Pieces"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat grows",
+          "control": "select",
+          "default": "SPD",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ]
+        },
+        {
+          "id": "bonusPerMissingType",
+          "label": "Bonus for each lost type (0.2 = +20% of the stat)",
+          "control": "slider",
+          "default": 0.2,
+          "editable": true,
+          "min": 0.01,
+          "max": 1,
+          "step": 0.01
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The bonus only counts types I have lost with this ability's own memory; with none lost the stat is unchanged",
+        "Only the chosen stat is changed; every other stat calculation is left alone"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "stat",
+          "bonusPerMissingType"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified (see the header). 1 attr in 1 ability: World in Pieces (5917 attr 2). No closure, so no binding. The stat check of canApply is the effect's own setting (param stat), so conditions stays empty: a staff-made rule adds IFs on top of it. Constructor change (behaviour neutral): stat and bonusPerMissingType default to Speed and 0.2 (WORLD_IN_PIECES_SPEED_PER_MISSING); the inherited multiplier stays 1 and is unused. The stat enum has no ACC/EVA in the multiplier dispatch in practice, but the select lists the same STAT_OPTIONS as every stat param. Requested: R-B15-46, R-B15-48, plus the stat condition R-B15-28. Suspected oddity, NOT fixed: the base class StatMultiplierAbAttr declares its own private condition and multiplier; this subclass overrides both canApply and apply and so ignores them, which is why the declaration lists no multiplier param.",
+      "uses": 1
+    },
+    {
+      "id": "block.world-in-pieces-summon",
+      "className": "WorldInPiecesSummonAbAttr",
+      "label": "Start over with all my types when I enter (World in Pieces)",
+      "summary": "When I enter the battle, I forget every type I lost, so I start whole again. Example: after switching back in, I have all my types and no Speed bonus.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "world in pieces",
+        "reset my lost types",
+        "start whole again",
+        "forget what I lost",
+        "restore on switch in",
+        "fresh start on entry"
+      ],
+      "examples": [
+        "Every time I switch in I start with all my types again, like World in Pieces"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "It does nothing in a preview",
+        "The memory it clears belongs to the three other halves of the same ability (lose a type, Speed bonus, win a type back)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified (see the header). 1 attr in 1 ability: World in Pieces (5917 attr 0). No closure, so no binding. The class itself is stateless: the state lives in the module WeakMaps WORLD_IN_PIECES_STATE and WORLD_IN_PIECES_REMOVED_THIS_TURN, keyed by the Pokemon object, so a rebuilt attr shares the very same memory with the original siblings. Requested: R-B15-46 (the lost-types memory as a library memory plus effects). Suspected oddity, NOT fixed: the memory is only cleared on summon (the ability has no leave-field reset), so a holder whose ability is swapped away mid-battle keeps its stripped types for as long as it stays out.",
       "uses": 1
     }
   ]

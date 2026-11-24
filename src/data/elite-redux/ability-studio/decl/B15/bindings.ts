@@ -205,3 +205,12 @@ bindCondition(
   { all: [{ id: "move.damaging" }, { id: "move.category", category: "PHYSICAL" }] },
   "gate",
 );
+
+// =============================================================================================
+// B15 chunk 6. Tier B gate (slot "gate"), keyed by (abilityId, attrIndex). The other three classes of this chunk (the entry reset, the Speed bonus, the win-back) have no closure.
+// =============================================================================================
+
+// WorldInPiecesRemoveTypeAbAttr, gate: the ORIGINAL first half of clause 1, `move.category === STATUS` (returns false), i.e. the move deals damage -> move.damaging
+// (the same `move.category !== MoveCategory.STATUS` test). The other half of clause 1 (damage <= 0), the immune-hit test and the once-per-turn memory are guards() in the class
+// (pure reads, run first); "at least one removable type" is the residual.
+bindCondition(5917, 1, { id: "move.damaging" }, "gate"); // World in Pieces, lose a type after a damaging hit

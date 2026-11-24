@@ -39,10 +39,11 @@ import {
   type StatMultiplierAbAttrParams,
 } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { HitResult } from "#enums/hit-result";
 import { MoveCategory } from "#enums/move-category";
 import { PokemonType } from "#enums/pokemon-type";
-import { Stat } from "#enums/stat";
+import { type BattleStat, Stat } from "#enums/stat";
 import type { Pokemon } from "#field/pokemon";
 import type { AbAttrBaseParams } from "#types/ability-types";
 
@@ -86,12 +87,12 @@ function syncTypes(pokemon: Pokemon, state: WorldInPiecesState): void {
   pokemon.summonData.types = state.original.filter(t => !state.removed.has(t));
 }
 
-/** The holder's currently-attached NON-Normal types (candidates for stripping). */
-function removableTypes(pokemon: Pokemon): PokemonType[] {
+/** The holder's currently-attached types other than the protected one (candidates for stripping). */
+function removableTypes(pokemon: Pokemon, protectedType: PokemonType): PokemonType[] {
   const state = WORLD_IN_PIECES_STATE.get(pokemon);
   const base = state?.original ?? pokemon.getTypes();
   const removed = state?.removed;
-  return base.filter(t => t !== PokemonType.NORMAL && !(removed?.has(t) ?? false));
+  return base.filter(t => t !== protectedType && !(removed?.has(t) ?? false));
 }
 
 /** Number of the holder's types currently removed. */
@@ -115,20 +116,49 @@ export class WorldInPiecesSummonAbAttr extends PostSummonAbAttr {
 }
 
 /** PostDefend half: remove one seeded-random non-Normal type after the first direct hit each turn. */
-export class WorldInPiecesRemoveTypeAbAttr extends PostDefendAbAttr {
-  override canApply({ pokemon, move, damage, hitResult }: PostMoveInteractionAbAttrParams): boolean {
-    if (move.category === MoveCategory.STATUS || damage <= 0) {
+export class WorldInPiecesRemoveTypeAbAttr
+  extends PostDefendAbAttr
+  implements GatedAttr<PostMoveInteractionAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /**
+   * @param protectedType - The one type that can never be removed (default Normal).
+   */
+  constructor(public readonly protectedType: PokemonType = PokemonType.NORMAL) {
+    super();
+  }
+
+  /** Tier B (ability studio spec 3.1): `canApply` is `guards && gate && residual`. */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /**
+   * Safety rules (all pure, so their order against the gate cannot change the answer): the hit must have dealt damage
+   * and must not be a no-effect or immune result, and the ability's own once-per-turn memory must be free.
+   * Original order was: category/damage, hit result, once per turn, removable type.
+   */
+  public guards({ pokemon, damage, hitResult }: PostMoveInteractionAbAttrParams): boolean {
+    if (damage <= 0) {
       return false;
     }
     // Only "real" damaging hits (exclude no-effect/immune).
     if (hitResult === HitResult.NO_EFFECT || hitResult === HitResult.IMMUNE) {
       return false;
     }
-    if (WORLD_IN_PIECES_REMOVED_THIS_TURN.get(pokemon) === turnKey()) {
-      return false;
-    }
-    // At least one removable (non-Normal) type currently attached.
-    return removableTypes(pokemon).length > 0;
+    return WORLD_IN_PIECES_REMOVED_THIS_TURN.get(pokemon) !== turnKey();
+  }
+
+  /** The replaceable condition: the move is not a status move (the original `move.category === STATUS` test). */
+  public gate({ move }: PostMoveInteractionAbAttrParams): boolean {
+    return move.category !== MoveCategory.STATUS;
+  }
+
+  /** What stays in the class: at least one removable (not the protected type) type is still attached. */
+  public residual({ pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    return removableTypes(pokemon, this.protectedType).length > 0;
   }
 
   override apply({ pokemon, simulated }: PostMoveInteractionAbAttrParams): void {
@@ -140,7 +170,7 @@ export class WorldInPiecesRemoveTypeAbAttr extends PostDefendAbAttr {
     if (!state.original) {
       state.original = [...pokemon.getTypes()];
     }
-    const removable = state.original.filter(t => t !== PokemonType.NORMAL && !state.removed.has(t));
+    const removable = state.original.filter(t => t !== this.protectedType && !state.removed.has(t));
     if (removable.length === 0) {
       return;
     }
@@ -156,17 +186,24 @@ export class WorldInPiecesRemoveTypeAbAttr extends PostDefendAbAttr {
 
 /** StatMultiplier half: +20% Speed per missing type. */
 export class WorldInPiecesSpeedAbAttr extends StatMultiplierAbAttr {
-  constructor() {
-    super(Stat.SPD, 1);
+  /**
+   * @param stat - The stat that grows with each missing type (default Speed).
+   * @param bonusPerMissingType - Extra share of the stat per missing type, additive (default 0.2 = +20%).
+   */
+  constructor(
+    stat: BattleStat = Stat.SPD,
+    public readonly bonusPerMissingType: number = WORLD_IN_PIECES_SPEED_PER_MISSING,
+  ) {
+    super(stat, 1);
   }
 
   override canApply({ stat }: StatMultiplierAbAttrParams): boolean {
-    return stat === Stat.SPD;
+    return stat === this.stat;
   }
 
   override apply(params: StatMultiplierAbAttrParams): void {
     const missing = worldInPiecesMissingCount(params.pokemon);
-    params.statVal.value *= 1 + WORLD_IN_PIECES_SPEED_PER_MISSING * missing;
+    params.statVal.value *= 1 + this.bonusPerMissingType * missing;
   }
 }
 
