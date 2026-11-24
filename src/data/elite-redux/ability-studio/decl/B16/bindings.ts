@@ -87,3 +87,80 @@ const DEFEATIST_GATE_REASON =
   "The gate is `pokemon.getHpRatio() <= 1 / 3`, and getHpRatio() rounds the ratio to two decimals (round(hp / max * 100) / 100), so at 33.4 percent HP it passes. hp.at-most (exact) tests hp * 100 <= max * 33 and fails there, and floor-half differs again; no atom calls the game's rounded ratio. Requested as R-B16-11 (hp.ratio-at-most) in requests/B16.md.";
 bindLegacyClosure(129, 0, DEFEATIST_GATE_REASON, "gate");
 bindLegacyClosure(129, 1, DEFEATIST_GATE_REASON, "gate");
+
+// ===========================================================================================================================
+// Chunk 3. attrIndex read from the live game (throwaway dump of every attr of every user).
+// ErTerrainSummonAbAttr (Psychic Surge 227, Misty Surge 228, Grassy Surge 229, Hadron Engine 289 attr 0, Psychic Supremacy 20000 attr 2) and
+// PostSummonWonderRoomAbAttr (False Equivalence 6007 attr 0) have no closure and need no binding.
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// HydromancyEffectChanceAbAttr, Hydromancy (6005) attr 0. Gate = [move.attrs.some(attr => attr.constructor.name === "ErDrenchAttr")].
+bindLegacyClosure(
+  6005,
+  0,
+  "The gate is `move.attrs.some(attr => attr.constructor.name === 'ErDrenchAttr')`, 'the move carries the Drench part'. No atom reads the parts of a move; requested as R-B16-16 (move.can-drench) in requests/B16.md.",
+  "gate",
+);
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// ElectromancyEffectChanceAbAttr, Electromancy (6037) attr 0. Gate = [move.getAttrs("StatusEffectAttr").some(a => a.effect === PARALYSIS)].
+bindLegacyClosure(
+  6037,
+  0,
+  "The gate is `move.getAttrs('StatusEffectAttr').some(attr => attr.effect === boostedStatus)`, 'the move has a part that can inflict the status' (paralysis for the one user). No atom reads the parts of a move; requested as R-B16-15 (move.can-inflict-status) in requests/B16.md.",
+  "gate",
+);
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// IrradiatedFistAbAttr, Irradiated Fist (6035) attr 0 (the only attr). ctor:0 = the inherited attackCondition
+// `(_user, _target, move) => move.category !== STATUS`. Gate = [move.hasFlag(PUNCHING_MOVE), holder.randBattleSeedInt(100) < 50]: the flag
+// test first, then the one draw (rng.chance keeps the position). Guards 1 and 2 (the attack condition, damage > 0) and the residual
+// (foe.canSetStatus(TOXIC)) stay in the class.
+bindCondition(6035, 0, { id: "move.damaging" }, "ctor:0");
+bindCondition(
+  6035,
+  0,
+  {
+    all: [
+      { id: "move.flag", flag: "PUNCHING_MOVE" },
+      { id: "rng.chance", pct: 50 },
+    ],
+  },
+  "gate",
+);
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// HijackAbAttr, Hijack (6038) attr 0 (the only attr). ctor:0 = the inherited attackCondition `move.category !== STATUS`. Gate =
+// [holder.getMoveType(move) === ELECTRIC, foe.status?.effect === PARALYSIS]. Residual (the foe's once-per-switch-in flag and its
+// Commanded marker) stays in the class.
+bindCondition(6038, 0, { id: "move.damaging" }, "ctor:0");
+bindCondition(
+  6038,
+  0,
+  {
+    all: [
+      { id: "move.type", type: "ELECTRIC", effective: true },
+      { id: "status.has", who: "other", status: "PARALYSIS" },
+    ],
+  },
+  "gate",
+);
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// EulogyAbAttr, Eulogy (6046) attr 0 (the only attr). Gate = [!holder.battleData.erAbilityProvenance.includes("eulogy:spent")].
+bindLegacyClosure(
+  6046,
+  0,
+  "The gate is `!holder.battleData.erAbilityProvenance.includes('eulogy:spent')`, 'I have not used my revival this battle'. time.once-per reads its own memory (a WeakMap by battle data), which this class's apply never writes, so it would not be the same test; an atom that reads the class's own marker is requested as R-B16-17 (time.marker-set) in requests/B16.md.",
+  "gate",
+);
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// JackpotBattleBuffAbAttr, Jackpot (6114) attr 1 (attr 0 is PostSummonScriptedMoveAbAttr). Gate (read inside `apply`) =
+// [!currentBattle.erJackpotSides?.has(holder.isPlayer())].
+bindLegacyClosure(
+  6114,
+  1,
+  "The gate is `!currentBattle.erJackpotSides?.has(holder.isPlayer())`, 'nobody on my side got the boost yet in this battle'. time.once-per keeps its memory per Pokemon, this one lives per side on the battle object; requested as R-B16-18 (time.side-once-per-battle) in requests/B16.md.",
+  "gate",
+);

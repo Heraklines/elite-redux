@@ -184,28 +184,59 @@ class StarHitPowerAbAttr extends HitMultiplierPowerAbAttr {
   }
 }
 
-class HydromancyEffectChanceAbAttr extends MoveEffectChanceMultiplierAbAttr {
-  constructor() {
-    super(5);
+export class HydromancyEffectChanceAbAttr extends MoveEffectChanceMultiplierAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: ModifyMoveEffectChanceAbAttrParams) => boolean) | undefined;
+
+  /** Ability studio (Tier B): the former literal `5` is now a constructor argument whose default equals the old value. */
+  constructor(chanceMultiplier = 5) {
+    super(chanceMultiplier);
   }
 
+  /** Tier B split (ability studio spec 3.1), original clause order: `guards`, then `gate`. */
   override canApply(params: ModifyMoveEffectChanceAbAttrParams): boolean {
-    return super.canApply(params) && params.move.attrs.some(attr => attr.constructor.name === "ErDrenchAttr");
+    return gatedCanApply<ModifyMoveEffectChanceAbAttrParams>(this, params);
+  }
+
+  /** Clause 1: the parent's rule (a real chance above 0, and not Order Up or Electro Shot). */
+  public guards(params: ModifyMoveEffectChanceAbAttrParams): boolean {
+    return super.canApply(params);
+  }
+
+  /** Clause 2, the replaceable condition: the move can drench the target (it carries the Drench part). */
+  public gate(params: ModifyMoveEffectChanceAbAttrParams): boolean {
+    return params.move.attrs.some(attr => attr.constructor.name === "ErDrenchAttr");
   }
 }
 
-class ElectromancyEffectChanceAbAttr extends MoveEffectChanceMultiplierAbAttr {
-  constructor() {
-    super(5);
+export class ElectromancyEffectChanceAbAttr extends MoveEffectChanceMultiplierAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: ModifyMoveEffectChanceAbAttrParams) => boolean) | undefined;
+
+  /** The status whose moves get the boosted chance (the former literal PARALYSIS). */
+  private readonly boostedStatus: StatusEffect;
+
+  /** Ability studio (Tier B): the former literals `5` and PARALYSIS are constructor arguments whose defaults equal the old values. */
+  constructor(chanceMultiplier = 5, boostedStatus: StatusEffect = StatusEffect.PARALYSIS) {
+    super(chanceMultiplier);
+    this.boostedStatus = boostedStatus;
   }
 
+  /** Tier B split (ability studio spec 3.1), original clause order: `guards`, then `gate`. */
   override canApply(params: ModifyMoveEffectChanceAbAttrParams): boolean {
-    return (
-      super.canApply(params)
-      && params.move
-        .getAttrs<"StatusEffectAttr">("StatusEffectAttr")
-        .some(attr => attr.effect === StatusEffect.PARALYSIS)
-    );
+    return gatedCanApply<ModifyMoveEffectChanceAbAttrParams>(this, params);
+  }
+
+  /** Clause 1: the parent's rule (a real chance above 0, and not Order Up or Electro Shot). */
+  public guards(params: ModifyMoveEffectChanceAbAttrParams): boolean {
+    return super.canApply(params);
+  }
+
+  /** Clause 2, the replaceable condition: the move has a part that can inflict the boosted status. */
+  public gate(params: ModifyMoveEffectChanceAbAttrParams): boolean {
+    return params.move
+      .getAttrs<"StatusEffectAttr">("StatusEffectAttr")
+      .some(attr => attr.effect === this.boostedStatus);
   }
 }
 
@@ -353,17 +384,33 @@ class MoxibustionAbAttr extends PostAttackAbAttr {
   }
 }
 
-class HijackAbAttr extends PostAttackAbAttr {
+export class HijackAbAttr extends PostAttackAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), original clause order: `guards`, then `gate`, then `residual`. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { pokemon, opponent, move, damage } = params;
-    return (
-      super.canApply(params)
-      && damage > 0
-      && pokemon.getMoveType(move) === PokemonType.ELECTRIC
-      && opponent.status?.effect === StatusEffect.PARALYSIS
-      && !opponent.summonData.erCommandedUsedThisSwitchIn
-      && !opponent.getTag(BattlerTagType.ER_COMMANDED)
-    );
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /**
+   * Clause 1: the inherited attack condition (constructor argument 0, a replaceable library condition; default: a damaging
+   * move) sits here only to keep the order. Clause 2: the hit really dealt damage.
+   */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    return super.canApply(params) && params.damage > 0;
+  }
+
+  /** Clauses 3 and 4, the replaceable conditions: my move is Electric type (after abilities) and the foe is paralyzed. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    const { pokemon, opponent, move } = params;
+    return pokemon.getMoveType(move) === PokemonType.ELECTRIC && opponent.status?.effect === StatusEffect.PARALYSIS;
+  }
+
+  /** Clauses 5 and 6, feasibility: the foe has not been commanded since it came in, and is not commanded right now. */
+  public residual(params: PostMoveInteractionAbAttrParams): boolean {
+    const { opponent } = params;
+    return !opponent.summonData.erCommandedUsedThisSwitchIn && !opponent.getTag(BattlerTagType.ER_COMMANDED);
   }
 
   override apply({ pokemon, opponent, simulated }: PostMoveInteractionAbAttrParams): void {
@@ -507,15 +554,43 @@ export class ConfectiousDefendAbAttr extends PostDefendAbAttr {
   }
 }
 
-class IrradiatedFistAbAttr extends PostAttackAbAttr {
+export class IrradiatedFistAbAttr extends PostAttackAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** The chance (percent) that a punch badly poisons the foe (the former literal 50). */
+  private readonly chance: number;
+
+  /**
+   * Ability studio (Tier B): argument 0 is the parent's attack condition (default: a damaging move), argument 1 the former
+   * literal `50`, whose default equals the old value.
+   */
+  constructor(attackCondition?: PokemonAttackCondition, chance = 50) {
+    super(attackCondition);
+    this.chance = chance;
+  }
+
+  /** Tier B split (ability studio spec 3.1), original clause order: `guards`, then `gate`, then `residual`. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    return (
-      super.canApply(params)
-      && params.damage > 0
-      && params.move.hasFlag(MoveFlags.PUNCHING_MOVE)
-      && params.pokemon.randBattleSeedInt(100) < 50
-      && params.opponent.canSetStatus(StatusEffect.TOXIC, true, false, params.pokemon)
-    );
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /**
+   * Clause 1: the inherited attack condition (constructor argument 0, a replaceable library condition; default: a damaging
+   * move) sits here only to keep the order. Clause 2: the hit really dealt damage.
+   */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    return super.canApply(params) && params.damage > 0;
+  }
+
+  /** Clauses 3 and 4, the replaceable conditions: the move is a punching move, then the chance roll (one draw, only for punches). */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    return params.move.hasFlag(MoveFlags.PUNCHING_MOVE) && params.pokemon.randBattleSeedInt(100) < this.chance;
+  }
+
+  /** Clause 5, feasibility: the foe can be badly poisoned (asked AFTER the roll, so the draw also happens for a foe that cannot be poisoned). */
+  public residual(params: PostMoveInteractionAbAttrParams): boolean {
+    return params.opponent.canSetStatus(StatusEffect.TOXIC, true, false, params.pokemon);
   }
 
   override apply({ pokemon, opponent, simulated }: PostMoveInteractionAbAttrParams): void {
@@ -627,11 +702,31 @@ export class DecayRestoreAbAttr extends PostTurnAbAttr {
   }
 }
 
-class EulogyAbAttr extends PostFaintAbAttr {
-  override canApply({ pokemon }: PostFaintAbAttrParams): boolean {
-    if (pokemon.battleData.erAbilityProvenance.includes("eulogy:spent")) {
-      return false;
-    }
+export class EulogyAbAttr extends PostFaintAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostFaintAbAttrParams) => boolean) | undefined;
+
+  /** How much of its max HP the brought-back party member gets, in percent (the former literal 0.5). */
+  private readonly revivePercent: number;
+
+  /** Ability studio (Tier B): the former literal `0.5` is now a whole percent whose default equals the old value. */
+  constructor(revivePercent = 50) {
+    super();
+    this.revivePercent = revivePercent;
+  }
+
+  /** Tier B split (ability studio spec 3.1), original clause order: `gate`, then `residual`. */
+  override canApply(params: PostFaintAbAttrParams): boolean {
+    return gatedCanApply<PostFaintAbAttrParams>(this, params);
+  }
+
+  /** Clause 1, the replaceable condition: I have not used my one revival this battle yet (no "spent" marker in my battle memory). */
+  public gate({ pokemon }: PostFaintAbAttrParams): boolean {
+    return !pokemon.battleData.erAbilityProvenance.includes("eulogy:spent");
+  }
+
+  /** Clause 2, feasibility: a fainted party member that is not a boss exists to be brought back (not me). */
+  public residual({ pokemon }: PostFaintAbAttrParams): boolean {
     const party = pokemon.isPlayer() ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
     return party.some(ally => ally !== pokemon && ally.isFainted() && !ally.isBoss());
   }
@@ -647,7 +742,7 @@ class EulogyAbAttr extends PostFaintAbAttr {
     }
     pokemon.battleData.erAbilityProvenance.push("eulogy:spent");
     ally.resetStatus(true, false, false, false);
-    ally.hp = Math.max(1, Math.floor(ally.getMaxHp() * 0.5));
+    ally.hp = Math.max(1, Math.floor((ally.getMaxHp() * this.revivePercent) / 100));
     ally.updateInfo();
   }
 }
@@ -1466,10 +1561,25 @@ export class BitterDrillDamageAbAttr extends VariableMovePowerAbAttr {
   }
 }
 
-class PostSummonWonderRoomAbAttr extends PostSummonAbAttr {
+export class PostSummonWonderRoomAbAttr extends PostSummonAbAttr {
+  /** How many turns the room lasts (the former literal 5). */
+  private readonly roomTurns: number;
+
+  /** Ability studio (Tier A): the former literal `5` is now a constructor argument whose default equals the old value. */
+  constructor(roomTurns = 5) {
+    super();
+    this.roomTurns = roomTurns;
+  }
+
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
     if (!simulated) {
-      globalScene.arena.addTag(ArenaTagType.WONDER_ROOM, 5, MoveId.WONDER_ROOM, pokemon.id, ArenaTagSide.BOTH);
+      globalScene.arena.addTag(
+        ArenaTagType.WONDER_ROOM,
+        this.roomTurns,
+        MoveId.WONDER_ROOM,
+        pokemon.id,
+        ArenaTagSide.BOTH,
+      );
     }
   }
 }

@@ -2320,7 +2320,7 @@ function patchTerrainSummoner(ability: MutableAbility, turns: number): void {
   }
 }
 
-class ErTerrainSummonAbAttr extends PostSummonTerrainChangeAbAttr {
+export class ErTerrainSummonAbAttr extends PostSummonTerrainChangeAbAttr {
   private readonly erTurns: number;
 
   constructor(terrain: TerrainType, turns: number) {

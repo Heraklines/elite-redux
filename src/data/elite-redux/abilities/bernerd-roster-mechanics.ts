@@ -157,14 +157,29 @@ class KnuckleDownAbAttr extends PostAttackAbAttr {
 }
 
 /** Gives Jackpot's +1 crit/+1 Luck to one holder per side for this battle. */
-class JackpotBattleBuffAbAttr extends PostSummonAbAttr {
-  override apply({ pokemon, simulated }: AbAttrBaseParams): void {
+export class JackpotBattleBuffAbAttr extends PostSummonAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /**
+   * The condition of this class lives in `apply`, not in `canApply` (always true). The studio split stays inside `apply`, in the
+   * original clause order: `!simulated`, create the battle's set of buffed sides, then this replaceable gate: nobody on my side has
+   * received the buff yet in this battle. The test is pure; the set is created before it, exactly as before.
+   */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
+    const battle = globalScene.currentBattle as unknown as { erJackpotSides?: Set<boolean> };
+    return !battle.erJackpotSides?.has(pokemon.isPlayer());
+  }
+
+  override apply(params: AbAttrBaseParams): void {
+    const { pokemon, simulated } = params;
     if (simulated) {
       return;
     }
     const battle = globalScene.currentBattle as unknown as { erJackpotSides?: Set<boolean> };
     const sides = (battle.erJackpotSides ??= new Set<boolean>());
-    if (sides.has(pokemon.isPlayer())) {
+    const gate = this.gateOverride ?? this.gate.bind(this);
+    if (!gate(params)) {
       return;
     }
     sides.add(pokemon.isPlayer());

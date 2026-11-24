@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "0e4915b66e1fa9",
+  "hash": "17003a79d8bf84",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -683,6 +683,92 @@
       "uses": 1
     },
     {
+      "id": "block.electromancy-effect-chance",
+      "className": "ElectromancyEffectChanceAbAttr",
+      "label": "Multiply the chance that my moves cause one chosen status",
+      "summary": "The extra-effect chance of my moves that can cause Paralysis is multiplied by 5, never above 100%. Example: 5 = a 10% chance becomes 50%.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.effect-chance",
+      "whenLabel": "While the game calculates my move's effect chance",
+      "synonyms": [
+        "electromancy",
+        "more paralysis",
+        "paralysis chance",
+        "serene grace for one status",
+        "status chance boost",
+        "stronger side effect",
+        "more burns"
+      ],
+      "examples": [
+        "Make my paralyzing moves paralyze five times as often, like Electromancy"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Chance multiplier (5 = five times as likely, 0 = never)",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 0,
+          "max": 10,
+          "step": 0.1,
+          "gateIndependent": true
+        },
+        {
+          "id": "status",
+          "label": "Which status the move must be able to cause",
+          "control": "select",
+          "default": "PARALYSIS",
+          "editable": true,
+          "options": [
+            "NONE",
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN",
+            "FAINT"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must have an extra effect with a chance above 0 (a guaranteed or missing effect is left alone)",
+        "Order Up and Electro Shot are never changed",
+        "The result never goes above 100%"
+      ],
+      "gateParams": [
+        {
+          "param": "status",
+          "block": "move.can-inflict-status",
+          "field": "status"
+        }
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.er-bad-dreams",
       "className": "ErBadDreamsAbAttr",
       "label": "Hurt every sleeping foe a little at the end of each turn",
@@ -917,6 +1003,79 @@
       "uses": 2
     },
     {
+      "id": "block.er-terrain-summon",
+      "className": "ErTerrainSummonAbAttr",
+      "label": "Set the terrain for a set number of turns when I enter",
+      "summary": "When I enter the battle, I set the terrain to Psychic for 8 turns (a terrain-extending item adds more). Example: 8 = the terrain lasts 8 turns.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "psychic surge",
+        "grassy surge",
+        "misty surge",
+        "hadron engine",
+        "summon terrain",
+        "timed terrain",
+        "long terrain",
+        "terrain setter"
+      ],
+      "examples": [
+        "Set Grassy Terrain for 8 turns when I enter the battle, like Grassy Surge"
+      ],
+      "params": [
+        {
+          "id": "terrain",
+          "label": "Which terrain (None clears it)",
+          "control": "select",
+          "default": "PSYCHIC",
+          "editable": true,
+          "options": [
+            "NONE",
+            "MISTY",
+            "ELECTRIC",
+            "GRASSY",
+            "PSYCHIC",
+            "TOXIC"
+          ]
+        },
+        {
+          "id": "turns",
+          "label": "How many turns the terrain lasts (an extending item adds more)",
+          "control": "number",
+          "default": 8,
+          "editable": true,
+          "min": 1,
+          "max": 20,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The terrain must differ from the one that is already set",
+        "The field may still refuse the new terrain (a protected Toxic terrain is not overwritten by an ordinary one)",
+        "The new length is written to whatever terrain is active afterwards, if it has turns left",
+        "Nothing happens while the game only previews the entry"
+      ],
+      "effect": {
+        "id": "effect.set-terrain",
+        "params": [
+          "terrain",
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 5
+    },
+    {
       "id": "block.er-weather-summon",
       "className": "ErWeatherSummonAbAttr",
       "label": "Set the weather for a set number of turns when I enter",
@@ -997,6 +1156,70 @@
       "uses": 10
     },
     {
+      "id": "block.eulogy",
+      "className": "EulogyAbAttr",
+      "label": "Bring back a fainted party member when I faint (once)",
+      "summary": "When I faint, one fainted party member (never a boss) comes back with 50% of its max HP and no status. Works once per battle. Example: 50 = half HP.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.faint",
+      "whenLabel": "When I faint",
+      "synonyms": [
+        "eulogy",
+        "revive a teammate",
+        "bring back an ally",
+        "last wish",
+        "resurrect",
+        "revive on faint",
+        "second chance for an ally"
+      ],
+      "examples": [
+        "When I faint, revive one fainted teammate at half HP, once per battle"
+      ],
+      "params": [
+        {
+          "id": "percent",
+          "label": "HP the party member comes back with (% of its max HP)",
+          "control": "slider",
+          "default": 50,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A fainted party member that is not a boss must exist (never myself); the first one in party order is brought back",
+        "Its status is cleared and it comes back with at least 1 HP",
+        "The revival is marked as used the moment it happens, before the party member is changed",
+        "Nothing happens while the game only previews the faint"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "percent"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.float",
       "className": "FloatAbAttr",
       "label": "I float above the ground",
@@ -1029,6 +1252,62 @@
         "do": true
       },
       "uses": 5
+    },
+    {
+      "id": "block.hijack",
+      "className": "HijackAbAttr",
+      "label": "Take command of a paralyzed foe's next action",
+      "summary": "After my Electric move hurts a paralyzed foe, I take command of the foe's next action. Works once per time the foe comes in.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "hijack",
+        "control the foe",
+        "mind control",
+        "puppet the foe",
+        "force the foe's move",
+        "steal the foe's turn",
+        "remote control"
+      ],
+      "examples": [
+        "When my Electric move hurts a paralyzed foe, I take control of its next move"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "lib": "move.damaging",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really have dealt damage (more than 0)",
+        "The foe must not have been commanded already since it came in (once per switch-in)",
+        "The foe must not be commanded right now",
+        "Nothing happens while the game only previews a hit"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.hp-threshold-form-change",
@@ -1149,6 +1428,68 @@
       "uses": 2
     },
     {
+      "id": "block.hydromancy-effect-chance",
+      "className": "HydromancyEffectChanceAbAttr",
+      "label": "Multiply the chance that my moves drench the target",
+      "summary": "The chance of my moves that can drench the target is multiplied by 5, never above 100%. Example: 5 = a 20% chance becomes 100%.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.effect-chance",
+      "whenLabel": "While the game calculates my move's effect chance",
+      "synonyms": [
+        "hydromancy",
+        "drench more",
+        "soak chance",
+        "more drenching",
+        "wet the target",
+        "water magic",
+        "serene grace for drench"
+      ],
+      "examples": [
+        "Make my drenching moves drench five times as often, like Hydromancy"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Chance multiplier (5 = five times as likely, 0 = never)",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 0,
+          "max": 10,
+          "step": 0.1,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must have an extra effect with a chance above 0 (a guaranteed or missing effect is left alone)",
+        "Order Up and Electro Shot are never changed",
+        "The result never goes above 100%"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.ignore-contact",
       "className": "IgnoreContactAbAttr",
       "label": "My moves never count as making contact",
@@ -1175,6 +1516,157 @@
       "reusableAlone": {
         "when": true,
         "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.irradiated-fist",
+      "className": "IrradiatedFistAbAttr",
+      "label": "Sometimes badly poison and curse the foe when I punch",
+      "summary": "After my punching move hurts a foe, there is a 50% chance it becomes badly poisoned. Once that poison is gone, its stat boosts are wiped and it cannot raise stats until it switches.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "irradiated fist",
+        "poison punch",
+        "toxic punch",
+        "punch poison chance",
+        "badly poison on punch",
+        "radioactive",
+        "toxic touch"
+      ],
+      "examples": [
+        "Each punching move has a 50% chance to badly poison the foe, like Irradiated Fist"
+      ],
+      "params": [
+        {
+          "id": "chance",
+          "label": "Chance (%)",
+          "control": "slider",
+          "default": 50,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "lib": "move.damaging",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really have dealt damage (more than 0)",
+        "The foe must be able to be badly poisoned (it has no status and nothing blocks it); this is asked after the chance roll",
+        "The curse (stat boosts wiped and locked once the poison is gone) is only put on the foe if the poisoning really landed",
+        "Nothing happens while the game only previews a hit"
+      ],
+      "gateParams": [
+        {
+          "param": "chance",
+          "block": "rng.chance",
+          "field": "pct"
+        }
+      ],
+      "branches": [
+        {
+          "label": "Badly poison the foe",
+          "conditions": [],
+          "effect": {
+            "id": "effect.inflict-status",
+            "params": []
+          }
+        },
+        {
+          "label": "Curse the foe if it was badly poisoned",
+          "conditions": [
+            "The poisoning really landed"
+          ],
+          "effect": {
+            "id": "effect.apply-tag",
+            "params": []
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.jackpot-battle-buff",
+      "className": "JackpotBattleBuffAbAttr",
+      "label": "Give my side a critical-hit and luck boost for the battle",
+      "summary": "When I enter the battle, my side's attacks get +1 critical-hit stage and I get +1 Luck, for the rest of the battle. Only one Pokemon per side gets it per battle.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "jackpot",
+        "lucky crits",
+        "crit boost for the team",
+        "luck boost",
+        "battle long crit",
+        "team critical chance",
+        "lucky streak"
+      ],
+      "examples": [
+        "When I come in, my whole side lands critical hits more often for the rest of the battle, like Jackpot"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens while the game only previews the entry"
+      ],
+      "branches": [
+        {
+          "label": "Raise my side's critical-hit stage by 1 for the battle",
+          "conditions": [],
+          "effect": {
+            "id": "effect.package",
+            "params": []
+          }
+        },
+        {
+          "label": "Raise my Luck by 1 for this wave",
+          "conditions": [],
+          "effect": {
+            "id": "effect.package",
+            "params": []
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
         "do": true
       },
       "uses": 1
@@ -1434,6 +1926,60 @@
         "do": true
       },
       "uses": 7
+    },
+    {
+      "id": "block.post-summon-wonder-room",
+      "className": "PostSummonWonderRoomAbAttr",
+      "label": "Swap Defense and Sp. Def for everyone when I enter",
+      "summary": "When I enter the battle, Defense and Sp. Def are swapped for every Pokemon on both sides for 5 turns. Example: 5 = the room lasts 5 turns.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "wonder room",
+        "swap defenses",
+        "swap defense and special defense",
+        "false equivalence",
+        "defense swap room",
+        "field defense swap",
+        "stat swap field"
+      ],
+      "examples": [
+        "Set Wonder Room for 5 turns when I enter the battle, like False Equivalence"
+      ],
+      "params": [
+        {
+          "id": "turns",
+          "label": "How many turns the room lasts",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 1,
+          "max": 20,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens while the game only previews the entry",
+        "If a Wonder Room is already up, the field refuses a second one"
+      ],
+      "effect": {
+        "id": "effect.arena-tag",
+        "params": [
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.received-move-damage-multiplier",
