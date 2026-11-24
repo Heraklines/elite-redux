@@ -163,22 +163,42 @@ function isStarMove(user: Pokemon, move: Move): boolean {
   );
 }
 
-class StarHitMultiplierAbAttr extends HitMultiplierAbAttr {
-  constructor() {
-    super({ extraStrikes: 1 });
+export class StarHitMultiplierAbAttr extends HitMultiplierAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: Parameters<HitMultiplierAbAttr["canApply"]>[0]) => boolean) | undefined;
+
+  /** The number of extra strikes used to be the literal 1 in the `super` call; it is now a constructor argument with that default. */
+  constructor(extraStrikes = 1) {
+    super({ extraStrikes });
   }
 
+  /** Tier B split (ability studio spec 3.1): `canApply = gate`. No guards, no residual, every clause is a pure read, no random draw. */
   override canApply(params: Parameters<HitMultiplierAbAttr["canApply"]>[0]): boolean {
+    return gatedCanApply<Parameters<HitMultiplierAbAttr["canApply"]>[0]>(this, params);
+  }
+
+  /** The replaceable condition, in the old order: the inherited multi-strike test of the base class, then the move is Star-based. */
+  public gate(params: Parameters<HitMultiplierAbAttr["canApply"]>[0]): boolean {
     return super.canApply(params) && isStarMove(params.pokemon, params.move);
   }
 }
 
-class StarHitPowerAbAttr extends HitMultiplierPowerAbAttr {
-  constructor() {
-    super({ multiplier: 0.7 });
+export class StarHitPowerAbAttr extends HitMultiplierPowerAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: Parameters<HitMultiplierPowerAbAttr["canApply"]>[0]) => boolean) | undefined;
+
+  /** The damage multiplier used to be the literal 0.7 in the `super` call; it is now a constructor argument with that default. */
+  constructor(multiplier = 0.7) {
+    super({ multiplier });
   }
 
+  /** Tier B split (ability studio spec 3.1): `canApply = gate`. No guards, no residual, every clause is a pure read, no random draw. */
   override canApply(params: Parameters<HitMultiplierPowerAbAttr["canApply"]>[0]): boolean {
+    return gatedCanApply<Parameters<HitMultiplierPowerAbAttr["canApply"]>[0]>(this, params);
+  }
+
+  /** The replaceable condition, in the old order: the inherited condition of the base class (always true here), then the move is Star-based. */
+  public gate(params: Parameters<HitMultiplierPowerAbAttr["canApply"]>[0]): boolean {
     return super.canApply(params) && isStarMove(params.pokemon, params.move);
   }
 }
@@ -379,7 +399,7 @@ class HijackAbAttr extends PostAttackAbAttr {
   }
 }
 
-class ThirdEyeAbAttr extends PostSummonAbAttr {
+export class ThirdEyeAbAttr extends PostSummonAbAttr {
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
     if (simulated) {
       return;
@@ -694,11 +714,36 @@ function oracleGuardActive(pokemon: Pokemon): boolean {
   return pokemon.summonData.erAbilityProvenance.some(entry => entry.startsWith("oracle:guard:"));
 }
 
-class SplashDamageAbAttr extends PostAttackAbAttr {
+export class SplashDamageAbAttr extends PostAttackAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** The share of the move's power that the splash hit uses; it used to be the literal 0.5 in `apply`, now a constructor argument with that default. */
+  private readonly powerShare: number;
+
+  constructor(powerShare = 0.5) {
+    super();
+    this.powerShare = powerShare;
+  }
+
+  /** Tier B split (ability studio spec 3.1): `canApply = guards && gate`. Every clause is a pure read, no random draw. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The hit really dealt damage (clause 2 of the old canApply; it only reads the frame, so it can run first). */
+  public guards({ damage }: PostMoveInteractionAbAttrParams): boolean {
+    return damage > 0;
+  }
+
+  /**
+   * The replaceable condition, in the old order: the inherited attack condition (the move deals damage), the move is not a
+   * status move (the same test again), the move targets one other Pokemon (Near enemy, Other or Near other), the splash
+   * marker is not already set for this turn, and the foe I hit has a standing neighbour.
+   */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
     return (
       super.canApply(params)
-      && params.damage > 0
       && params.move.category !== MoveCategory.STATUS
       && [MoveTarget.NEAR_ENEMY, MoveTarget.OTHER, MoveTarget.NEAR_OTHER].includes(params.move.moveTarget)
       && !params.pokemon.turnData.erAbilityProvenance.includes("splash-damage:guard")
@@ -719,7 +764,7 @@ class SplashDamageAbAttr extends PostAttackAbAttr {
       "MovePhase",
       pokemon,
       [ally.getBattlerIndex()],
-      scriptedPokemonMove(move.id, Math.max(1, Math.floor(move.power * 0.5))),
+      scriptedPokemonMove(move.id, Math.max(1, Math.floor(move.power * this.powerShare))),
       MoveUseMode.INDIRECT,
     );
   }
@@ -1086,24 +1131,60 @@ class StellarizeTypeAbAttr extends MoveTypeChangeAbAttr {
     super(PokemonType.STELLAR, (_user, _target, move) => move.type === PokemonType.NORMAL);
   }
 }
-class SleepingInAccuracyAbAttr extends SetMoveAccuracyAbAttr {
-  constructor() {
-    super([], 100);
+export class SleepingInAccuracyAbAttr extends SetMoveAccuracyAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: SetMoveAccuracyAbAttrParams) => boolean) | undefined;
+
+  /** The accuracy used to be the literal 100 in the `super` call; it is now a constructor argument with that default. */
+  constructor(accuracy = 100) {
+    super([], accuracy);
   }
 
-  override canApply({ move, accuracy }: SetMoveAccuracyAbAttrParams): boolean {
-    return accuracy.value !== -1 && isSleepInducingMove(move);
+  /** Tier B split (ability studio spec 3.1): `canApply = guards && gate`. Both clauses are pure reads, no random draw. */
+  override canApply(params: SetMoveAccuracyAbAttrParams): boolean {
+    return gatedCanApply<SetMoveAccuracyAbAttrParams>(this, params);
+  }
+
+  /** The move does not already never miss (accuracy -1); this rule used to be the first clause of canApply and keeps its place. */
+  public guards({ accuracy }: SetMoveAccuracyAbAttrParams): boolean {
+    return accuracy.value !== -1;
+  }
+
+  /** The replaceable condition: the move can put its target to sleep (a sleep effect or the drowsy effect). */
+  public gate({ move }: SetMoveAccuracyAbAttrParams): boolean {
+    return isSleepInducingMove(move);
   }
 }
 
-class SomniloquyPostTurnAbAttr extends PostTurnAbAttr {
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+export class SomniloquyPostTurnAbAttr extends PostTurnAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** Every how many turns it acts (used to be the literal 2 in canApply) and the move it uses (used to be the literal Sleep Talk in apply); constructor arguments with those defaults. */
+  private readonly everyTurns: number;
+  private readonly moveId: MoveId;
+
+  constructor(everyTurns = 2, moveId: MoveId = MoveId.SLEEP_TALK) {
+    super();
+    this.everyTurns = everyTurns;
+    this.moveId = moveId;
+  }
+
+  /** Tier B split (ability studio spec 3.1): `canApply = guards && gate`. Every clause is a pure read, no random draw. */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** I am still standing (clause 1 of the old canApply). */
+  public guards({ pokemon }: AbAttrBaseParams): boolean {
+    return !pokemon.isFainted();
+  }
+
+  /** The replaceable condition, in the old order: I have been out for a turn or more, it is every Nth turn, and I have not already acted on this turn number. */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     const turn = pokemon.tempSummonData?.turnCount ?? 0;
     return (
-      !pokemon.isFainted()
-      && turn > 0
-      && turn % 2 === 0
-      && !pokemon.summonData.erAbilityProvenance.includes(`somniloquy:${turn}`)
+      turn > 0 && turn % this.everyTurns === 0 && !pokemon.summonData.erAbilityProvenance.includes(`somniloquy:${turn}`)
     );
   }
 
@@ -1121,7 +1202,7 @@ class SomniloquyPostTurnAbAttr extends PostTurnAbAttr {
       "MovePhase",
       pokemon,
       [target.getBattlerIndex()],
-      scriptedPokemonMove(MoveId.SLEEP_TALK),
+      scriptedPokemonMove(this.moveId),
       MoveUseMode.INDIRECT,
     );
   }
@@ -1520,14 +1601,22 @@ class PostSummonWonderRoomAbAttr extends PostSummonAbAttr {
   }
 }
 
-class PostSummonScreensAbAttr extends PostSummonAbAttr {
+export class PostSummonScreensAbAttr extends PostSummonAbAttr {
+  /** How many turns both screens last; it used to be the literal 3 in `apply`, now a constructor argument with that default. */
+  private readonly turns: number;
+
+  constructor(turns = 3) {
+    super();
+    this.turns = turns;
+  }
+
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
     if (simulated) {
       return;
     }
     const side = pokemon.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY;
-    globalScene.arena.addTag(ArenaTagType.REFLECT, 3, MoveId.REFLECT, pokemon.id, side);
-    globalScene.arena.addTag(ArenaTagType.LIGHT_SCREEN, 3, MoveId.LIGHT_SCREEN, pokemon.id, side);
+    globalScene.arena.addTag(ArenaTagType.REFLECT, this.turns, MoveId.REFLECT, pokemon.id, side);
+    globalScene.arena.addTag(ArenaTagType.LIGHT_SCREEN, this.turns, MoveId.LIGHT_SCREEN, pokemon.id, side);
   }
 }
 

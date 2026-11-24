@@ -69,7 +69,7 @@ import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
 import { PokemonType } from "#enums/pokemon-type";
-import { type EffectiveStat, Stat } from "#enums/stat";
+import { type BattleStat, type EffectiveStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import type { Pokemon } from "#field/pokemon";
 import { PokemonHeldItemModifier } from "#modifiers/modifier";
@@ -120,12 +120,29 @@ export class GritAttackStatAbAttr extends AbAttr {
 
 const PUSH_KICK_TURN = new WeakMap<Pokemon, number>();
 
-class PushKickAbAttr extends StatDebuffOnFlagAttackAbAttr {
-  constructor() {
-    super({ flag: MoveFlags.KICKING_MOVE, stat: Stat.DEF, stages: -1 });
+export class PushKickAbAttr extends StatDebuffOnFlagAttackAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /**
+   * The three settings used to be literals in the `super` call (kicking moves, Defense, one stage down); they are now
+   * constructor arguments with those same defaults, so the shipped ability is unchanged and staff get typed settings.
+   */
+  constructor(flag: MoveFlags = MoveFlags.KICKING_MOVE, stat: BattleStat = Stat.DEF, stages = -1) {
+    super({ flag, stat, stages });
   }
 
+  /** Tier B split (ability studio spec 3.1): `canApply = gate`. No guards and no residual, every clause is a pure read, no random draw. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /**
+   * The replaceable condition, in the old order: (1) I have not already used this effect on this turn out (the turn
+   * number is remembered in {@linkcode PUSH_KICK_TURN}), then (2) every clause of the base class: the move deals damage,
+   * the hit landed, it is the first strike of my move, and the move has the configured property.
+   */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
     const turn = params.pokemon.tempSummonData.waveTurnCount;
     return PUSH_KICK_TURN.get(params.pokemon) !== turn && super.canApply(params);
   }

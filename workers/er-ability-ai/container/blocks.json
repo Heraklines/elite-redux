@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "0503b0a476ae21",
+  "hash": "10a2e6ca46aefe",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -1335,6 +1335,60 @@
       "uses": 1
     },
     {
+      "id": "block.post-summon-screens",
+      "className": "PostSummonScreensAbAttr",
+      "label": "Raise Reflect and Light Screen on my side when I enter",
+      "summary": "When I enter the battle, my side gets both Reflect and Light Screen for 3 turns. A screen that is already up is not renewed. Example: 3 turns.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "split mind",
+        "set up screens",
+        "reflect and light screen",
+        "defensive screens on entry",
+        "barrier on switch in",
+        "team barrier"
+      ],
+      "examples": [
+        "Set up Reflect and Light Screen for 3 turns when I come in",
+        "Both screens on entry for 5 turns"
+      ],
+      "params": [
+        {
+          "id": "turns",
+          "label": "How many turns both screens last",
+          "control": "number",
+          "default": 3,
+          "editable": true,
+          "min": 1,
+          "max": 8,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A screen that is already active on my side is left as it is (it is not refreshed)",
+        "It never sets anything for a preview (a simulated entry)"
+      ],
+      "effect": {
+        "id": "effect.arena-tag",
+        "params": [
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.post-summon-weather-change",
       "className": "PostSummonWeatherChangeAbAttr",
       "label": "Set the weather when I enter",
@@ -1397,6 +1451,128 @@
         "do": true
       },
       "uses": 7
+    },
+    {
+      "id": "block.push-kick",
+      "className": "PushKickAbAttr",
+      "label": "Change a stat of the foe once per turn after my move hits",
+      "summary": "After one of my damaging moves with the \"Kicking move\" property lands, the foe's Defense changes by -1 stages, once per turn out. Example: -1 Defense after a kick.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "push kick",
+        "lower defense",
+        "defense drop",
+        "kick debuff",
+        "armor break",
+        "denting blows",
+        "chainsaw",
+        "once per turn"
+      ],
+      "examples": [
+        "Lower the foe's Defense by 1 stage after my first kicking move each turn",
+        "Drop the target's Defense after a hit with a kick"
+      ],
+      "params": [
+        {
+          "id": "flag",
+          "label": "Kind of move that triggers it",
+          "control": "select",
+          "default": "KICKING_MOVE",
+          "editable": true,
+          "options": [
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        },
+        {
+          "id": "stat",
+          "label": "Which stat of the foe changes",
+          "control": "select",
+          "default": "DEF",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "stages",
+          "label": "Number of stages (negative lowers, 0 is refused by the class)",
+          "control": "number",
+          "default": -1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.damaging and move.flag, plus requests R25 (once per turn out), R12 (the hit landed) and R24 (first strike of my move)",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The stat change is never queued for a preview (a simulated hit), but the turn marker is still written",
+        "The stat cannot go beyond -6 or +6; the stat change itself stops there"
+      ],
+      "gateParams": [
+        {
+          "param": "flag",
+          "block": "move.flag",
+          "field": "flag"
+        }
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stat",
+          "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.received-move-damage-multiplier",
@@ -1462,6 +1638,378 @@
         "do": true
       },
       "uses": 64
+    },
+    {
+      "id": "block.sleeping-in-accuracy",
+      "className": "SleepingInAccuracyAbAttr",
+      "label": "Give my sleep-inducing moves a fixed accuracy",
+      "summary": "While the game calculates accuracy, my moves that put the foe to sleep or make it drowsy get 100% base accuracy (a move that never misses is left alone). Evasion still applies on top.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.accuracy",
+      "whenLabel": "While the game calculates my move's accuracy",
+      "synonyms": [
+        "sleeping in",
+        "yawn accuracy",
+        "sleep move accuracy",
+        "hypnosis never misses",
+        "sleep powder accuracy",
+        "accurate sleep moves"
+      ],
+      "examples": [
+        "Make Hypnosis and Sleep Powder hit with 100% accuracy",
+        "Sleep moves get 90% accuracy like Hypnotist"
+      ],
+      "params": [
+        {
+          "id": "accuracy",
+          "label": "Accuracy the move gets (%)",
+          "control": "number",
+          "default": 100,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "request R27 (the move can put its target to sleep or make it drowsy)",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A move that already never misses (accuracy shown as a dash) keeps never missing"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "accuracy"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B, PACKAGE for the effect only, with a written reason: the library has no 'set the move's accuracy to N' effect. effect.always-hit (unimplemented) means 'never miss' (accuracy -1), which is a different rule from 'accuracy becomes exactly N'; request R33 asks for effect.set-accuracy with a number. The trigger (while the game calculates my move's accuracy) and the condition (sleep-inducing move) are separate blocks; the number is a typed setting, the old literal 100 is now the constructor argument `accuracy` (default 100, same behaviour). The `accuracy !== -1` rule moved from the first clause of canApply into a `guards` method (a pure move of code, same position). The gate is legacy-closure-pending-request (R27). Users: Sleeping In (6056, attr 0) only; its 'no repeat' and 'Yawn style' parts are runtime capability attrs of another batch. Oddity, not a bug: the ability text promises 'the accuracy of Yawn' while the class sets a plain 100; nothing is changed. The accuracy staff set is the BASE accuracy, before evasion and stages.",
+      "uses": 1
+    },
+    {
+      "id": "block.somniloquy-post-turn",
+      "className": "SomniloquyPostTurnAbAttr",
+      "label": "Use a move on the first foe every few turns",
+      "summary": "Every 2 turns I am out, at the end of the turn I use Sleep talk on the first foe still standing. Example: 2 means every other turn.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "somniloquy",
+        "sleep talk",
+        "free move every other turn",
+        "automatic move",
+        "periodic move",
+        "end of turn move"
+      ],
+      "examples": [
+        "Use Sleep Talk at the end of every 2nd turn",
+        "Every third turn, use Rest for free on the first foe"
+      ],
+      "params": [
+        {
+          "id": "everyTurns",
+          "label": "Acts every this many turns out (2 = every 2nd turn)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "moveId",
+          "label": "Move it uses (type the move name, for example Sleep Talk)",
+          "control": "text",
+          "default": "SLEEP_TALK",
+          "editable": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "time.turn-count, plus requests R26 (every Nth turn) and R3 (a marker with the turn number is set)",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [
+        "not-fainted"
+      ],
+      "feasibility": [
+        "A foe must still be standing, otherwise nothing is used (the turn is still marked as done)",
+        "It never uses the move for a preview (a simulated turn end)",
+        "The used move is a real move: the move itself decides whether it can work (for Sleep Talk, its own conditions)"
+      ],
+      "gateParams": [
+        {
+          "param": "everyTurns",
+          "block": "time.turn-count-multiple",
+          "field": "n"
+        }
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "moveId"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B, PACKAGE for the effect only, with a written reason: effect.scripted-move cannot express it. It needs the 'other' slot (the end of the turn has none), uses a fixed move at default power with no power override, picks 'the first foe still standing' instead of the foe that was hit, and writes a turn marker in the same step; request R35 extends effect.scripted-move with those options. The trigger (end of turn) and every condition are separate blocks. The two literals of the old class (every 2nd turn and Sleep Talk) are now the constructor arguments `everyTurns` and `moveId` with those defaults, so Somniloquy is unchanged and both are typed settings. Source edit (pure move of code, spec 3.1): `isFainted` moved into a `guards` method and the other three clauses into `gate`, keeping the old order; all are pure reads. The gate is legacy-closure-pending-request (R26 every Nth turn, R3 marker with the turn number). Users: Somniloquy (6058, attr 0) only. Oddity, not a bug: the marker is written before the foe check, so a turn with no foe left still counts as done. The class does not test that the holder is asleep: the effect is a scripted Sleep Talk whose own move conditions decide; this was not changed or probed here.",
+      "uses": 1
+    },
+    {
+      "id": "block.splash-damage",
+      "className": "SplashDamageAbAttr",
+      "label": "Repeat my hit on the foe's neighbour at reduced power",
+      "summary": "After my single-target attack lands, the same move also hits the foe's standing neighbour at 50% of its power (at least 1), once per turn. Example: 50 = half power.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "splash damage",
+        "two chambered",
+        "spread damage",
+        "hit the neighbour too",
+        "echo attack",
+        "half damage to the ally of the target"
+      ],
+      "examples": [
+        "Also hit the foe next to my target for half damage",
+        "After a single-target hit, splash 50% of the move's power onto the other foe"
+      ],
+      "params": [
+        {
+          "id": "powerPercent",
+          "label": "Power of the repeated hit (% of the move's power, 50 = half)",
+          "control": "number",
+          "default": 50,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.damaging, plus requests R28 (the exact single-target list), R3 (marker in turn memory) and R29 (the foe has a standing neighbour)",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must have dealt at least 1 damage",
+        "It never queues the repeated hit for a preview (a simulated hit)",
+        "The repeated hit is a real, indirect use of the same move: it cannot trigger another splash in the same turn"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "powerPercent"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B, PACKAGE for the effect only, with a written reason: effect.scripted-move takes a FIXED move id and a FIXED power, and always targets the foe that was hit. This rule repeats the move that was just used, at a share of THAT move's power (never below 1), against a different Pokemon (the standing neighbour of the foe), and leaves a marker so it happens once per turn; request R35 extends effect.scripted-move with 'repeat the move I just used', 'power as a share of the move's power' and 'target the neighbour of the foe I hit'. The power share is a typed setting (the old literal 0.5 in apply is now the constructor argument `powerShare`, default 0.5, shown to staff as a whole percent; floor(power * 50 / 100) equals floor(power * 0.5), proved in chunk3.test.ts). The trigger and every condition are separate blocks. Source edit (pure move of code, spec 3.1): `damage > 0` moved into a `guards` method (a pure read of the frame; the first clause of the old canApply is the inherited attack condition, which stays first inside `gate`, so only one pure read was moved in front of it); the rest is `gate` in the old order. The gate is legacy-closure-pending-request (R28, R3, R29). Users: Splash Damage (6025, attr 0) and Two-Chambered (6086, attr 2, next to the HitMultiplier archetype attrs of other batches); both use the default share. Suspected game bugs, NOT fixed: (1) for a move with variable or no listed power (power -1 or 0, for example a fixed-damage or weight move) the repeated hit gets power max(1, floor(-0.5)) = 1, an almost harmless 1-power copy that still counts as a splash; (2) the marker is turn memory per holder, so with a multi-hit move only the FIRST landed hit splashes, which may or may not be intended (Two-Chambered hits twice). No other oddity found.",
+      "uses": 2
+    },
+    {
+      "id": "block.star-hit-multiplier",
+      "className": "StarHitMultiplierAbAttr",
+      "label": "Make my Star moves hit extra times",
+      "summary": "While the game decides how many times my move hits, moves that count as Star moves get 1 extra strike(s). Example: 1 means they hit twice.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.hit-count",
+      "whenLabel": "While the game decides how many times a move hits",
+      "synonyms": [
+        "starcrossed",
+        "hit twice",
+        "extra strike",
+        "double hit",
+        "parental bond",
+        "lunar moves hit twice",
+        "star moves hit again"
+      ],
+      "examples": [
+        "Make my Star moves hit twice",
+        "Lunar moves strike one extra time"
+      ],
+      "params": [
+        {
+          "id": "extraStrikes",
+          "label": "Extra strikes added (1 = the move hits twice)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 3,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "requests R30 (the move can be hit more than once by an ability) and R31 (the move is Star-based)",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.hit-n-times",
+        "params": [
+          "extraStrikes"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.star-hit-power",
+      "className": "StarHitPowerAbAttr",
+      "label": "Deal less damage with each hit of my Star moves",
+      "summary": "While the game calculates damage I deal, each hit of a move that counts as a Star move does 0.7 times its damage. Example: 0.7 = 70% damage per hit.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.damage-dealt",
+      "whenLabel": "While the game calculates damage I deal",
+      "synonyms": [
+        "starcrossed",
+        "reduce damage per hit",
+        "weaker hits",
+        "damage penalty",
+        "lunar damage",
+        "balance for extra strikes"
+      ],
+      "examples": [
+        "Each hit of my Star moves does 70% damage",
+        "Weaken the strikes of lunar moves to 0.7x"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Damage multiplier per hit (0.7 = 70% damage)",
+          "control": "number",
+          "default": 0.7,
+          "editable": true,
+          "min": 0.05,
+          "max": 1,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "request R31 (the move is Star-based)",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The multiplier can only lower damage (up to 1): the base class refuses values above 1"
+      ],
+      "effect": {
+        "id": "effect.multiply-damage-dealt",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.third-eye",
+      "className": "ThirdEyeAbAttr",
+      "label": "Expose the Dark-type foes when I enter",
+      "summary": "When I enter the battle, every Dark-type foe on the field is exposed, so Psychic moves can hit it as if it were not Dark (like Miracle Eye).",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "third eye",
+        "miracle eye on entry",
+        "psychic hits dark",
+        "remove dark immunity",
+        "expose dark types",
+        "identify foe"
+      ],
+      "examples": [
+        "Let Psychic moves hit Dark-type foes when I switch in",
+        "Cast Miracle Eye on every Dark foe on entry"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only Dark-type foes are changed; every other foe is left alone",
+        "It reaches the foes on the field at the moment I enter; a Dark foe that enters later is not exposed",
+        "It never changes anything for a preview (a simulated entry)"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     }
   ]
 }

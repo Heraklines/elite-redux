@@ -129,3 +129,67 @@ bindCondition(
   },
   "gate",
 );
+
+// ---- Chunk 3 (Push Kick, Sleeping In, Somniloquy, Splash Damage, Split Mind, Starcrossed, Third Eye). Same method as chunks 1 and 2:
+// each gate was read by hand from the live `gate` method. Every gate of this chunk contains at least one clause that no atom can express
+// yet, and one `gate` slot holds the whole gate, so each stays a written legacy-closure with the missing atoms listed in requests/B17.md.
+// Split Mind (6045) and Third Eye (6048) have no gate and no closure, so they need no binding.
+
+// Push Kick (6088, attr 0): `PUSH_KICK_TURN.get(holder) !== waveTurnCount && super.canApply` (damaging, hit landed, first strike, kicking move).
+// Atoms exist for the damaging and kicking-move clauses (move.damaging, move.flag); the other three do not (R25, R12, R24).
+bindLegacyClosure(
+  6088,
+  0,
+  "No atom reads the class's own once-per-turn-out memory (R25), whether the hit landed (R12) or whether it is the first strike of my move (R24); see requests R25, R12 and R24 in requests/B17.md",
+  "gate",
+);
+
+// Sleeping In (6056, attr 0): `isSleepInducingMove(move)` (the `accuracy !== -1` clause is a guard). No atom reads whether a move can put its target to sleep.
+bindLegacyClosure(
+  6056,
+  0,
+  "No atom reads whether the move can put its target to sleep or make it drowsy (a sleep effect or the drowsy effect among the move's attrs); see request R27 in requests/B17.md",
+  "gate",
+);
+
+// Somniloquy (6058, attr 0): `turn > 0 && turn % 2 === 0 && !marker("somniloquy:" + turn)` (the `isFainted` clause is the guard not-fainted).
+// time.turn-count covers the first clause; "every Nth turn" and a marker whose key contains the turn number have no atom (R26, R3/R23).
+bindLegacyClosure(
+  6058,
+  0,
+  "No atom tests 'every Nth turn' (turn % N === 0) or reads a marker whose key contains the turn number; see requests R26 and R3 (with R23) in requests/B17.md",
+  "gate",
+);
+
+// Splash Damage (6025, attr 0) and Two-Chambered (6086, attr 2): `super.canApply && category !== STATUS && moveTarget in [NEAR_ENEMY, OTHER, NEAR_OTHER]
+// && !marker("splash-damage:guard") && foe has a standing neighbour` (the `damage > 0` clause is a guard).
+// move.damaging covers the first two; move.target-kind 'single' is a different list (it contains RANDOM_NEAR_ENEMY and lacks NEAR_ENEMY), the
+// marker needs R3 and the neighbour test has no atom (R28, R3, R29).
+bindLegacyClosure(
+  6025,
+  0,
+  "No exact atom for the single-target move list [Near enemy, Other, Near other] (R28), the turn marker 'splash-damage:guard' (R3) or 'the foe has a standing neighbour' (R29); see requests in requests/B17.md",
+  "gate",
+);
+bindLegacyClosure(
+  6086,
+  2,
+  "No exact atom for the single-target move list [Near enemy, Other, Near other] (R28), the turn marker 'splash-damage:guard' (R3) or 'the foe has a standing neighbour' (R29); see requests in requests/B17.md",
+  "gate",
+);
+
+// Starcrossed (6017, attr 0): `super.canApply` (move.canBeMultiStrikeEnhanced, empty filter) `&& isStarMove(holder, move)`.
+bindLegacyClosure(
+  6017,
+  0,
+  "No atom reads whether the move can be hit more than once by an ability (canBeMultiStrikeEnhanced, R30) or whether the move is Star-based (the Lunar property or the Astral Project marker, R31); see requests in requests/B17.md",
+  "gate",
+);
+
+// Starcrossed (6017, attr 1): `super.canApply` (always true for the empty filter) `&& isStarMove(holder, move)`.
+bindLegacyClosure(
+  6017,
+  1,
+  "No atom reads whether the move is Star-based (the Lunar property or the Astral Project marker); see request R31 in requests/B17.md",
+  "gate",
+);
