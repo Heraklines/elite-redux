@@ -274,6 +274,57 @@ export const TEMPLATES: Readonly<Record<string, ScenarioSpec>> = {
     foeMoves: [MoveId.EXPLOSION],
     turns: [celebrate("BerryPhase")],
   },
+  /** B05 chunk 2. The HOLDER lands critical hits (attacker-side crit hooks: crit damage multiplier). */
+  "holder-crits-foe": {
+    ...BASE,
+    id: "holder-crits-foe",
+    label: "The holder lands critical hits on the enemy",
+    foe: SpeciesId.SNORLAX,
+    foeLevel: 100,
+    foeMoves: [MoveId.CELEBRATE],
+    crits: true,
+    turns: [use(MoveId.TACKLE), use(MoveId.TACKLE)],
+  },
+  /** B05 chunk 2. A poisoned (or whatever the status axis says) holder sits through the end-of-turn status tick. */
+  "holder-status-turns": {
+    ...BASE,
+    id: "holder-status-turns",
+    label: "The holder has a status condition and sits through three turns",
+    foeMoves: [MoveId.CELEBRATE],
+    turns: [celebrate(), celebrate(), celebrate()],
+    setup: ({ holder }) => {
+      // A status axis was applied before this runs; only poison an unaffected holder.
+      if (holder.status == null) {
+        setStatusOf(holder, StatusEffect.POISON);
+      }
+    },
+  },
+  /** B05 chunk 3. A damaging weather is already up (the axis picks which) and the holder sits through its end-of-turn ticks. */
+  "holder-in-damaging-weather": {
+    ...BASE,
+    id: "holder-in-damaging-weather",
+    label: "A damaging weather blows and the holder sits through three turns",
+    weather: WeatherType.SANDSTORM,
+    foeMoves: [MoveId.CELEBRATE],
+    turns: [celebrate(), celebrate(), celebrate()],
+    // Abilities such as Sand Veil or Slush Rush only count while THEIR weather is up (an ability-level condition), so the engine
+    // does not even look at their attrs in another weather. The holder therefore gets the first damaging weather its own
+    // weather-block lists (Sandstorm when it lists none, as for Cloud Nine and Overcoat).
+    setup: ({ game, holder }) => {
+      const listed = holder
+        .getAbility()
+        .getAttrs("PreWeatherDamageAbAttr")
+        .flatMap(attr => ((attr as unknown as { weatherTypes?: readonly WeatherType[] }).weatherTypes ?? []).slice());
+      const damaging = listed.find(
+        type =>
+          type === WeatherType.SANDSTORM
+          || type === WeatherType.HAIL
+          || type === WeatherType.TEMPEST_STORM
+          || type === WeatherType.SNOWY_WRATH,
+      );
+      setWeatherOf(game, damaging ?? WeatherType.SANDSTORM);
+    },
+  },
   /** The holder is low enough to want its berry; the enemy hits it. */
   "holder-low-hp-turns": {
     ...BASE,
@@ -324,6 +375,9 @@ const t = {
   doubles: "doubles-ally",
   reserve: "hit-with-reserve",
   flags: "while-active-flags",
+  holderCrits: "holder-crits-foe",
+  statusTurns: "holder-status-turns",
+  damagingWeather: "holder-in-damaging-weather",
 } as const;
 
 /** WHEN id to the template that reaches it. Reviewed by hand; `reach.test.ts` proves it with a probe attr. */
@@ -377,7 +431,7 @@ const WHEN_TEMPLATE: Readonly<Record<string, string>> = {
   "calc.damage-taken": t.hit,
   "calc.stab": t.attack,
   "calc.crit-stage": t.attack,
-  "calc.crit-multiplier": t.crit,
+  "calc.crit-multiplier": t.holderCrits,
   "calc.crit-roll": t.attack,
   "calc.hit-count": t.attack,
   "calc.max-multi-hit": t.attack,
@@ -410,13 +464,13 @@ const WHEN_TEMPLATE: Readonly<Record<string, string>> = {
   "cancel.battle-effect": t.inflicted,
   "cancel.battle-effect-immunity": t.inflicted,
   "cancel.battle-effect-immunity-field": t.inflicted,
-  "cancel.weather-damage": t.weather,
-  "cancel.weather-effect": t.weather,
-  "cancel.weather-suppress": t.weather,
+  "cancel.weather-damage": t.damagingWeather,
+  "cancel.weather-effect": t.damagingWeather,
+  "cancel.weather-suppress": t.damagingWeather,
   "cancel.interaction": t.hit,
   "cancel.crit": t.crit,
   "cancel.item-theft": t.item,
-  "cancel.indirect-damage": t.weather,
+  "cancel.indirect-damage": t.statusTurns,
   "cancel.one-hit-ko": t.hit,
   "cancel.forced-switch": t.forced,
   "cancel.explosive-moves": t.boom,

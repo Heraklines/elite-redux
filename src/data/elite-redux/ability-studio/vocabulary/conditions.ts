@@ -337,7 +337,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     pure: true,
     formula: {
       expr: "arena.weatherType === WeatherType[weather]",
-      source: `${ARENA}:219 (weatherType, suppression aware)`,
+      source: `${ARENA}:219 (weatherType, the raw weather: NOT changed by Cloud Nine or Air Lock)`,
     },
     synonyms: ["rain", "sun", "sandstorm", "hail", "snow", "weather active"],
     examples: ["Boost Speed in rain"],
@@ -773,6 +773,18 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     formula: { expr: "pokemon.getFormKey() === key", source: `${ENGINE} getFormKey` },
     synonyms: ["form", "current form", "transformed", "ape form"],
     examples: ["Only while in the battle form"],
+  },
+  {
+    id: "mon.in-form-number",
+    group: "Pokemon",
+    label: "{who} is in form number {formIndex}",
+    requires: [],
+    whoParam: "who",
+    params: [WHO(), numberParam("formIndex", "Form number (0 = first form, 1 = second form)", 1, 0, 30, 1, true)],
+    pure: true,
+    formula: { expr: "pokemon.formIndex === formIndex", source: `${ENGINE} formIndex` },
+    synonyms: ["form number", "which form", "broken form", "busted form", "second form"],
+    examples: ["Only while my disguise is broken (second form)"],
   },
   {
     id: "mon.can-change-form",

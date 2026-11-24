@@ -4923,8 +4923,25 @@ export class SetMoveAccuracyAbAttr extends AbAttr {
     this.accuracyValue = accuracyValue;
   }
 
-  override canApply({ move, accuracy }: SetMoveAccuracyAbAttrParams): boolean {
-    return this.moveIds.includes(move.id) && accuracy.value !== -1 && accuracy.value < this.accuracyValue;
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: SetMoveAccuracyAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `gate` (the move is one of the listed moves),
+   * then `residual` (the move does not always hit and its base accuracy is below the set value). No random draw.
+   */
+  override canApply(params: SetMoveAccuracyAbAttrParams): boolean {
+    return gatedCanApply<SetMoveAccuracyAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the move is one of the listed moves. */
+  public gate({ move }: SetMoveAccuracyAbAttrParams): boolean {
+    return this.moveIds.includes(move.id);
+  }
+
+  /** Feasibility that stays in the class: never-miss moves (-1) are left alone, and accuracy is only ever raised. */
+  public residual({ accuracy }: SetMoveAccuracyAbAttrParams): boolean {
+    return accuracy.value !== -1 && accuracy.value < this.accuracyValue;
   }
 
   override apply({ accuracy }: SetMoveAccuracyAbAttrParams): void {
@@ -4938,15 +4955,19 @@ export interface BonusCritAbAttrParams extends AbAttrBaseParams {
 }
 
 export class BonusCritAbAttr extends AbAttr {
-  constructor() {
+  /** How many critical hit levels this adds (Super Luck: 1) */
+  public stages: number;
+
+  constructor(stages = 1) {
     super(false);
+    this.stages = stages;
   }
 
   /**
-   * Apply the bonus crit ability by increasing the value in the provided number holder by 1
+   * Apply the bonus crit ability by increasing the value in the provided number holder by {@linkcode stages} (default 1)
    */
   override apply({ critStage }: BonusCritAbAttrParams): void {
-    critStage.value += 1;
+    critStage.value += this.stages;
   }
 }
 
@@ -5018,8 +5039,25 @@ export class BlockStatusDamageAbAttr extends CancelInteractionAbAttr {
     this.effects = effects;
   }
 
-  override canApply({ pokemon, cancelled }: AbAttrParamsWithCancel): boolean {
-    return !cancelled.value && !!pokemon.status?.effect && this.effects.includes(pokemon.status.effect);
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrParamsWithCancel) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `guards` (nothing was blocked yet), then
+   * `gate` (the holder has one of the listed statuses). No residual, no random draw.
+   */
+  override canApply(params: AbAttrParamsWithCancel): boolean {
+    return gatedCanApply<AbAttrParamsWithCancel>(this, params);
+  }
+
+  /** Safety rule that stays in the class: damage that an earlier ability already blocked needs no second block. */
+  public guards({ cancelled }: AbAttrParamsWithCancel): boolean {
+    return !cancelled.value;
+  }
+
+  /** The replaceable condition: the holder has one of the listed statuses. */
+  public gate({ pokemon }: AbAttrParamsWithCancel): boolean {
+    return !!pokemon.status?.effect && this.effects.includes(pokemon.status.effect);
   }
 }
 
@@ -5056,7 +5094,16 @@ export class ChangeMovePriorityAbAttr extends AbAttr {
     this.changeAmount = changeAmount;
   }
 
-  override canApply({ pokemon, move }: ChangeMovePriorityAbAttrParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: ChangeMovePriorityAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole rule is the replaceable `gate`, there is no residual. */
+  override canApply(params: ChangeMovePriorityAbAttrParams): boolean {
+    return gatedCanApply<ChangeMovePriorityAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the constructor closure. */
+  public gate({ pokemon, move }: ChangeMovePriorityAbAttrParams): boolean {
     return this.moveFunc(pokemon, move);
   }
 
@@ -5075,7 +5122,16 @@ export class ChangeMovePriorityInBracketAbAttr extends AbAttr {
     this.moveFunc = moveFunc;
   }
 
-  override canApply({ pokemon, move }: ChangeMovePriorityAbAttrParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: ChangeMovePriorityAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole rule is the replaceable `gate`, there is no residual. */
+  override canApply(params: ChangeMovePriorityAbAttrParams): boolean {
+    return gatedCanApply<ChangeMovePriorityAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the constructor closure. */
+  public gate({ pokemon, move }: ChangeMovePriorityAbAttrParams): boolean {
     return this.moveFunc(pokemon, move);
   }
 
@@ -5114,12 +5170,25 @@ export class BlockWeatherDamageAttr extends PreWeatherDamageAbAttr {
     this.weatherTypes = weatherTypes;
   }
 
-  override canApply({ weather, cancelled }: PreWeatherEffectAbAttrParams): boolean {
-    if (!weather || cancelled.value) {
-      return false;
-    }
-    const weatherType = weather.weatherType;
-    return this.weatherTypes.length === 0 || this.weatherTypes.includes(weatherType);
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreWeatherEffectAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `guards` (there is a weather and nothing blocked
+   * the damage yet), then `gate` (the weather is one of the listed ones; an empty list means every weather). No residual.
+   */
+  override canApply(params: PreWeatherEffectAbAttrParams): boolean {
+    return gatedCanApply<PreWeatherEffectAbAttrParams>(this, params);
+  }
+
+  /** Safety rule that stays in the class: no weather, or damage that an earlier ability already blocked, needs no block. */
+  public guards({ weather, cancelled }: PreWeatherEffectAbAttrParams): boolean {
+    return !(!weather || cancelled.value);
+  }
+
+  /** The replaceable condition: the weather is one of the listed ones (an empty list means every weather). */
+  public gate({ weather }: PreWeatherEffectAbAttrParams): boolean {
+    return this.weatherTypes.length === 0 || (!!weather && this.weatherTypes.includes(weather.weatherType));
   }
 
   override apply({ cancelled }: PreWeatherEffectAbAttrParams): void {
@@ -5310,7 +5379,16 @@ export class PostWeatherChangeFormChangeAbAttr extends PostWeatherChangeAbAttr {
     this.formRevertingWeathers = formRevertingWeathers;
   }
 
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** Only the safety rule decides whether this runs; the weather rule below picks WHAT it does (see {@linkcode gate}). */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return this.guards(params);
+  }
+
+  /** Safety rule (guard `weather-form-species-only`): Castform with Forecast or Cherrim with Flower Gift, nothing else. */
+  public guards({ pokemon }: AbAttrBaseParams): boolean {
     const isCastformWithForecast =
       pokemon.species.speciesId === SpeciesId.CASTFORM && this.ability === AbilityId.FORECAST;
     const isCherrimWithFlowerGift =
@@ -5320,19 +5398,29 @@ export class PostWeatherChangeFormChangeAbAttr extends PostWeatherChangeAbAttr {
   }
 
   /**
-   * Calls {@linkcode Arena.triggerWeatherBasedFormChangesToNormal | triggerWeatherBasedFormChangesToNormal} when the
-   * weather changed to form-reverting weather, otherwise calls {@linkcode Arena.triggerWeatherBasedFormChanges | triggerWeatherBasedFormChanges}
+   * The replaceable weather rule: the weather sends me back to my normal form. Reads the ARENA weather, not the `weather` of the
+   * call (the class has always done so, see the TODO in {@linkcode apply}); no weather, or a weather whose id is 0, is never
+   * a reverting weather.
    */
-  override apply({ simulated }: AbAttrBaseParams): void {
-    if (simulated) {
+  public gate(_params: AbAttrBaseParams): boolean {
+    const weatherType = globalScene.arena.weather?.weatherType;
+    return !!weatherType && this.formRevertingWeathers.includes(weatherType);
+  }
+
+  /**
+   * Calls {@linkcode Arena.triggerWeatherBasedFormChangesToNormal | triggerWeatherBasedFormChangesToNormal} when the
+   * weather changed to form-reverting weather (the {@linkcode gate}), otherwise calls {@linkcode Arena.triggerWeatherBasedFormChanges | triggerWeatherBasedFormChanges}
+   *
+   * TODO: investigate why the rule does not use the weatherType parameter and reads the weather from the global scene
+   */
+  override apply(params: AbAttrBaseParams): void {
+    if (params.simulated) {
       return;
     }
 
-    // TODO: investigate why this is not using the weatherType parameter
-    // and is instead reading the weather from the global scene
-    const weatherType = globalScene.arena.weather?.weatherType;
-
-    if (weatherType && this.formRevertingWeathers.includes(weatherType)) {
+    // The weather rule is the replaceable `gate` (ability studio spec 3.1): it picks the branch, not whether this runs.
+    const sendsBackToNormal = this.gateOverride ?? this.gate.bind(this);
+    if (sendsBackToNormal(params)) {
       globalScene.arena.triggerWeatherBasedFormChangesToNormal();
     } else {
       globalScene.arena.triggerWeatherBasedFormChanges();
@@ -5352,7 +5440,19 @@ export class IceFaceFormChangeAbAttr extends PostWeatherChangeAbAttr {
     this.formIndex = formIndex;
   }
 
-  override canApply({ pokemon, weather }: PostWeatherChangeAbAttrParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostWeatherChangeAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order, all in `gate` (no guard): the holder is in the form
+   * that can change back, then the new weather is hail or snow. Both are pure reads, no residual, no draw.
+   */
+  override canApply(params: PostWeatherChangeAbAttrParams): boolean {
+    return gatedCanApply<PostWeatherChangeAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the holder is in the form it restores from (`formIndex`) AND the new weather is hail or snow. */
+  public gate({ pokemon, weather }: PostWeatherChangeAbAttrParams): boolean {
     return pokemon.formIndex === this.formIndex && (weather === WeatherType.HAIL || weather === WeatherType.SNOW);
   }
 
@@ -5382,7 +5482,19 @@ export class FogRestoreDisguiseFormChangeAbAttr extends PostWeatherChangeAbAttr 
     this.bustedFormIndex = bustedFormIndex;
   }
 
-  override canApply({ pokemon, weather }: PostWeatherChangeAbAttrParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostWeatherChangeAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order, all in `gate` (no guard): the holder is in its busted
+   * form, then the new weather is fog. Both are pure reads, no residual, no draw.
+   */
+  override canApply(params: PostWeatherChangeAbAttrParams): boolean {
+    return gatedCanApply<PostWeatherChangeAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the holder is in the busted form (`bustedFormIndex`) AND the new weather is fog (either kind). */
+  public gate({ pokemon, weather }: PostWeatherChangeAbAttrParams): boolean {
     return pokemon.formIndex === this.bustedFormIndex && isFogWeather(weather);
   }
 
@@ -5419,7 +5531,19 @@ export class PostSummonFogRestoreDisguiseAbAttr extends PostSummonAbAttr {
     return false;
   }
 
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order, all in `gate` (no guard): the holder is in its busted
+   * form, then the weather on the field is fog. Both are pure reads, no residual, no draw.
+   */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The replaceable condition: the holder is in the busted form (`bustedFormIndex`) AND the weather on the field is fog (either kind). */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     return pokemon.formIndex === this.bustedFormIndex && isFogWeather(globalScene.arena.weatherType);
   }
 
@@ -5447,8 +5571,25 @@ export class PostWeatherChangeAddBattlerTagAbAttr extends PostWeatherChangeAbAtt
     this.weatherTypes = weatherTypes;
   }
 
-  override canApply({ weather, pokemon }: PostWeatherChangeAbAttrParams): boolean {
-    return this.weatherTypes.includes(weather) && pokemon.canAddTag(this.tagType);
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostWeatherChangeAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `gate` (the new weather is one of the listed
+   * ones), then `residual` (the holder can take the tag, which stays in the class). No guard, no draw.
+   */
+  override canApply(params: PostWeatherChangeAbAttrParams): boolean {
+    return gatedCanApply<PostWeatherChangeAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the weather that was just set is one of the listed ones. */
+  public gate({ weather }: PostWeatherChangeAbAttrParams): boolean {
+    return this.weatherTypes.includes(weather);
+  }
+
+  /** Effect-side feasibility that stays in the class: the holder must be able to take the tag. */
+  public residual({ pokemon }: PostWeatherChangeAbAttrParams): boolean {
+    return pokemon.canAddTag(this.tagType);
   }
 
   override apply({ simulated, pokemon }: PostWeatherChangeAbAttrParams): void {
@@ -5475,7 +5616,19 @@ export class PostWeatherLapseAbAttr extends AbAttr {
 
   apply(_params: Closed<PostWeatherLapseAbAttrParams>): void {}
 
+  /** Set by the ability studio compiler to replace the weather test (the gate) on a freshly built instance. */
+  public declare gateOverride: ((params: PostWeatherLapseAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B (ability studio spec 3.1): the weather test is the GATE and it lives here, not in `canApply`; the engine asks it
+   * BEFORE `canApply` (apply-ab-attrs.ts). Untouched, it is `getWeatherCondition(...weatherTypes)`. A replaced gate is called
+   * with the same two fields the dispatch passes: the holder, and the arena weather that weather-effect-phase.ts hands in.
+   */
   getCondition(): AbAttrCondition {
+    const override = this.gateOverride;
+    if (override !== undefined) {
+      return (pokemon: Pokemon) => override({ pokemon, weather: globalScene.arena.weather });
+    }
     return getWeatherCondition(...this.weatherTypes);
   }
 }
@@ -5567,8 +5720,25 @@ export class PostTerrainChangeAddBattlerTagAttr extends PostTerrainChangeAbAttr 
     this.terrainTypes = terrainTypes;
   }
 
-  override canApply({ pokemon, terrain }: PostTerrainChangeAbAttrParams): boolean {
-    return !!this.terrainTypes.find(t => t === terrain) && pokemon.canAddTag(this.tagType);
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostTerrainChangeAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order, no guard, no prepare, no random draw: `gate` (the new
+   * terrain is one of the listed ones), then `residual` (the holder can take the battle effect).
+   */
+  override canApply(params: PostTerrainChangeAbAttrParams): boolean {
+    return gatedCanApply<PostTerrainChangeAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the terrain that was just set is one of the listed ones. */
+  public gate({ terrain }: PostTerrainChangeAbAttrParams): boolean {
+    return !!this.terrainTypes.find(t => t === terrain);
+  }
+
+  /** Feasibility, stays in the class: the holder can take the battle effect. */
+  public residual({ pokemon }: PostTerrainChangeAbAttrParams): boolean {
+    return pokemon.canAddTag(this.tagType);
   }
 
   override apply({ pokemon, simulated }: PostTerrainChangeAbAttrParams): void {

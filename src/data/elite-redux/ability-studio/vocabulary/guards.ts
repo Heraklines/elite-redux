@@ -80,6 +80,17 @@ export const GUARD_REGISTRY: readonly GuardDef[] = [
     },
     synonyms: ["fainted", "knocked out", "alive"],
   },
+  {
+    id: "weather-form-species-only",
+    label: "Only works for Castform with Forecast and Cherrim with Flower Gift",
+    why: "The weather forms exist only on those two species; on any other Pokemon there is no form to change to.",
+    requires: [],
+    formula: {
+      expr: "(species === CASTFORM && ability === FORECAST) || (species === CHERRIM && ability === FLOWER_GIFT)",
+      source: "src/data/abilities/ab-attrs.ts PostWeatherChangeFormChangeAbAttr.guards",
+    },
+    synonyms: ["castform", "cherrim", "forecast", "flower gift"],
+  },
 ];
 
 const BY_ID: ReadonlyMap<string, GuardDef> = new Map(GUARD_REGISTRY.map(def => [def.id, def]));

@@ -54,7 +54,7 @@
     "maxWeight": 2
   },
   {
-    "key": "TM_COMMON",
+    "key": "TM_CASE",
     "tier": "COMMON",
     "weight": 2,
     "maxWeight": 2
@@ -140,7 +140,7 @@
   {
     "key": "NUGGET",
     "tier": "GREAT",
-    "weight": null,
+    "weight": 0,
     "maxWeight": 0
   },
   {
@@ -156,7 +156,7 @@
     "maxWeight": 8
   },
   {
-    "key": "MAP",
+    "key": "ER_UPGRADED_MAP",
     "tier": "GREAT",
     "weight": null,
     "maxWeight": 2
@@ -166,12 +166,6 @@
     "tier": "GREAT",
     "weight": 2,
     "maxWeight": 2
-  },
-  {
-    "key": "TM_GREAT",
-    "tier": "GREAT",
-    "weight": 3,
-    "maxWeight": 3
   },
   {
     "key": "MEMORY_MUSHROOM",
@@ -186,6 +180,54 @@
     "maxWeight": 2
   },
   {
+    "key": "ER_EJECT_BUTTON",
+    "tier": "GREAT",
+    "weight": 0,
+    "maxWeight": 0
+  },
+  {
+    "key": "ER_EJECT_PACK",
+    "tier": "GREAT",
+    "weight": 0,
+    "maxWeight": 0
+  },
+  {
+    "key": "ER_SHED_SHELL",
+    "tier": "GREAT",
+    "weight": 0,
+    "maxWeight": 0
+  },
+  {
+    "key": "ER_ADRENALINE_ORB",
+    "tier": "GREAT",
+    "weight": 0,
+    "maxWeight": 0
+  },
+  {
+    "key": "ER_ROOM_SERVICE",
+    "tier": "GREAT",
+    "weight": 0,
+    "maxWeight": 0
+  },
+  {
+    "key": "ER_MENTAL_HERB",
+    "tier": "GREAT",
+    "weight": 1,
+    "maxWeight": 1
+  },
+  {
+    "key": "ER_BLUNDER_POLICY",
+    "tier": "GREAT",
+    "weight": 0,
+    "maxWeight": 0
+  },
+  {
+    "key": "ER_STICKY_BARB",
+    "tier": "GREAT",
+    "weight": 0,
+    "maxWeight": 0
+  },
+  {
     "key": "BASE_STAT_BOOSTER",
     "tier": "GREAT",
     "weight": 3,
@@ -196,12 +238,6 @@
     "tier": "GREAT",
     "weight": null,
     "maxWeight": 0
-  },
-  {
-    "key": "DNA_SPLICERS",
-    "tier": "GREAT",
-    "weight": null,
-    "maxWeight": 4
   },
   {
     "key": "VOUCHER",
@@ -240,28 +276,22 @@
     "maxWeight": 4
   },
   {
-    "key": "SPEED_ORDER",
-    "tier": "ULTRA",
-    "weight": null,
-    "maxWeight": 4
-  },
-  {
     "key": "RARE_EVOLUTION_ITEM",
     "tier": "ULTRA",
-    "weight": null,
-    "maxWeight": 32
+    "weight": 5,
+    "maxWeight": 5
   },
   {
     "key": "FORM_CHANGE_ITEM",
     "tier": "ULTRA",
-    "weight": null,
-    "maxWeight": 24
+    "weight": 5,
+    "maxWeight": 5
   },
   {
     "key": "AMULET_COIN",
     "tier": "ULTRA",
-    "weight": null,
-    "maxWeight": 0
+    "weight": 2,
+    "maxWeight": 2
   },
   {
     "key": "EVIOLITE",
@@ -322,12 +352,6 @@
     "tier": "ULTRA",
     "weight": 9,
     "maxWeight": 9
-  },
-  {
-    "key": "TM_ULTRA",
-    "tier": "ULTRA",
-    "weight": 11,
-    "maxWeight": 11
   },
   {
     "key": "RARER_CANDY",
@@ -432,6 +456,132 @@
     "maxWeight": 4
   },
   {
+    "key": "ER_GREATER_ABILITY_CAPSULE",
+    "tier": "ULTRA",
+    "weight": 2,
+    "maxWeight": 2
+  },
+  {
+    "key": "MOVE_RANDOMIZER",
+    "tier": "ULTRA",
+    "weight": 4,
+    "maxWeight": 4
+  },
+  {
+    "key": "ER_EXPERT_BELT",
+    "tier": "ULTRA",
+    "weight": 3,
+    "maxWeight": 3
+  },
+  {
+    "key": "ER_HEAVY_DUTY_BOOTS",
+    "tier": "ULTRA",
+    "weight": 1,
+    "maxWeight": 1
+  },
+  {
+    "key": "ER_AIR_BALLOON",
+    "tier": "ULTRA",
+    "weight": 1,
+    "maxWeight": 1
+  },
+  {
+    "key": "ER_SAFETY_GOGGLES",
+    "tier": "ULTRA",
+    "weight": 1,
+    "maxWeight": 1
+  },
+  {
+    "key": "ER_COVERT_CLOAK",
+    "tier": "ULTRA",
+    "weight": 0,
+    "maxWeight": 0
+  },
+  {
+    "key": "ER_CLEAR_AMULET",
+    "tier": "ULTRA",
+    "weight": 1,
+    "maxWeight": 1
+  },
+  {
+    "key": "ER_ABILITY_SHIELD",
+    "tier": "ULTRA",
+    "weight": 1,
+    "maxWeight": 1
+  },
+  {
+    "key": "ER_THROAT_SPRAY",
+    "tier": "ULTRA",
+    "weight": 0,
+    "maxWeight": 0
+  },
+  {
+    "key": "ER_PUNCHING_GLOVE",
+    "tier": "ULTRA",
+    "weight": 3,
+    "maxWeight": 3
+  },
+  {
+    "key": "ER_MUSCLE_BAND",
+    "tier": "ULTRA",
+    "weight": null,
+    "maxWeight": 0
+  },
+  {
+    "key": "ER_WISE_GLASSES",
+    "tier": "ULTRA",
+    "weight": null,
+    "maxWeight": 0
+  },
+  {
+    "key": "ER_ZOOM_LENS",
+    "tier": "ULTRA",
+    "weight": 1,
+    "maxWeight": 1
+  },
+  {
+    "key": "ER_IRON_BALL",
+    "tier": "ULTRA",
+    "weight": 0,
+    "maxWeight": 0
+  },
+  {
+    "key": "ER_FLOAT_STONE",
+    "tier": "ULTRA",
+    "weight": 1,
+    "maxWeight": 1
+  },
+  {
+    "key": "ER_SMOKE_BALL",
+    "tier": "ULTRA",
+    "weight": 0,
+    "maxWeight": 0
+  },
+  {
+    "key": "ER_UTILITY_UMBRELLA",
+    "tier": "ULTRA",
+    "weight": 0,
+    "maxWeight": 0
+  },
+  {
+    "key": "ABILITY_RANDOMIZER",
+    "tier": "ULTRA",
+    "weight": 4,
+    "maxWeight": 4
+  },
+  {
+    "key": "BERRY_POUCH",
+    "tier": "ULTRA",
+    "weight": 4,
+    "maxWeight": 4
+  },
+  {
+    "key": "DNA_SPLICERS",
+    "tier": "ULTRA",
+    "weight": 2,
+    "maxWeight": 2
+  },
+  {
     "key": "ROGUE_BALL",
     "tier": "ROGUE",
     "weight": null,
@@ -454,12 +604,6 @@
     "tier": "ROGUE",
     "weight": 3,
     "maxWeight": 3
-  },
-  {
-    "key": "BERRY_POUCH",
-    "tier": "ROGUE",
-    "weight": 4,
-    "maxWeight": 4
   },
   {
     "key": "GRIP_CLAW",
@@ -495,13 +639,7 @@
     "key": "ABILITY_CHARM",
     "tier": "ROGUE",
     "weight": null,
-    "maxWeight": 0
-  },
-  {
-    "key": "ABILITY_RANDOMIZER",
-    "tier": "ROGUE",
-    "weight": 4,
-    "maxWeight": 4
+    "maxWeight": 6
   },
   {
     "key": "MOVE_SLOT_EXPANDER",
@@ -510,10 +648,28 @@
     "maxWeight": 4
   },
   {
+    "key": "ER_GREATER_MOVE_RANDOMIZER",
+    "tier": "ROGUE",
+    "weight": null,
+    "maxWeight": 2
+  },
+  {
     "key": "ER_OMNI_GEM",
     "tier": "ROGUE",
     "weight": 3,
     "maxWeight": 3
+  },
+  {
+    "key": "ER_METRONOME_ITEM",
+    "tier": "ROGUE",
+    "weight": 3,
+    "maxWeight": 3
+  },
+  {
+    "key": "ER_BOOSTER_ENERGY",
+    "tier": "ROGUE",
+    "weight": null,
+    "maxWeight": 0
   },
   {
     "key": "DAMAGE_CALCULATOR",
@@ -570,12 +726,6 @@
     "maxWeight": 3
   },
   {
-    "key": "MULTI_LENS",
-    "tier": "ROGUE",
-    "weight": 18,
-    "maxWeight": 18
-  },
-  {
     "key": "MASTER_BALL",
     "tier": "MASTER",
     "weight": null,
@@ -594,21 +744,27 @@
     "maxWeight": 18
   },
   {
+    "key": "MULTI_LENS",
+    "tier": "MASTER",
+    "weight": 18,
+    "maxWeight": 18
+  },
+  {
     "key": "VOUCHER_PREMIUM",
     "tier": "MASTER",
     "weight": null,
     "maxWeight": 5
   },
   {
-    "key": "DNA_SPLICERS",
-    "tier": "MASTER",
-    "weight": null,
-    "maxWeight": 24
-  },
-  {
     "key": "MINI_BLACK_HOLE",
     "tier": "MASTER",
     "weight": null,
     "maxWeight": 1
+  },
+  {
+    "key": "ER_GREATER_ABILITY_RANDOMIZER",
+    "tier": "MASTER",
+    "weight": 2,
+    "maxWeight": 2
   }
 ]

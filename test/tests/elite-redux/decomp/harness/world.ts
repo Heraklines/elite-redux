@@ -13,6 +13,7 @@
 // status / weather / stage / type variants that matter, instead of a full cartesian product. The
 // world is mutated once per state and every binding is evaluated inside that state.
 
+import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import { Gender } from "#data/gender";
 import { Status } from "#data/status-effect";
@@ -396,4 +397,48 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     power: new NumberHolder(ctx.move.power),
     simulated: false,
   }),
+  // Move.calculateBattleAccuracy (move.ts:1249): the USER is the holder, there is no opponent, and the number is the
+  // base accuracy of the move before the evasion and accuracy stages. Added by B05 (SetMoveAccuracyAbAttr).
+  "calc.accuracy": ctx => ({
+    pokemon: ctx.holder,
+    move: ctx.move,
+    accuracy: new NumberHolder(ctx.move.accuracy),
+    simulated: false,
+  }),
+  // Added by B05 chunk 2. Move.getPriority / getPriorityModifier (move.ts:1445, :1455): the user is the holder, the
+  // number is the move priority (a bracket value for ChangeMovePriorityInBracketAbAttr; the shape is the same).
+  "calc.priority": ctx => ({
+    pokemon: ctx.holder,
+    move: ctx.move,
+    priority: new NumberHolder(ctx.move.priority),
+    simulated: false,
+  }),
+  // Pokemon.getCritStage (pokemon.ts:2063): only the holder and the stage number.
+  "calc.crit-stage": ctx => ({ pokemon: ctx.holder, critStage: new NumberHolder(0) }),
+  // Pokemon.getAttackDamage (pokemon.ts:6071): a critical hit starts at 1.5 (a plain hit at 1, which MultCrit skips).
+  "calc.crit-multiplier": ctx => ({ pokemon: ctx.holder, critMult: new NumberHolder(1.5), simulated: false }),
+  // Pokemon.getCriticalHitResult (pokemon.ts:6438): the holder attacks `target`, the number is "will crit".
+  "calc.crit-roll": ctx => ({
+    pokemon: ctx.holder,
+    target: ctx.foe,
+    move: ctx.move,
+    isCritical: new BooleanHolder(false),
+  }),
+  // Cancel checks with no opponent (turn-end-phase.ts:89, move.ts:4713).
+  "cancel.indirect-damage": ctx => ({ pokemon: ctx.holder, cancelled: new BooleanHolder(false) }),
+  "cancel.one-hit-ko": ctx => ({ pokemon: ctx.holder, cancelled: new BooleanHolder(false) }),
+  // Added by B05 chunk 3. WeatherEffectPhase (weather-effect-phase.ts:94 and :101): the holder and the weather on the field
+  // (null when there is none), a fresh "cancelled" flag.
+  "cancel.weather-damage": ctx => ({
+    pokemon: ctx.holder,
+    weather: globalScene.arena.weather,
+    cancelled: new BooleanHolder(false),
+  }),
+  "cancel.weather-suppress": ctx => ({
+    pokemon: ctx.holder,
+    weather: globalScene.arena.weather,
+    cancelled: new BooleanHolder(false),
+  }),
+  // Arena.trySetWeather (arena.ts:537): the weather it was just changed to (the arena has stored it already).
+  "event.weather-changed": ctx => ({ pokemon: ctx.holder, weather: globalScene.arena.weatherType, simulated: false }),
 };

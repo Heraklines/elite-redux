@@ -11,8 +11,10 @@
 
 import { allMoves } from "#data/data-lists";
 import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
+import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { MoveResult } from "#enums/move-result";
+import { SpeciesId } from "#enums/species-id";
 import type { Frame } from "./frame";
 
 export type GuardPredicate = (frame: Frame) => boolean;
@@ -56,6 +58,10 @@ export const GUARD_EVALUATORS: Readonly<Record<string, GuardPredicate>> = {
       allMoves[enemyLastMoveUsed.move].chance >= 0 && abilityQuery(source, ENGINE_QUERY.SHEER_FORCE_SECONDARY_EFFECTS)
     );
   },
+  // Forecast works for Castform and Flower Gift for Cherrim only (PostWeatherChangeFormChangeAbAttr.guards).
+  "weather-form-species-only": frame =>
+    (frame.holder.species.speciesId === SpeciesId.CASTFORM && frame.holder.hasAbility(AbilityId.FORECAST))
+    || (frame.holder.species.speciesId === SpeciesId.CHERRIM && frame.holder.hasAbility(AbilityId.FLOWER_GIFT)),
   // Activate only after the last hit of multistrike moves.
   "after-final-hit": frame => {
     const source = frame.other;

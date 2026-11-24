@@ -412,6 +412,7 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
   },
   "mon.ability-ignorable": () => frame => frame.holder.getAbility().ignorable,
   "mon.in-form": p => frame => holderLikeOf(frame, String(p.who))?.getFormKey() === String(p.key),
+  "mon.in-form-number": p => frame => holderLikeOf(frame, String(p.who))?.formIndex === Number(p.formIndex),
   "mon.can-change-form": p => frame => {
     const target = holderLikeOf(frame, String(p.who));
     if (target === undefined) {

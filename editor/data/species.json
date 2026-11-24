@@ -15,7 +15,7 @@
     "id": 10694,
     "dex": 63,
     "eggTier": 0,
-    "cost": 3
+    "cost": 4
   },
   {
     "const": "SPECIES_ABSOL",
@@ -33,7 +33,7 @@
     "id": 142,
     "dex": 142,
     "eggTier": 1,
-    "cost": 5
+    "cost": 4
   },
   {
     "const": "SPECIES_AIPOM",
@@ -42,7 +42,7 @@
     "id": 190,
     "dex": 190,
     "eggTier": 0,
-    "cost": 2
+    "cost": 3
   },
   {
     "const": "SPECIES_ALOMOMOLA",
@@ -51,7 +51,7 @@
     "id": 594,
     "dex": 594,
     "eggTier": 1,
-    "cost": 3
+    "cost": 1
   },
   {
     "const": "SPECIES_AMAURA",
@@ -60,7 +60,7 @@
     "id": 698,
     "dex": 698,
     "eggTier": 1,
-    "cost": 2
+    "cost": 3
   },
   {
     "const": "SPECIES_ANORITH",
@@ -69,7 +69,7 @@
     "id": 347,
     "dex": 347,
     "eggTier": 1,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_APPLIN",
@@ -87,7 +87,7 @@
     "id": 493,
     "dex": 493,
     "eggTier": 3,
-    "cost": 9
+    "cost": 8
   },
   {
     "const": "SPECIES_ARCHEN",
@@ -141,7 +141,7 @@
     "id": 846,
     "dex": 846,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_ARTICUNO",
@@ -168,7 +168,7 @@
     "id": 10621,
     "dex": 144,
     "eggTier": 3,
-    "cost": 9
+    "cost": 8
   },
   {
     "const": "SPECIES_GRENINJA_ASH",
@@ -204,7 +204,7 @@
     "id": 482,
     "dex": 482,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_AZELF_REDUX",
@@ -213,7 +213,7 @@
     "id": 10712,
     "dex": 482,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_AZURILL",
@@ -222,7 +222,7 @@
     "id": 298,
     "dex": 298,
     "eggTier": 0,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_BAGON",
@@ -258,7 +258,7 @@
     "id": 550,
     "dex": 550,
     "eggTier": 1,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_BELDUM",
@@ -285,7 +285,7 @@
     "id": 10667,
     "dex": 69,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_BERGMITE",
@@ -294,7 +294,7 @@
     "id": 712,
     "dex": 712,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_BEWEAR_ANGRY",
@@ -330,7 +330,7 @@
     "id": 806,
     "dex": 806,
     "eggTier": 2,
-    "cost": 7
+    "cost": 5
   },
   {
     "const": "SPECIES_BLIPBUG",
@@ -357,7 +357,7 @@
     "id": 10022,
     "dex": null,
     "eggTier": 1,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_BLOCLI",
@@ -375,7 +375,7 @@
     "id": 962,
     "dex": 962,
     "eggTier": 0,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_BONSLY",
@@ -393,7 +393,7 @@
     "id": 626,
     "dex": 626,
     "eggTier": 1,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_BOUNSWEET",
@@ -420,7 +420,7 @@
     "id": 946,
     "dex": 946,
     "eggTier": 0,
-    "cost": 3
+    "cost": 1
   },
   {
     "const": "SPECIES_BRONZOR",
@@ -429,7 +429,7 @@
     "id": 436,
     "dex": 436,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_BRUTE_BONNET",
@@ -447,7 +447,7 @@
     "id": 779,
     "dex": 779,
     "eggTier": 1,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_BUBBLEO",
@@ -510,7 +510,7 @@
     "id": 659,
     "dex": 659,
     "eggTier": 0,
-    "cost": 3
+    "cost": 1
   },
   {
     "const": "SPECIES_BURMY",
@@ -528,7 +528,7 @@
     "id": 10042,
     "dex": 412,
     "eggTier": 3,
-    "cost": 11
+    "cost": 10
   },
   {
     "const": "SPECIES_BUZZWOLE",
@@ -600,7 +600,7 @@
     "id": 318,
     "dex": 318,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_CASTFORM",
@@ -609,7 +609,7 @@
     "id": 351,
     "dex": 351,
     "eggTier": 1,
-    "cost": 2
+    "cost": 1
   },
   {
     "const": "SPECIES_CATERPIE",
@@ -636,7 +636,7 @@
     "id": 797,
     "dex": 797,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_CETODDLE",
@@ -645,7 +645,7 @@
     "id": 974,
     "dex": 974,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_CETODDLE_REDUX",
@@ -716,7 +716,7 @@
     "slug": "chi_yu",
     "id": 1004,
     "dex": 1004,
-    "eggTier": 2,
+    "eggTier": 3,
     "cost": 7
   },
   {
@@ -834,7 +834,7 @@
     "id": 638,
     "dex": 638,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_COMBEE",
@@ -870,7 +870,7 @@
     "id": 10088,
     "dex": null,
     "eggTier": 1,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_CORPHISH",
@@ -906,7 +906,7 @@
     "id": 789,
     "dex": 789,
     "eggTier": 3,
-    "cost": 7
+    "cost": 6
   },
   {
     "const": "SPECIES_COTTONEE",
@@ -951,7 +951,7 @@
     "id": 845,
     "dex": 845,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_CRANIDOS",
@@ -969,7 +969,7 @@
     "id": 488,
     "dex": 488,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_CROAGUNK",
@@ -987,7 +987,7 @@
     "id": 615,
     "dex": 615,
     "eggTier": 1,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_CUBCHOO",
@@ -1059,7 +1059,7 @@
     "id": 10769,
     "dex": 491,
     "eggTier": 3,
-    "cost": 10
+    "cost": 9
   },
   {
     "const": "SPECIES_DARUMAKA",
@@ -1104,7 +1104,7 @@
     "id": 585,
     "dex": 585,
     "eggTier": 0,
-    "cost": 2
+    "cost": 1
   },
   {
     "const": "SPECIES_DEINO",
@@ -1206,6 +1206,15 @@
     "cost": 2
   },
   {
+    "const": "SPECIES_DIPPOWDOWN",
+    "name": "Dippowdown",
+    "slug": "dippowdown",
+    "id": 70036,
+    "dex": null,
+    "eggTier": 2,
+    "cost": 5
+  },
+  {
     "const": "SPECIES_DITTO",
     "name": "Ditto",
     "slug": "ditto",
@@ -1266,7 +1275,7 @@
     "id": 10752,
     "dex": 149,
     "eggTier": 3,
-    "cost": 9
+    "cost": 8
   },
   {
     "const": "SPECIES_DRAMPA",
@@ -1356,7 +1365,7 @@
     "id": 206,
     "dex": 206,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_DURALUDON",
@@ -1383,7 +1392,7 @@
     "id": 355,
     "dex": 355,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_DWEBBLE",
@@ -1464,7 +1473,7 @@
     "id": 905,
     "dex": 905,
     "eggTier": 2,
-    "cost": 6
+    "cost": 4
   },
   {
     "const": "SPECIES_ENTEI",
@@ -1473,7 +1482,7 @@
     "id": 244,
     "dex": 244,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_ESPURR",
@@ -1500,7 +1509,7 @@
     "id": 102,
     "dex": 102,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_EXEGGCUTE_REDUX",
@@ -1509,13 +1518,22 @@
     "id": 10681,
     "dex": 102,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_FALINKS",
     "name": "Falinks",
     "slug": "falinks",
     "id": 870,
+    "dex": 870,
+    "eggTier": 1,
+    "cost": 3
+  },
+  {
+    "const": "SPECIES_FALINKS_CONVERGENT",
+    "name": "Falinks Convergent",
+    "slug": "falinks_convergent",
+    "id": 70052,
     "dex": 870,
     "eggTier": 1,
     "cost": 4
@@ -1608,7 +1626,7 @@
     "id": 669,
     "dex": 669,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_FLAMIGO",
@@ -1617,7 +1635,7 @@
     "id": 973,
     "dex": 973,
     "eggTier": 1,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_FLETCHLING",
@@ -1653,7 +1671,7 @@
     "id": 987,
     "dex": 987,
     "eggTier": 2,
-    "cost": 7
+    "cost": 5
   },
   {
     "const": "SPECIES_FLYGON_REDUX_B",
@@ -1662,7 +1680,7 @@
     "id": 10759,
     "dex": 330,
     "eggTier": 2,
-    "cost": 4
+    "cost": 5
   },
   {
     "const": "SPECIES_FOGGING",
@@ -1689,7 +1707,7 @@
     "id": 590,
     "dex": 590,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_FRIGIBAX",
@@ -1698,7 +1716,7 @@
     "id": 996,
     "dex": 996,
     "eggTier": 1,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_FRILLISH",
@@ -1707,7 +1725,7 @@
     "id": 592,
     "dex": 592,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_FROAKIE",
@@ -1734,7 +1752,7 @@
     "id": 676,
     "dex": 676,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_GASTLY",
@@ -1743,7 +1761,7 @@
     "id": 92,
     "dex": 92,
     "eggTier": 1,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_GENESECT",
@@ -1761,7 +1779,7 @@
     "id": 74,
     "dex": 74,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_ALOLA_GEODUDE",
@@ -1770,7 +1788,7 @@
     "id": 2074,
     "dex": 74,
     "eggTier": 1,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_GIBLE",
@@ -1788,7 +1806,7 @@
     "id": 10727,
     "dex": 443,
     "eggTier": 0,
-    "cost": 3
+    "cost": 4
   },
   {
     "const": "SPECIES_GIMMIGHOUL",
@@ -1851,7 +1869,7 @@
     "id": 10802,
     "dex": 207,
     "eggTier": 0,
-    "cost": 3
+    "cost": 4
   },
   {
     "const": "SPECIES_GLIMMET",
@@ -1905,7 +1923,7 @@
     "id": 574,
     "dex": 574,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_GOUGING_FIRE",
@@ -1914,7 +1932,7 @@
     "id": 1020,
     "dex": 1020,
     "eggTier": 2,
-    "cost": 7
+    "cost": 6
   },
   {
     "const": "SPECIES_GREAT_TUSK",
@@ -1923,7 +1941,7 @@
     "id": 984,
     "dex": 984,
     "eggTier": 2,
-    "cost": 7
+    "cost": 5
   },
   {
     "const": "SPECIES_GREAVARD",
@@ -1941,7 +1959,7 @@
     "id": 88,
     "dex": 88,
     "eggTier": 0,
-    "cost": 2
+    "cost": 1
   },
   {
     "const": "SPECIES_ALOLA_GRIMER",
@@ -1950,7 +1968,7 @@
     "id": 2088,
     "dex": 88,
     "eggTier": 1,
-    "cost": 3
+    "cost": 1
   },
   {
     "const": "SPECIES_GROOKEY",
@@ -1968,7 +1986,7 @@
     "id": 10069,
     "dex": null,
     "eggTier": 1,
-    "cost": 5
+    "cost": 4
   },
   {
     "const": "SPECIES_GROTOM_DRUM",
@@ -1977,7 +1995,7 @@
     "id": 10634,
     "dex": null,
     "eggTier": 1,
-    "cost": 5
+    "cost": 4
   },
   {
     "const": "SPECIES_GROTOM_FILL",
@@ -1986,7 +2004,7 @@
     "id": 10636,
     "dex": null,
     "eggTier": 1,
-    "cost": 5
+    "cost": 4
   },
   {
     "const": "SPECIES_GROTOM_GLASS",
@@ -1995,7 +2013,7 @@
     "id": 10632,
     "dex": null,
     "eggTier": 1,
-    "cost": 5
+    "cost": 4
   },
   {
     "const": "SPECIES_GROTOM_KICK",
@@ -2004,7 +2022,7 @@
     "id": 10635,
     "dex": null,
     "eggTier": 1,
-    "cost": 5
+    "cost": 4
   },
   {
     "const": "SPECIES_GROTOM_ROLL",
@@ -2013,7 +2031,7 @@
     "id": 10633,
     "dex": null,
     "eggTier": 1,
-    "cost": 5
+    "cost": 4
   },
   {
     "const": "SPECIES_GROUDON",
@@ -2022,7 +2040,7 @@
     "id": 383,
     "dex": 383,
     "eggTier": 3,
-    "cost": 9
+    "cost": 8
   },
   {
     "const": "SPECIES_GROWLITHE",
@@ -2031,7 +2049,7 @@
     "id": 58,
     "dex": 58,
     "eggTier": 1,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_HISUI_GROWLITHE",
@@ -2067,7 +2085,7 @@
     "id": 316,
     "dex": 316,
     "eggTier": 0,
-    "cost": 1
+    "cost": 2
   },
   {
     "const": "SPECIES_GUZZLORD",
@@ -2077,6 +2095,15 @@
     "dex": 799,
     "eggTier": 2,
     "cost": 6
+  },
+  {
+    "const": "SPECIES_GUZZLORD_M",
+    "name": "Guzzlord M",
+    "slug": "guzzlord_m",
+    "id": 70062,
+    "dex": 799,
+    "eggTier": 3,
+    "cost": 10
   },
   {
     "const": "SPECIES_HAPPINY",
@@ -2129,7 +2156,7 @@
     "slug": "heatran",
     "id": 485,
     "dex": 485,
-    "eggTier": 2,
+    "eggTier": 3,
     "cost": 7
   },
   {
@@ -2184,7 +2211,7 @@
     "id": 250,
     "dex": 250,
     "eggTier": 3,
-    "cost": 8
+    "cost": 7
   },
   {
     "const": "SPECIES_HONEDGE",
@@ -2319,7 +2346,7 @@
     "id": 991,
     "dex": 991,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_IRON_CARAPACE",
@@ -2328,7 +2355,7 @@
     "id": 10024,
     "dex": null,
     "eggTier": 1,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_IRON_CROWN",
@@ -2337,7 +2364,7 @@
     "id": 1023,
     "dex": 1023,
     "eggTier": 2,
-    "cost": 7
+    "cost": 5
   },
   {
     "const": "SPECIES_IRON_EXO",
@@ -2418,7 +2445,7 @@
     "id": 10066,
     "dex": null,
     "eggTier": 1,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_IRON_SPIRALS",
@@ -2427,6 +2454,15 @@
     "id": 10089,
     "dex": null,
     "eggTier": 1,
+    "cost": 6
+  },
+  {
+    "const": "SPECIES_IRON_STREAM",
+    "name": "Iron Stream",
+    "slug": "iron_stream",
+    "id": 70053,
+    "dex": null,
+    "eggTier": 2,
     "cost": 6
   },
   {
@@ -2463,7 +2499,7 @@
     "id": 10047,
     "dex": null,
     "eggTier": 1,
-    "cost": 6
+    "cost": 7
   },
   {
     "const": "SPECIES_JANGMO_O",
@@ -2490,6 +2526,15 @@
     "id": 595,
     "dex": 595,
     "eggTier": 0,
+    "cost": 2
+  },
+  {
+    "const": "SPECIES_JUSTYKE",
+    "name": "Justyke",
+    "slug": "justyke",
+    "id": 70037,
+    "dex": null,
+    "eggTier": 1,
     "cost": 3
   },
   {
@@ -2535,7 +2580,7 @@
     "id": 10777,
     "dex": 798,
     "eggTier": 3,
-    "cost": 12
+    "cost": 10
   },
   {
     "const": "SPECIES_KECLEON",
@@ -2543,8 +2588,8 @@
     "slug": "kecleon",
     "id": 352,
     "dex": 352,
-    "eggTier": 0,
-    "cost": 2
+    "eggTier": 1,
+    "cost": 5
   },
   {
     "const": "SPECIES_KECLEONG",
@@ -2553,7 +2598,7 @@
     "id": 10684,
     "dex": null,
     "eggTier": 3,
-    "cost": 12
+    "cost": 10
   },
   {
     "const": "SPECIES_KELDEO",
@@ -2679,7 +2724,7 @@
     "id": 382,
     "dex": 382,
     "eggTier": 3,
-    "cost": 9
+    "cost": 8
   },
   {
     "const": "SPECIES_KYUREM",
@@ -2733,7 +2778,7 @@
     "id": 246,
     "dex": 246,
     "eggTier": 1,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_LARVITAR_REDUX",
@@ -2751,7 +2796,7 @@
     "id": 380,
     "dex": 380,
     "eggTier": 2,
-    "cost": 7
+    "cost": 6
   },
   {
     "const": "SPECIES_LATIOS",
@@ -2760,7 +2805,7 @@
     "id": 381,
     "dex": 381,
     "eggTier": 2,
-    "cost": 7
+    "cost": 6
   },
   {
     "const": "SPECIES_LECHONK",
@@ -2859,7 +2904,7 @@
     "id": 249,
     "dex": 249,
     "eggTier": 3,
-    "cost": 8
+    "cost": 7
   },
   {
     "const": "SPECIES_LUMBERING_SLOTH",
@@ -2886,7 +2931,7 @@
     "id": 337,
     "dex": 337,
     "eggTier": 0,
-    "cost": 3
+    "cost": 1
   },
   {
     "const": "SPECIES_LUVDISC",
@@ -2922,7 +2967,7 @@
     "id": 240,
     "dex": 240,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_MAGEARNA",
@@ -2979,13 +3024,22 @@
     "cost": 7
   },
   {
+    "const": "SPECIES_MANGLING_BLADE",
+    "name": "Mangling Blade",
+    "slug": "mangling_blade",
+    "id": 70040,
+    "dex": null,
+    "eggTier": 2,
+    "cost": 6
+  },
+  {
     "const": "SPECIES_MANKEY",
     "name": "Mankey",
     "slug": "mankey",
     "id": 56,
     "dex": 56,
     "eggTier": 1,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_MANTYKE",
@@ -3012,7 +3066,7 @@
     "id": 10029,
     "dex": null,
     "eggTier": 0,
-    "cost": 2
+    "cost": 3
   },
   {
     "const": "SPECIES_MAREANIE",
@@ -3102,7 +3156,7 @@
     "id": 808,
     "dex": 808,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_MEOWTH",
@@ -3120,7 +3174,7 @@
     "id": 2052,
     "dex": 52,
     "eggTier": 1,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_GALAR_MEOWTH",
@@ -3129,7 +3183,7 @@
     "id": 4052,
     "dex": 52,
     "eggTier": 1,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_MERRYKARP",
@@ -3138,7 +3192,7 @@
     "id": 10856,
     "dex": null,
     "eggTier": 0,
-    "cost": 2
+    "cost": 3
   },
   {
     "const": "SPECIES_MESPRIT",
@@ -3147,7 +3201,7 @@
     "id": 481,
     "dex": 481,
     "eggTier": 2,
-    "cost": 5
+    "cost": 4
   },
   {
     "const": "SPECIES_MESPRIT_REDUX",
@@ -3156,7 +3210,7 @@
     "id": 10713,
     "dex": 481,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_MEW",
@@ -3192,7 +3246,7 @@
     "id": 868,
     "dex": 868,
     "eggTier": 0,
-    "cost": 3
+    "cost": 1
   },
   {
     "const": "SPECIES_MILTANK",
@@ -3201,7 +3255,7 @@
     "id": 241,
     "dex": 241,
     "eggTier": 1,
-    "cost": 4
+    "cost": 2
   },
   {
     "const": "SPECIES_MIME_JR",
@@ -3210,7 +3264,7 @@
     "id": 439,
     "dex": 439,
     "eggTier": 0,
-    "cost": 2
+    "cost": 1
   },
   {
     "const": "SPECIES_MIMIKYU",
@@ -3219,7 +3273,7 @@
     "id": 778,
     "dex": 778,
     "eggTier": 1,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_MIMIKYU_APEX",
@@ -3245,7 +3299,7 @@
     "slug": "minccino_redux",
     "id": 10623,
     "dex": 572,
-    "eggTier": 0,
+    "eggTier": 2,
     "cost": 3
   },
   {
@@ -3291,7 +3345,7 @@
     "id": 146,
     "dex": 146,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_GALAR_MOLTRES",
@@ -3309,7 +3363,7 @@
     "id": 10622,
     "dex": 146,
     "eggTier": 3,
-    "cost": 12
+    "cost": 10
   },
   {
     "const": "SPECIES_MORELULL",
@@ -3354,7 +3408,7 @@
     "id": 446,
     "dex": 446,
     "eggTier": 1,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_MUNCHLAX_REDUX",
@@ -3390,7 +3444,7 @@
     "id": 198,
     "dex": 198,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_NACLI",
@@ -3399,7 +3453,7 @@
     "id": 932,
     "dex": 932,
     "eggTier": 1,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_NATU",
@@ -3453,7 +3507,7 @@
     "id": 793,
     "dex": 793,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_NINCADA",
@@ -3524,7 +3578,7 @@
     "slug": "ogerpon",
     "id": 1017,
     "dex": 1017,
-    "eggTier": 2,
+    "eggTier": 3,
     "cost": 7
   },
   {
@@ -3534,7 +3588,7 @@
     "id": 1014,
     "dex": 1014,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_OMANYTE",
@@ -3543,7 +3597,7 @@
     "id": 138,
     "dex": 138,
     "eggTier": 1,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_ONIX",
@@ -3552,7 +3606,7 @@
     "id": 95,
     "dex": 95,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_ORANGURU",
@@ -3561,7 +3615,7 @@
     "id": 765,
     "dex": 765,
     "eggTier": 1,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_ORICORIO",
@@ -3579,7 +3633,7 @@
     "id": 968,
     "dex": 968,
     "eggTier": 1,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_OSHAWOTT",
@@ -3615,7 +3669,7 @@
     "id": 674,
     "dex": 674,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_PANPOUR",
@@ -3624,7 +3678,7 @@
     "id": 515,
     "dex": 515,
     "eggTier": 0,
-    "cost": 2
+    "cost": 1
   },
   {
     "const": "SPECIES_PANPOUR_REDUX",
@@ -3633,7 +3687,7 @@
     "id": 10702,
     "dex": 515,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_PANSAGE",
@@ -3642,7 +3696,7 @@
     "id": 511,
     "dex": 511,
     "eggTier": 0,
-    "cost": 2
+    "cost": 1
   },
   {
     "const": "SPECIES_PANSAGE_REDUX",
@@ -3651,7 +3705,7 @@
     "id": 10704,
     "dex": 511,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_PANSEAR",
@@ -3660,7 +3714,7 @@
     "id": 513,
     "dex": 513,
     "eggTier": 0,
-    "cost": 2
+    "cost": 1
   },
   {
     "const": "SPECIES_PANSEAR_REDUX",
@@ -3669,7 +3723,7 @@
     "id": 10706,
     "dex": 513,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_PARAS",
@@ -3732,7 +3786,7 @@
     "id": 1025,
     "dex": 1025,
     "eggTier": 2,
-    "cost": 5
+    "cost": 3
   },
   {
     "const": "SPECIES_PETILIL",
@@ -3741,7 +3795,7 @@
     "id": 548,
     "dex": 548,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_PHANPY",
@@ -3750,7 +3804,7 @@
     "id": 231,
     "dex": 231,
     "eggTier": 0,
-    "cost": 3
+    "cost": 1
   },
   {
     "const": "SPECIES_PHANTUMP",
@@ -3777,7 +3831,7 @@
     "id": 489,
     "dex": 489,
     "eggTier": 2,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_PICHU",
@@ -3894,7 +3948,7 @@
     "id": 10438,
     "dex": null,
     "eggTier": 1,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_POLIWAG",
@@ -3903,7 +3957,7 @@
     "id": 60,
     "dex": 60,
     "eggTier": 0,
-    "cost": 2
+    "cost": 1
   },
   {
     "const": "SPECIES_POLTCHAGEIST",
@@ -3912,7 +3966,7 @@
     "id": 1012,
     "dex": 1012,
     "eggTier": 1,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_PONYTA",
@@ -3931,6 +3985,15 @@
     "dex": 77,
     "eggTier": 1,
     "cost": 2
+  },
+  {
+    "const": "SPECIES_PONYTA_REDUX",
+    "name": "Ponyta Redux",
+    "slug": "ponyta_redux",
+    "id": 70047,
+    "dex": 77,
+    "eggTier": 1,
+    "cost": 3
   },
   {
     "const": "SPECIES_POOCHYENA",
@@ -3958,6 +4021,15 @@
     "dex": 137,
     "eggTier": 1,
     "cost": 4
+  },
+  {
+    "const": "SPECIES_POWER_PLANT",
+    "name": "Power Plant",
+    "slug": "power_plant",
+    "id": 70045,
+    "dex": null,
+    "eggTier": 2,
+    "cost": 6
   },
   {
     "const": "SPECIES_PSYDUCK",
@@ -3996,6 +4068,15 @@
     "cost": 2
   },
   {
+    "const": "SPECIES_PYROTHON",
+    "name": "Pyrothon",
+    "slug": "pyrothon",
+    "id": 70046,
+    "dex": null,
+    "eggTier": 2,
+    "cost": 6
+  },
+  {
     "const": "SPECIES_PYUKUMUKU",
     "name": "Pyukumuku",
     "slug": "pyukumuku",
@@ -4029,7 +4110,7 @@
     "id": 6211,
     "dex": 211,
     "eggTier": 1,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_RAGING_BOLT",
@@ -4038,7 +4119,7 @@
     "id": 1021,
     "dex": 1021,
     "eggTier": 2,
-    "cost": 7
+    "cost": 6
   },
   {
     "const": "SPECIES_RAIKOU",
@@ -4110,7 +4191,7 @@
     "id": 378,
     "dex": 378,
     "eggTier": 2,
-    "cost": 5
+    "cost": 4
   },
   {
     "const": "SPECIES_REGIDRAGO",
@@ -4119,7 +4200,7 @@
     "id": 895,
     "dex": 895,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_REGIELEKI",
@@ -4128,7 +4209,7 @@
     "id": 894,
     "dex": 894,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_REGIGIGAS",
@@ -4137,7 +4218,7 @@
     "id": 486,
     "dex": 486,
     "eggTier": 3,
-    "cost": 7
+    "cost": 6
   },
   {
     "const": "SPECIES_REGIROCK",
@@ -4146,7 +4227,7 @@
     "id": 377,
     "dex": 377,
     "eggTier": 2,
-    "cost": 6
+    "cost": 4
   },
   {
     "const": "SPECIES_REGISTEEL",
@@ -4155,7 +4236,7 @@
     "id": 379,
     "dex": 379,
     "eggTier": 2,
-    "cost": 6
+    "cost": 4
   },
   {
     "const": "SPECIES_REGITUBE",
@@ -4218,7 +4299,7 @@
     "id": 10761,
     "dex": 743,
     "eggTier": 0,
-    "cost": 3
+    "cost": 4
   },
   {
     "const": "SPECIES_RIOLU",
@@ -4236,7 +4317,7 @@
     "id": 1005,
     "dex": 1005,
     "eggTier": 2,
-    "cost": 7
+    "cost": 6
   },
   {
     "const": "SPECIES_ROCKRUFF",
@@ -4263,7 +4344,7 @@
     "id": 837,
     "dex": 837,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_ROOKIDEE",
@@ -4316,7 +4397,7 @@
     "slug": "sableye_redux",
     "id": 10736,
     "dex": 302,
-    "eggTier": 0,
+    "eggTier": 1,
     "cost": 3
   },
   {
@@ -4362,7 +4443,7 @@
     "id": 989,
     "dex": 989,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_SANDYGAST",
@@ -4380,7 +4461,7 @@
     "id": 539,
     "dex": 539,
     "eggTier": 1,
-    "cost": 4
+    "cost": 2
   },
   {
     "const": "SPECIES_SAWK_REDUX",
@@ -4442,8 +4523,8 @@
     "slug": "scyther_redux",
     "id": 10827,
     "dex": 123,
-    "eggTier": 0,
-    "cost": 4
+    "eggTier": 2,
+    "cost": 5
   },
   {
     "const": "SPECIES_SEEDOT",
@@ -4461,7 +4542,7 @@
     "id": 86,
     "dex": 86,
     "eggTier": 0,
-    "cost": 1
+    "cost": 2
   },
   {
     "const": "SPECIES_SEEL_REDUX",
@@ -4469,7 +4550,7 @@
     "slug": "seel_redux",
     "id": 10805,
     "dex": 86,
-    "eggTier": 0,
+    "eggTier": 1,
     "cost": 3
   },
   {
@@ -4497,7 +4578,7 @@
     "id": 336,
     "dex": 336,
     "eggTier": 1,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_SEWADDLE",
@@ -4506,7 +4587,7 @@
     "id": 540,
     "dex": 540,
     "eggTier": 0,
-    "cost": 2
+    "cost": 1
   },
   {
     "const": "SPECIES_SHAYMIN",
@@ -4515,7 +4596,7 @@
     "id": 492,
     "dex": 492,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_SHELLDER",
@@ -4596,7 +4677,7 @@
     "id": 213,
     "dex": 213,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_SHUPPET",
@@ -4623,7 +4704,7 @@
     "id": 843,
     "dex": 843,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_SINISTEA",
@@ -4659,7 +4740,7 @@
     "id": 227,
     "dex": 227,
     "eggTier": 1,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_SKARMORY_REDUX",
@@ -4667,8 +4748,8 @@
     "slug": "skarmory_redux",
     "id": 10721,
     "dex": 227,
-    "eggTier": 1,
-    "cost": 3
+    "eggTier": 2,
+    "cost": 4
   },
   {
     "const": "SPECIES_SKIDDO",
@@ -4716,6 +4797,15 @@
     "cost": 2
   },
   {
+    "const": "SPECIES_SLABBERIGUS",
+    "name": "Slabberigus",
+    "slug": "slabberigus",
+    "id": 70054,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 5
+  },
+  {
     "const": "SPECIES_SLAKOTH",
     "name": "Slakoth",
     "slug": "slakoth",
@@ -4731,7 +4821,7 @@
     "id": 988,
     "dex": 988,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_SLOWPOKE",
@@ -4776,7 +4866,7 @@
     "id": 235,
     "dex": 235,
     "eggTier": 0,
-    "cost": 1
+    "cost": 2
   },
   {
     "const": "SPECIES_SMOLIV",
@@ -4830,7 +4920,7 @@
     "id": 872,
     "dex": 872,
     "eggTier": 0,
-    "cost": 3
+    "cost": 1
   },
   {
     "const": "SPECIES_SNORUNT",
@@ -4869,6 +4959,15 @@
     "cost": 2
   },
   {
+    "const": "SPECIES_SNUGLETT",
+    "name": "Snuglett",
+    "slug": "snuglett",
+    "id": 70042,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 2
+  },
+  {
     "const": "SPECIES_SOBBLE",
     "name": "Sobble",
     "slug": "sobble",
@@ -4884,7 +4983,7 @@
     "id": 577,
     "dex": 577,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_SOLOSIS_REDUX",
@@ -4983,7 +5082,7 @@
     "id": 442,
     "dex": 442,
     "eggTier": 1,
-    "cost": 4
+    "cost": 3
   },
   {
     "const": "SPECIES_SPIRITOMB_REDUX",
@@ -5001,7 +5100,7 @@
     "id": 325,
     "dex": 325,
     "eggTier": 0,
-    "cost": 2
+    "cost": 1
   },
   {
     "const": "SPECIES_SPRIGATITO",
@@ -5046,7 +5145,7 @@
     "id": 805,
     "dex": 805,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_STANTLER",
@@ -5082,7 +5181,7 @@
     "id": 874,
     "dex": 874,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_STUFFUL",
@@ -5091,7 +5190,7 @@
     "id": 759,
     "dex": 759,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_STUFFUL_REDUX",
@@ -5127,7 +5226,7 @@
     "id": 434,
     "dex": 434,
     "eggTier": 0,
-    "cost": 2
+    "cost": 1
   },
   {
     "const": "SPECIES_SUICUNE",
@@ -5154,7 +5253,7 @@
     "id": 283,
     "dex": 283,
     "eggTier": 0,
-    "cost": 2
+    "cost": 1
   },
   {
     "const": "SPECIES_SWABLU",
@@ -5181,7 +5280,7 @@
     "id": 220,
     "dex": 220,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_SWINUB_REDUX",
@@ -5199,7 +5298,7 @@
     "id": 684,
     "dex": 684,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_TADBULB",
@@ -5209,6 +5308,15 @@
     "dex": 938,
     "eggTier": 0,
     "cost": 3
+  },
+  {
+    "const": "SPECIES_TAGELA",
+    "name": "Tagela",
+    "slug": "tagela",
+    "id": 70055,
+    "dex": null,
+    "eggTier": 0,
+    "cost": 4
   },
   {
     "const": "SPECIES_TAILLOW",
@@ -5235,7 +5343,7 @@
     "id": 114,
     "dex": 114,
     "eggTier": 0,
-    "cost": 3
+    "cost": 1
   },
   {
     "const": "SPECIES_TAPU_BULU",
@@ -5271,7 +5379,7 @@
     "id": 786,
     "dex": 786,
     "eggTier": 2,
-    "cost": 7
+    "cost": 6
   },
   {
     "const": "SPECIES_TAROUNTULA",
@@ -5319,6 +5427,15 @@
     "cost": 4
   },
   {
+    "const": "SPECIES_TEMPORAL_SKULL",
+    "name": "Temporal Skull",
+    "slug": "temporal_skull",
+    "id": 70060,
+    "dex": null,
+    "eggTier": 2,
+    "cost": 6
+  },
+  {
     "const": "SPECIES_TENTACOOL",
     "name": "Tentacool",
     "slug": "tentacool",
@@ -5343,7 +5460,7 @@
     "id": 1024,
     "dex": 1024,
     "eggTier": 3,
-    "cost": 9
+    "cost": 8
   },
   {
     "const": "SPECIES_TERRAKION",
@@ -5352,7 +5469,7 @@
     "id": 639,
     "dex": 639,
     "eggTier": 2,
-    "cost": 7
+    "cost": 5
   },
   {
     "const": "SPECIES_THROH",
@@ -5361,7 +5478,7 @@
     "id": 538,
     "dex": 538,
     "eggTier": 1,
-    "cost": 4
+    "cost": 2
   },
   {
     "const": "SPECIES_THROH_REDUX",
@@ -5522,7 +5639,7 @@
     "slug": "trapinch_redux",
     "id": 10794,
     "dex": 328,
-    "eggTier": 0,
+    "eggTier": 1,
     "cost": 3
   },
   {
@@ -5535,13 +5652,22 @@
     "cost": 3
   },
   {
+    "const": "SPECIES_TREMBURR",
+    "name": "Tremburr",
+    "slug": "tremburr",
+    "id": 70033,
+    "dex": null,
+    "eggTier": 1,
+    "cost": 2
+  },
+  {
     "const": "SPECIES_TROPIUS",
     "name": "Tropius",
     "slug": "tropius",
     "id": 357,
     "dex": 357,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_TRUBBISH",
@@ -5622,7 +5748,7 @@
     "id": 696,
     "dex": 696,
     "eggTier": 1,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_UNOWN",
@@ -5649,7 +5775,7 @@
     "id": 480,
     "dex": 480,
     "eggTier": 2,
-    "cost": 5
+    "cost": 4
   },
   {
     "const": "SPECIES_UXIE_REDUX",
@@ -5658,7 +5784,7 @@
     "id": 10714,
     "dex": 480,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_VANILLITE",
@@ -5730,7 +5856,7 @@
     "id": 640,
     "dex": 640,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_VOLBEAT",
@@ -5748,7 +5874,7 @@
     "id": 721,
     "dex": 721,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_VOLTORB",
@@ -5767,6 +5893,15 @@
     "dex": 100,
     "eggTier": 1,
     "cost": 3
+  },
+  {
+    "const": "SPECIES_VOLTRIEVER",
+    "name": "Voltriever",
+    "slug": "voltriever",
+    "id": 70049,
+    "dex": null,
+    "eggTier": 2,
+    "cost": 5
   },
   {
     "const": "SPECIES_VULLABY",
@@ -5794,6 +5929,15 @@
     "dex": 37,
     "eggTier": 1,
     "cost": 3
+  },
+  {
+    "const": "SPECIES_WAILBORE",
+    "name": "Wailbore",
+    "slug": "wailbore",
+    "id": 70050,
+    "dex": null,
+    "eggTier": 2,
+    "cost": 5
   },
   {
     "const": "SPECIES_WAILMER",
@@ -6018,7 +6162,7 @@
     "id": 796,
     "dex": 796,
     "eggTier": 2,
-    "cost": 6
+    "cost": 5
   },
   {
     "const": "SPECIES_YAMASK",
@@ -6054,7 +6198,7 @@
     "id": 193,
     "dex": 193,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_YUNGOOS",
@@ -6063,7 +6207,7 @@
     "id": 734,
     "dex": 734,
     "eggTier": 0,
-    "cost": 2
+    "cost": 1
   },
   {
     "const": "SPECIES_YVELTAL",
@@ -6126,7 +6270,7 @@
     "id": 10620,
     "dex": 145,
     "eggTier": 3,
-    "cost": 9
+    "cost": 8
   },
   {
     "const": "SPECIES_ZARUDE",
@@ -6162,7 +6306,7 @@
     "id": 263,
     "dex": 263,
     "eggTier": 0,
-    "cost": 2
+    "cost": 3
   },
   {
     "const": "SPECIES_GALAR_ZIGZAGOON",
@@ -6171,7 +6315,7 @@
     "id": 4263,
     "dex": 263,
     "eggTier": 1,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_ZORUA",
@@ -6180,7 +6324,7 @@
     "id": 570,
     "dex": 570,
     "eggTier": 0,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_HISUI_ZORUA",
@@ -6189,7 +6333,7 @@
     "id": 6570,
     "dex": 570,
     "eggTier": 1,
-    "cost": 3
+    "cost": 2
   },
   {
     "const": "SPECIES_ZUBAT",
