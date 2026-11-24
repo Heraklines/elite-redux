@@ -31,7 +31,6 @@ import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
-import { PokemonMove } from "#moves/pokemon-move";
 import type { GameManager } from "#test/framework/game-manager";
 import { BooleanHolder, NumberHolder } from "#utils/common";
 
