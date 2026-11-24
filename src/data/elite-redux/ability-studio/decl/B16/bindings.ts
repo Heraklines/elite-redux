@@ -164,3 +164,13 @@ bindLegacyClosure(
   "The gate is `!currentBattle.erJackpotSides?.has(holder.isPlayer())`, 'nobody on my side got the boost yet in this battle'. time.once-per keeps its memory per Pokemon, this one lives per side on the battle object; requested as R-B16-18 (time.side-once-per-battle) in requests/B16.md.",
   "gate",
 );
+
+// ===========================================================================================================================
+// Chunk 4. attrIndex read from the live game (golden-attr-order.json: Knuckle Down has the one attr).
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// KnuckleDownAbAttr, Knuckle Down (6099) attr 0 (the only attr). ctor:0 = the inherited attackCondition
+// `(_user, _target, move) => move.category !== STATUS`; gate = [move.doesFlagEffectApply({ flag: PUNCHING_MOVE, user: holder, target: foe })].
+// Guards 2 and 3 (hitResult < NO_EFFECT, hitCount === hitsLeft) stay in the class (R-B16-17, R-B16-18).
+bindCondition(6099, 0, { id: "move.damaging" }, "ctor:0");
+bindCondition(6099, 0, { id: "move.flag", flag: "PUNCHING_MOVE" }, "gate");

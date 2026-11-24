@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "0f449a1a9e3941",
+  "hash": "01389cd1a7abaa",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -1692,6 +1692,94 @@
           }
         }
       ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.knuckle-down",
+      "className": "KnuckleDownAbAttr",
+      "label": "Change a stat of mine after my punching move hits",
+      "summary": "After the first strike of my punching move hurts a foe, my Attack changes by 1 stage(s). Example: Attack +1 after a punch, like Knuckle Down.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "knuckle down",
+        "punch boost",
+        "raise attack after punching",
+        "stat boost after a punch",
+        "fist power up",
+        "punching move raises attack",
+        "boost on punch"
+      ],
+      "examples": [
+        "When my punching move hits, raise my Attack by 1 stage, like Knuckle Down"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat (Attack, Defense, Sp. Atk, Sp. Def, Speed, Accuracy or Evasion)",
+          "control": "select",
+          "default": "ATK",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "stages",
+          "label": "Number of stages (+1 raises by one stage, a negative number lowers)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "lib": "move.damaging",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really have connected and dealt damage (a blocked or immune hit does not count)",
+        "Only the first strike of a move counts: a multi-hit punch raises the stat once, not once per strike",
+        "Nothing happens while the game only previews a hit"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stat",
+          "stages"
+        ]
+      },
       "reusableAlone": {
         "when": true,
         "if": true,
