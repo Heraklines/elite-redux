@@ -16,6 +16,7 @@
 //    original attr and the rebuilt attr must agree on `canApply`, `getCondition()` and (for calc
 //    moments) on the value `apply` leaves in every NumberHolder.
 
+import Phaser from "phaser";
 import type { AbAttr } from "#abilities/ab-attrs";
 import type { Ability } from "#abilities/ability";
 import { getBinding } from "#data/elite-redux/ability-studio/bindings";
@@ -106,23 +107,32 @@ export class RngProbe {
   count = 0;
   private next = seededGenerator("l1");
   private readonly spy: MockInstance;
+  private readonly rndSpy: MockInstance;
 
   constructor(game: GameManager) {
     this.spy = vi.spyOn(game.scene, "randBattleSeedInt").mockImplementation((range: number, min = 0) => {
       this.count++;
       return range <= 1 ? min : min + Math.floor(this.next() * range);
     });
+    // randSeedInt (src/utils/common.ts) draws from Phaser's seeded generator directly. Attr-level chance conditions
+    // (Shed Skin, Wonder Scale: `!randSeedInt(3)`) use it, so both sides of a comparison must see the same draws.
+    this.rndSpy = vi.spyOn(Phaser.Math.RND, "integerInRange").mockImplementation((min: number, max: number) => {
+      this.count++;
+      return max <= min ? min : min + Math.floor(this.next() * (max - min + 1));
+    });
   }
 
   reset(): void {
     // The spy records every call's arguments; over millions of evaluations that is gigabytes, and nobody reads it.
     this.spy.mockClear();
+    this.rndSpy.mockClear();
     this.count = 0;
     this.next = seededGenerator("l1");
   }
 
   restore(): void {
     this.spy.mockRestore();
+    this.rndSpy.mockRestore();
   }
 }
 
@@ -364,7 +374,9 @@ export function runAttrDifferential(
             }
             const origCond = pair.site.attr.getCondition();
             const newCond = pair.rebuilt.getCondition();
+            rng.reset();
             const origCondValue = origCond === null ? null : origCond(world.holder);
+            rng.reset();
             const newCondValue = newCond === null ? null : newCond(world.holder);
             if (origCondValue !== newCondValue) {
               say("getCondition", origCondValue, newCondValue);
