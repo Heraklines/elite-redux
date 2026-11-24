@@ -35,7 +35,6 @@ export default defineDecl(ElectromancyEffectChanceAbAttr, {
     "serene grace for one status",
     "status chance boost",
     "stronger side effect",
-    "more burns",
   ],
   examples: ["Make my paralyzing moves paralyze five times as often, like Electromancy"],
   params: [

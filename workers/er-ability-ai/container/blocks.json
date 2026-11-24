@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "17003a79d8bf84",
+  "hash": "02534f02ec1ae3",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -698,8 +698,7 @@
         "paralysis chance",
         "serene grace for one status",
         "status chance boost",
-        "stronger side effect",
-        "more burns"
+        "stronger side effect"
       ],
       "examples": [
         "Make my paralyzing moves paralyze five times as often, like Electromancy"
@@ -1523,7 +1522,7 @@
     {
       "id": "block.irradiated-fist",
       "className": "IrradiatedFistAbAttr",
-      "label": "Sometimes badly poison and curse the foe when I punch",
+      "label": "Sometimes badly poison and mark the foe when I punch",
       "summary": "After my punching move hurts a foe, there is a 50% chance it becomes badly poisoned. Once that poison is gone, its stat boosts are wiped and it cannot raise stats until it switches.",
       "tier": "B",
       "kind": "event-effect",
@@ -1594,7 +1593,7 @@
           }
         },
         {
-          "label": "Curse the foe if it was badly poisoned",
+          "label": "Mark the foe if it was badly poisoned",
           "conditions": [
             "The poisoning really landed"
           ],
@@ -1633,7 +1632,32 @@
       "examples": [
         "When I come in, my whole side lands critical hits more often for the rest of the battle, like Jackpot"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "critStages",
+          "label": "Critical-hit stages my side gains for the battle",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 0,
+          "max": 3,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "luck",
+          "label": "Luck I gain for this wave",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 0,
+          "max": 5,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
       "conditions": [
         {
           "slot": "gate",
@@ -1648,19 +1672,23 @@
       ],
       "branches": [
         {
-          "label": "Raise my side's critical-hit stage by 1 for the battle",
+          "label": "Raise my side's critical-hit stage for the battle",
           "conditions": [],
           "effect": {
             "id": "effect.package",
-            "params": []
+            "params": [
+              "critStages"
+            ]
           }
         },
         {
-          "label": "Raise my Luck by 1 for this wave",
+          "label": "Raise my Luck for this wave",
           "conditions": [],
           "effect": {
             "id": "effect.package",
-            "params": []
+            "params": [
+              "luck"
+            ]
           }
         }
       ],

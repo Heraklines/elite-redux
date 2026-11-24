@@ -571,21 +571,21 @@ describe("B16 chunk 3", () => {
 
   // ---------------------------------------------------------------------------------------------------------------------
   describe("Jackpot", () => {
-    type Sides = { erJackpotSides?: Set<boolean> | undefined };
+    type Sides = { erJackpotSides?: Map<boolean, number> | undefined };
     const battle = () => globalScene.currentBattle as unknown as Sides;
-    const lucky = (mon: Pokemon) => (mon.waveData as unknown as { erJackpotLuck?: boolean }).erJackpotLuck === true;
+    const lucky = (mon: Pokemon) => (mon.waveData as unknown as { erJackpotLuck?: number }).erJackpotLuck === 1;
 
     it("one boost per SIDE per battle: the side flag, the holder's Luck flag, simulated, canApply always true", async () => {
       const { holder, party, foe } = await startParty();
       const original = liveAbility(JACKPOT).attrs[1];
       const module = moduleOf("JackpotBattleBuffAbAttr");
-      expect(readDeclParams(module, original)).toEqual({});
-      const rebuilt = buildAttr(module, {}, { gate: gateOf(original) });
+      expect(readDeclParams(module, original)).toEqual({ critStages: 1, luck: 1 });
+      const rebuilt = buildAttr(module, { critStages: 1, luck: 1 }, { gate: gateOf(original) });
       const partner = party[1];
       for (const attr of [original, rebuilt]) {
         battle().erJackpotSides = undefined;
         for (const mon of [holder, partner, foe]) {
-          (mon.waveData as unknown as { erJackpotLuck?: boolean }).erJackpotLuck = undefined;
+          (mon.waveData as unknown as { erJackpotLuck?: number }).erJackpotLuck = undefined;
         }
         expect(attr.canApply(baseParams(holder))).toBe(true);
         attr.apply(baseParams(holder, true));
@@ -593,19 +593,34 @@ describe("B16 chunk 3", () => {
         expect(lucky(holder)).toBe(false);
         const before = holder.getLuck();
         attr.apply(baseParams(holder));
-        expect([...(battle().erJackpotSides ?? [])]).toEqual([true]);
+        expect([...(battle().erJackpotSides ?? [])]).toEqual([[true, 1]]);
         expect(lucky(holder)).toBe(true);
         expect(holder.getLuck()).toBe(before + 1);
         // A second Pokemon of the SAME side gets nothing; the other side has its own boost.
         attr.apply(baseParams(partner));
         expect(lucky(partner), "same side").toBe(false);
         attr.apply(baseParams(foe));
-        expect([...(battle().erJackpotSides ?? [])].sort()).toEqual([false, true]);
+        expect([...(battle().erJackpotSides?.keys() ?? [])].sort()).toEqual([false, true]);
         expect(lucky(foe), "other side").toBe(true);
         // Even the holder again changes nothing (the flag is already there).
         attr.apply(baseParams(holder));
         expect(battle().erJackpotSides?.size).toBe(2);
       }
+    });
+
+    it("the amounts are editable: critStages 2 and luck 3 are stored and read by the engine", async () => {
+      const { holder, foe } = await startParty();
+      const module = moduleOf("JackpotBattleBuffAbAttr");
+      battle().erJackpotSides = undefined;
+      (holder.waveData as unknown as { erJackpotLuck?: number }).erJackpotLuck = undefined;
+      const before = holder.getLuck();
+      const strong = buildAttr(module, { critStages: 2, luck: 3 }, { gate: gateOf(liveAbility(JACKPOT).attrs[1]) });
+      strong.apply(baseParams(holder));
+      expect(battle().erJackpotSides?.get(true)).toBe(2);
+      expect(holder.getLuck()).toBe(before + 3);
+      expect(battle().erJackpotSides?.get(foe.isPlayer())).toBeUndefined();
+      battle().erJackpotSides = undefined;
+      (holder.waveData as unknown as { erJackpotLuck?: number }).erJackpotLuck = undefined;
     });
 
     it("the gate is a real slot: replaced by 'always', a second Pokemon of the same side gets the Luck flag too", async () => {

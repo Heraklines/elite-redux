@@ -25,7 +25,7 @@ export default defineDecl(IrradiatedFistAbAttr, {
   tier: "B",
   kind: "event-effect",
   when: "event.after-my-hit",
-  label: "Sometimes badly poison and curse the foe when I punch",
+  label: "Sometimes badly poison and mark the foe when I punch",
   summary: params =>
     `After my punching move hurts a foe, there is a ${params.chance}% chance it becomes badly poisoned. Once that poison is gone, its stat boosts are wiped and it cannot raise stats until it switches.`,
   synonyms: [
@@ -74,7 +74,7 @@ export default defineDecl(IrradiatedFistAbAttr, {
       effect: { id: "effect.inflict-status", params: [] },
     },
     {
-      label: "Curse the foe if it was badly poisoned",
+      label: "Mark the foe if it was badly poisoned",
       conditions: ["The poisoning really landed"],
       effect: { id: "effect.apply-tag", params: [] },
     },

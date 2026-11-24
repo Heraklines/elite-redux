@@ -161,13 +161,24 @@ export class JackpotBattleBuffAbAttr extends PostSummonAbAttr {
   /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
   public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
 
+  /** Critical-hit stages my side gets for the battle (Jackpot: 1). Stored per side, read in Pokemon.getCritStage. */
+  private readonly critStages: number;
+  /** Luck I get for this wave (Jackpot: 1). Read in Pokemon.getLuck. */
+  private readonly luck: number;
+
+  constructor(critStages = 1, luck = 1) {
+    super();
+    this.critStages = critStages;
+    this.luck = luck;
+  }
+
   /**
    * The condition of this class lives in `apply`, not in `canApply` (always true). The studio split stays inside `apply`, in the
    * original clause order: `!simulated`, create the battle's set of buffed sides, then this replaceable gate: nobody on my side has
    * received the buff yet in this battle. The test is pure; the set is created before it, exactly as before.
    */
   public gate({ pokemon }: AbAttrBaseParams): boolean {
-    const battle = globalScene.currentBattle as unknown as { erJackpotSides?: Set<boolean> };
+    const battle = globalScene.currentBattle as unknown as { erJackpotSides?: Map<boolean, number> };
     return !battle.erJackpotSides?.has(pokemon.isPlayer());
   }
 
@@ -176,14 +187,14 @@ export class JackpotBattleBuffAbAttr extends PostSummonAbAttr {
     if (simulated) {
       return;
     }
-    const battle = globalScene.currentBattle as unknown as { erJackpotSides?: Set<boolean> };
-    const sides = (battle.erJackpotSides ??= new Set<boolean>());
+    const battle = globalScene.currentBattle as unknown as { erJackpotSides?: Map<boolean, number> };
+    const sides = (battle.erJackpotSides ??= new Map<boolean, number>());
     const gate = this.gateOverride ?? this.gate.bind(this);
     if (!gate(params)) {
       return;
     }
-    sides.add(pokemon.isPlayer());
-    (pokemon.waveData as unknown as { erJackpotLuck?: boolean }).erJackpotLuck = true;
+    sides.set(pokemon.isPlayer(), this.critStages);
+    (pokemon.waveData as unknown as { erJackpotLuck?: number }).erJackpotLuck = this.luck;
   }
 }
 
