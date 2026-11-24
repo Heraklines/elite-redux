@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "0ea24dd30ea814",
-  "hash": "1600ea7975402f",
+  "vocabularyHash": "079cfba793fa49",
+  "hash": "044147573f7edd",
   "blocks": [
     {
       "id": "block.allied-field-damage-reduction",
@@ -430,6 +430,46 @@
         "do": true
       },
       "uses": 2
+    },
+    {
+      "id": "block.commander",
+      "className": "CommanderAbAttr",
+      "label": "Jump into an ally Dondozo's mouth and power it up",
+      "summary": "When an ally Dondozo is next to me (doubles or triples), I jump into its mouth: it gets +2 in every stat, my next move is cancelled and attacks aimed at me miss.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.ally-entered",
+      "whenLabel": "When an ally enters the battle or is revived",
+      "synonyms": [
+        "commander",
+        "tatsugiri",
+        "dondozo",
+        "ride an ally",
+        "hide in ally",
+        "jump in mouth"
+      ],
+      "examples": [
+        "Hide inside my Dondozo partner and boost all its stats, the way Tatsugiri does"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The battle must have more than one Pokemon on my side (doubles or triples)",
+        "An adjacent ally must be an active Dondozo that has not fainted and is not already being commanded"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PARKED (legacy-closure-pending-request): needs the WHEN event.ally-entered, see the header and requests/B04.md. Package, justified: the effect is four coupled steps around one found Dondozo and one tag (animation, tag, queued-move removal, tag lapse). Single user: Commander (attr 0). Engine coupling untouched: pokemon.ts hasAbilityWithAttr('CommanderAbAttr') (sprite hiding) and the COMMANDER_HOSTING engine query. SUSPECTED GAME BUG (not fixed): pokemon.ts:8127 hides the Commander sprite only when `currentBattle.double`, while canApply uses getBattlerCount() > 1 (comment says `double` is dead in triples), so in a triple battle the Commander gets the tag but its sprite is not hidden on load-in.",
+      "uses": 1
     },
     {
       "id": "block.conditional-user-field-battler-tag-immunity",
@@ -4810,6 +4850,42 @@
       "reusableAlone": {
         "when": true,
         "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.preserve-base-stat-abilities",
+      "className": "PreserveBaseStatAbilitiesAbAttr",
+      "label": "Keep the foe's stat abilities while I ignore abilities",
+      "summary": "While I have this and I ignore the foe's ability, the foe's stat-changing abilities (Grass Pelt, Fur Coat...) still work. Their other abilities are still ignored.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "blind rage",
+        "teravolt",
+        "turboblaze",
+        "tempered mold breaker",
+        "do not ignore stat abilities",
+        "keep fur coat",
+        "grass pelt still works"
+      ],
+      "examples": [
+        "I ignore the foe's abilities except ones that change stats, like Blind Rage"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only matters while my ability makes the game ignore the foe's abilities (Mold Breaker style)",
+        "Only keeps abilities that change a stat value; immunities, damage reduction and effect abilities are still ignored"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
         "do": true
       },
       "uses": 3

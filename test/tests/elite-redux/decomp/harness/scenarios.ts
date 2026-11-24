@@ -359,6 +359,7 @@ const WHEN_TEMPLATE: Readonly<Record<string, string>> = {
   "event.biome-changed": t.entry,
   "event.stat-changed": t.statDrop,
   "event.ally-stat-changed": t.doubles,
+  "event.ally-entered": t.doubles,
   "event.foe-raised-stat": t.statRaise,
   "calc.redirect-move": t.doubles,
   "calc.priority": t.attack,

@@ -20,8 +20,6 @@
 export const UNEXPOSED_DISPATCH_KEYS: Readonly<Record<string, string>> = {
   AiMovegenMoveStatsAbAttr:
     "Only consulted while the enemy AI generates movesets (move.ts getMovegen stats). It is not a battle moment staff can react to.",
-  CommanderAbAttr:
-    "Doubles-only Commander (Tatsugiri) bookkeeping, re-checked at summon and when held items are counted. A one-ability engine hook; it stays a package.",
   CudChewConsumeBerryAbAttr:
     "Cud Chew's second berry meal is driven by the berry phase after turn end. A bespoke one-ability mechanic, shown as a package.",
   IllusionBreakAbAttr:
@@ -41,8 +39,6 @@ export const UNEXPOSED_DISPATCH_KEYS: Readonly<Record<string, string>> = {
     "Presence check only (pokemon.ts getAttrs): disables the ability while the Pokemon is fused. A rule about fusion state, not a battle moment.",
   NoTransformAbilityAbAttr:
     "Presence check only (pokemon.ts getAttrs): disables the ability while the Pokemon is transformed. A rule about transform state, not a battle moment.",
-  PreserveBaseStatAbilitiesAbAttr:
-    "Presence check only (pokemon.ts hasAbilityWithAttr): keeps the defender's base stats when abilities are ignored. A flag read by the stat calculation, not a battle moment.",
 };
 
 /**

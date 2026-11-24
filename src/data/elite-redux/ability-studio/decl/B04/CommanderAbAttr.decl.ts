@@ -34,13 +34,12 @@ import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 export default defineDecl(CommanderAbAttr, {
   tier: "C",
   kind: "package",
-  // PENDING: not in WHEN_REGISTRY yet (requests/B04.md, "event.ally-entered").
   when: "event.ally-entered",
   label: "Jump into an ally Dondozo's mouth and power it up",
   summary: () =>
     "When an ally Dondozo is next to me (doubles or triples), I jump into its mouth: it gets +2 in every stat, my next move is cancelled and attacks aimed at me miss.",
   synonyms: ["commander", "tatsugiri", "dondozo", "ride an ally", "hide in ally", "jump in mouth"],
-  examples: ["Hide inside my Dondozo partner and boost all its stats, like Commander"],
+  examples: ["Hide inside my Dondozo partner and boost all its stats, the way Tatsugiri does"],
   params: [],
   noParamsReason:
     "The mechanic has no tunable numbers: the partner species (Dondozo), the +2 boost to five stats and the cancelled move are fixed by the class and the COMMANDED tag.",

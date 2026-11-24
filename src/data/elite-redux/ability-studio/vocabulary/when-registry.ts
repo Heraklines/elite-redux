@@ -92,6 +92,14 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
 
     composable: true,
   }),
+  event(
+    "event.ally-entered",
+    "CommanderAbAttr",
+    [H, A, SIM],
+    "When an ally enters the battle or is revived",
+    "Entry and exit",
+    { synonyms: ["ally switch in", "partner arrives", "ally sent out", "ally revived"] },
+  ),
   event("event.before-entry", "PreSummonAbAttr", [H], "Just before I enter the battle", "Entry and exit", {
     legacyHookId: "PreSummonAbAttr",
   }),
@@ -979,6 +987,7 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     kind: "while-active",
     dispatchKey: null,
     flagKeys: [
+      "PreserveBaseStatAbilitiesAbAttr",
       "AlwaysHitAbAttr",
       "BadDreamsImmunityAbAttr",
       "BlockRedirectAbAttr",

@@ -97,6 +97,24 @@
       "composable": true
     },
     {
+      "id": "event.ally-entered",
+      "kind": "event",
+      "dispatchKey": "CommanderAbAttr",
+      "provides": [
+        "holder",
+        "ally",
+        "simulated"
+      ],
+      "label": "When an ally enters the battle or is revived",
+      "group": "Entry and exit",
+      "synonyms": [
+        "ally switch in",
+        "partner arrives",
+        "ally sent out",
+        "ally revived"
+      ]
+    },
+    {
       "id": "event.before-entry",
       "kind": "event",
       "dispatchKey": "PreSummonAbAttr",
@@ -1735,6 +1753,7 @@
       "kind": "while-active",
       "dispatchKey": null,
       "flagKeys": [
+        "PreserveBaseStatAbilitiesAbAttr",
         "AlwaysHitAbAttr",
         "BadDreamsImmunityAbAttr",
         "BlockRedirectAbAttr",
@@ -5169,5 +5188,5 @@
       ]
     }
   ],
-  "hash": "0ea24dd30ea814"
+  "hash": "079cfba793fa49"
 }
