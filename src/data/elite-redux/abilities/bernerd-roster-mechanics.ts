@@ -191,7 +191,7 @@ class JackpotBattleBuffAbAttr extends PostSummonAbAttr {
 }
 
 /** End-of-turn one-item theft from any opponent with a transferable item. */
-class VoidPostTurnStealAbAttr extends PostTurnAbAttr {
+export class VoidPostTurnStealAbAttr extends PostTurnAbAttr {
   private candidates(pokemon: Pokemon): PokemonHeldItemModifier[] {
     return pokemon
       .getOpponents()
