@@ -353,6 +353,9 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     hitResult: HitResult.EFFECTIVE,
     simulated: false,
   }),
+  // B03: PostKnockOutAbAttr is dispatched for every Pokemon on the field with `victim` = the Pokemon that fainted
+  // (faint-phase.ts). The single-battle grid can only offer the foe as the victim.
+  "event.on-ko": ({ holder, foe }) => ({ pokemon: holder, victim: foe, simulated: false }),
   "calc.damage-taken": ctx => ({
     pokemon: ctx.holder,
     opponent: ctx.foe,

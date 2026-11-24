@@ -200,6 +200,11 @@ export function signatureSites(sites: readonly AttrSite[], module: DeclModule): 
   return [...seen.values()];
 }
 
+/** Abilities the engine identifies by id, so their rebuild is twinned inside the live ability (see twinById). */
+// 112 Slow Start: SlowStartTag is an AbilityBattlerTag and ends when the holder lacks the real ability id.
+// 150 Imposter: PokemonTransformPhase checks the id of a copied Imposter.
+const ID_CHECKED_BY_ENGINE: ReadonlySet<number> = new Set([112, 150]);
+
 let nextShadow = SHADOW_ID_BASE;
 export function allocateShadowId(): number {
   const id = nextShadow++;
@@ -227,8 +232,26 @@ export async function twinById(
     runScenario(freshGame(phaserGame), scenario.template, { abilityId: id, axes: scenario.axes }, game =>
       BattleTrace.attach(game, { rng, seed, aliases: { [idB]: idA } }),
     );
+  // The engine checks a few ability ids directly (Imposter: the Attack boost of a copied Imposter in
+  // PokemonTransformPhase), so a shadow id would differ for a reason that is not the rebuilt attrs. For those, the
+  // rebuild run swaps the shadow attrs into the live ability (a NEW array: the ability caches per dispatch type, keyed
+  // on the identity of the array) and keeps the real id.
+  const runRebuild = async (): Promise<TraceData> => {
+    const live = allAbilities[idA];
+    const shadow = allAbilities[idB];
+    if (!ID_CHECKED_BY_ENGINE.has(idA) || live === undefined || shadow === undefined) {
+      return run(idB);
+    }
+    const liveAttrs = live.attrs;
+    (live as unknown as { attrs: readonly unknown[] }).attrs = [...shadow.attrs];
+    try {
+      return await run(idA);
+    } finally {
+      (live as unknown as { attrs: readonly unknown[] }).attrs = liveAttrs;
+    }
+  };
   const original = await run(idA);
-  const rebuild = await run(idB);
+  const rebuild = await runRebuild();
   return {
     scenario,
     differences: [...reachProblems(idA, original, scenario, options.reach), ...diffTraces(original, rebuild)],
