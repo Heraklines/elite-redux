@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "10a2e6ca46aefe",
+  "hash": "0e045a036cb1b0",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -1456,7 +1456,7 @@
       "id": "block.push-kick",
       "className": "PushKickAbAttr",
       "label": "Change a stat of the foe once per turn after my move hits",
-      "summary": "After one of my damaging moves with the \"Kicking move\" property lands, the foe's Defense changes by -1 stages, once per turn out. Example: -1 Defense after a kick.",
+      "summary": "After one of my damaging moves with the \"Kicking move\" property lands, the foe's Defense changes by -1 stage(s), once per turn out. Example: -1 Defense after a kick.",
       "tier": "B",
       "kind": "event-effect",
       "status": "decomposed",
@@ -1528,7 +1528,7 @@
         },
         {
           "id": "stages",
-          "label": "Number of stages (negative lowers, 0 is refused by the class)",
+          "label": "Number of stages (-1 lowers by one, +1 raises by one; 0 is not allowed)",
           "control": "number",
           "default": -1,
           "editable": true,

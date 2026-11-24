@@ -35,7 +35,7 @@ export default defineDecl(PushKickAbAttr, {
   when: "event.after-my-hit",
   label: "Change a stat of the foe once per turn after my move hits",
   summary: params =>
-    `After one of my damaging moves with the "${params.flag}" property lands, the foe's ${params.stat} changes by ${params.stages} stages, once per turn out. Example: -1 Defense after a kick.`,
+    `After one of my damaging moves with the "${params.flag}" property lands, the foe's ${params.stat} changes by ${params.stages} stage(s), once per turn out. Example: -1 Defense after a kick.`,
   synonyms: [
     "push kick",
     "lower defense",
@@ -79,7 +79,7 @@ export default defineDecl(PushKickAbAttr, {
       ctorIndex: 2,
       path: "stages",
       control: "number",
-      label: "Number of stages (negative lowers, 0 is refused by the class)",
+      label: "Number of stages (-1 lowers by one, +1 raises by one; 0 is not allowed)",
       editable: true,
       gateIndependent: true,
       default: -1,
@@ -87,6 +87,18 @@ export default defineDecl(PushKickAbAttr, {
       max: 6,
       step: 1,
       integer: true,
+      // Zero would mean "change nothing", which the game refuses; the editor reports it in plain words instead of failing.
+      codec: {
+        toCtor: value => {
+          if (Number(value) === 0) {
+            throw new Error(
+              "The number of stages cannot be 0. Pick -1 or lower to lower the stat, or +1 or higher to raise it.",
+            );
+          }
+          return Number(value);
+        },
+        fromInstance: raw => (typeof raw === "number" ? raw : undefined),
+      },
     },
   ],
   // The move-property condition of the gate repeats the `flag` param as a literal once a library binding exists.
