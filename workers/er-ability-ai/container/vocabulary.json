@@ -708,6 +708,22 @@
       "modifies": "chance"
     },
     {
+      "id": "calc.double-battle-chance",
+      "kind": "calc",
+      "dispatchKey": "DoubleBattleChanceAbAttr",
+      "provides": [
+        "holder"
+      ],
+      "label": "While the game rolls the chance of a double battle",
+      "group": "Move flow",
+      "modifies": "chance",
+      "synonyms": [
+        "double battle",
+        "wild double encounter",
+        "encounter chance"
+      ]
+    },
+    {
       "id": "calc.weight",
       "kind": "calc",
       "dispatchKey": "WeightMultiplierAbAttr",
@@ -4061,6 +4077,71 @@
       ]
     },
     {
+      "id": "effect.add-stab-bonus",
+      "kind": "calc",
+      "label": "Add {bonus} to a same-type bonus the move already has",
+      "requires": [],
+      "params": [
+        {
+          "id": "bonus",
+          "label": "Bonus added",
+          "control": "number",
+          "default": 0.5,
+          "min": 0,
+          "max": 2,
+          "step": 0.05,
+          "integer": false
+        }
+      ],
+      "modifies": "stab",
+      "implemented": false,
+      "synonyms": [
+        "adaptability",
+        "stronger stab",
+        "same type bonus",
+        "double stab"
+      ],
+      "examples": [
+        "Same-type moves hit with 2x instead of 1.5x"
+      ]
+    },
+    {
+      "id": "effect.survive-lethal-hit",
+      "kind": "calc",
+      "label": "Survive a knockout hit with 1 HP",
+      "requires": [],
+      "params": [],
+      "modifies": "damage",
+      "implemented": false,
+      "synonyms": [
+        "sturdy",
+        "endure",
+        "survive at 1 hp",
+        "focus sash"
+      ],
+      "examples": [
+        "Survive a hit that would knock me out"
+      ]
+    },
+    {
+      "id": "effect.more-double-battles",
+      "kind": "calc",
+      "label": "Make double battles four times as likely",
+      "requires": [],
+      "params": [],
+      "modifies": "chance",
+      "implemented": false,
+      "synonyms": [
+        "more double battles",
+        "arena trap",
+        "double encounters",
+        "no guard"
+      ],
+      "examples": [
+        "Wild double battles show up four times as often"
+      ]
+    },
+    {
       "id": "effect.multiply-stat",
       "kind": "calc",
       "label": "Multiply {stat} by {multiplier}",
@@ -4775,6 +4856,23 @@
       ]
     },
     {
+      "id": "effect.ability-form-change",
+      "kind": "event",
+      "label": "Change to the form my ability asks for",
+      "requires": [],
+      "params": [],
+      "implemented": false,
+      "synonyms": [
+        "ability form change",
+        "reset form",
+        "back to normal form",
+        "zen mode"
+      ],
+      "examples": [
+        "Return to my normal form when a battle begins"
+      ]
+    },
+    {
       "id": "effect.return-base-form",
       "kind": "event",
       "label": "Return to the base form",
@@ -5022,5 +5120,5 @@
       ]
     }
   ],
-  "hash": "1264fa83dbcdc7"
+  "hash": "19b4a3aed16a8d"
 }

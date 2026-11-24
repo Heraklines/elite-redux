@@ -86,6 +86,11 @@ export function reachProblems(
       });
     }
   }
+  // A written l2StaticReason means the shared templates cannot drive this attr (R-B01-7). The traces are still diffed,
+  // but the "was the attr evaluated" check is waived; the owning batch ships its own test that does reach the attr.
+  if (scenario.staticReason !== undefined) {
+    return problems;
+  }
   const events = original.attrEvents.filter(event => event.startsWith(`${abilityId}#`));
   if (reach?.presenceOnly === true) {
     return problems;
