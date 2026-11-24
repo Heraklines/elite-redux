@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "0452d4209833b5",
+  "hash": "1682d4703c6ec1",
   "blocks": [
     {
       "id": "block.astral-project-star-marker",
@@ -434,6 +434,172 @@
       "uses": 1
     },
     {
+      "id": "block.capacitor-bank-absorb",
+      "className": "CapacitorBankAbsorbAbAttr",
+      "label": "Absorb a type of move and gain a charge stack",
+      "summary": "Moves of the Electric type do nothing to me, and each one I absorb gives me 1 charge stack (at most 4 in total). Example: absorb Electric moves, +1 stack.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-immunity",
+      "whenLabel": "While the game checks whether a move can hit me",
+      "synonyms": [
+        "absorb and charge",
+        "lightning rod charge",
+        "volt absorb charge",
+        "capacitor bank",
+        "immune and gain a stack",
+        "soak up electricity",
+        "store a type of move"
+      ],
+      "examples": [
+        "Immune to Electric moves, and every one I absorb adds a charge stack, like Capacitor Bank"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Immune to this type",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "stacks",
+          "label": "Charge stacks gained per absorbed move (1-4)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 4,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Moves that hit every Pokemon or a whole side (Spikes, Rain Dance) are never blocked",
+        "A Pokemon never blocks its own move",
+        "The stack is only added while I hold fewer than the maximum number of stacks (4) and the move is really used (not when the game only previews it)"
+      ],
+      "branches": [
+        {
+          "label": "Block the move",
+          "conditions": [],
+          "effect": {
+            "id": "effect.immune-to-type",
+            "params": [
+              "type"
+            ]
+          }
+        },
+        {
+          "label": "Gain charge stacks",
+          "conditions": [
+            "I hold fewer than the maximum number of stacks"
+          ],
+          "effect": {
+            "id": "effect.package",
+            "params": [
+              "stacks"
+            ]
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.capacitor-bank-gain",
+      "className": "CapacitorBankGainAbAttr",
+      "label": "Gain charge stacks when a damaging move hits me",
+      "summary": "Each time a damaging move hurts me, I gain 1 charge stack (at most 4 in total, once per incoming move). Example: 1 = one stack per move that hits me.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "capacitor bank",
+        "charge up when hit",
+        "build charge",
+        "stack a charge",
+        "store electricity",
+        "gain a stack",
+        "charge counter"
+      ],
+      "examples": [
+        "Every time I get hit by a damaging move my charge goes up by one, to a maximum of four, like Capacitor Bank"
+      ],
+      "params": [
+        {
+          "id": "stacks",
+          "label": "Charge stacks gained per hit (1-4)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 4,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only when the hit really dealt damage and was not blocked",
+        "Only while I hold fewer than the maximum number of stacks (4)",
+        "A multi-hit move gives one stack, not one per hit",
+        "Does nothing while the game is only previewing"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "stacks"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package for the effect only; the trigger and the condition are separate blocks. Reason it cannot be split: the charge counter is a bespoke store (`charge-stack.ts`: a WeakMap keyed by Pokemon, clamped at CHARGE_STACK_MAX = 4) that no library effect can write, and the class also keeps a per-move memory (a module WeakMap of `wave:turn:attacker:move` tokens) so a multi-hit move counts once. Requests R-B14-6.1 (an effect that changes the charge counter), R-B14-6.2 (an atom that reads it) and R-B14-6.3 (the 'already counted this move' memory) would let it be built from blocks. Users (1): Capacitor Bank (5925) attr 0 (attr 1 absorbs Electric moves, attr 2 is the redirect of another batch). The gate (clause 1) is fully bound to move.damaging; the residual stays in the class. Not covered by this attr and held by engine code that finds the class BY NAME (`carriesAttr(.., 'CapacitorBankGainAbAttr')`, so this class name must never change and the class doubles as the holder marker): the attack-side gain (+1 when I land a damaging hit, once per move: `erCapacitorBankOnAttack`, called from `erBatch3OnTargetHit`) and the spend (an Electric move I use consumes one stack: `erCapacitorBankConsumeOnElectricUse`, called from `MoveEffectPhase`); request R-B14-6.4. The maximum of 4 stacks is a module constant used by all charge-stack code, so it is not a setting here. Oddity, not fixed: clause 3 tests 11 and NO_EFFECT only, not the other results that are no real hit (STATUS, MISS, FAIL, ...); those carry no damage in practice, so clause 2 stops them first. The grid cannot reach clauses 2 to 5 through the shared L1, so B14/chunk6.test.ts compares canApply with a literal copy of the original over every combination.",
+      "uses": 1
+    },
+    {
       "id": "block.celestial-jelly",
       "className": "CelestialJellyAbAttr",
       "label": "Survive a knockout once per battle and cure my status",
@@ -731,6 +897,84 @@
       "uses": 1
     },
     {
+      "id": "block.fault-current",
+      "className": "FaultCurrentAbAttr",
+      "label": "Release all charge stacks as a spread attack every few turns",
+      "summary": "Every 2 turns on the field I spend all my charge stacks to hit every foe like Discharge at 15 base power per stack. Example: 3 stacks x 15 = 45 base power.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "fault current",
+        "discharge the charge",
+        "release stored power",
+        "spread attack every other turn",
+        "spend all stacks",
+        "charge blast",
+        "delayed discharge"
+      ],
+      "examples": [
+        "Every second turn on the field I spend my charge stacks on a spread Electric attack, like Fault Current"
+      ],
+      "params": [
+        {
+          "id": "period",
+          "label": "Release every this many turns on the field (2 = every second turn)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "powerPerStack",
+          "label": "Base power added per spent stack (15 = 60 with a full charge)",
+          "control": "number",
+          "default": 15,
+          "editable": true,
+          "min": 1,
+          "max": 60,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "move",
+          "label": "Attack to copy for type and damage (its name, for example Discharge)",
+          "control": "text",
+          "default": "Discharge",
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Counts only the end-of-turn checks where I am on the field; the count starts again when I leave the field",
+        "Only releases when I hold at least one charge stack",
+        "Needs at least one foe still standing; every foe still standing is hit, with its type matchup",
+        "Does nothing while the game is only previewing",
+        "Hits straight through the damage formula: no accuracy roll, no extra effects of the copied move"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "period",
+          "powerPerStack",
+          "move"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "packageReason": "Package, Tier C. Reason: the effect is a small state machine (a turns-on-the-field counter that advances on every active end of turn, the charge store, and a direct damage loop over the foes) whose clauses are interleaved with two state writes, so they cannot be moved into a gate without changing the cycle (see the header). Params are typed: the period, the power per stack and the copied move are constructor arguments now (defaults 2, 15, Discharge; behaviour identical). Users (1): Fault Current (5926), its only attr. Requests: R-B14-6.1 (an effect that spends the charge counter), R-B14-6.2 (a charge-stack atom), R-B14-6.7 (an every-Nth-active-turn atom with its own reset), R-B14-6.8 (a foe is standing) and R-B14-6.9 (an effect that hits every foe through the damage formula with a base power taken from a count). The count is reset by `erFaultCurrentOnLeaveField`, called from `Pokemon` when the holder leaves the field; that engine hook finds the store, not the class, so it is not affected by a rebuilt attr but it is part of the behaviour. Oddities, not fixed: (1) the discharge ignores accuracy, Protect and ability flyouts because it calls the damage formula directly (the code comment says a MovePhase at the end of the turn does not run reliably); (2) with a period of 1 every turn is a discharge turn.",
+      "uses": 1
+    },
+    {
       "id": "block.float",
       "className": "FloatAbAttr",
       "label": "I float above the ground",
@@ -986,6 +1230,175 @@
       "uses": 1
     },
     {
+      "id": "block.negative-feedback",
+      "className": "NegativeFeedbackAbAttr",
+      "label": "Consume paralysis: gain Speed, lock an item, two-type move",
+      "summary": "After I hit a paralyzed foe: its paralysis is cured, I gain 1 Speed stage, one of its items stops working for a while, and my next physical move is Electric and Fairy.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "negative feedback",
+        "eat paralysis for speed",
+        "item lock after paralysis",
+        "disable a held item",
+        "dual type next move",
+        "speed boost from paralysis",
+        "convert paralysis"
+      ],
+      "examples": [
+        "After I hit a paralyzed foe, I get faster, one of its items is switched off and my next physical move is Electric and Fairy, like Negative Feedback"
+      ],
+      "params": [
+        {
+          "id": "speedStages",
+          "label": "Speed stages I gain (1-6)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "primaryType",
+          "label": "My next physical move becomes this type first",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "secondType",
+          "label": "...and this type second",
+          "control": "select",
+          "default": "FAIRY",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only after an ordinary hit: a one-hit KO or a blocked hit does not count",
+        "Does nothing while the game is only previewing",
+        "The item lock needs the foe to hold at least one item that is not a form-change item; it lifts at the end of the following turn",
+        "The dual-type mark only affects my next physical move and is then used up"
+      ],
+      "branches": [
+        {
+          "label": "Cure the foe's paralysis",
+          "conditions": [
+            "foe is paralyzed"
+          ],
+          "effect": {
+            "id": "effect.cure-status",
+            "params": []
+          }
+        },
+        {
+          "label": "Raise my Speed",
+          "conditions": [
+            "foe is paralyzed"
+          ],
+          "effect": {
+            "id": "effect.stat-stage",
+            "params": [
+              "speedStages"
+            ]
+          }
+        },
+        {
+          "label": "Switch off one of the foe's held items for a while",
+          "conditions": [
+            "foe is paralyzed"
+          ],
+          "effect": {
+            "id": "effect.package",
+            "params": []
+          }
+        },
+        {
+          "label": "Make my next physical move two types",
+          "conditions": [
+            "foe is paralyzed"
+          ],
+          "effect": {
+            "id": "effect.package",
+            "params": [
+              "primaryType",
+              "secondType"
+            ]
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.ofuda",
       "className": "OfudaAbAttr",
       "label": "Curse a foe",
@@ -1056,6 +1469,64 @@
         "id": "effect.apply-tag",
         "params": [
           "tag"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.overloaded-power",
+      "className": "OverloadedPowerAbAttr",
+      "label": "Boost Electric move power at full charge",
+      "summary": "While I hold the maximum of 4 charge stacks, my Electric moves have their power multiplied by 1.25. Example: 1.25 = 25% more power.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "overloaded",
+        "full charge bonus",
+        "electric power at max stacks",
+        "overcharge boost",
+        "charged up damage",
+        "stronger electric moves",
+        "max stacks power"
+      ],
+      "examples": [
+        "While I am fully charged my Electric moves hit 25% harder, like Overloaded"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.25 = 25% more, 0.5 = half)",
+          "control": "number",
+          "default": 1.25,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
         ]
       },
       "reusableAlone": {
@@ -1280,6 +1751,151 @@
         "do": true
       },
       "packageReason": "The gained type is a constructor argument (default Electric, so the shipped ability is unchanged) and an editable param. Package, reason: no effect.add-type in the effect library (requested), not because the effect cannot be split. Users (1): Photovoltaic (6030) attr 1; attr 0 is a SelfHighestStatMultiplierAbAttr (Solar Power half) from another batch. apply writes pokemon.summonData.types, which is reset when the Pokemon leaves the field. It ignores `simulated` (never read), harmless because PostSummon is never dispatched simulated. A Pokemon that already has summonData.types set (a type change before entry) keeps that list and gets Electric appended; with no summon types it starts from getTypes().",
+      "uses": 1
+    },
+    {
+      "id": "block.positive-feedback",
+      "className": "PositiveFeedbackAbAttr",
+      "label": "Consume the foe's paralysis and lower its better defense",
+      "summary": "After my attack hits a paralyzed foe, its paralysis is cured and its higher defense (Defense or Sp. Def) drops by 1 stage. Example: 1 = one stage lower.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "positive feedback",
+        "cure paralysis and lower defense",
+        "eat the paralysis",
+        "convert paralysis into a stat drop",
+        "shock to defense drop",
+        "defense break after paralysis",
+        "spend paralysis"
+      ],
+      "examples": [
+        "After I hit a paralyzed foe, its paralysis is gone and its better defense drops one stage, like Positive Feedback"
+      ],
+      "params": [
+        {
+          "id": "stageDrop",
+          "label": "Stages the foe's higher defense drops (1-6)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only after an ordinary hit: a one-hit KO or a blocked hit does not count",
+        "Does nothing while the game is only previewing",
+        "The foe's paralysis is cured at once, before the stat drop is queued"
+      ],
+      "branches": [
+        {
+          "label": "Cure the foe's paralysis",
+          "conditions": [
+            "foe is paralyzed"
+          ],
+          "effect": {
+            "id": "effect.cure-status",
+            "params": []
+          }
+        },
+        {
+          "label": "Lower the foe's higher defense",
+          "conditions": [
+            "foe is paralyzed"
+          ],
+          "effect": {
+            "id": "effect.stat-stage",
+            "params": [
+              "stageDrop"
+            ]
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.positive-feedback-power",
+      "className": "PositiveFeedbackPowerAbAttr",
+      "label": "Boost move power against a paralyzed foe",
+      "summary": "My moves have their power multiplied by 1.25 while the foe I aim at is paralyzed. Example: 1.25 = 25% more power.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "positive feedback",
+        "bonus against paralysis",
+        "hit paralyzed foes harder",
+        "power up on a status",
+        "paralysis bonus",
+        "static boost",
+        "stronger against paralyzed"
+      ],
+      "examples": [
+        "My attacks get 25% more power against a paralyzed foe, like Positive Feedback"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.25 = 25% more, 0.5 = half)",
+          "control": "number",
+          "default": 1.25,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
       "uses": 1
     },
     {

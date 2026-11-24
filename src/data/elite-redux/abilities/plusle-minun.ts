@@ -52,6 +52,7 @@ import { StatusEffect } from "#enums/status-effect";
 import type { Pokemon } from "#field/pokemon";
 import type {
   AbAttrBaseParams,
+  PokemonAttackCondition,
   PostMoveInteractionAbAttrParams,
   PreAttackModifyPowerAbAttrParams,
 } from "#types/ability-types";
@@ -310,20 +311,63 @@ export class SynchronizedCurrentHealAbAttr extends PostTurnAbAttr {
 
 /** +25% power when the holder's move targets a PARALYZED foe. */
 export class PositiveFeedbackPowerAbAttr extends VariableMovePowerAbAttr {
-  override canApply({ opponent }: PreAttackModifyPowerAbAttrParams): boolean {
+  /** Power multiplier of the attack (1.25 for the shipped ability). */
+  public readonly powerMultiplier: number;
+
+  constructor(powerMultiplier = POSITIVE_FEEDBACK_POWER_MULTIPLIER) {
+    super();
+    this.powerMultiplier = powerMultiplier;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreAttackModifyPowerAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole original `canApply` is the gate; there is no guard and no residual. */
+  override canApply(params: PreAttackModifyPowerAbAttrParams): boolean {
+    return gatedCanApply<PreAttackModifyPowerAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the foe this move is aimed at is paralyzed. */
+  public gate({ opponent }: PreAttackModifyPowerAbAttrParams): boolean {
     return opponent?.status?.effect === StatusEffect.PARALYSIS;
   }
 
   override apply({ power }: PreAttackModifyPowerAbAttrParams): void {
-    power.value *= POSITIVE_FEEDBACK_POWER_MULTIPLIER;
+    power.value *= this.powerMultiplier;
   }
 }
 
 /** Consume the target's paralysis and drop its higher defensive stat after damage. */
 export class PositiveFeedbackAbAttr extends PostAttackAbAttr {
+  /** Stages the foe's higher defensive stat drops by (1 for the shipped ability). */
+  public readonly stageDrop: number;
+
+  /** The first two arguments are the parent's (`attackCondition` default: the move deals damage; `showAbility`). */
+  constructor(attackCondition?: PokemonAttackCondition, showAbility = true, stageDrop = 1) {
+    super(attackCondition, showAbility);
+    this.stageDrop = stageDrop;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `guards`, then `gate`. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { opponent, hitResult } = params;
-    return super.canApply(params) && hitResult < 4 && opponent?.status?.effect === StatusEffect.PARALYSIS;
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /**
+   * Clauses 1 and 2, in order: the parent's check (its constructor closure `attackCondition`, which the compiler can swap, by
+   * default "the move deals damage") and an ordinary hit (`hitResult < 4`, that is below ONE_HIT_KO: a one-hit KO and a blocked
+   * hit do not count). Not editable here.
+   */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    return super.canApply(params) && params.hitResult < 4;
+  }
+
+  /** Clause 3, the replaceable condition: the foe is paralyzed. */
+  public gate({ opponent }: PostMoveInteractionAbAttrParams): boolean {
+    return opponent?.status?.effect === StatusEffect.PARALYSIS;
   }
 
   override apply({ opponent, simulated }: PostMoveInteractionAbAttrParams): void {
@@ -334,7 +378,13 @@ export class PositiveFeedbackAbAttr extends PostAttackAbAttr {
     opponent.resetStatus(true, false, false, false);
     // Lower the HIGHER defensive stat by one stage.
     const higherDef = opponent.getStat(Stat.DEF) >= opponent.getStat(Stat.SPDEF) ? Stat.DEF : Stat.SPDEF;
-    globalScene.phaseManager.unshiftNew("StatStageChangePhase", opponent.getBattlerIndex(), false, [higherDef], -1);
+    globalScene.phaseManager.unshiftNew(
+      "StatStageChangePhase",
+      opponent.getBattlerIndex(),
+      false,
+      [higherDef],
+      -this.stageDrop,
+    );
   }
 }
 
@@ -346,9 +396,47 @@ export class PositiveFeedbackAbAttr extends PostAttackAbAttr {
  * next physical move to Electric/Fairy dual-type (self-buff).
  */
 export class NegativeFeedbackAbAttr extends PostAttackAbAttr {
+  /** Speed stages the holder gains (1 for the shipped ability). */
+  public readonly speedStages: number;
+  /** The holder's next physical move becomes this type first (Electric)... */
+  public readonly primaryType: PokemonType;
+  /** ...and this type second (Fairy). */
+  public readonly secondType: PokemonType;
+
+  /** The first two arguments are the parent's (`attackCondition` default: the move deals damage; `showAbility`). */
+  constructor(
+    attackCondition?: PokemonAttackCondition,
+    showAbility = true,
+    speedStages = 1,
+    primaryType: PokemonType = PokemonType.ELECTRIC,
+    secondType: PokemonType = PokemonType.FAIRY,
+  ) {
+    super(attackCondition, showAbility);
+    this.speedStages = speedStages;
+    this.primaryType = primaryType;
+    this.secondType = secondType;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `guards`, then `gate`. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { opponent, hitResult } = params;
-    return super.canApply(params) && hitResult < 4 && opponent?.status?.effect === StatusEffect.PARALYSIS;
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /**
+   * Clauses 1 and 2, in order: the parent's check (its constructor closure `attackCondition`, which the compiler can swap, by
+   * default "the move deals damage") and an ordinary hit (`hitResult < 4`, that is below ONE_HIT_KO: a one-hit KO and a blocked
+   * hit do not count). Not editable here.
+   */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    return super.canApply(params) && params.hitResult < 4;
+  }
+
+  /** Clause 3, the replaceable condition: the foe is paralyzed. */
+  public gate({ opponent }: PostMoveInteractionAbAttrParams): boolean {
+    return opponent?.status?.effect === StatusEffect.PARALYSIS;
   }
 
   override apply({ pokemon, opponent, simulated }: PostMoveInteractionAbAttrParams): void {
@@ -356,11 +444,17 @@ export class NegativeFeedbackAbAttr extends PostAttackAbAttr {
       return;
     }
     opponent.resetStatus(true, false, false, false);
-    globalScene.phaseManager.unshiftNew("StatStageChangePhase", pokemon.getBattlerIndex(), true, [Stat.SPD], 1);
+    globalScene.phaseManager.unshiftNew(
+      "StatStageChangePhase",
+      pokemon.getBattlerIndex(),
+      true,
+      [Stat.SPD],
+      this.speedStages,
+    );
     // Suppress one seeded-random held item until end of the following turn.
     suppressRandomHeldItem(opponent);
     // Prime the HOLDER's own next physical move → Electric (primary) / Fairy (second).
-    primeDualTypeMove(pokemon, PokemonType.ELECTRIC, PokemonType.FAIRY);
+    primeDualTypeMove(pokemon, this.primaryType, this.secondType);
   }
 }
 

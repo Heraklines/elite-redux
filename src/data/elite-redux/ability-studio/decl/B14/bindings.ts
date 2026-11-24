@@ -164,3 +164,34 @@ bindLegacyClosure(
   "Needs 'an active ally is on the field' (R-B14-5.8, the first ally with isActive(true); party.ally-exists uses getAlly() which is not active-filtered) and 'attacked this turn' (R-B14-5.10: turnData.acted and a last move that is neither None nor a status move; time.acted reads only turnData.acted).",
   "gate",
 );
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// Chunk 6. attrIndex read from the live game (golden-attr-order.json). Closed Circuit (5924) is a marker with no closure and no
+// gate (its declaration is parked), Capacitor Bank Absorb (5925 attr 1) and Fault Current (5926 attr 0) have no condition slot, so
+// they need no binding.
+// ---------------------------------------------------------------------------------------------------------------------------
+
+// Positive Feedback (5922), attr 0 (PositiveFeedbackPowerAbAttr). Gate = [the foe I aim at is paralyzed]. No guard, no residual.
+bindCondition(5922, 0, { id: "status.has", who: "other", status: "PARALYSIS" }, "gate");
+
+// Positive Feedback (5922), attr 1 (PositiveFeedbackAbAttr). ctor:0 = the parent attackCondition, default `move.category !== STATUS`.
+// Gate = [the foe is paralyzed]. Guard 2 (`hitResult < 4`) stays in the class.
+bindCondition(5922, 1, { id: "move.damaging" }, "ctor:0");
+bindCondition(5922, 1, { id: "status.has", who: "other", status: "PARALYSIS" }, "gate");
+
+// Negative Feedback (5923), attr 0 (NegativeFeedbackAbAttr). Same two slots as Positive Feedback.
+bindCondition(5923, 0, { id: "move.damaging" }, "ctor:0");
+bindCondition(5923, 0, { id: "status.has", who: "other", status: "PARALYSIS" }, "gate");
+
+// Capacitor Bank (5925), attr 0 (CapacitorBankGainAbAttr). Gate = [the move deals damage (category !== STATUS)]. The residual
+// (damage dealt, not blocked, below the maximum stacks, this move not counted yet) stays in the class.
+bindCondition(5925, 0, { id: "move.damaging" }, "gate");
+
+// Overloaded (5927), attr 0 (OverloadedPowerAbAttr). Gate = [I hold exactly the maximum stacks, I carry the Overloaded marker, the
+// move is Electric after ability changes], in that order.
+bindLegacyClosure(
+  5927,
+  0,
+  "Clauses 1 and 2 have no atom: I hold exactly the maximum charge stacks (mon.charge-stacks, R-B14-6.2) and I carry an active ability attr named OverloadedChipAbAttr (mon.has-active-attr, R-B14-6.10). Clause 3 is move.type ELECTRIC with effective true; the exact planned tree is in OverloadedPowerAbAttr.decl.ts.",
+  "gate",
+);
