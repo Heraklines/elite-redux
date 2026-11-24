@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "0c0f1050e46f41",
+  "hash": "15e97c93ebc5f4",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -450,8 +450,8 @@
     {
       "id": "block.metallosis-poison",
       "className": "MetallosisPoisonAbAttr",
-      "label": "Give the target a status after a critical hit",
-      "summary": "After my attack lands as a critical hit, the target gets this status if it can take it: Poison.",
+      "label": "Give the target a status",
+      "summary": "After my attack hits, the target gets this status if it can take it: Poison. As built, only after a critical hit.",
       "tier": "B",
       "kind": "event-effect",
       "status": "decomposed",
@@ -630,8 +630,8 @@
     {
       "id": "block.oracle-entry",
       "className": "OracleEntryAbAttr",
-      "label": "Start a damage-halving guard for a few turns",
-      "summary": "The first time I enter this battle, I start a guard that lasts 3 turns. Effects that look for the guard, such as halving damage, work while it lasts.",
+      "label": "Start a timed guard for a few turns",
+      "summary": "The first time I enter this battle, I start a timed guard that lasts 3 turns. Other effects can look for the guard while it lasts, for example one that halves damage taken.",
       "tier": "B",
       "kind": "package",
       "status": "decomposed",
@@ -692,7 +692,7 @@
     {
       "id": "block.oracle-guard-tick",
       "className": "OracleGuardTickAbAttr",
-      "label": "Count my guard down by one turn",
+      "label": "Count a running timed guard down by one turn",
       "summary": "At the end of each turn, a running guard loses one turn. When no turns are left, the guard ends and effects that look for it stop.",
       "tier": "B",
       "kind": "package",
