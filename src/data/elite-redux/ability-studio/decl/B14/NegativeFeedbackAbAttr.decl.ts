@@ -19,14 +19,14 @@
 //   a.  `if (simulated || !opponent) return`
 //   b.  `opponent.resetStatus(true, false, false, false)`                      cure the foe at once (effect.cure-status)
 //   b2. unshift `StatStageChangePhase(holder, selfTarget true, [SPD], +1)`     raise my Speed (effect.stat-stage)
-//   c.  `suppressRandomHeldItem(opponent)`: a seeded random pick (`randBattleSeedInt(n)` only when n > 1) among its held items that
+//   c.  `suppressRandomHeldItem(opponent, suppressTurns)`: a seeded random pick (`randBattleSeedInt(n)` only when n > 1) among its held items that
 //       are not form-change items; the item stays but does nothing until the end of the FOLLOWING turn   (no library effect)
-//   d.  `primeDualTypeMove(holder, ELECTRIC, FAIRY)`: my NEXT physical move counts as Electric first and Fairy second (a lasting
+//   d.  `primeDualTypeMove(holder, ELECTRIC, FAIRY, physicalOnly)`: my NEXT physical move counts as Electric first and Fairy second (a lasting
 //       mark on me that the move code reads and clears)                                                   (no library effect)
 // Steps b and b2 exist in the library; steps c and d do not, so those two branches are "works as one piece" parts (requests
 // R-B14-6.5 and R-B14-6.6). The class keeps the four in this exact order (the seeded draw sits between the stat stage and the type mark).
 // Class edit (pure move of code): a constructor with the old behaviour as defaults, `(attackCondition?, showAbility = true,
-// speedStages = 1, primaryType = ELECTRIC, secondType = FAIRY)`.
+// speedStages = 1, primaryType = ELECTRIC, secondType = FAIRY, suppressTurns = 1, physicalOnly = true)`.
 import { NegativeFeedbackAbAttr } from "#data/elite-redux/abilities/plusle-minun";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 import { enumCodec } from "#data/elite-redux/ability-studio/param-codecs";
@@ -91,6 +91,30 @@ export default defineDecl(NegativeFeedbackAbAttr, {
       codec: enumCodec(PokemonType, "type"),
       gateIndependent: true,
     },
+    {
+      id: "suppressTurns",
+      ctorIndex: 5,
+      path: "suppressTurns",
+      control: "number",
+      min: 1,
+      max: 10,
+      step: 1,
+      integer: true,
+      label: "Turns the item stays switched off (1 = until the end of the following turn)",
+      editable: true,
+      default: 1,
+      gateIndependent: true,
+    },
+    {
+      id: "physicalOnly",
+      ctorIndex: 6,
+      path: "physicalOnly",
+      control: "boolean",
+      label: "Only physical moves get the two types",
+      editable: true,
+      default: true,
+      gateIndependent: true,
+    },
   ],
   // The constructor's second argument, `showAbility`, is never exposed.
   fixedCtorArgs: { 1: true },
@@ -121,12 +145,12 @@ export default defineDecl(NegativeFeedbackAbAttr, {
     {
       label: "Switch off one of the foe's held items for a while",
       conditions: ["foe is paralyzed"],
-      effect: { id: "effect.package", params: [] },
+      effect: { id: "effect.package", params: ["suppressTurns"] },
     },
     {
       label: "Make my next physical move two types",
       conditions: ["foe is paralyzed"],
-      effect: { id: "effect.package", params: ["primaryType", "secondType"] },
+      effect: { id: "effect.package", params: ["primaryType", "secondType", "physicalOnly"] },
     },
   ],
   reusableAlone: { when: true, if: true, do: true },

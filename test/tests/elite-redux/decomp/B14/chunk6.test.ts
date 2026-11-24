@@ -36,7 +36,11 @@ import {
   FaultCurrentAbAttr,
   OverloadedPowerAbAttr,
 } from "#data/elite-redux/abilities/electivire";
-import { erIsHeldItemSuppressed, resetItemSuppression } from "#data/elite-redux/abilities/item-suppression";
+import {
+  erHeldItemSuppressionState,
+  erIsHeldItemSuppressed,
+  resetItemSuppression,
+} from "#data/elite-redux/abilities/item-suppression";
 import {
   ClosedCircuitAbAttr,
   ER_CLOSED_CIRCUIT_ABILITY_ID,
@@ -142,6 +146,7 @@ describe("B14 chunk 6: the six classes keep their names, places and defaults", (
       PokemonType.ELECTRIC,
       PokemonType.FAIRY,
     ]);
+    expect([negative.suppressTurns, negative.physicalOnly]).toEqual([1, true]);
     expect([gain.stacks, absorb.stacks, absorb.getImmuneType()]).toEqual([1, 1, PokemonType.ELECTRIC]);
     expect([fault.period, fault.powerPerStack, fault.moveId]).toEqual([2, 15, MoveId.DISCHARGE]);
     expect(overloaded.powerMultiplier).toBe(1.25);
@@ -376,6 +381,17 @@ describe("B14 chunk 6: Positive Feedback and Negative Feedback, the consume halv
     expect(order).toEqual(["phase:StatStageChangePhase"]);
     expect(erIsHeldItemSuppressed(foe, "ONLY")).toBe(true);
     expect(getDualTypePrime(holder)).toMatchObject({ primaryType: PokemonType.FIRE, secondType: PokemonType.WATER });
+    // Defaults pinned: the lock lasts to the end of the following turn and the prime is physical-only.
+    expect(erHeldItemSuppressionState(foe, "ONLY")?.turnsLeft).toBe(2);
+    expect(getDualTypePrime(holder)).toMatchObject({ physicalOnly: true });
+    // The two new settings: a longer item lock and a prime that also covers special moves.
+    resetItemSuppression();
+    new NegativeFeedbackAbAttr(undefined, true, 1, PokemonType.FIRE, PokemonType.WATER, 3, false).apply({
+      ...params,
+      simulated: false,
+    } as never);
+    expect(erHeldItemSuppressionState(foe, "ONLY")?.turnsLeft).toBe(4);
+    expect(getDualTypePrime(holder)).toMatchObject({ physicalOnly: false });
   });
 
   it("in a real battle Negative Feedback consumes a paralysis it just met", async () => {

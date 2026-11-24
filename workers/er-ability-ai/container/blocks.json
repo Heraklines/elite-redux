@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "1682d4703c6ec1",
+  "hash": "125697ac2fa21f",
   "blocks": [
     {
       "id": "block.astral-project-star-marker",
@@ -1321,6 +1321,26 @@
             "STELLAR"
           ],
           "gateIndependent": true
+        },
+        {
+          "id": "suppressTurns",
+          "label": "Turns the item stays switched off (1 = until the end of the following turn)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "physicalOnly",
+          "label": "Only physical moves get the two types",
+          "control": "boolean",
+          "default": true,
+          "editable": true,
+          "gateIndependent": true
         }
       ],
       "conditions": [
@@ -1374,7 +1394,9 @@
           ],
           "effect": {
             "id": "effect.package",
-            "params": []
+            "params": [
+              "suppressTurns"
+            ]
           }
         },
         {
@@ -1386,7 +1408,8 @@
             "id": "effect.package",
             "params": [
               "primaryType",
-              "secondType"
+              "secondType",
+              "physicalOnly"
             ]
           }
         }

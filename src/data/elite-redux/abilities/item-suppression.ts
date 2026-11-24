@@ -42,7 +42,7 @@ function currentTurn(): number {
  * following turn. No-op if the pokemon holds no suppressible items. Returns the
  * suppressed item's type id, or `undefined` if nothing was suppressed.
  */
-export function suppressRandomHeldItem(pokemon: Pokemon): string | undefined {
+export function suppressRandomHeldItem(pokemon: Pokemon, turns = 1): string | undefined {
   const items = (pokemon.getHeldItems() as ReadonlyArray<{ type?: { id?: string }; formChangeItem?: unknown }>).filter(
     m => m.formChangeItem === undefined && !!m.type?.id,
   );
@@ -54,7 +54,7 @@ export function suppressRandomHeldItem(pokemon: Pokemon): string | undefined {
   if (!typeId) {
     return;
   }
-  SUPPRESSED.set(pokemon.id, { typeId, expiryTurn: currentTurn() + 1 });
+  SUPPRESSED.set(pokemon.id, { typeId, expiryTurn: currentTurn() + turns });
   return typeId;
 }
 

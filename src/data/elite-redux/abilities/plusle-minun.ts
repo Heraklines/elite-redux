@@ -402,6 +402,10 @@ export class NegativeFeedbackAbAttr extends PostAttackAbAttr {
   public readonly primaryType: PokemonType;
   /** ...and this type second (Fairy). */
   public readonly secondType: PokemonType;
+  /** Turns the suppressed item stays off after the current one (1 = until the end of the following turn). */
+  public readonly suppressTurns: number;
+  /** Only physical moves get the two types (the shipped ability: true). */
+  public readonly physicalOnly: boolean;
 
   /** The first two arguments are the parent's (`attackCondition` default: the move deals damage; `showAbility`). */
   constructor(
@@ -410,11 +414,15 @@ export class NegativeFeedbackAbAttr extends PostAttackAbAttr {
     speedStages = 1,
     primaryType: PokemonType = PokemonType.ELECTRIC,
     secondType: PokemonType = PokemonType.FAIRY,
+    suppressTurns = 1,
+    physicalOnly = true,
   ) {
     super(attackCondition, showAbility);
     this.speedStages = speedStages;
     this.primaryType = primaryType;
     this.secondType = secondType;
+    this.suppressTurns = suppressTurns;
+    this.physicalOnly = physicalOnly;
   }
 
   /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
@@ -452,9 +460,9 @@ export class NegativeFeedbackAbAttr extends PostAttackAbAttr {
       this.speedStages,
     );
     // Suppress one seeded-random held item until end of the following turn.
-    suppressRandomHeldItem(opponent);
+    suppressRandomHeldItem(opponent, this.suppressTurns);
     // Prime the HOLDER's own next physical move → Electric (primary) / Fairy (second).
-    primeDualTypeMove(pokemon, this.primaryType, this.secondType);
+    primeDualTypeMove(pokemon, this.primaryType, this.secondType, this.physicalOnly);
   }
 }
 
