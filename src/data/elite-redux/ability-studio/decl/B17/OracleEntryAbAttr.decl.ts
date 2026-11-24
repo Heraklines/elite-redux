@@ -25,9 +25,9 @@ export default defineDecl(OracleEntryAbAttr, {
   tier: "B",
   kind: "package",
   when: "event.on-entry",
-  label: "Start a damage-halving guard for a few turns",
+  label: "Start a timed guard for a few turns",
   summary: params =>
-    `The first time I enter this battle, I start a guard that lasts ${params.guardTurns} turns. Effects that look for the guard, such as halving damage, work while it lasts.`,
+    `The first time I enter this battle, I start a timed guard that lasts ${params.guardTurns} turns. Other effects can look for the guard while it lasts, for example one that halves damage taken.`,
   synonyms: [
     "oracle",
     "first entry shield",

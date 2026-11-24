@@ -27,9 +27,9 @@ export default defineDecl(MetallosisPoisonAbAttr, {
   tier: "B",
   kind: "event-effect",
   when: "event.after-my-hit",
-  label: "Give the target a status after a critical hit",
+  label: "Give the target a status",
   summary: params =>
-    `After my attack lands as a critical hit, the target gets this status if it can take it: ${params.status}.`,
+    `After my attack hits, the target gets this status if it can take it: ${params.status}. As built, only after a critical hit.`,
   synonyms: [
     "metallosis",
     "poison on crit",
