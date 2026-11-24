@@ -42,9 +42,11 @@
 
 import { PostAttackAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { HitResult } from "#enums/hit-result";
 import type { MoveFlags } from "#enums/move-flags";
 import type { BattleStat } from "#enums/stat";
+import type { Pokemon } from "#field/pokemon";
 
 /** Construction options for {@linkcode StatDebuffOnFlagAttackAbAttr}. */
 export interface StatDebuffOnFlagAttackOptions {
@@ -88,7 +90,13 @@ export interface StatDebuffOnFlagAttackOptions {
  * Pokerogue's stat-stage cap (-6) is handled by `StatStageChangePhase`; we
  * unconditionally queue the phase and let the cap apply naturally.
  */
-export class StatDebuffOnFlagAttackAbAttr extends PostAttackAbAttr {
+export class StatDebuffOnFlagAttackAbAttr
+  extends PostAttackAbAttr
+  implements GatedAttr<PostMoveInteractionAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
   private readonly flag: MoveFlags;
   private readonly stat: BattleStat;
   private readonly stages: number;
@@ -123,22 +131,37 @@ export class StatDebuffOnFlagAttackAbAttr extends PostAttackAbAttr {
     return this.stages;
   }
 
+  /**
+   * Tier B (ability studio spec 3.1): `canApply = guards && gate && residual`. The ORIGINAL clause order was a damaging move,
+   * the hit connected, first strike only, the move property, then the chance draw. The two safety clauses (hit connected, first
+   * strike) are pure reads, so moving them in front of the damaging-move test changes no answer; the property test and the single
+   * random draw stay last and in their original order, so a hit that fails any earlier clause still draws nothing.
+   */
   public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    if (!super.canApply(params)) {
-      return false;
-    }
-    const { pokemon, opponent, move, hitResult } = params;
-    // The drop occurs only when the move actually HITS (dex: "when hitting" /
-    // "after damage"). Misses (MISS) and immune targets (NO_EFFECT) never drop.
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /**
+   * Safety rules: the move actually HITS (dex: "when hitting" / "after damage"; a miss or an immune target never drops the stat),
+   * and only the FIRST strike of a multi-hit move counts ("each target can only be affected once per turn": hitsLeft still equals
+   * the total hitCount on the opening hit).
+   */
+  public guards({ pokemon, hitResult }: PostMoveInteractionAbAttrParams): boolean {
     if (hitResult >= HitResult.NO_EFFECT) {
       return false;
     }
-    // "Each target can only be affected once per turn." A multi-hit flag move
-    // must drop the stat only ONCE — gate to the first strike (hitsLeft still
-    // equals the total hitCount on the opening hit).
-    if (pokemon.turnData.hitCount !== pokemon.turnData.hitsLeft) {
+    // A stand-in without turnData (the old unit-test stubs) counts as the first strike, so a stub still gets the same answers as before the split;
+    // a real Pokemon always has turnData.
+    const turnData = pokemon.turnData as Pokemon["turnData"] | undefined;
+    return turnData === undefined || turnData.hitCount === turnData.hitsLeft;
+  }
+
+  /** The replaceable conditions, in the original order: a damaging move (base condition), the move property, then the chance roll. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    if (!super.canApply(params)) {
       return false;
     }
+    const { pokemon, opponent, move } = params;
     if (!move.doesFlagEffectApply({ flag: this.flag, user: pokemon, target: opponent })) {
       return false;
     }

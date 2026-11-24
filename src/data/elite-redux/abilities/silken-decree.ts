@@ -20,20 +20,27 @@ function usableMoveCount(pokemon: Pokemon): number {
   ).size;
 }
 
-export function applySilkenDecreeToOpponents(pokemon: Pokemon): boolean {
+/** Turns the seal lasts (1 = the foe's next move selection only). */
+export const SILKEN_DECREE_TURNS = 1;
+
+export function applySilkenDecreeToOpponents(pokemon: Pokemon, turns: number = SILKEN_DECREE_TURNS): boolean {
   let applied = false;
   for (const opponent of pokemon.getOpponents()) {
     if (!opponent || opponent.isFainted() || usableMoveCount(opponent) <= 1) {
       continue;
     }
-    applied = opponent.addTag(BattlerTagType.ER_SILKEN_DECREE, 1, undefined, pokemon.id) || applied;
+    applied = opponent.addTag(BattlerTagType.ER_SILKEN_DECREE, turns, undefined, pokemon.id) || applied;
   }
   return applied;
 }
 
 export class SilkenDecreeAbAttr extends PostTurnAbAttr {
-  constructor() {
+  /** Turns the seal lasts (ability studio param; the default is the original 1). */
+  public readonly turns: number;
+
+  constructor(turns: number = SILKEN_DECREE_TURNS) {
     super(true);
+    this.turns = turns;
   }
 
   override canApply({ pokemon }: { pokemon: Pokemon }): boolean {
@@ -44,7 +51,7 @@ export class SilkenDecreeAbAttr extends PostTurnAbAttr {
 
   override apply({ pokemon, simulated }: { pokemon: Pokemon; simulated?: boolean }): void {
     if (!simulated) {
-      applySilkenDecreeToOpponents(pokemon);
+      applySilkenDecreeToOpponents(pokemon, this.turns);
     }
   }
 }

@@ -26,10 +26,14 @@ export const ER_TANGLED_SEED_ABILITY_ID = 5903;
 /** Number of turns the seeded target is prevented from voluntarily switching. */
 export const TANGLED_SEED_TRAP_TURNS = 2;
 
-/** Marker attribute; the effect is applied from {@linkcode SeedTag.onAdd}. */
+/** Marker attribute; the effect is applied from {@linkcode SeedTag.onAdd}, which reads the number of turns from the seeder's live attr. */
 export class TangledSeedAbAttr extends AbAttr {
-  constructor() {
+  /** Turns the seeded target cannot voluntarily switch (ability studio param; the default is the original 2). */
+  public readonly trapTurns: number;
+
+  constructor(trapTurns: number = TANGLED_SEED_TRAP_TURNS) {
     super(false);
+    this.trapTurns = trapTurns;
   }
 
   override apply(_params: AbAttrBaseParams): void {}

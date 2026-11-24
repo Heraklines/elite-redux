@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "148286b1d0b532",
-  "hash": "188e283c24ad8d",
+  "vocabularyHash": "0210c37e7c01a5",
+  "hash": "077b6fe3bfbabc",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -2824,6 +2824,626 @@
       "uses": 6
     },
     {
+      "id": "block.set-terrain-on-hit",
+      "className": "SetTerrainOnHitAbAttr",
+      "label": "Set a terrain when I am hit",
+      "summary": "When a damaging move hits me, the terrain becomes Electric Terrain (unless it already is). Example: Electric Terrain after every hit I take.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "terrain when hit",
+        "electric terrain when hit",
+        "psychic terrain when hit",
+        "change the terrain when attacked",
+        "react with a terrain",
+        "surge when hit",
+        "power leak",
+        "brain overload"
+      ],
+      "examples": [
+        "Any damaging hit on me sets Electric Terrain, like Power Leak",
+        "Getting hit sets Psychic Terrain, like Brain Overload"
+      ],
+      "params": [
+        {
+          "id": "terrain",
+          "label": "Terrain to set",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "MISTY",
+            "ELECTRIC",
+            "GRASSY",
+            "PSYCHIC",
+            "TOXIC"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "contactRequired",
+          "label": "Only when the move makes contact",
+          "control": "boolean",
+          "default": false,
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must have connected: a miss, a block or an immunity does nothing",
+        "A terrain that is already active is left alone, and the field's own terrain priority rules decide",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.set-terrain",
+        "params": [
+          "terrain"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.shattered-psyche",
+      "className": "ShatteredPsycheAbAttr",
+      "label": "Fuse two foes into one with shared HP, once per battle",
+      "summary": "Once per battle, after everyone chose a move, two foes fuse into one with their HP added together and it also uses the other foe's move. The HP is split back when it leaves.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "shattered psyche",
+        "merge two foes",
+        "fuse the enemies",
+        "combine foe hp",
+        "dna splice the opponents",
+        "double the boss",
+        "two foes act as one"
+      ],
+      "examples": [
+        "Once per battle, the two enemies in a double battle become one big foe that uses both of their moves, like Shattered Psyche",
+        "In a single battle, the foe absorbs a random benched Pokemon for one turn"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "It only works for the host or in solo play (the turn-start hook is skipped for a guest)",
+        "In doubles the two foes on the field fuse; in singles the foe on the field absorbs one living benched foe chosen with a seeded roll, and with nothing on the bench nothing happens and the use is not spent",
+        "A foe that is already fused or absorbed is skipped",
+        "The absorbed foe is hidden and cannot be targeted or chosen as a reserve until the fusion ends",
+        "It is built into the turn start and the battle end and is not part of this block"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.silken-decree",
+      "className": "SilkenDecreeAbAttr",
+      "label": "Seal some moves of each foe at the end of the turn",
+      "summary": "At the end of every turn, each foe that has more than one usable move gets some moves sealed for 1 turn(s); one move always stays free. Example: a foe with four moves can use only two.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "silken decree",
+        "seal moves",
+        "disable moves",
+        "restrict the foe's moves",
+        "limit what the foe can use",
+        "move lock",
+        "encore style restriction",
+        "torment the foe"
+      ],
+      "examples": [
+        "At the end of every turn the foe loses access to some of its moves for the next turn, like Silken Decree",
+        "A weaker form of Disable that hits every foe every turn"
+      ],
+      "params": [
+        {
+          "id": "turns",
+          "label": "Number of turns the seal lasts (1 = the foe's next move selection only)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one foe on the field must still be standing and have more than one usable move (distinct moves with PP left); foes with one move are left alone",
+        "The seal always leaves at least one move free, and the choice of which moves are sealed is random",
+        "A foe that cannot take the seal (the battle effect refuses it) is skipped",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": [
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.soulmate",
+      "className": "SoulmateAbAttr",
+      "label": "Link to my ally and share damage and healing with it",
+      "summary": "When I enter I link to my nearest living ally. While linked I take 25% of the direct damage my ally takes, and my ally gets 50% of the direct healing I receive. No ally, no effect.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "soulmate",
+        "share damage with my partner",
+        "split damage with an ally",
+        "share healing with my ally",
+        "link with my doubles partner",
+        "bodyguard for my ally",
+        "doubles link"
+      ],
+      "examples": [
+        "In doubles I take a quarter of my partner's hits and it gets half of my healing",
+        "A soul link that spreads damage and recovery between two allies"
+      ],
+      "params": [
+        {
+          "id": "damageShare",
+          "label": "Share of my ally's direct damage that I take (0.25 = 25%)",
+          "control": "slider",
+          "default": 0.25,
+          "editable": true,
+          "min": 0.05,
+          "max": 1,
+          "step": 0.05
+        },
+        {
+          "id": "healShare",
+          "label": "Share of my direct healing that my ally gets (0.5 = 50%)",
+          "control": "slider",
+          "default": 0.5,
+          "editable": true,
+          "min": 0.05,
+          "max": 1,
+          "step": 0.05
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Needs an adjacent living ally on the field; in singles it does nothing",
+        "In triples with two possible allies one is picked with a seeded roll, and an ally that is already linked is skipped",
+        "Only direct damage with a source counts; the share I take is raw damage, so my defenses and abilities such as Multiscale do not reduce it",
+        "The copied healing never copies again, and an ally at full HP gets nothing",
+        "The damage and healing halves are built into the game's damage and healing handling and are not part of this block",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "damageShare",
+          "healShare"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified. 1 attr in 1 ability: Soulmate (5918 attr 0). The entry trigger is a separate swappable WHEN and the class has no condition, guard or gate (PostSummonAbAttr answers true). The effect is a soul link plus two engine reactions: the library has no 'link two Pokemon' effect (state in link.ts; the same missing block as Heartbreak, R-B15-13), no moment 'when my linked ally takes direct damage' with a 'take a share of it' effect (the same shape as Chivalry's R-B15-2, but through the link instead of the adjacent ally; R-B15-41) and no moment 'when I am healed' with a 'copy a share to my linked ally' effect (R-B15-42). Both shares are typed params read from the holder's live attr by the seams. Why it cannot be split further today: the link is one shared state with the two halves that read it (formLink in apply, getLinkedAlly in both seams), the seams are driven from Pokemon.damageAndUpdate and Pokemon.heal by constructor name, not from a dispatched moment, and a split would need the three library blocks above. Suspected oddities, NOT fixed: (1) the redirect gate reads the link with getLinkedAlly(victim) and then asks the PARTNER for the marker, so the holder redirects damage only while it is itself ACTIVE and not fainted, and a holder that left the field stops sharing (intended); (2) the heal copy is computed from the ACTUAL amount healed, so overheal is not copied; (3) formLink skips allies that are already linked, so a holder next to an ally that Heartbreak linked first gets no link; (4) the recursion guard is a module variable shared by every holder, which is safe only because battle code is single threaded; the copied heal runs inside try/finally so the flag always resets.",
+      "uses": 1
+    },
+    {
+      "id": "block.stat-boost-on-flag-attack",
+      "className": "StatBoostOnFlagAttackAbAttr",
+      "label": "Raise my stat after using a certain kind of move",
+      "summary": "After I use a damaging move with the \"Biting move\" property, my Attack changes by 1 stage(s). Example: Biting moves raise my Attack by 1 stage.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "boost after a biting move",
+        "attack up after using a horn move",
+        "raise attack after hitting",
+        "weapon move boost",
+        "stat boost on move type",
+        "snowball with a move property",
+        "growing tooth",
+        "hardened sheath",
+        "daredevil"
+      ],
+      "examples": [
+        "Biting moves raise my Attack by one stage after they land, like Growing Tooth",
+        "Reckless moves raise my Attack by one stage, like Daredevil"
+      ],
+      "params": [
+        {
+          "id": "flag",
+          "label": "Move property that triggers it (for example Biting move)",
+          "control": "select",
+          "default": "BITING_MOVE",
+          "editable": true,
+          "options": [
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        },
+        {
+          "id": "stat",
+          "label": "Which of my stats changes",
+          "control": "select",
+          "default": "ATK",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "stages",
+          "label": "Stages to change (1 = one stage up, -1 = one stage down; not 0)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The stat stops at +6 (or -6); the normal stat change handles that and a stat already at the limit shows its usual message",
+        "A number of stages of 0 or a fraction is refused when the ability is built",
+        "It does nothing in a preview"
+      ],
+      "gateParams": [
+        {
+          "param": "flag",
+          "block": "move.flag",
+          "field": "flag"
+        }
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stat",
+          "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.stat-change-on-category-attack",
+      "className": "StatChangeOnCategoryAttackAbAttr",
+      "label": "Change a stat after using a physical or special move",
+      "summary": "After I use a damaging Physical move, the stat Defense of The target changes by -1 stage(s). Example: physical moves lower the target's Defense by 1.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "lower defense after a physical move",
+        "stat drop on physical attacks",
+        "special attacks lower special defense",
+        "debuff by move category",
+        "raise my attack after a special move",
+        "armor shred",
+        "whiplash"
+      ],
+      "examples": [
+        "Physical moves lower the target's Defense by one stage, like Whiplash",
+        "Special moves raise my Sp. Atk by one stage after they land"
+      ],
+      "params": [
+        {
+          "id": "category",
+          "label": "Move category that triggers it (Physical or Special)",
+          "control": "select",
+          "default": "PHYSICAL",
+          "editable": true,
+          "options": [
+            "PHYSICAL",
+            "SPECIAL"
+          ]
+        },
+        {
+          "id": "stat",
+          "label": "Which stat changes",
+          "control": "select",
+          "default": "DEF",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "stages",
+          "label": "Stages to change (-1 = one stage lower, 1 = one stage higher; not 0)",
+          "control": "number",
+          "default": -1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "target",
+          "label": "Whose stat changes",
+          "control": "select",
+          "default": "THE_TARGET",
+          "editable": true,
+          "options": [
+            "MYSELF",
+            "THE_TARGET"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The stat stops at -6 (or +6); the normal stat change handles that, and Clear Body, Mist and Contrary still apply",
+        "A number of stages of 0 or a fraction is refused when the ability is built",
+        "It does nothing in a preview"
+      ],
+      "gateParams": [
+        {
+          "param": "category",
+          "block": "move.category",
+          "field": "category"
+        }
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "target",
+          "stat",
+          "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.stat-debuff-on-flag-attack",
+      "className": "StatDebuffOnFlagAttackAbAttr",
+      "label": "Change the target's stat after using a certain kind of move",
+      "summary": "After my damaging move with the \"Hammer based\" property hits, the target's Defense changes by -1 stage(s), 100% of the time, only on the first strike. Example: hammer moves lower Defense by 1.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "lower the target's defense after a hammer move",
+        "debuff on hit with a move type",
+        "weaken the foe with biting moves",
+        "slicing moves lower defense",
+        "stat drop on contact move property",
+        "armor break",
+        "denting blows",
+        "chainsaw",
+        "crushing jaw"
+      ],
+      "examples": [
+        "Hammer moves lower the target's Defense by one stage, like Denting Blows",
+        "Biting moves have a 50% chance to lower the target's Defense, like Crushing Jaw"
+      ],
+      "params": [
+        {
+          "id": "flag",
+          "label": "Move property that triggers it (for example Hammer based)",
+          "control": "select",
+          "default": "HAMMER_BASED",
+          "editable": true,
+          "options": [
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        },
+        {
+          "id": "stat",
+          "label": "Which of the target's stats changes",
+          "control": "select",
+          "default": "DEF",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "stages",
+          "label": "Stages to change (-1 = one stage lower, 1 = one stage higher; not 0)",
+          "control": "number",
+          "default": -1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "chance",
+          "label": "Chance (%) that it happens (100 = always)",
+          "control": "number",
+          "default": 100,
+          "editable": true,
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must have connected: a miss, a block or an immunity does nothing",
+        "Only the first strike of a multi-hit move counts, so a target is affected once per move",
+        "The stat stops at -6 (or +6); the normal stat change handles that, and Clear Body, Mist and Contrary still apply",
+        "A number of stages of 0 or a fraction, or a chance outside 0 to 100, is refused when the ability is built",
+        "It does nothing in a preview"
+      ],
+      "gateParams": [
+        {
+          "param": "flag",
+          "block": "move.flag",
+          "field": "flag"
+        },
+        {
+          "param": "chance",
+          "block": "rng.chance",
+          "field": "pct"
+        }
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stat",
+          "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 5
+    },
+    {
       "id": "block.swirlify",
       "className": "SwirlifyAbAttr",
       "label": "Set Swirly Room (or another field effect) when I enter",
@@ -2937,6 +3557,57 @@
       "reusableAlone": {
         "when": true,
         "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.tangled-seed",
+      "className": "TangledSeedAbAttr",
+      "label": "Trap the foes I plant Leech Seed on",
+      "summary": "While I have this, a foe that I plant Leech Seed on cannot switch out by choice for 2 turns (forced switches such as Roar still work). Example: 2 = until the end of the following turn.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "tangled seed",
+        "leech seed traps",
+        "seeded foe cannot switch",
+        "trap the seeded foe",
+        "no escape from leech seed",
+        "block switching",
+        "mean look with seeds"
+      ],
+      "examples": [
+        "A foe I seed cannot switch out for two turns, like Tangled Seed",
+        "Leech Seed that also works like Mean Look"
+      ],
+      "params": [
+        {
+          "id": "trapTurns",
+          "label": "Number of turns the seeded foe cannot switch out (2 = until the end of the following turn)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 8,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "It only happens when Leech Seed really lands on the foe (a Grass type, or a foe that already has the seed, is not seeded and not trapped)",
+        "Forced switches such as Roar, Whirlwind and Dragon Tail still work",
+        "The Leech Seed has to come from me (the seed remembers who planted it)",
+        "It is built into the Leech Seed battle effect and is not part of this block"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
         "do": true
       },
       "uses": 1

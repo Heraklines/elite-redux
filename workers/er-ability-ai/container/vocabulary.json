@@ -1742,11 +1742,13 @@
         "QuickeningGraceAbAttr",
         "RapierFlagInjectionAbAttr",
         "RelativityAbAttr",
+        "ShatteredPsycheAbAttr",
         "SpreadTargetByFlagAbAttr",
         "StealthRockImmunityAbAttr",
         "SuppressFieldAbilitiesWhenEnragedAbAttr",
         "SuppressFieldEffectsAbAttr",
-        "SwitchWhileRampagingAbAttr"
+        "SwitchWhileRampagingAbAttr",
+        "TangledSeedAbAttr"
       ],
       "provides": [
         "holder"
@@ -5033,5 +5035,5 @@
       ]
     }
   ],
-  "hash": "148286b1d0b532"
+  "hash": "0210c37e7c01a5"
 }

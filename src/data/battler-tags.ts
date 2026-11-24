@@ -1356,8 +1356,11 @@ export class SeedTag extends SerializableBattlerTag {
     // the voluntary switch command (Pokemon.isTrapped) but not forced switches
     // (Roar / Whirlwind). turnCount 2: applied mid-turn, survives this turn-end,
     // expires at the end of the following turn.
-    if (source.getAllActiveAbilityAttrs().some(a => a?.constructor?.name === "TangledSeedAbAttr")) {
-      pokemon.addTag(BattlerTagType.TRAPPED, 2, MoveId.LEECH_SEED, source.id);
+    const tangledSeed = source.getAllActiveAbilityAttrs().find(a => a?.constructor?.name === "TangledSeedAbAttr") as
+      | { trapTurns: number }
+      | undefined;
+    if (tangledSeed) {
+      pokemon.addTag(BattlerTagType.TRAPPED, tangledSeed.trapTurns, MoveId.LEECH_SEED, source.id);
     }
   }
 

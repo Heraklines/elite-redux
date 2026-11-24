@@ -195,7 +195,10 @@ export interface SetTerrainOnHitOptions {
  * overwritten by a lower-priority one). `trySetTerrain` already silently
  * no-ops when the requested state is already active.
  */
-export class SetTerrainOnHitAbAttr extends PostDefendAbAttr {
+export class SetTerrainOnHitAbAttr extends PostDefendAbAttr implements GatedAttr<PostMoveInteractionAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
   private readonly terrain: TerrainType;
   private readonly contactRequired: boolean;
 
@@ -215,18 +218,22 @@ export class SetTerrainOnHitAbAttr extends PostDefendAbAttr {
     return this.contactRequired;
   }
 
+  /** Tier B (ability studio spec 3.1): `canApply = guards && gate && residual`, in the original clause order. */
   public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { move, opponent: attacker, pokemon, hitResult } = params;
-    if (hitResult >= HitResult.NO_EFFECT) {
-      return false;
-    }
-    if (
-      this.contactRequired
-      && !move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
-    ) {
-      return false;
-    }
-    return true;
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Safety rule: must be a damaging move that actually landed (not a miss, a block or an immunity). */
+  public guards({ hitResult }: PostMoveInteractionAbAttrParams): boolean {
+    return hitResult < HitResult.NO_EFFECT;
+  }
+
+  /** The replaceable condition: the move makes contact (always true when contact is not required). */
+  public gate({ move, opponent: attacker, pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    return (
+      !this.contactRequired
+      || move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
+    );
   }
 
   public override apply(params: PostMoveInteractionAbAttrParams): void {

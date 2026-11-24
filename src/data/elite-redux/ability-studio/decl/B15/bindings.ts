@@ -164,3 +164,44 @@ bindLegacyClosure(
   "The gate tests whether my linked ally already hit this target this turn, read from the turn attack ledger; no library atom reads that ledger yet. Needs 'My linked ally already hit this target this turn' (R-B15-37).",
   "gate",
 );
+
+// =============================================================================================
+// B15 chunk 5. Tier B gates (slot "gate"), keyed by (abilityId, attrIndex). The other classes of this chunk (Shattered Psyche, Silken Decree, Soulmate, Tangled Seed) have no closure.
+// =============================================================================================
+
+// SetTerrainOnHitAbAttr, gate, the contact clause: `!contactRequired || move.doesFlagEffectApply({ flag: MAKES_CONTACT, user: attacker, target: holder })`.
+// Both live users have contactRequired false, so the clause is the always-true gate { all: [] }. The "hit connected" clause (hitResult < NO_EFFECT) is guards() in the class.
+bindCondition(5599, 0, { all: [] }, "gate"); // Power Leak, Electric Terrain on any damaging hit
+bindCondition(5655, 0, { all: [] }, "gate"); // Brain Overload, Psychic Terrain on any damaging hit
+
+// StatBoostOnFlagAttackAbAttr, gate, in the ORIGINAL order: A. the default attackCondition move.category !== STATUS -> move.damaging,
+// B. move.doesFlagEffectApply({ flag, user: holder, target: other }) -> move.flag (the same call; for after-my-hit the moveUser is the holder and the target is the other Pokemon).
+// No guard and no residual in this class.
+const damagingMoveWithProperty = (flag: string): unknown => ({
+  all: [{ id: "move.damaging" }, { id: "move.flag", flag }],
+});
+bindCondition(5027, 0, damagingMoveWithProperty("BITING_MOVE"), "gate"); // Growing Tooth, Attack +1
+bindCondition(5129, 0, damagingMoveWithProperty("HORN_BASED"), "gate"); // Hardened Sheath, Attack +1
+bindCondition(5709, 1, damagingMoveWithProperty("RECKLESS_MOVE"), "gate"); // Daredevil (attr 1; attr 0 is another class), Attack +1
+
+// StatDebuffOnFlagAttackAbAttr, gate, in the ORIGINAL order of the replaceable clauses (the two safety rules, hit connected and first strike only, are guards() and run first;
+// all the reads in front of the draw are pure, so moving them changes no answer):
+//   A. the default attackCondition move.category !== STATUS                         -> move.damaging
+//   D. move.doesFlagEffectApply({ flag, user: holder, target: other })              -> move.flag
+//   E. chance >= 100 || holder.randBattleSeedInt(100) < chance                      -> rng.chance pct, LAST (no draw when pct is 100, the same as the class)
+const damagingMoveWithPropertyAndChance = (flag: string, pct: number): unknown => ({
+  all: [{ id: "move.damaging" }, { id: "move.flag", flag }, { id: "rng.chance", pct }],
+});
+bindCondition(5347, 0, damagingMoveWithPropertyAndChance("HAMMER_BASED", 100), "gate"); // Denting Blows, Defense -1
+bindCondition(5623, 0, damagingMoveWithPropertyAndChance("SLICING_MOVE", 100), "gate"); // Chainsaw, Defense -1
+bindCondition(5677, 1, damagingMoveWithPropertyAndChance("BITING_MOVE", 50), "gate"); // Crushing Jaw (attr 1), Defense -1, 50% chance
+bindCondition(6043, 0, damagingMoveWithPropertyAndChance("DRILL_BASED", 100), "gate"); // Augur, Defense -1
+bindCondition(6105, 0, damagingMoveWithPropertyAndChance("ARROW_BASED", 100), "gate"); // Crossbow, Defense -1
+
+// StatChangeOnCategoryAttackAbAttr, gate, in the ORIGINAL order: A. the default attackCondition -> move.damaging, B. move.category === category -> move.category.
+bindCondition(
+  5425, // Whiplash, Physical moves lower the target's Defense
+  0,
+  { all: [{ id: "move.damaging" }, { id: "move.category", category: "PHYSICAL" }] },
+  "gate",
+);
