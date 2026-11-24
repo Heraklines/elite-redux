@@ -294,13 +294,25 @@ export class OverloadedPowerAbAttr extends VariableMovePowerAbAttr {
   }
 }
 
-/** +1 priority on the holder's Electric moves while at 4 stacks. */
+/**
+ * The shipped priority condition, in the original order: the holder is at the maximum number of stacks and carries the Overloaded
+ * marker (`overloadedActive`), and its move is Electric after ability changes.
+ */
+export function overloadedPriorityCondition(pokemon: Pokemon, move: Move): boolean {
+  return overloadedActive(pokemon) && pokemon.getMoveType(move) === PokemonType.ELECTRIC;
+}
+
+/**
+ * +1 priority on the holder's Electric moves while at 4 stacks.
+ * The condition and the amount are constructor arguments (the old values are the defaults), so a rebuilt rule can swap the condition
+ * (Tier A, slot `ctor:0`) and change the amount.
+ */
 export class OverloadedPriorityAbAttr extends ChangeMovePriorityAbAttr {
-  constructor() {
-    super(
-      (pokemon, move) => overloadedActive(pokemon) && pokemon.getMoveType(move) === PokemonType.ELECTRIC,
-      OVERLOADED_PRIORITY_BONUS,
-    );
+  constructor(
+    moveFunc: (pokemon: Pokemon, move: Move) => boolean = overloadedPriorityCondition,
+    changeAmount = OVERLOADED_PRIORITY_BONUS,
+  ) {
+    super(moveFunc, changeAmount);
   }
 }
 
@@ -309,11 +321,38 @@ export class OverloadedPriorityAbAttr extends ChangeMovePriorityAbAttr {
  * `overloadedActive` / the switch-lock hook.
  */
 export class OverloadedChipAbAttr extends PostTurnAbAttr {
-  override apply({ pokemon, simulated }: AbAttrBaseParams): void {
-    if (simulated || pokemon.isFainted() || getCharge(pokemon) !== CHARGE_STACK_MAX) {
+  /** Share of the holder's maximum HP lost each turn at full charge (1/8 for the shipped ability). */
+  public readonly chipFraction: number;
+
+  constructor(chipFraction = OVERLOADED_CHIP_FRACTION) {
+    super();
+    this.chipFraction = chipFraction;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /**
+   * The clauses stay in `apply` (not in `canApply`) on purpose: the inherited `canApply` is always true, so the ability flyout is
+   * shown at every end of turn whether or not the chip happens. Moving a clause into `canApply` would remove that flyout.
+   * Order kept: a preview does nothing, then the guard, then the gate.
+   */
+  override apply(params: AbAttrBaseParams): void {
+    if (params.simulated || !gatedCanApply<AbAttrBaseParams>(this, params)) {
       return;
     }
-    const chip = Math.max(1, Math.floor(pokemon.getMaxHp() * OVERLOADED_CHIP_FRACTION));
+    const { pokemon } = params;
+    const chip = Math.max(1, Math.floor(pokemon.getMaxHp() * this.chipFraction));
     pokemon.damageAndUpdate(chip, { result: HitResult.INDIRECT });
+  }
+
+  /** Non-removable: a fainted holder takes no chip. */
+  public guards({ pokemon }: AbAttrBaseParams): boolean {
+    return !pokemon.isFainted();
+  }
+
+  /** The replaceable condition: the holder is at exactly the maximum number of stacks. */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
+    return getCharge(pokemon) === CHARGE_STACK_MAX;
   }
 }

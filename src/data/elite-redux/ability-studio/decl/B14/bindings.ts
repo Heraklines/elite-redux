@@ -195,3 +195,24 @@ bindLegacyClosure(
   "Clauses 1 and 2 have no atom: I hold exactly the maximum charge stacks (mon.charge-stacks, R-B14-6.2) and I carry an active ability attr named OverloadedChipAbAttr (mon.has-active-attr, R-B14-6.10). Clause 3 is move.type ELECTRIC with effective true; the exact planned tree is in OverloadedPowerAbAttr.decl.ts.",
   "gate",
 );
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// Chunk 7. attrIndex read from the live game (Overloaded: 0 power, 1 priority, 2 chip).
+// ---------------------------------------------------------------------------------------------------------------------------
+
+// Overloaded (5927), attr 1 (OverloadedPriorityAbAttr). ctor:0 = the same rule as the power half: [I hold exactly the maximum stacks,
+// I carry the Overloaded marker, the move is Electric after ability changes], in that order.
+bindLegacyClosure(
+  5927,
+  1,
+  "Clauses 1 and 2 have no atom: I hold exactly the maximum charge stacks (mon.charge-stacks, R-B14-6.2) and I carry an active ability attr named OverloadedChipAbAttr (mon.has-active-attr, R-B14-6.10). Clause 3 is move.type ELECTRIC with effective true; the exact planned tree is in OverloadedPriorityAbAttr.decl.ts.",
+  "ctor:0",
+);
+
+// Overloaded (5927), attr 2 (OverloadedChipAbAttr). Gate = [I hold exactly the maximum stacks]. The guard (not fainted) stays in the class.
+bindLegacyClosure(
+  5927,
+  2,
+  "I hold exactly the maximum charge stacks (getCharge(pokemon) === CHARGE_STACK_MAX) has no atom: mon.charge-stacks is requested in requests/B14.md (R-B14-6.2); the planned tree is mon.charge-stacks { holder, '=', 4 }.",
+  "gate",
+);
