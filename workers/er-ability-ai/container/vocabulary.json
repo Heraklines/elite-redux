@@ -253,6 +253,21 @@
       "legacyHookId": "FlinchEffectAbAttr"
     },
     {
+      "id": "event.berry-phase-end",
+      "kind": "event",
+      "dispatchKey": "CudChewConsumeBerryAbAttr",
+      "provides": [
+        "holder"
+      ],
+      "label": "When the berries of the turn have been eaten",
+      "group": "Turn",
+      "synonyms": [
+        "after berry phase",
+        "berry meal ends",
+        "cud chew moment"
+      ]
+    },
+    {
       "id": "event.berry-eaten",
       "kind": "event",
       "dispatchKey": "HealFromBerryUseAbAttr",
@@ -765,9 +780,24 @@
       ],
       "label": "While the game calculates burn damage on me",
       "group": "Move flow",
-      "modifies": "burnDamage",
-      "alsoDispatchKeys": [
-        "BypassBurnDamageReductionAbAttr"
+      "modifies": "burnDamage"
+    },
+    {
+      "id": "cancel.burn-attack-cut",
+      "kind": "calc",
+      "dispatchKey": "BypassBurnDamageReductionAbAttr",
+      "provides": [
+        "holder",
+        "simulated"
+      ],
+      "label": "While the game checks if my burn or frostbite weakens my attacks",
+      "group": "Cancel checks",
+      "modifies": "cancelled",
+      "synonyms": [
+        "guts",
+        "rage point",
+        "burn attack drop",
+        "ignore burn"
       ]
     },
     {
@@ -5302,5 +5332,5 @@
       ]
     }
   ],
-  "hash": "1b0d3e676ca6b3"
+  "hash": "12cfcf0d1d55d3"
 }

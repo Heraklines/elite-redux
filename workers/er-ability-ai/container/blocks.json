@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "1b0d3e676ca6b3",
-  "hash": "005900a89f12ea",
+  "vocabularyHash": "12cfcf0d1d55d3",
+  "hash": "0dc63db4f4af3b",
   "blocks": [
     {
       "id": "block.allied-field-damage-reduction",
@@ -55,6 +55,54 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.arena-trap",
+      "className": "ArenaTrapAbAttr",
+      "label": "Trap foes so they cannot switch out or run away",
+      "summary": "While I am on the field, foes that pass my test cannot switch out or run away. Ghost types and foes with Run Away are never trapped. Example: Arena Trap traps grounded foes.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.trap-check",
+      "whenLabel": "While the game checks if a foe can escape",
+      "synonyms": [
+        "arena trap",
+        "shadow tag",
+        "magnet pull",
+        "trap",
+        "cannot switch",
+        "cannot flee",
+        "salt circle"
+      ],
+      "examples": [
+        "Trap grounded foes, like Arena Trap",
+        "Trap Steel types, like Magnet Pull"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Ghost types are never trapped",
+        "A foe with Run Away or a similar escape ability is never trapped"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 5
     },
     {
       "id": "block.attack-type-immunity",
@@ -476,6 +524,39 @@
       "uses": 5
     },
     {
+      "id": "block.block-redirect",
+      "className": "BlockRedirectAbAttr",
+      "label": "My moves cannot be pulled to another target",
+      "summary": "While I have this, other Pokemon cannot redirect my moves away from the target I picked. Example: Stalwart ignores Lightning Rod and Follow Me.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "stalwart",
+        "propeller tail",
+        "ignore redirection",
+        "cannot be redirected",
+        "ignore follow me",
+        "ignore lightning rod",
+        "keep my target"
+      ],
+      "examples": [
+        "My moves hit the target I chose even against Follow Me or Lightning Rod"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
       "id": "block.block-status-damage",
       "className": "BlockStatusDamageAbAttr",
       "label": "Block damage from chosen status conditions",
@@ -670,6 +751,46 @@
         "do": true
       },
       "uses": 2
+    },
+    {
+      "id": "block.bypass-burn-damage-reduction",
+      "className": "BypassBurnDamageReductionAbAttr",
+      "label": "Keep my attacks at full strength while burned",
+      "summary": "A burn no longer halves my physical attacks, and frostbite no longer halves my special attacks. Example: a burned Pokemon with this deals the same damage as an unburned one.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.burn-attack-cut",
+      "whenLabel": "While the game checks if my burn or frostbite weakens my attacks",
+      "synonyms": [
+        "guts",
+        "rage point",
+        "ignore burn",
+        "burn does not weaken attack",
+        "no burn attack drop",
+        "burn immunity to attack cut"
+      ],
+      "examples": [
+        "A burn does not halve my attack, like Guts"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only matters while I am burned (physical moves) or have frostbite (special moves)",
+        "Not used while my ability is being ignored",
+        "Does nothing when another effect already cancelled the halving"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 8
     },
     {
       "id": "block.change-move-priority",
@@ -1252,6 +1373,88 @@
       "uses": 3
     },
     {
+      "id": "block.cud-chew-consume-berry",
+      "className": "CudChewConsumeBerryAbAttr",
+      "label": "Eat last turn's berries again",
+      "summary": "When the berries of a turn have been eaten, I eat again every berry I ate the turn before, for free. Example: Cud Chew.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.berry-phase-end",
+      "whenLabel": "When the berries of the turn have been eaten",
+      "synonyms": [
+        "cud chew",
+        "eat berry twice",
+        "replay berry",
+        "second berry meal",
+        "berry encore",
+        "chew again"
+      ],
+      "examples": [
+        "Eat the same berry again one turn later without using it up, like Cud Chew"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Needs the block that remembers the berries I ate (its pair), otherwise the memory stays empty"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.cud-chew-record-berry",
+      "className": "CudChewRecordBerryAbAttr",
+      "label": "Remember the berries I ate this turn",
+      "summary": "At the end of every turn, I remember which berries I ate during it, so another block can eat them again next turn. Example: Cud Chew.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "cud chew",
+        "remember eaten berries",
+        "berry memory",
+        "record berries",
+        "chew again later"
+      ],
+      "examples": [
+        "Remember this turn's berries so they can be eaten twice, like Cud Chew"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing useful without the block that eats the remembered berries next turn"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.defensive-stat-substitute",
       "className": "DefensiveStatSubstituteAbAttr",
       "label": "Defend with another stat instead of Defense and Sp. Def",
@@ -1342,6 +1545,45 @@
         "do": true
       },
       "uses": 4
+    },
+    {
+      "id": "block.double-berry-effect",
+      "className": "DoubleBerryEffectAbAttr",
+      "label": "Double the strength of berries I eat",
+      "summary": "Berries I eat work twice as strongly: healing, stat boosts and restored PP are doubled, and berries that soften a hit soften it twice as much. Example: a berry that heals 10 HP heals 20.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.berry-effect",
+      "whenLabel": "While the game calculates a berry's healing",
+      "synonyms": [
+        "ripen",
+        "apple pie",
+        "stronger berries",
+        "double berry",
+        "berry boost",
+        "berries heal more"
+      ],
+      "examples": [
+        "Berries heal and boost twice as much, like Ripen"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only matters when I actually eat a berry",
+        "Applies to the berry's healing, stat boost, PP and damage-softening effects"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.double-self-inflicted-damage",
@@ -1627,6 +1869,79 @@
       "uses": 15
     },
     {
+      "id": "block.flinch-stat-stage-change",
+      "className": "FlinchStatStageChangeAbAttr",
+      "label": "Change my stats when I flinch",
+      "summary": "When I flinch, my chosen stat changes by 1 stage (a negative number lowers it). Example: Steadfast raises Speed by 1 stage.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.flinched",
+      "whenLabel": "When I flinch",
+      "synonyms": [
+        "steadfast",
+        "rattled",
+        "superheavy",
+        "boost when flinched",
+        "speed up on flinch",
+        "stat boost after flinching",
+        "flinch reaction"
+      ],
+      "examples": [
+        "Raise Speed by 1 stage when I flinch, like Steadfast"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Stat that changes",
+          "control": "select",
+          "default": "SPD",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "stages",
+          "label": "Stages the stats change by (negative lowers them)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Each stat can only go up to +6 or down to -6; at the limit the stat change reports that it cannot go further",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stat",
+          "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
       "id": "block.float",
       "className": "FloatAbAttr",
       "label": "I float above the ground",
@@ -1767,6 +2082,45 @@
       "uses": 2
     },
     {
+      "id": "block.full-burn-damage-immunity",
+      "className": "FullBurnDamageImmunityAbAttr",
+      "label": "Take no damage from my own burn",
+      "summary": "The damage my burn does at the end of every turn is 0. Example: a burned Pokemon with 160 max HP loses 0 HP instead of 10.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.burn-damage",
+      "whenLabel": "While the game calculates burn damage on me",
+      "synonyms": [
+        "heatproof",
+        "iron giant",
+        "no burn damage",
+        "burn does not hurt",
+        "burn immune damage",
+        "fireproof burn"
+      ],
+      "examples": [
+        "My burn does no damage at the end of the turn, like Iron Giant"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only matters while I am burned",
+        "Nothing happens to other end-of-turn damage such as poison"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 5
+    },
+    {
       "id": "block.full-hp-resist-type",
       "className": "FullHpResistTypeAbAttr",
       "label": "Limit how effective attacks are against me",
@@ -1822,6 +2176,57 @@
       "reusableAlone": {
         "when": true,
         "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.heal-from-berry-use",
+      "className": "HealFromBerryUseAbAttr",
+      "label": "Heal a share of my max HP after I eat a berry",
+      "summary": "After I eat a berry, I heal 33% of my max HP. Example: 0.33 heals a third of max HP, 1 heals all of it.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.berry-eaten",
+      "whenLabel": "After I eat a berry",
+      "synonyms": [
+        "cheek pouch",
+        "gluttony",
+        "voracity",
+        "berry heal",
+        "heal after eating",
+        "recover hp from berries"
+      ],
+      "examples": [
+        "Heal a third of max HP after eating a berry, like Gluttony"
+      ],
+      "params": [
+        {
+          "id": "healShare",
+          "label": "Share of my max HP to heal (0.33 = a third, 1 = all)",
+          "control": "slider",
+          "default": 0.3333333333333333,
+          "editable": true,
+          "min": 0,
+          "max": 1,
+          "step": 0.01
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Heals the share of max HP rounded down, at least 1 HP",
+        "Does nothing in a simulated preview",
+        "After a berry I eat in battle I heal once per round; a berry eaten through a move (like Bug Bite) heals once per berry"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
         "do": true
       },
       "uses": 2
@@ -2176,6 +2581,106 @@
         "do": true
       },
       "uses": 15
+    },
+    {
+      "id": "block.max-multi-hit",
+      "className": "MaxMultiHitAbAttr",
+      "label": "Always roll the most hits on a 2 to 5 hit move",
+      "summary": "Moves that hit 2 to 5 times always hit 5 times, and moves that check accuracy on every strike, like Triple Axel, check it only once. Example: Skill Link.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.max-multi-hit",
+      "whenLabel": "While the game rolls how many hits a multi-hit move gets",
+      "synonyms": [
+        "skill link",
+        "always five hits",
+        "max hits",
+        "best multi hit roll",
+        "multi hit boost",
+        "ninja"
+      ],
+      "examples": [
+        "Moves like Bullet Seed always hit five times, like Skill Link"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only moves that roll 2 to 5 hits are changed; fixed hit counts stay as they are",
+        "Does nothing for moves that ignore the user's ability"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.moody",
+      "className": "MoodyAbAttr",
+      "label": "Raise one random stat and lower another each turn",
+      "summary": "At the end of every turn, one random stat goes up by 2 stages and a different random stat goes down by 1. Stats already at +6 or -6 are skipped.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "mood swings",
+        "random stat change",
+        "stat roulette",
+        "random boost and drop",
+        "unpredictable stats",
+        "random stat each turn"
+      ],
+      "examples": [
+        "Each turn one random stat rises by 2 and another falls by 1, like a moody Pokemon"
+      ],
+      "params": [
+        {
+          "id": "raise",
+          "label": "Stages the raised stat goes up by",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 6,
+          "step": 1
+        },
+        {
+          "id": "lower",
+          "label": "Stages the lowered stat goes down by",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 6,
+          "step": 1
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A stat at +6 cannot be raised and a stat at -6 cannot be lowered; if none can be raised only the drop happens, and the other way round",
+        "The lowered stat is never the one that was just raised",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.move-immunity",
@@ -2760,6 +3265,171 @@
       "uses": 10
     },
     {
+      "id": "block.post-battle-loot",
+      "className": "PostBattleLootAbAttr",
+      "label": "Take a random item the foes dropped after a win",
+      "summary": "After I win a battle, I take one random item that the defeated wild Pokemon were holding, if I can carry it. Example: Pickup.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-battle",
+      "whenLabel": "After the battle ends",
+      "synonyms": [
+        "pickup",
+        "loot",
+        "take foe items",
+        "find items after battle",
+        "scavenge",
+        "item drop"
+      ],
+      "examples": [
+        "Pick up one of the defeated foes' items after winning, like Pickup"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only after the battle was won",
+        "Only when the defeated foes left at least one item that can be carried",
+        "The item must be one I can take (a theft block, or already holding the most of that item, stops it)",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified: the attr keeps the drawn item between canApply and apply (`randItem`), the draw sits in canApply after three gate clauses, and apply moves the item and edits the shared loot list, so splitting it would re-implement the class. The won-battle test has no library atom (request R-B06-19: an atom 'I won the battle' reading the victory flag, and a gate/residual split of canApply, which is a foundation decision). Users (1 attr, no closure): Pickup (53, attr 0; the ability is unsuppressable). The class is asked for every Pokemon allowed in battle, so each Pickup holder draws separately in party order and the loot list shrinks as items are taken.",
+      "uses": 1
+    },
+    {
+      "id": "block.post-biome-change-terrain-change",
+      "className": "PostBiomeChangeTerrainChangeAbAttr",
+      "label": "Set the terrain again when the area changes",
+      "summary": "When the game moves on to a new area, I set the terrain to Electric if it is not already active. Example: Electric Terrain is back in the next area.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.biome-changed",
+      "whenLabel": "When the biome changes",
+      "synonyms": [
+        "keep terrain after biome change",
+        "terrain on new area",
+        "electric surge",
+        "grassy surge",
+        "psychic surge",
+        "misty surge",
+        "terrain on new biome"
+      ],
+      "examples": [
+        "Set Electric Terrain again when the area changes, like Electric Surge"
+      ],
+      "params": [
+        {
+          "id": "terrain",
+          "label": "Which terrain is set",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "MISTY",
+            "ELECTRIC",
+            "GRASSY",
+            "PSYCHIC",
+            "TOXIC"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The terrain must differ from the one on the field right now",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.set-terrain",
+        "params": [
+          "terrain"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 8
+    },
+    {
+      "id": "block.post-biome-change-weather-change",
+      "className": "PostBiomeChangeWeatherChangeAbAttr",
+      "label": "Set the weather again when the area changes",
+      "summary": "When the game moves on to a new area, I set the weather to Extremely harsh sunlight again, but only while a lasting weather is still active. Example: Harsh Sun stays in the next area.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.biome-changed",
+      "whenLabel": "When the biome changes",
+      "synonyms": [
+        "keep weather after biome change",
+        "weather survives new area",
+        "primal weather",
+        "desolate land",
+        "primordial sea",
+        "delta stream",
+        "weather on new biome"
+      ],
+      "examples": [
+        "Set Harsh Sun again when the area changes, like Desolate Land"
+      ],
+      "params": [
+        {
+          "id": "weather",
+          "label": "Which weather is set",
+          "control": "select",
+          "default": "HARSH_SUN",
+          "editable": true,
+          "options": [
+            "NONE",
+            "SUNNY",
+            "RAIN",
+            "SANDSTORM",
+            "HAIL",
+            "SNOW",
+            "FOG",
+            "HEAVY_RAIN",
+            "HARSH_SUN",
+            "STRONG_WINDS",
+            "TEMPEST_STORM",
+            "SNOWY_WRATH",
+            "EERIE_FOG"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A lasting weather (Harsh Sun, Heavy Rain or Strong Winds) must be active when the area changes",
+        "The weather must differ from the current one, and no weather lock may be up",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.set-weather",
+        "params": [
+          "weather"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 6
+    },
+    {
       "id": "block.post-damage-force-switch",
       "className": "PostDamageForceSwitchAbAttr",
       "label": "Switch out when my HP gets low",
@@ -2820,6 +3490,56 @@
       ],
       "effect": {
         "id": "effect.force-switch-out",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.post-dancing-move",
+      "className": "PostDancingMoveAbAttr",
+      "label": "Copy a dance move that was just used",
+      "summary": "After any Pokemon uses a dance move, I use the same move right away, aimed the same way. Example: a foe uses Swords Dance, then I use Swords Dance too.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-any-move",
+      "whenLabel": "After anyone uses a move",
+      "synonyms": [
+        "dancer",
+        "samba",
+        "copy dance",
+        "repeat the move",
+        "echo a move",
+        "copycat dance",
+        "copy move"
+      ],
+      "examples": [
+        "Use the same move right after any dance move, like Dancer"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.flag",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move cannot come from me, so I never copy my own move",
+        "I cannot copy while I am flying, diving or underground",
+        "Only attack moves and status moves are copied",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.package",
         "params": []
       },
       "reusableAlone": {
@@ -3519,6 +4239,138 @@
         "do": true
       },
       "uses": 1
+    },
+    {
+      "id": "block.post-faint-form-change",
+      "className": "PostFaintFormChangeAbAttr",
+      "label": "Go back to my normal form when I faint",
+      "summary": "When I faint, if I am not already in the form I should be in, I change form. Example: Disguise puts Mimikyu back in its disguised form after it faints.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.faint",
+      "whenLabel": "When I faint",
+      "synonyms": [
+        "disguise",
+        "battle bond",
+        "power construct",
+        "revert form on faint",
+        "form change on faint",
+        "patchwork",
+        "revert form",
+        "back to base form",
+        "normal form",
+        "go back"
+      ],
+      "examples": [
+        "Go back to my first form when I faint, like Disguise"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": false,
+          "editable": false,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "I must not already be in the form I should be in",
+        "My species must have a form change registered for its ability (otherwise nothing happens)",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 5
+    },
+    {
+      "id": "block.post-faint-hp-damage",
+      "className": "PostFaintHPDamageAbAttr",
+      "label": "Hurt my attacker with the damage that knocked me out",
+      "summary": "When a foe knocks me out with a move, that foe loses as much HP as the hit that knocked me out did to me. Example: Innards Out.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.faint",
+      "whenLabel": "When I faint",
+      "synonyms": [
+        "innards out",
+        "take them with me",
+        "revenge damage on faint",
+        "last hit back",
+        "deal damage when knocked out",
+        "damage the killer",
+        "mutual damage"
+      ],
+      "examples": [
+        "When I am knocked out, the foe takes the damage of the final hit, like Innards Out"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "I must have been knocked out by a move of a foe: no effect after poison, weather, recoil or other damage that is not a move",
+        "A Pokemon on my own side that knocks me out is never hurt",
+        "A foe with an ability that blocks damage that is not from a move (Magic Guard) takes nothing",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.post-faint-unsuppressed-weather-form-change",
+      "className": "PostFaintUnsuppressedWeatherFormChangeAbAttr",
+      "label": "Update weather forms (Castform, Cherrim) when I faint",
+      "summary": "When I faint, Pokemon whose form follows the weather, like Castform and Cherrim, check the weather again and change form. Example: Castform turns Sunny once Cloud Nine faints.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.faint",
+      "whenLabel": "When I faint",
+      "synonyms": [
+        "cloud nine",
+        "air lock",
+        "weather forms return",
+        "castform",
+        "cherrim",
+        "weather form refresh"
+      ],
+      "examples": [
+        "When I faint, Castform changes form with the weather again, like Cloud Nine"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only matters when a Castform with Forecast or a Cherrim with Flower Gift is on the field",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 3
     },
     {
       "id": "block.post-intimidate-stat-stage-change",
@@ -5428,6 +6280,55 @@
       "uses": 1
     },
     {
+      "id": "block.post-turn-form-change",
+      "className": "PostTurnFormChangeAbAttr",
+      "label": "Change form at the end of the turn when it is needed",
+      "summary": "At the end of every turn, if my form is not the one my ability asks for, I change form. Example: Zen Mode changes form below half HP, Schooling below 25%.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "zen mode",
+        "schooling",
+        "shields down",
+        "form change each turn",
+        "power construct",
+        "hunger switch",
+        "change form when hurt"
+      ],
+      "examples": [
+        "Check my form every turn and change it when my HP says so, like Zen Mode"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": false,
+          "editable": false,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The form my ability asks for must exist for my species",
+        "The form must differ from my current form",
+        "The species must have a form change registered for its ability (otherwise nothing happens)",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 9
+    },
+    {
       "id": "block.post-turn-random-berry-effect",
       "className": "PostTurnRandomBerryEffectAbAttr",
       "label": "Trigger a random berry's effect every turn",
@@ -5467,6 +6368,180 @@
         "params": [
           "berries"
         ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.post-turn-reset-status",
+      "className": "PostTurnResetStatusAbAttr",
+      "label": "Cure a status at the end of every turn",
+      "summary": "At the end of every turn, if I have a status (or Bleed, Frostbite, Fear), it is cured. Example: Shed Skin cures a burn.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "shed skin",
+        "cure status each turn",
+        "heal status",
+        "hydration",
+        "healer",
+        "cleanse ailments",
+        "clear burn or poison"
+      ],
+      "examples": [
+        "Cure my own status at the end of every turn, like Hydration",
+        "Cure my ally's status, like Healer"
+      ],
+      "params": [
+        {
+          "id": "target",
+          "label": "Who gets cured",
+          "control": "select",
+          "default": "Me",
+          "editable": true,
+          "options": [
+            "Me",
+            "An adjacent ally"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "There must be someone to cure: me, or an ally next to me that has a status or an ailment",
+        "A fainted ally is never picked (as long as it has no Elite Redux ailment tag: the pick is a status other than fainted, or such a tag)",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.cure-status",
+        "params": [
+          "target"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 12
+    },
+    {
+      "id": "block.post-turn-restore-berry",
+      "className": "PostTurnRestoreBerryAbAttr",
+      "label": "Get back a berry I ate, with a chance (like Harvest)",
+      "summary": "At the end of every turn, there is a chance to get back one berry I ate in this battle. Example: Harvest is 50%, or 100% in harsh sun.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "harvest",
+        "regrow berry",
+        "restore eaten berry",
+        "berry recycling",
+        "berry garden",
+        "get my berry back"
+      ],
+      "examples": [
+        "Get back an eaten berry at the end of the turn, always in the sun, like Harvest"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": false,
+          "editable": false,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "I must have eaten a berry in this battle that I can still get back (a berry already at its maximum stack does not count)",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 5
+    },
+    {
+      "id": "block.post-turn-status-heal",
+      "className": "PostTurnStatusHealAbAttr",
+      "label": "Heal each turn while I have certain statuses",
+      "summary": "At the end of every turn, while I have Poison, Toxic and am not at full HP, I heal 1/8 of my max HP. Example: 160 max HP heals 20 HP.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "poison heal",
+        "heal while poisoned",
+        "heal from status",
+        "status healing",
+        "recover each turn",
+        "regenerate when statused"
+      ],
+      "examples": [
+        "Heal 1/8 of max HP at the end of every turn while poisoned, like Poison Heal"
+      ],
+      "params": [
+        {
+          "id": "statuses",
+          "label": "Statuses that heal me (comma separated, for example Poison, Toxic)",
+          "control": "text",
+          "default": "POISON,TOXIC",
+          "editable": true,
+          "options": [
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "hp.full",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only while I have one of the chosen statuses (the setting above, checked first)",
+        "Does nothing in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
       },
       "reusableAlone": {
         "when": true,
@@ -6377,6 +7452,82 @@
       "uses": 3
     },
     {
+      "id": "block.prevent-berry-use",
+      "className": "PreventBerryUseAbAttr",
+      "label": "Stop my foes from eating their berries",
+      "summary": "While I am on the field, opposing Pokemon cannot eat their held berries, and the ability pop-up shows when it stops one. Example: a foe at low HP cannot use its Sitrus Berry.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.berry-use",
+      "whenLabel": "While the game checks if a berry can be eaten",
+      "synonyms": [
+        "unnerve",
+        "as one",
+        "crowned king",
+        "block berries",
+        "no berries for foes",
+        "berry lock",
+        "klutz"
+      ],
+      "examples": [
+        "Foes cannot eat their berries while I am out, like Unnerve"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only the opposing side is stopped, never my own berries",
+        "Does nothing when another effect already blocked this berry"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 9
+    },
+    {
+      "id": "block.prevent-item-use",
+      "className": "PreventItemUseAbAttr",
+      "label": "Stop my foes from using their held items",
+      "summary": "While I am on the field, opposing Pokemon cannot use their single-use held items, such as gems, Red Card, Eject Button and Eject Pack. Example: a foe's Fire Gem does not boost its Fire move.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "cancel.interaction",
+      "whenLabel": "While the game checks if an interaction is blocked",
+      "synonyms": [
+        "as one",
+        "unnerve",
+        "klutz",
+        "crowned king",
+        "item lock",
+        "no items for foes",
+        "block held items"
+      ],
+      "examples": [
+        "Foes cannot use their gems or Eject Button while I am out, like As One"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only the opposing side is stopped, never my own items",
+        "Berries are stopped by the separate berry block that the same abilities carry"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 10
+    },
+    {
       "id": "block.protect-stat",
       "className": "ProtectStatAbAttr",
       "label": "Stop other Pokemon from lowering my stats",
@@ -6583,6 +7734,142 @@
       "uses": 42
     },
     {
+      "id": "block.redirect-type-move",
+      "className": "RedirectTypeMoveAbAttr",
+      "label": "Draw single-target moves of one type to me",
+      "summary": "When a foe or ally aims a single-target Electric move at someone else, the move goes to me instead. Example: Lightning Rod draws Electric moves.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.redirect-move",
+      "whenLabel": "While the game picks who a move targets",
+      "synonyms": [
+        "lightning rod",
+        "storm drain",
+        "redirect attacks",
+        "draw in moves",
+        "attract moves",
+        "magnet for a type",
+        "take the hit for my team"
+      ],
+      "examples": [
+        "Draw every Electric move to me, like Lightning Rod",
+        "Draw Water moves to me"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Type of move that is drawn to me",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only moves that aim at one other Pokemon can be drawn in (not moves that hit everyone, a whole side or only the user)",
+        "In a triple battle I must stand next to the user, unless the move is Flying or a pulse move",
+        "Nothing happens when the move already aims at me",
+        "Center-of-attention moves such as Follow Me override it, and a user whose ability ignores redirection is not redirected"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 9
+    },
+    {
+      "id": "block.reduce-status-effect-duration",
+      "className": "ReduceStatusEffectDurationAbAttr",
+      "label": "Wake up from sleep faster",
+      "summary": "Each turn I try to move while I am asleep, my sleep counts down 1 extra turn, so I wake up much sooner. Example: Early Bird (1 extra turn).",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.status-duration",
+      "whenLabel": "While the game calculates how long my status lasts",
+      "synonyms": [
+        "early bird",
+        "wake up sooner",
+        "shorter sleep",
+        "sleep less",
+        "faster wake up",
+        "rest less",
+        "sleep counts down faster"
+      ],
+      "examples": [
+        "Wake up from sleep about twice as fast, like Early Bird"
+      ],
+      "params": [
+        {
+          "id": "status",
+          "label": "Status that counts down faster (only Sleep has a counter the game asks about)",
+          "control": "select",
+          "default": "SLEEP",
+          "editable": false,
+          "options": [
+            "SLEEP"
+          ]
+        },
+        {
+          "id": "turns",
+          "label": "Extra turns taken off each turn I try to move",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only the sleep counter is ever asked, when I try to move while asleep",
+        "The turns left go down by one extra every turn I try to move, so the sleep lasts about half as long (a 4 turn sleep ends on the second turn)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.reflect-stat-stage-change",
       "className": "ReflectStatStageChangeAbAttr",
       "label": "Bounce stat drops back at the Pokemon that caused them",
@@ -6661,6 +7948,45 @@
       },
       "packageReason": "Package, justified in the header. Users (1 attr): Liquid Ooze (64 attr 0). The class dispatches BlockNonDirectDamageAbAttr on the attacker BEFORE it looks at the move, even for moves with no drain effect (the dispatch can show the attacker's ability flyout, kept as it was). `simulated` is passed through to that dispatch and apply returns early when simulated. Engine identity checks by attr name (HitHealAttr.apply in move.ts, Leech Seed in battler-tags.ts, the lifesteal archetype, common-root) keep working because the rebuilt instance is the same class. Honest bucket: package-only for the effect; the trigger is the shared 'After I am hit' block and extra IFs can be ANDed on top.",
       "uses": 1
+    },
+    {
+      "id": "block.run-success",
+      "className": "RunSuccessAbAttr",
+      "label": "Always escape when I run from a wild battle",
+      "summary": "When my side tries to run from a wild battle the escape always works, and foes' trapping abilities cannot hold me. Example: Run Away always gets out.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.run-chance",
+      "whenLabel": "While the game rolls my chance to run away",
+      "synonyms": [
+        "run away",
+        "escape",
+        "flee",
+        "guaranteed escape",
+        "dust cloud",
+        "always run"
+      ],
+      "examples": [
+        "Always escape from wild battles, like Run Away"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only runs from wild battles can be attempted at all; trainer battles never ask",
+        "Arena Trap style trapping abilities never trap a Pokemon with this (a rule the trapping class applies)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 7
     },
     {
       "id": "block.self-stat-drop-immunity",
@@ -6795,6 +8121,81 @@
       "uses": 3
     },
     {
+      "id": "block.speed-boost",
+      "className": "SpeedBoostAbAttr",
+      "label": "Raise a stat every turn (Speed by default)",
+      "summary": "At the end of every turn, my Speed goes up by 1 stages. Example: Speed Boost. It does not trigger on the turn I switched in or after I failed to run away.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "speed boost",
+        "speed up each turn",
+        "get faster",
+        "max acceleration",
+        "turn end speed",
+        "gradual speed"
+      ],
+      "examples": [
+        "Raise Speed by 1 stage at the end of every turn, like Speed Boost"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Stat that goes up",
+          "control": "select",
+          "default": "SPD",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "stages",
+          "label": "Stages it goes up by",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 6,
+          "step": 1,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The stage can only go up to +6 (the stat change itself fails at the limit)"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stat",
+          "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
       "id": "block.spread-target-by-flag",
       "className": "SpreadTargetByFlagAbAttr",
       "label": "Make single-target moves with a property hit both foes",
@@ -6915,6 +8316,61 @@
         "do": true
       },
       "uses": 4
+    },
+    {
+      "id": "block.stat-stage-change-multiplier",
+      "className": "StatStageChangeMultiplierAbAttr",
+      "label": "Multiply every stat change that happens to me",
+      "summary": "Every stat raise or drop on me is multiplied by 2 before it lands. Example: 2 turns a +1 into +2 and a -1 into -2; -1 turns a +1 into a -1.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.stage-change-amount",
+      "whenLabel": "While the game calculates how far my stats move",
+      "synonyms": [
+        "simple",
+        "contrary",
+        "double stat changes",
+        "reverse stat changes",
+        "flip stat boosts",
+        "stat change multiplier",
+        "invert stat drops"
+      ],
+      "examples": [
+        "Double every stat change on me, like Simple",
+        "Turn raises into drops and drops into raises, like Contrary"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Stat change multiplier (2 = doubled, -1 = reversed)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": -4,
+          "max": 4,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Skipped when the stat change ignores abilities, such as a drop bounced back by a mirror",
+        "The stat limits of -6 and +6 still apply to the result"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.status-effect-immunity",
