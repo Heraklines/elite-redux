@@ -21,7 +21,7 @@ export default defineDecl(OracleGuardTickAbAttr, {
   tier: "B",
   kind: "package",
   when: "event.end-of-turn",
-  label: "Count my guard down by one turn",
+  label: "Count a running timed guard down by one turn",
   summary: () =>
     "At the end of each turn, a running guard loses one turn. When no turns are left, the guard ends and effects that look for it stop.",
   synonyms: ["oracle", "tick down", "shield timer", "guard countdown", "temporary effect wears off", "turn counter"],
