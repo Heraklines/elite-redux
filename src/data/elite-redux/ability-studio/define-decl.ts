@@ -234,6 +234,23 @@ export function constructorArity(ctor: AbAttrClass): number {
   return 0;
 }
 
+/**
+ * True when the class's own constructor ends in a rest parameter (`...effects`). Such a constructor takes any number of
+ * arguments, so a declared setting may follow the list (a trailing settings object); L0 then skips the upper-bound check.
+ */
+export function constructorHasRest(ctor: AbAttrClass): boolean {
+  let current: unknown = ctor;
+  while (typeof current === "function" && current !== Function.prototype) {
+    const text = Function.prototype.toString.call(current);
+    const start = text.search(/constructor\s*\(/);
+    if (start >= 0) {
+      return /^[^()]*\.\.\.\s*[A-Za-z_$]/.test(text.slice(text.indexOf("(", start) + 1));
+    }
+    current = Object.getPrototypeOf(current);
+  }
+  return false;
+}
+
 // Types are already stripped from the text the runtime sees, so only brackets and quotes matter.
 function countTopLevelParameters(text: string, open: number): number {
   let depth = 0;

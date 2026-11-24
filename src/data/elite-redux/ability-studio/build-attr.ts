@@ -128,8 +128,10 @@ export function buildAttr(
     args[Number(match[1])] = closure;
   }
   if (spread !== undefined) {
+    // Settings that follow the rest arguments (ctorIndex above the spread index) stay behind the list.
+    const tail = args.slice(spread.index + 1);
     args.length = spread.index;
-    args.push(...spread.list);
+    args.push(...spread.list, ...tail);
   }
   const attr = new (ctor as unknown as new (...a: unknown[]) => AbAttr)(...args);
   if (gate !== undefined) {

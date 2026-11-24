@@ -4214,21 +4214,46 @@ export interface ConfusionOnStatusEffectAbAttrParams extends AbAttrBaseParams {
 export class ConfusionOnStatusEffectAbAttr extends AbAttr {
   /** List of effects to apply confusion after */
   private readonly effects: ReadonlySet<StatusEffect>;
+  /** The battle effect put on the target (confusion unless the settings say otherwise) */
+  private readonly tag: BattlerTagType;
+  /** Shortest duration, in turns (inclusive) */
+  private readonly turnsMin: number;
+  /** Longest duration, in turns (inclusive) */
+  private readonly turnsMax: number;
 
-  constructor(...effects: StatusEffect[]) {
+  /**
+   * @param args - The statuses to react to, optionally followed by one settings object
+   * (`{ tag, turnsMin, turnsMax }`, defaults confusion for 2 to 5 turns).
+   */
+  constructor(...args: (StatusEffect | ConfusionOnStatusEffectSettings)[]) {
     super();
-    this.effects = new Set(effects);
+    const last = args.at(-1);
+    const settings = typeof last === "object" ? last : {};
+    this.effects = new Set(args.filter((arg): arg is StatusEffect => typeof arg === "number"));
+    this.tag = settings.tag ?? BattlerTagType.CONFUSED;
+    this.turnsMin = settings.turnsMin ?? 2;
+    this.turnsMax = settings.turnsMax ?? 5;
   }
 
   override canApply({ opponent, effect }: ConfusionOnStatusEffectAbAttrParams): boolean {
-    return this.effects.has(effect) && !opponent.isFainted() && opponent.canAddTag(BattlerTagType.CONFUSED);
+    return this.effects.has(effect) && !opponent.isFainted() && opponent.canAddTag(this.tag);
   }
 
   override apply({ opponent, simulated, pokemon }: ConfusionOnStatusEffectAbAttrParams): void {
     if (!simulated) {
-      opponent.addTag(BattlerTagType.CONFUSED, pokemon.randBattleSeedIntRange(2, 5), undefined, opponent.id);
+      opponent.addTag(this.tag, pokemon.randBattleSeedIntRange(this.turnsMin, this.turnsMax), undefined, opponent.id);
     }
   }
+}
+
+/** Optional trailing settings of {@linkcode ConfusionOnStatusEffectAbAttr}. */
+export interface ConfusionOnStatusEffectSettings {
+  /** The battle effect to apply (default confusion) */
+  tag?: BattlerTagType;
+  /** Shortest duration in turns (default 2) */
+  turnsMin?: number;
+  /** Longest duration in turns (default 5) */
+  turnsMax?: number;
 }
 
 export interface PreSetStatusAbAttrParams extends AbAttrBaseParams {
@@ -4528,12 +4553,16 @@ export interface EnemyMinDamageRollAbAttrParams extends AbAttrBaseParams {
  * every ability that lacks this attr.
  */
 export class EnemyMinDamageRollAbAttr extends AbAttr {
-  constructor() {
+  /**
+   * @param rollPercent - the damage roll every attack against the holder is forced to, in percent of the top value
+   * (default 85, the floor of the normal 85 to 100 spread; every shipped user keeps it)
+   */
+  constructor(public readonly rollPercent = 85) {
     super(false);
   }
 
   override apply({ rollMultiplier }: EnemyMinDamageRollAbAttrParams): void {
-    rollMultiplier.value = 0.85;
+    rollMultiplier.value = this.rollPercent / 100;
   }
 }
 

@@ -9,7 +9,7 @@
 
 import { namingProblems } from "./decl-naming";
 import type { DeclRegistry } from "./decl-registry";
-import { type ClassDecl, constructorArity, type DeclModule } from "./define-decl";
+import { type ClassDecl, constructorArity, constructorHasRest, type DeclModule } from "./define-decl";
 import { getCondition } from "./vocabulary/conditions";
 import { getEffect } from "./vocabulary/effects";
 import { getGuard } from "./vocabulary/guards";
@@ -83,7 +83,7 @@ export function lintDecl(module: DeclModule): string[] {
     }
   }
 
-  const arity = constructorArity(ctor);
+  const arity = constructorHasRest(ctor) ? Number.POSITIVE_INFINITY : constructorArity(ctor);
   const usedIndices = new Set<number>();
   const claim = (index: number, what: string, optionKey?: string): void => {
     if (!Number.isInteger(index) || index < 0 || index >= arity) {
