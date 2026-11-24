@@ -39,9 +39,9 @@ export default defineDecl(FirstEntryPartyHealAbAttr, {
   tier: "B",
   kind: "event-effect",
   when: "event.on-entry",
-  label: "Heal the whole party the first time I enter",
+  label: "Heal the whole party the first time I enter each wave",
   summary: params =>
-    `The first time I enter the battle, every living party member that is hurt heals ${params.healFraction}% of its max HP. Example: 10 heals a tenth. It happens once per battle.`,
+    `The first time I enter the battle in each wave, every living party member that is hurt heals ${params.healFraction}% of its max HP. Example: 10 heals a tenth. It happens once per wave (it comes back in the next wave).`,
   synonyms: ["pastel veil", "sweet veil", "heal team on entry", "party heal", "heal everyone once", "team recovery"],
   examples: ["Heal my whole party by 10% of their max HP when I first come in, like Pastel Veil"],
   params: [
@@ -51,8 +51,8 @@ export default defineDecl(FirstEntryPartyHealAbAttr, {
       ctorOption: "key",
       path: "key",
       control: "text",
-      label: "Memory name that keeps this to once per battle (leave as is)",
-      // Not editable: it names the once-per-battle memory the gate binding reads (the bound `time.once-per` repeats the
+      label: "Memory name that keeps this to once per wave (leave as is)",
+      // Not editable: it names the once-per-wave memory the gate binding reads (the bound `time.once-per` repeats the
       // prefixed key as a literal), so changing it would split the gate's memory from the class's own write.
       editable: false,
       default: "party-heal",

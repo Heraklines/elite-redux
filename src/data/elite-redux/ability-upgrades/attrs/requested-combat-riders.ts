@@ -45,10 +45,18 @@ const SCREEN_TAGS = [ArenaTagType.REFLECT, ArenaTagType.LIGHT_SCREEN, ArenaTagTy
 
 /** Marks every battler currently present as Poison-weak for this field entry. */
 export class FieldPoisonWeaknessOnEntryAbAttr extends PostSummonAbAttr {
+  /** The type everyone present becomes weak to (Poison by default). */
+  private readonly weakType: PokemonType;
+
+  constructor(weakType: PokemonType = PokemonType.POISON) {
+    super();
+    this.weakType = weakType;
+  }
+
   override apply({ simulated }: Parameters<PostSummonAbAttr["apply"]>[0]): void {
     if (!simulated) {
       for (const pokemon of globalScene.getField(true)) {
-        pokemon.tempSummonData.erPoisonWeakness = true;
+        pokemon.tempSummonData.erWeakToType = this.weakType;
       }
     }
   }

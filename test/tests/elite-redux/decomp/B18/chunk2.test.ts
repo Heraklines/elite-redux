@@ -4,16 +4,11 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// B18 chunk 2 probes: what the shared L1 and L2 suites cannot see.
-//  - Aroma Veil (both halves, Tier B): the effect-chance line (above 0 and below 100) through the real dispatch, simulated or not.
-//  - Pastel Veil / Sweet Veil (P) (Tier B, memory): the once-per-wave key, the party heal, the benched members, simulated calls.
-//  - Soothing Aroma / Butter Up (Tier C): the end-of-turn heal reaches only hurt, living holder and adjacent allies.
-//  - Toxic Spill, Telekinetic, Blistering Sun (Tier C): the marks and the arena effect, simulated or not.
-//  - Juggernaut / Precise Fist (Tier B): the split canApply gives the old answer for every move, target and option.
+import type { AbAttrBaseParams } from "#abilities/ab-attrs";
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { allAbilities, allMoves } from "#data/data-lists";
-import { buildAttr, readDeclParams, recomposeAttr } from "#data/elite-redux/ability-studio/build-attr";
 import { getBinding } from "#data/elite-redux/ability-studio/bindings";
+import { buildAttr, readDeclParams, recomposeAttr } from "#data/elite-redux/ability-studio/build-attr";
 import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
 import type { IgnoreOptionalMoveEffectsAbAttr } from "#data/elite-redux/ability-upgrades/attrs/optional-secondary-effect";
 import {
@@ -22,9 +17,9 @@ import {
 } from "#data/elite-redux/ability-upgrades/attrs/party-recovery";
 import {
   BreakScreensOnAttackAbAttr,
-  FieldPoisonWeaknessOnEntryAbAttr,
-  PreLeaveFieldRemoveLinkedTailwindAbAttr,
-  TelekineticStruggleOnEntryAbAttr,
+  type FieldPoisonWeaknessOnEntryAbAttr,
+  type PreLeaveFieldRemoveLinkedTailwindAbAttr,
+  type TelekineticStruggleOnEntryAbAttr,
 } from "#data/elite-redux/ability-upgrades/attrs/requested-combat-riders";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -33,13 +28,19 @@ import { HitResult } from "#enums/hit-result";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
+// B18 chunk 2 probes: what the shared L1 and L2 suites cannot see.
+//  - Aroma Veil (both halves, Tier B): the effect-chance line (above 0 and below 100) through the real dispatch, simulated or not.
+//  - Pastel Veil / Sweet Veil (P) (Tier B, memory): the once-per-wave key, the party heal, the benched members, simulated calls.
+//  - Soothing Aroma / Butter Up (Tier C): the end-of-turn heal reaches only hurt, living holder and adjacent allies.
+//  - Toxic Spill, Telekinetic, Blistering Sun (Tier C): the marks and the arena effect, simulated or not.
+//  - Juggernaut / Precise Fist (Tier B): the split canApply gives the old answer for every move, target and option.
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
 import { freshGame, startWorld } from "#test/tests/elite-redux/decomp/harness/game";
-import { NumberHolder, toDmgValue } from "#utils/common";
-import type { AbAttrBaseParams } from "#abilities/ab-attrs";
 import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
+import { NumberHolder, toDmgValue } from "#utils/common";
 import Phaser from "phaser";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -323,12 +324,15 @@ describe("B18 chunk 2", () => {
       const { holder, foe } = await startWorld(phaserGame);
       const module = declRegistry.get("FieldPoisonWeaknessOnEntryAbAttr")!;
       const rebuilt = buildAttr(module) as FieldPoisonWeaknessOnEntryAbAttr;
-      holder.tempSummonData.erPoisonWeakness = false;
-      foe.tempSummonData.erPoisonWeakness = false;
+      holder.tempSummonData.erWeakToType = null;
+      foe.tempSummonData.erWeakToType = null;
       rebuilt.apply({ pokemon: holder, simulated: true } as AbAttrBaseParams);
-      expect([holder.tempSummonData.erPoisonWeakness, foe.tempSummonData.erPoisonWeakness]).toEqual([false, false]);
+      expect([holder.tempSummonData.erWeakToType, foe.tempSummonData.erWeakToType]).toEqual([null, null]);
       rebuilt.apply({ pokemon: holder, simulated: false } as AbAttrBaseParams);
-      expect([holder.tempSummonData.erPoisonWeakness, foe.tempSummonData.erPoisonWeakness]).toEqual([true, true]);
+      expect([holder.tempSummonData.erWeakToType, foe.tempSummonData.erWeakToType]).toEqual([
+        PokemonType.POISON,
+        PokemonType.POISON,
+      ]);
     });
   });
 
