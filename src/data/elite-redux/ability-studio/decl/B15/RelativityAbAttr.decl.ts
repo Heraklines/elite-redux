@@ -9,11 +9,12 @@
 // Source: src/data/elite-redux/abilities/relativity.ts, class RelativityAbAttr (extends AbAttr; constructor passes showAbility false; apply is empty, there is no canApply of its own).
 // It is an offence marker plus a resolver. Nothing dispatches it: Pokemon.getBaseDamage (src/field/pokemon.ts:5636) scans the ATTACKER's attrs by constructor name and calls
 // resolveOffenseStat(source, target), which returns:
-//   1. pokemonActedBefore(source, target) ? Stat.SPD : null                                             -> condition (the order test) + effect (the stat to use)
+//   1. gate({ source, target }) = pokemonActedBefore(source, target); the gate answer picks the substitute stat, else null  -> gate CONDITION (the order test) + effect (the stat to use)
 //      pokemonActedBefore reads the authoritative per-turn move order, dynamicQueueManager.getLastTurnOrder(): the source must be in it; a target that is not in it has not acted yet (so the
 //      source is first); both present -> compare their indices. It is the real order of the Trick Room aware queue, so Trick Room is respected for free.
 // When the resolver answers a stat, getBaseDamage reads the SOURCE's own effective stat for it (getEffectiveStat(sub, target, ...)) in place of the move's attack stat. No random draw, no state of its own.
 // Constructor change (behaviour-neutral): the substitute stat is a constructor argument (default Speed).
+// Refactor (pure move of code, spec 3.1): resolveOffenseStat = (gateOverride ?? gate)({ source, target }) ? substituteStat : null; the order test is now the class's `gate` method, bound as a legacy closure.
 // The twin attr in the same ability, RelativityDefenseReductionAbAttr, is a separate class with its own declaration.
 import { RelativityAbAttr } from "#data/elite-redux/abilities/relativity";
 import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
@@ -45,15 +46,19 @@ export default defineDecl(RelativityAbAttr, {
       control: "select",
       label: "Stat used in place of the attack stat",
       editable: true,
+      gateIndependent: true,
       default: "SPD",
       options: [...OFFENCE_STAT_OPTIONS],
       codec: enumCodec(Stat, "stat"),
     },
   ],
-  conditions: [],
+  conditions: [
+    // The order test (I act before my target this turn). Legacy closure: the library has no 'moved before' atom yet (R-B15-36).
+    { slot: "gate", ctx: "params", removable: true, editable: true },
+  ],
   guards: [],
   feasibility: [
-    "Only when I act before my target this turn, judged by the real move order of the turn (so Trick Room is respected); built into the game's damage handling today, requested as a separate condition (R-B15-36)",
+    "The game asks for this while it picks the stat my attack uses (inside the damage calculation), not at a separate ability moment; the proper moment is requested as R-B15-36",
     "It reads my own current stat after stages and other boosts (for Speed, after Borrowed Time's swap too)",
     "Only damaging moves read an attack stat, so a status move is not affected",
     "It is worked out in the damage calculation; the choice of stat is not a dispatched ability moment",
@@ -66,5 +71,5 @@ export default defineDecl(RelativityAbAttr, {
   probes: [{ name: "the holder and the foe trade attacks", axes: {} }],
   status: "decomposed",
   notes:
-    "PACKAGE, justified. 1 attr in 1 ability: Relativity (5911 attr 0, Speed). The effect 'use another stat in place of the attack stat' cannot be split because the library has no such effect and no moment for it: the engine picks the attack stat inside getBaseDamage by scanning the attacker's attrs by name, and nothing dispatches it, so the order test (resolver) cannot be a separate condition block until that seam is a WHEN. Requested as R-B15-36: the moment 'While the game picks the stat my attack uses', the condition 'I act before the target this turn' (time.acted-before, by the real turn order list) and the effect 'Use {stat} in place of the attack stat'; the same condition atom is what the defence half (RelativityDefenseReductionAbAttr) needs. The only setting is the stat, typed (constructor argument, default Speed). WHEN is 'while active' and needs RelativityAbAttr in that WHEN's flagKeys (added locally with this chunk, request R-B15-35, keep the union on merge). Suspected oddities, NOT fixed: (1) the substitution runs after the move's own attack-stat change (VariableAtkAttr, the Foul Play style) and overwrites it, so Foul Play used by a Relativity holder that moved first hits with the holder's own Speed instead of the target's Attack; (2) it sits inside the same loop as the other attack-stat substitutes (Ancient Idol, Momentum), so a holder with two of them gets whichever attr comes LAST; (3) it is skipped while the attacker's ability is being ignored, and the order is compared per target, so one spread move can use Speed against one foe and Attack against the other.",
+    "PACKAGE, justified. 1 attr in 1 ability: Relativity (5911 attr 0, Speed). The effect 'use another stat in place of the attack stat' cannot be split because the library has no such effect and no moment for it: the engine picks the attack stat inside getBaseDamage by scanning the attacker's attrs by name, and nothing dispatches it, so the WHEN stays 'while active' until that seam is a moment. The order test IS a separate condition now: the class's `gate` method (pokemonActedBefore), bound as a legacy closure in bindings.ts (5911 attr 0) because the library has no 'moved before' atom. Requested as R-B15-36: the moment 'While the game picks the stat my attack uses', the condition 'I act before the target this turn' (time.acted-before, by the real turn order list) and the effect 'Use {stat} in place of the attack stat'; the same condition atom is what the defence half (RelativityDefenseReductionAbAttr) needs. The only setting is the stat, typed (constructor argument, default Speed). WHEN is 'while active' and needs RelativityAbAttr in that WHEN's flagKeys (added locally with this chunk, request R-B15-35, keep the union on merge). Suspected oddities, NOT fixed: (1) the substitution runs after the move's own attack-stat change (VariableAtkAttr, the Foul Play style) and overwrites it, so Foul Play used by a Relativity holder that moved first hits with the holder's own Speed instead of the target's Attack; (2) it sits inside the same loop as the other attack-stat substitutes (Ancient Idol, Momentum), so a holder with two of them gets whichever attr comes LAST; (3) it is skipped while the attacker's ability is being ignored, and the order is compared per target, so one spread move can use Speed against one foe and Attack against the other.",
 });

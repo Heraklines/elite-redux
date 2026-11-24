@@ -13,9 +13,10 @@
 //      (globalScene.randBattleSeedInt(candidates.length)). Singles: nothing to link to, the ability is inert.
 // The REAL mechanic is NOT in apply; two engine seams find the holder's attr by constructor name (either end of the linked pair may carry it):
 //   a. erRendezvousPowerMultiplier(user, target), read in Move.calculateBattlePower (src/data/moves/move.ts:1435): rendezvousPair(user) (the linked partner, and a Rendezvous attr on user or partner);
-//      when the partner already hit THIS target this turn (turn-attack-ledger.ts allyHitTargetThisTurn) -> power *= powerMultiplier (1.2), else 1                     -> condition + effect
-//   b. erRendezvousOnHit(user, target), read in batch3-on-hit.ts after a hit: same pair and ledger test; then once per PAIR per turn (module variable healedKey = wave:turn:lowest id) -> for user and
+//      when attr.gateHolds({ user, partner, target }) (gate = the partner already hit THIS target this turn, turn-attack-ledger.ts allyHitTargetThisTurn) -> power *= powerMultiplier (1.2), else 1   -> gate condition + effect.multiply-power
+//   b. erRendezvousOnHit(user, target), read in batch3-on-hit.ts after a hit: same pair and the same gate; then the residual (once per PAIR per turn: module variable healedKey = wave:turn:lowest id, now behind healKeyOf) -> for user and
 //      partner, unless fainted or at full HP: heal(toDmgValue(maxHp * healFraction, 1)) (5%)                                                                       -> condition + memory + effect
+// Refactor (pure move of code, spec 3.1): the ledger test is the class's `gate` (replaceable, `gateOverride`, read through gateHolds by both seams) and the once-per-pair-per-turn test is its `residual` (heal seam only). Same tests, same order.
 // Constructor change (behaviour-neutral): the power factor and the heal share are constructor arguments (defaults 1.2 and 0.05, the old module constants); both seams read them from the live attr.
 import { RendezvousAbAttr } from "#data/elite-redux/abilities/rendezvous";
 import { defineDecl, type ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
@@ -53,6 +54,7 @@ export default defineDecl(RendezvousAbAttr, {
       step: 0.05,
       label: "Power multiplier of the second attack (1.2 = 20% stronger)",
       editable: true,
+      gateIndependent: true,
       default: 1.2,
     },
     {
@@ -66,21 +68,41 @@ export default defineDecl(RendezvousAbAttr, {
       integer: true,
       label: "HP both partners heal (% of max HP)",
       editable: true,
+      gateIndependent: true,
       default: 5,
       codec: percentCodec,
     },
   ],
-  conditions: [],
+  conditions: [
+    // The gate is 'my linked ally already hit this target this turn' (turn attack ledger). Legacy closure: no library atom reads the ledger yet (R-B15-37).
+    { slot: "gate", ctx: "params", removable: true, editable: true },
+  ],
   guards: [],
   feasibility: [
     "Needs a living ally on the field to link to; in singles it does nothing",
     "Both partners must still be on the field and linked; the link ends when either leaves",
-    "Only when the partner already hit the SAME target earlier this turn",
+    "The heal needs the partner to have hit the SAME target earlier this turn (the same test as the power boost, the gate)",
     "The heal happens once per pair per turn, even for a spread move, and skips a partner that has fainted or is at full HP",
     "The power boost and the heal are built into the game's damage handling, not into this block's entry moment; the link is made on entry",
     "It does nothing in a preview",
   ],
-  effect: { id: "effect.package", params: ["powerMultiplier", "healPercent"] },
+  // Two seams, two effects, one shared gate. The link itself is the entry moment (this class's apply).
+  branches: [
+    {
+      label: "Boost the second hit",
+      conditions: ["gate: my linked ally already hit this target this turn"],
+      effect: { id: "effect.multiply-power", params: ["powerMultiplier"] },
+    },
+    {
+      label: "Heal both of us",
+      conditions: [
+        "gate: my linked ally already hit this target this turn",
+        "this pair has not healed yet this turn (kept in the class)",
+      ],
+      // Package: no block heals me and a linked ally by a share of max HP once per turn (R-B15-37).
+      effect: { id: "effect.package", params: ["healPercent"] },
+    },
+  ],
   reusableAlone: { when: true, if: true, do: true },
   flags: {
     rng: "apply",
@@ -95,5 +117,5 @@ export default defineDecl(RendezvousAbAttr, {
   probes: [{ name: "enter and let two turns pass", axes: {} }],
   status: "decomposed",
   notes:
-    "PACKAGE, justified. 1 attr in 1 ability: Rendezvous (5919 attr 0, x1.2 and 5%). The entry trigger is a separate swappable WHEN and the class has no condition of its own, but the two conditions that make the ability work (the linked ally already hit THIS target this turn; the heal only once per pair per turn) live in the engine seams, not in the class, so they cannot be separate blocks today. It cannot be split because the library has none of the pieces: 'link to my nearest ally' (the same effect Heartbreak needs, R-B15-13), a calc moment 'while the game calculates my move's power' with the condition 'my linked ally already hit this target this turn' (the existing effect.multiply-power would then do the boost), and a moment 'after the second attack on a target' with the effect 'heal me and my linked ally by N% of max HP once per turn'; requested as R-B15-37. Both numbers are typed settings (constructor arguments, old constants as defaults; the heal is shown as a percent). The only draw is the partner pick in triples. Suspected oddities, NOT fixed: (1) the heal memory (healedKey) is ONE module variable shared by every pair in the game and holds only the latest key: if a second pair heals in the same turn it overwrites the first pair's key, so the first pair could heal a second time that turn; (2) the code comment says the holder's Rendezvous grants the effect to whichever of the two acts second, so the partner without the ability is boosted too; (3) with several Rendezvous holders in triples only the first attr found on the user or partner supplies the numbers; (4) singles: inert, as documented.",
+    "Partly a package. 1 attr in 1 ability: Rendezvous (5919 attr 0, x1.2 and 5%). The class is the entry link (R-B15-13) plus two seams that read it by constructor name. The condition 'my linked ally already hit THIS target this turn' is now the class's own `gate` (bound as a legacy closure in bindings.ts, 5919 attr 0, because no library atom reads the turn attack ledger) and the once-per-pair-per-turn test is its `residual`; both seams run the same gate. The power boost is the library effect effect.multiply-power (branch 1, not a package); only the heal (branch 2: heal me and my linked ally by N% of max HP once per turn) and the link are packages or requests, R-B15-37. The moments 'while the game calculates my move's power' and 'after the second attack on a target' are still engine seams, not WHENs. Both numbers are typed settings (constructor arguments, old constants as defaults; the heal is shown as a percent). The only draw is the partner pick in triples. Suspected oddities, NOT fixed: (1) the heal memory (healedKey) is ONE module variable shared by every pair in the game and holds only the latest key: if a second pair heals in the same turn it overwrites the first pair's key, so the first pair could heal a second time that turn; (2) the code comment says the holder's Rendezvous grants the effect to whichever of the two acts second, so the partner without the ability is boosted too; (3) with several Rendezvous holders in triples only the first attr found on the user or partner supplies the numbers; (4) singles: inert, as documented.",
 });

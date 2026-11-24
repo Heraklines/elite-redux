@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-// B15 chunk 4. Tier B, package for the effect only. "After my attack lands, the target is Commanded: its next move is hijacked. By default only after a Psychic-type hit on a poisoned target."
+// B15 chunk 4. Tier B, library effect (effect.apply-tag). "After my attack lands, the target is Commanded: its next move is hijacked. By default only after a Psychic-type hit on a poisoned target."
 //
 // Source: src/data/elite-redux/abilities/puppet-strings.ts, class PuppetStringsAbAttr (extends PostAttackAbAttr; constructor passes the DEFAULT attackCondition (move.category !== STATUS)
 // and showAbility false; it has no constructor argument). canApply, now guards && gate && residual. ORIGINAL clause order, then where each one went:
@@ -29,7 +29,7 @@ export default defineDecl(PuppetStringsAbAttr, {
   when: "event.after-my-hit",
   label: "Take over the target's next move",
   summary: () =>
-    "After my attack lands, the target is Commanded: its next move fails, goes to its ally, or hurts itself. Once per switch-in. By default only after a Psychic hit on a poisoned target.",
+    "After my attack lands, the target is taken over: its next move fails, goes to its ally, or hurts itself. Once per switch-in. By default only after a Psychic hit on a poisoned target.",
   synonyms: [
     "puppet strings",
     "mind control",
@@ -45,7 +45,7 @@ export default defineDecl(PuppetStringsAbAttr, {
   ],
   params: [],
   noParamsReason:
-    "The effect has no number or choice of its own: the Commanded effect uses its own fixed length and its own damage share, set by the battle effect and not by this block. The move type and the status are conditions in the gate.",
+    "The effect applies one fixed battle effect (Commanded) to the other Pokemon; the target and the battle effect are fixed by this class and the Commanded effect uses its own length and damage share. The move type and the status are conditions in the gate.",
   conditions: [
     // The gate is the three design conditions: a damaging move, a Psychic move, a poisoned or badly poisoned target.
     { slot: "gate", ctx: "params", removable: true, editable: true },
@@ -57,7 +57,8 @@ export default defineDecl(PuppetStringsAbAttr, {
     "A target that is already Commanded, or was Commanded since it came in, is left alone (once per switch-in)",
     "It does nothing in a preview",
   ],
-  effect: { id: "effect.package", params: [] },
+  // effect.apply-tag with target = the other Pokemon and tag = ER_COMMANDED (both fixed by this class, so no param is exposed).
+  effect: { id: "effect.apply-tag", params: [] },
   reusableAlone: { when: true, if: true, do: true },
   flags: { rng: "none", state: "battle", simulated: "respects" },
   probes: [
@@ -69,5 +70,5 @@ export default defineDecl(PuppetStringsAbAttr, {
   ],
   status: "decomposed",
   notes:
-    "PACKAGE for the effect, justified; the trigger and the three design conditions are separate blocks. 1 attr in 1 ability: Puppet Strings (5901 attr 0). The effect cannot be split because effect.apply-tag is planned but not implemented, and this tag is not a plain tag: its own hook hijacks the move (fail, redirect to an ally with a seeded draw, or self-damage of 40%), so a generic 'apply a battle effect' block would also need the Commanded tag; requested as R-B15-31 (implement effect.apply-tag with the Commanded effect and the 'not since it came in' memory atom). The effect has no number or choice (see noParamsReason). The safety rules (the target is another, standing, damaged Pokemon; Shield Dust protection) are kept in the class as guards; the guard registry has no ids for them, so they are listed as feasibility and requested as R-B15-30. The gate is bound to the library atoms move.damaging, move.type PSYCHIC (effective: moveUser.getMoveType(move), the same call) and status.has POISON or TOXIC on the other Pokemon (target.status?.effect). Suspected oddities, NOT fixed: (1) the class comment says 'subject to the once-per-switch-in rule' but the flag is only set by the tag's onAdd, so a target that was Commanded and then switched out and back in can be Commanded again, which matches the text; (2) Shield Dust is tested with hasAbilityWithAttr (the IgnoreMoveEffects attr), so ANY ability with that attr protects, not only Shield Dust itself; (3) the tag expires at the end of the FOLLOWING turn, so a target that is Commanded late in a turn may be hijacked on the next one only, as documented; (4) in singles a damaging move is cancelled and the target takes 40% of its own damage: that happens inside the tag, not here.",
+    "Tier B with the library effect effect.apply-tag (target = the other Pokemon, tag = ER_COMMANDED), NOT a package; the trigger and the three design conditions are separate blocks. 1 attr in 1 ability: Puppet Strings (5901 attr 0). The effect is exactly target.addTag(ER_COMMANDED, 0, MoveId.NONE, holder.id), which is effect.apply-tag (same state as effect.arena-tag: in the registry, implemented false); the Commanded tag has its own hook (fail, redirect to an ally with a seeded draw, or self-damage of 40%). R-B15-31 stays open: implement effect.apply-tag for the Commanded tag and add the 'not Commanded since it came in' memory atom. The effect has no exposed number or choice (see noParamsReason). The safety rules (the target is another, standing, damaged Pokemon; Shield Dust protection) are kept in the class as guards; the guard registry has no ids for them, so they are listed as feasibility and requested as R-B15-30. The gate is bound to the library atoms move.damaging, move.type PSYCHIC (effective: moveUser.getMoveType(move), the same call) and status.has POISON or TOXIC on the other Pokemon (target.status?.effect). Suspected oddities, NOT fixed: (1) the class comment says 'subject to the once-per-switch-in rule' but the flag is only set by the tag's onAdd, so a target that was Commanded and then switched out and back in can be Commanded again, which matches the text; (2) Shield Dust is tested with hasAbilityWithAttr (the IgnoreMoveEffects attr), so ANY ability with that attr protects, not only Shield Dust itself; (3) the tag expires at the end of the FOLLOWING turn, so a target that is Commanded late in a turn may be hijacked on the next one only, as documented; (4) in singles a damaging move is cancelled and the target takes 40% of its own damage: that happens inside the tag, not here.",
 });

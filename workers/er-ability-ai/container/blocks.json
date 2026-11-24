@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "148286b1d0b532",
-  "hash": "1f63b37f1895ab",
+  "hash": "188e283c24ad8d",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -2155,7 +2155,7 @@
       "id": "block.puppet-strings",
       "className": "PuppetStringsAbAttr",
       "label": "Take over the target's next move",
-      "summary": "After my attack lands, the target is Commanded: its next move fails, goes to its ally, or hurts itself. Once per switch-in. By default only after a Psychic hit on a poisoned target.",
+      "summary": "After my attack lands, the target is taken over: its next move fails, goes to its ally, or hurts itself. Once per switch-in. By default only after a Psychic hit on a poisoned target.",
       "tier": "B",
       "kind": "event-effect",
       "status": "decomposed",
@@ -2191,7 +2191,7 @@
         "It does nothing in a preview"
       ],
       "effect": {
-        "id": "effect.package",
+        "id": "effect.apply-tag",
         "params": []
       },
       "reusableAlone": {
@@ -2498,13 +2498,21 @@
             "SPATK",
             "SPDEF",
             "SPD"
-          ]
+          ],
+          "gateIndependent": true
         }
       ],
-      "conditions": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
       "guards": [],
       "feasibility": [
-        "Only when I act before my target this turn, judged by the real move order of the turn (so Trick Room is respected); built into the game's damage handling today, requested as a separate condition (R-B15-36)",
+        "The game asks for this while it picks the stat my attack uses (inside the damage calculation), not at a separate ability moment; the proper moment is requested as R-B15-36",
         "It reads my own current stat after stages and other boosts (for Speed, after Borrowed Time's swap too)",
         "Only damaging moves read an attack stat, so a status move is not affected",
         "It is worked out in the damage calculation; the choice of stat is not a dispatched ability moment"
@@ -2520,7 +2528,7 @@
         "if": true,
         "do": true
       },
-      "packageReason": "PACKAGE, justified. 1 attr in 1 ability: Relativity (5911 attr 0, Speed). The effect 'use another stat in place of the attack stat' cannot be split because the library has no such effect and no moment for it: the engine picks the attack stat inside getBaseDamage by scanning the attacker's attrs by name, and nothing dispatches it, so the order test (resolver) cannot be a separate condition block until that seam is a WHEN. Requested as R-B15-36: the moment 'While the game picks the stat my attack uses', the condition 'I act before the target this turn' (time.acted-before, by the real turn order list) and the effect 'Use {stat} in place of the attack stat'; the same condition atom is what the defence half (RelativityDefenseReductionAbAttr) needs. The only setting is the stat, typed (constructor argument, default Speed). WHEN is 'while active' and needs RelativityAbAttr in that WHEN's flagKeys (added locally with this chunk, request R-B15-35, keep the union on merge). Suspected oddities, NOT fixed: (1) the substitution runs after the move's own attack-stat change (VariableAtkAttr, the Foul Play style) and overwrites it, so Foul Play used by a Relativity holder that moved first hits with the holder's own Speed instead of the target's Attack; (2) it sits inside the same loop as the other attack-stat substitutes (Ancient Idol, Momentum), so a holder with two of them gets whichever attr comes LAST; (3) it is skipped while the attacker's ability is being ignored, and the order is compared per target, so one spread move can use Speed against one foe and Attack against the other.",
+      "packageReason": "PACKAGE, justified. 1 attr in 1 ability: Relativity (5911 attr 0, Speed). The effect 'use another stat in place of the attack stat' cannot be split because the library has no such effect and no moment for it: the engine picks the attack stat inside getBaseDamage by scanning the attacker's attrs by name, and nothing dispatches it, so the WHEN stays 'while active' until that seam is a moment. The order test IS a separate condition now: the class's `gate` method (pokemonActedBefore), bound as a legacy closure in bindings.ts (5911 attr 0) because the library has no 'moved before' atom. Requested as R-B15-36: the moment 'While the game picks the stat my attack uses', the condition 'I act before the target this turn' (time.acted-before, by the real turn order list) and the effect 'Use {stat} in place of the attack stat'; the same condition atom is what the defence half (RelativityDefenseReductionAbAttr) needs. The only setting is the stat, typed (constructor argument, default Speed). WHEN is 'while active' and needs RelativityAbAttr in that WHEN's flagKeys (added locally with this chunk, request R-B15-35, keep the union on merge). Suspected oddities, NOT fixed: (1) the substitution runs after the move's own attack-stat change (VariableAtkAttr, the Foul Play style) and overwrites it, so Foul Play used by a Relativity holder that moved first hits with the holder's own Speed instead of the target's Attack; (2) it sits inside the same loop as the other attack-stat substitutes (Ancient Idol, Momentum), so a holder with two of them gets whichever attr comes LAST; (3) it is skipped while the attacker's ability is being ignored, and the order is compared per target, so one spread move can use Speed against one foe and Attack against the other.",
       "uses": 1
     },
     {
@@ -2609,7 +2617,8 @@
           "editable": true,
           "min": 1,
           "max": 4,
-          "step": 0.05
+          "step": 0.05,
+          "gateIndependent": true
         },
         {
           "id": "healPercent",
@@ -2620,32 +2629,60 @@
           "min": 0,
           "max": 100,
           "step": 1,
-          "integer": true
+          "integer": true,
+          "gateIndependent": true
         }
       ],
-      "conditions": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
       "guards": [],
       "feasibility": [
         "Needs a living ally on the field to link to; in singles it does nothing",
         "Both partners must still be on the field and linked; the link ends when either leaves",
-        "Only when the partner already hit the SAME target earlier this turn",
+        "The heal needs the partner to have hit the SAME target earlier this turn (the same test as the power boost, the gate)",
         "The heal happens once per pair per turn, even for a spread move, and skips a partner that has fainted or is at full HP",
         "The power boost and the heal are built into the game's damage handling, not into this block's entry moment; the link is made on entry",
         "It does nothing in a preview"
       ],
-      "effect": {
-        "id": "effect.package",
-        "params": [
-          "powerMultiplier",
-          "healPercent"
-        ]
-      },
+      "branches": [
+        {
+          "label": "Boost the second hit",
+          "conditions": [
+            "gate: my linked ally already hit this target this turn"
+          ],
+          "effect": {
+            "id": "effect.multiply-power",
+            "params": [
+              "powerMultiplier"
+            ]
+          }
+        },
+        {
+          "label": "Heal both of us",
+          "conditions": [
+            "gate: my linked ally already hit this target this turn",
+            "this pair has not healed yet this turn (kept in the class)"
+          ],
+          "effect": {
+            "id": "effect.package",
+            "params": [
+              "healPercent"
+            ]
+          }
+        }
+      ],
       "reusableAlone": {
         "when": true,
         "if": true,
         "do": true
       },
-      "packageReason": "PACKAGE, justified. 1 attr in 1 ability: Rendezvous (5919 attr 0, x1.2 and 5%). The entry trigger is a separate swappable WHEN and the class has no condition of its own, but the two conditions that make the ability work (the linked ally already hit THIS target this turn; the heal only once per pair per turn) live in the engine seams, not in the class, so they cannot be separate blocks today. It cannot be split because the library has none of the pieces: 'link to my nearest ally' (the same effect Heartbreak needs, R-B15-13), a calc moment 'while the game calculates my move's power' with the condition 'my linked ally already hit this target this turn' (the existing effect.multiply-power would then do the boost), and a moment 'after the second attack on a target' with the effect 'heal me and my linked ally by N% of max HP once per turn'; requested as R-B15-37. Both numbers are typed settings (constructor arguments, old constants as defaults; the heal is shown as a percent). The only draw is the partner pick in triples. Suspected oddities, NOT fixed: (1) the heal memory (healedKey) is ONE module variable shared by every pair in the game and holds only the latest key: if a second pair heals in the same turn it overwrites the first pair's key, so the first pair could heal a second time that turn; (2) the code comment says the holder's Rendezvous grants the effect to whichever of the two acts second, so the partner without the ability is boosted too; (3) with several Rendezvous holders in triples only the first attr found on the user or partner supplies the numbers; (4) singles: inert, as documented.",
+      "packageReason": "Partly a package. 1 attr in 1 ability: Rendezvous (5919 attr 0, x1.2 and 5%). The class is the entry link (R-B15-13) plus two seams that read it by constructor name. The condition 'my linked ally already hit THIS target this turn' is now the class's own `gate` (bound as a legacy closure in bindings.ts, 5919 attr 0, because no library atom reads the turn attack ledger) and the once-per-pair-per-turn test is its `residual`; both seams run the same gate. The power boost is the library effect effect.multiply-power (branch 1, not a package); only the heal (branch 2: heal me and my linked ally by N% of max HP once per turn) and the link are packages or requests, R-B15-37. The moments 'while the game calculates my move's power' and 'after the second attack on a target' are still engine seams, not WHENs. Both numbers are typed settings (constructor arguments, old constants as defaults; the heal is shown as a percent). The only draw is the partner pick in triples. Suspected oddities, NOT fixed: (1) the heal memory (healedKey) is ONE module variable shared by every pair in the game and holds only the latest key: if a second pair heals in the same turn it overwrites the first pair's key, so the first pair could heal a second time that turn; (2) the code comment says the holder's Rendezvous grants the effect to whichever of the two acts second, so the partner without the ability is boosted too; (3) with several Rendezvous holders in triples only the first attr found on the user or partner supplies the numbers; (4) singles: inert, as documented.",
       "uses": 1
     },
     {

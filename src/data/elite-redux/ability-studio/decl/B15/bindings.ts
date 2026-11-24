@@ -87,8 +87,8 @@ bindCondition(
 bindCondition(5247, 0, { id: "move.flag", flag: "MAKES_CONTACT" }, "gate"); // Spiteful
 
 // =============================================================================================
-// B15 chunk 4. Gates (slot "gate") and one constructor closure (slot "ctor:0"), keyed by (abilityId, attrIndex). QuickeningGraceAbAttr, RelativityAbAttr and RendezvousAbAttr have no
-// closure and no gate (presence markers read by engine seams), so they need no binding.
+// B15 chunk 4. Gates (slot "gate") and one constructor closure (slot "ctor:0"), keyed by (abilityId, attrIndex). QuickeningGraceAbAttr has no
+// closure and no gate (presence marker read by an engine seam), so it needs no binding.
 // =============================================================================================
 
 // SetArenaTagOnHitAbAttr, gate, the contact clause: `!contactRequired || move.doesFlagEffectApply({ flag: MAKES_CONTACT, user: attacker, target: holder })`.
@@ -147,4 +147,20 @@ bindLegacyClosure(
   1,
   "The closure reads the per-turn move order list (getLastTurnOrder) to see whether the attacker moved before the holder; time.acted reads one Pokemon's acted flag, which is a different predicate. Needs 'moved before' (R-B15-36).",
   "ctor:0",
+);
+
+// RelativityAbAttr, gate: pokemonActedBefore(source, target), the per-turn move order list (getLastTurnOrder). The library atom time.acted reads one Pokemon's acted flag, not the order list.
+bindLegacyClosure(
+  5911, // Relativity, the stat substitution (attr 0)
+  0,
+  "The gate tests whether the holder moved before the target by the per-turn move order list (getLastTurnOrder); time.acted reads one Pokemon's acted flag, a different predicate. Needs 'moved before' (R-B15-36).",
+  "gate",
+);
+
+// RendezvousAbAttr, gate: allyHitTargetThisTurn(partner, target), the turn attack ledger. No library atom reads that ledger (R-B15-37).
+bindLegacyClosure(
+  5919, // Rendezvous
+  0,
+  "The gate tests whether my linked ally already hit this target this turn, read from the turn attack ledger; no library atom reads that ledger yet. Needs 'My linked ally already hit this target this turn' (R-B15-37).",
+  "gate",
 );

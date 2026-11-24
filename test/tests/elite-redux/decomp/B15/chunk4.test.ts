@@ -150,7 +150,7 @@ describe("B15 chunk 4", () => {
           true,
         ],
         ["RainPumpAbAttr", RAIN_PUMP, 0, { ppRestored: 3 }, { ppRestored: 3 }, true],
-        ["RelativityAbAttr", RELATIVITY, 0, { substituteStat: "SPATK" }, { substituteStat: Stat.SPATK }, false],
+        ["RelativityAbAttr", RELATIVITY, 0, { substituteStat: "SPATK" }, { substituteStat: Stat.SPATK }, true],
         ["RelativityDefenseReductionAbAttr", RELATIVITY, 1, { multiplier: 0.5 }, { damageMultiplier: 0.5 }, false],
         [
           "RendezvousAbAttr",
@@ -158,7 +158,7 @@ describe("B15 chunk 4", () => {
           0,
           { powerMultiplier: 1.5, healPercent: 10 },
           { powerMultiplier: 1.5, healFraction: 0.1 },
-          false,
+          true,
         ],
       ];
       for (const [className, abilityId, index, params, expected, gateNeedsOverride] of cases) {
@@ -185,6 +185,25 @@ describe("B15 chunk 4", () => {
           expect(rebuilt[field], `${className}.${field}`).toBe(value);
         }
       }
+      // The gate of the two seam classes is replaceable: a rebuilt attr answers with its override, the live one with the original test.
+      const relativity = liveAbility(RELATIVITY).attrs[0] as unknown as {
+        resolveOffenseStat: (s: unknown, t: unknown) => number | null;
+        gateOverride?: unknown;
+        substituteStat: number;
+      };
+      const rebuiltRelativity = recomposeAttr(declared("RelativityAbAttr"), relativity as never, RELATIVITY, 0, {
+        conds: { gate: (() => true) as never },
+      }) as unknown as typeof relativity;
+      expect(rebuiltRelativity.resolveOffenseStat({}, {})).toBe(rebuiltRelativity.substituteStat);
+      const rebuiltNever = recomposeAttr(declared("RelativityAbAttr"), relativity as never, RELATIVITY, 0, {
+        conds: { gate: (() => false) as never },
+      }) as unknown as typeof relativity;
+      expect(rebuiltNever.resolveOffenseStat({}, {})).toBeNull();
+      const rendezvous = liveAbility(RENDEZVOUS).attrs[0];
+      const rebuiltRendezvous = recomposeAttr(declared("RendezvousAbAttr"), rendezvous, RENDEZVOUS, 0, {
+        conds: { gate: (() => true) as never },
+      }) as unknown as { gateHolds: (p: unknown) => boolean };
+      expect(rebuiltRendezvous.gateHolds({})).toBe(true);
       // Puppet Strings and Quickening Grace have no param.
       expect(declared("PuppetStringsAbAttr").decl.params).toEqual([]);
       expect(declared("QuickeningGraceAbAttr").decl.params).toEqual([]);

@@ -23,6 +23,7 @@
 
 import { PostSummonAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import type { GatedAttr } from "#data/elite-redux/ability-studio/gate-residual";
 import type { Pokemon } from "#field/pokemon";
 import type { AbAttrBaseParams } from "#types/ability-types";
 import { toDmgValue } from "#utils/common";
@@ -37,8 +38,31 @@ export const RENDEZVOUS_POWER_MULTIPLIER = 1.2;
 /** Fraction of max HP both linked Pokemon restore. */
 export const RENDEZVOUS_HEAL_FRACTION = 0.05;
 
-/** PostSummon marker: forms the link on entry. */
-export class RendezvousAbAttr extends PostSummonAbAttr {
+/** What the two seams hand to the gate and the residual: the acting Pokemon, its linked partner and the Pokemon being hit. */
+export interface RendezvousHitParams {
+  user: Pokemon;
+  partner: Pokemon;
+  target: Pokemon;
+}
+
+/** Per-turn guard so the paired heal fires once (wave:turn:pair key). */
+let healedKey = "";
+
+/** The wave:turn:pair key of the once-per-pair-per-turn heal. */
+function healKeyOf(user: Pokemon, partner: Pokemon): string {
+  const battle = globalScene.currentBattle;
+  const pairId = Math.min(user.id, partner.id);
+  return `${battle?.waveIndex ?? 0}:${battle?.turn ?? 0}:${pairId}`;
+}
+
+/**
+ * PostSummon marker: forms the link on entry. The two seams below read `gate` ("my linked partner already hit this
+ * target this turn", replaceable) and, for the heal only, `residual` ("this pair has not healed yet this turn").
+ */
+export class RendezvousAbAttr extends PostSummonAbAttr implements GatedAttr<RendezvousHitParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: RendezvousHitParams) => boolean) | undefined;
+
   /**
    * @param powerMultiplier - Power factor of the second of the two coordinated moves (default 1.2)
    * @param healFraction - Fraction of max HP both linked Pokemon restore (default 0.05)
@@ -54,6 +78,21 @@ export class RendezvousAbAttr extends PostSummonAbAttr {
     if (!simulated) {
       formLink(pokemon);
     }
+  }
+
+  /** The replaceable condition: the linked partner already hit this target earlier this turn. */
+  public gate({ partner, target }: RendezvousHitParams): boolean {
+    return allyHitTargetThisTurn(partner, target);
+  }
+
+  /** Feasibility that stays in the class (heal seam only): this pair has not healed yet this turn (once per pair, not per target). */
+  public residual({ user, partner }: RendezvousHitParams): boolean {
+    return healedKey !== healKeyOf(user, partner);
+  }
+
+  /** The gate as the seams run it: the compiler's replacement when present, else {@linkcode gate}. */
+  public gateHolds(params: RendezvousHitParams): boolean {
+    return (this.gateOverride ?? this.gate.bind(this))(params);
   }
 }
 
@@ -84,14 +123,11 @@ function rendezvousPair(user: Pokemon): { partner: Pokemon; attr: RendezvousAbAt
  */
 export function erRendezvousPowerMultiplier(user: Pokemon, target: Pokemon): number {
   const pair = rendezvousPair(user);
-  if (pair && allyHitTargetThisTurn(pair.partner, target)) {
+  if (pair?.attr.gateHolds({ user, partner: pair.partner, target })) {
     return pair.attr.powerMultiplier ?? RENDEZVOUS_POWER_MULTIPLIER;
   }
   return 1;
 }
-
-/** Per-turn guard so the paired heal fires once (wave:turn key). */
-let healedKey = "";
 
 /**
  * Heal both linked Pokemon 5% max HP when `user` completes the SECOND move of a
@@ -100,19 +136,20 @@ let healedKey = "";
  */
 export function erRendezvousOnHit(user: Pokemon, target: Pokemon): void {
   const pair = rendezvousPair(user);
-  if (!pair || !allyHitTargetThisTurn(pair.partner, target)) {
+  if (!pair) {
     return;
   }
   const { partner, attr } = pair;
-  // Once per pair per turn (NOT per target) — so a spread move coordinated on
-  // several foes still heals the pair a single 5%.
-  const battle = globalScene.currentBattle;
-  const pairId = Math.min(user.id, partner.id);
-  const key = `${battle?.waveIndex ?? 0}:${battle?.turn ?? 0}:${pairId}`;
-  if (healedKey === key) {
+  const params: RendezvousHitParams = { user, partner, target };
+  if (!attr.gateHolds(params)) {
     return;
   }
-  healedKey = key;
+  // Once per pair per turn (NOT per target) — so a spread move coordinated on
+  // several foes still heals the pair a single 5%.
+  if (!attr.residual(params)) {
+    return;
+  }
+  healedKey = healKeyOf(user, partner);
   for (const mon of [user, partner]) {
     if (!mon.isFainted() && !mon.isFullHp()) {
       mon.heal(toDmgValue(mon.getMaxHp() * (attr.healFraction ?? RENDEZVOUS_HEAL_FRACTION), 1));
