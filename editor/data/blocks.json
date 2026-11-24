@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "12cfcf0d1d55d3",
-  "hash": "0dc63db4f4af3b",
+  "hash": "0712b331bb29a8",
   "blocks": [
     {
       "id": "block.allied-field-damage-reduction",
@@ -55,6 +55,41 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.always-hit",
+      "className": "AlwaysHitAbAttr",
+      "label": "Moves I use and moves aimed at me never miss",
+      "summary": "While I have this, my moves never miss and foes' moves aimed at me never miss, even against a foe that is flying or underground. Example: Thunder always hits.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "no guard",
+        "never miss",
+        "perfect accuracy",
+        "always hit",
+        "100 percent accuracy",
+        "sure hit",
+        "cannot dodge"
+      ],
+      "examples": [
+        "Every move that involves me always hits, like No Guard"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing while a field effect that restores normal accuracy is active (the ER Dust Cloud field effect)"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 5
     },
     {
       "id": "block.arena-trap",
@@ -2042,6 +2077,129 @@
       "uses": 3
     },
     {
+      "id": "block.force-switch-out-immunity",
+      "className": "ForceSwitchOutImmunityAbAttr",
+      "label": "Cannot be forced out of battle",
+      "summary": "Moves that drag me out (Roar, Whirlwind, Dragon Tail, Circle Throw) fail against me, so I stay in the battle. Example: a foe's Roar does nothing.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.forced-switch",
+      "whenLabel": "While the game checks if I can be forced out",
+      "synonyms": [
+        "suction cups",
+        "anchor",
+        "no phazing",
+        "roar immunity",
+        "whirlwind immunity",
+        "cannot be dragged out",
+        "stay in the battle",
+        "guard dog"
+      ],
+      "examples": [
+        "Roar and Whirlwind fail against me, like Suction Cups"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when the forced switch was already blocked by something earlier"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 5
+    },
+    {
+      "id": "block.form-block-damage",
+      "className": "FormBlockDamageAbAttr",
+      "label": "Block a hit while in my intact form, then break form",
+      "summary": "While I am in form number 0, a hit that meets your rule does no damage, I take 12.5% of my max HP as recoil, and I change form. Example: Disguise, Ice Face.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.damage-taken",
+      "whenLabel": "While the game calculates damage I take",
+      "synonyms": [
+        "disguise",
+        "ice face",
+        "mimikyu",
+        "eiscue",
+        "block the first hit",
+        "free hit",
+        "decoy",
+        "busted form"
+      ],
+      "examples": [
+        "Take no damage from the first hit, then change to my busted form, like Disguise"
+      ],
+      "params": [
+        {
+          "id": "formNumber",
+          "label": "Form number that blocks hits (0 = my first form)",
+          "control": "number",
+          "default": 0,
+          "editable": true,
+          "min": 0,
+          "max": 20,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "message",
+          "label": "Message shown when it blocks",
+          "control": "select",
+          "default": "Say its disguise was busted",
+          "editable": true,
+          "options": [
+            "Say its disguise was busted",
+            "Say it avoided the damage with its ability"
+          ]
+        },
+        {
+          "id": "recoil",
+          "label": "Damage I take after blocking (% of max HP, 0 = none)",
+          "control": "number",
+          "default": 12.5,
+          "editable": true,
+          "min": 0,
+          "max": 100,
+          "step": 0.5
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:3",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only when the hit would really do damage",
+        "Does not work against a hit that lands on my substitute",
+        "Only when my species has a form to break into that can change right now (otherwise it would block every hit)",
+        "Nothing changes in a simulated preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
       "id": "block.frisk",
       "className": "FriskAbAttr",
       "label": "Reveal the foes' held items",
@@ -2543,6 +2701,416 @@
       "uses": 10
     },
     {
+      "id": "block.ignore-protect-by-flag",
+      "className": "IgnoreProtectByFlagAbAttr",
+      "label": "My chosen kind of move goes through protection",
+      "summary": "While I have this, my moves of the kind \"Slicing move\" ignore protection moves such as Protect and hit anyway. Example: slicing moves break through Protect.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "pinnacle blade",
+        "puncture",
+        "keen edge",
+        "slicing moves ignore protect",
+        "break through protect",
+        "bypass protect",
+        "ignore protection for a kind of move"
+      ],
+      "examples": [
+        "My slicing moves break through Protect, like Pinnacle Blade",
+        "My punching moves ignore Protect and Detect"
+      ],
+      "params": [
+        {
+          "id": "flag",
+          "label": "Kind of move that goes through protection",
+          "control": "select",
+          "default": "SLICING_MOVE",
+          "editable": true,
+          "options": [
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only moves that really carry that trait go through; a trait that another ability adds to a move does not count here"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.ignore-protect-on-contact",
+      "className": "IgnoreProtectOnContactAbAttr",
+      "label": "My contact moves go through protection",
+      "summary": "While I have this, my moves that make contact ignore protection moves such as Protect and hit anyway. Example: Tackle breaks through Protect.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "unseen fist",
+        "ignore protect",
+        "break through protect",
+        "bypass protect",
+        "protect breaker",
+        "final blow",
+        "contact ignores protection"
+      ],
+      "examples": [
+        "My contact moves break through Protect, like Unseen Fist"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only moves that make contact (after contact-ignoring abilities such as Long Reach) are let through; the engine tests that itself"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.ignore-type-immunity",
+      "className": "IgnoreTypeImmunityAbAttr",
+      "label": "My moves hit a type that is normally immune",
+      "summary": "My Normal, Fighting moves hit Ghost-type Pokemon even though they are normally immune. Example: Normal and Fighting moves hit Ghost types.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.ignore-type-immunity",
+      "whenLabel": "While the game checks the foe's type immunity",
+      "synonyms": [
+        "scrappy",
+        "mind's eye",
+        "hit ghost types",
+        "ignore type immunity",
+        "normal hits ghost",
+        "get past an immunity",
+        "ghost immunity ignored"
+      ],
+      "examples": [
+        "Normal and Fighting moves hit Ghost types, like Scrappy",
+        "Ghost moves hit Normal types, like Phantom Pain"
+      ],
+      "params": [
+        {
+          "id": "immuneType",
+          "label": "Type that is normally immune",
+          "control": "select",
+          "default": "GHOST",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "moveTypes",
+          "label": "Move types that can hit it (comma separated)",
+          "control": "text",
+          "default": "NORMAL,FIGHTING",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when the immunity was already ignored by something earlier, and is skipped when the target's ability is being ignored on purpose"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 10
+    },
+    {
+      "id": "block.ignore-type-status-effect-immunity",
+      "className": "IgnoreTypeStatusEffectImmunityAbAttr",
+      "label": "My status effects get past a type's normal immunity",
+      "summary": "I can inflict Poison, Toxic even on Steel, Poison-type Pokemon that are normally immune to it. Example: poison works on Steel types.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.status-type-immunity",
+      "whenLabel": "While the game checks type-based status immunity",
+      "synonyms": [
+        "corrosion",
+        "poison steel types",
+        "poison poison types",
+        "burn fire types",
+        "ignore status immunity",
+        "status ignores type immunity",
+        "mycelium might"
+      ],
+      "examples": [
+        "I can poison Steel and Poison types, like Corrosion",
+        "My status moves can burn Fire types, like Mycelium Might"
+      ],
+      "params": [
+        {
+          "id": "statuses",
+          "label": "Status effects that get through (comma separated)",
+          "control": "text",
+          "default": "POISON,TOXIC",
+          "editable": true,
+          "options": [
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN"
+          ]
+        },
+        {
+          "id": "types",
+          "label": "Types that are normally immune (comma separated)",
+          "control": "text",
+          "default": "STEEL,POISON",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "statusMovesOnly",
+          "label": "Only with status moves, not damaging moves",
+          "control": "boolean",
+          "default": false,
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when the immunity was already ignored by something earlier",
+        "Only asked when the status comes from a Pokemon; hazards such as Toxic Spikes never get past a type immunity"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 9
+    },
+    {
+      "id": "block.illusion-post-battle",
+      "className": "IllusionPostBattleAbAttr",
+      "label": "Drop my disguise when the battle ends",
+      "summary": "When the battle is over, my disguise (the look of another Pokemon) is dropped, so I can use it again in the next battle. Example: Zoroark.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-battle",
+      "whenLabel": "After the battle ends",
+      "synonyms": [
+        "illusion",
+        "zoroark",
+        "reset the disguise",
+        "disguise ends after battle",
+        "show my real form after the fight"
+      ],
+      "examples": [
+        "Take off the disguise once the fight is over, like Zoroark"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when I am not disguised",
+        "Only a Pokemon that can still battle is asked (the ability adds that check itself)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.illusion-pre-summon",
+      "className": "IllusionPreSummonAbAttr",
+      "label": "Disguise myself as another Pokemon when I enter",
+      "summary": "Just before I enter the battle I take the look of another Pokemon: a trainer's Pokemon copies its last healthy teammate, a wild one a random species. Example: Zoroark.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.before-entry",
+      "whenLabel": "Just before I enter the battle",
+      "synonyms": [
+        "illusion",
+        "zoroark",
+        "disguise as a teammate",
+        "fake look",
+        "copy the last party member",
+        "pretend to be another pokemon"
+      ],
+      "examples": [
+        "Look like the last healthy Pokemon in my party until I get hit, like Zoroark"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A trainer's Pokemon needs another healthy teammate to copy; when it is the last healthy one, nothing happens",
+        "Does nothing when the one to copy is Ogerpon or Terapagos and either of us is Terastallized",
+        "A wild Pokemon can always disguise as a random species"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.infiltrator",
+      "className": "InfiltratorAbAttr",
+      "label": "My moves bypass screens, Substitute, Safeguard and Mist",
+      "summary": "My moves ignore the foe's Light Screen, Reflect, Aurora Veil, Safeguard, Mist and Substitute. Example: my Tackle still hits a Pokemon hiding behind a Substitute.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.infiltrate",
+      "whenLabel": "While the game checks if my move bypasses screens",
+      "synonyms": [
+        "infiltrator",
+        "ignore screens",
+        "bypass substitute",
+        "ignore reflect and light screen",
+        "ignore safeguard",
+        "ignore mist",
+        "get past barriers"
+      ],
+      "examples": [
+        "My moves ignore Reflect, Light Screen and Substitute, like the classic screen-ignoring ability"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when something earlier already decided that the protection is bypassed"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 8
+    },
+    {
       "id": "block.intimidate-immunity",
       "className": "IntimidateImmunityAbAttr",
       "label": "Block Intimidate and similar stat drops on me",
@@ -2622,6 +3190,67 @@
       "uses": 2
     },
     {
+      "id": "block.money",
+      "className": "MoneyAbAttr",
+      "label": "Earn bonus prize money after a win",
+      "summary": "After I win a battle, a bonus of 20% of this wave's usual prize money is added to the money picked up. Example: Honey Gather.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-battle",
+      "whenLabel": "After the battle ends",
+      "synonyms": [
+        "honey gather",
+        "pay day",
+        "extra money",
+        "prize money",
+        "bonus gold",
+        "earn coins",
+        "money after battle"
+      ],
+      "examples": [
+        "Earn some extra prize money after every battle I win, like Honey Gather"
+      ],
+      "params": [
+        {
+          "id": "bonus",
+          "label": "Bonus prize money (% of this wave's usual prize money)",
+          "control": "number",
+          "default": 20,
+          "editable": true,
+          "min": 0,
+          "max": 500,
+          "step": 1,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Does nothing in a simulated preview",
+        "The bonus joins the money picked up after the battle, so Amulet Coin and Happy Hour still multiply it"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "bonus"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.moody",
       "className": "MoodyAbAttr",
       "label": "Raise one random stat and lower another each turn",
@@ -2681,6 +3310,54 @@
         "do": true
       },
       "uses": 1
+    },
+    {
+      "id": "block.move-ability-bypass",
+      "className": "MoveAbilityBypassAbAttr",
+      "label": "My moves ignore the target's ability",
+      "summary": "My moves ignore the target's ability, so abilities that block or weaken them do not work. Example: a Levitate foe is still hit by my Ground moves.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.ability-bypass",
+      "whenLabel": "While the game decides whether my move ignores abilities",
+      "synonyms": [
+        "mold breaker",
+        "ignore abilities",
+        "bypass ability",
+        "ignore the target's ability",
+        "teravolt",
+        "turboblaze",
+        "get past levitate",
+        "break through abilities"
+      ],
+      "examples": [
+        "My moves ignore the target's ability, like Mold Breaker",
+        "Only my Rock moves ignore abilities, like Stonecutter"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": false,
+          "editable": false,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when something earlier already decided that abilities are ignored"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 6
     },
     {
       "id": "block.move-immunity",
@@ -3972,6 +4649,51 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.post-defend-illusion-break",
+      "className": "PostDefendIllusionBreakAbAttr",
+      "label": "Drop my disguise when a damaging hit lands",
+      "summary": "After I take a damaging hit while disguised as another Pokemon, my disguise is dropped and everybody sees my real look. Example: Zoroark loses its Illusion.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "illusion",
+        "zoroark",
+        "break the disguise",
+        "reveal myself",
+        "illusion ends when hit",
+        "show my real form"
+      ],
+      "examples": [
+        "Stop looking like a teammate as soon as I take damage, like Zoroark"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Does nothing when I am not disguised"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.post-defend-party-status-heal",
@@ -5770,6 +6492,131 @@
       "uses": 23
     },
     {
+      "id": "block.post-summon-stat-stage-change-on-arena",
+      "className": "PostSummonStatStageChangeOnArenaAbAttr",
+      "label": "Raise a stat when I enter and a field effect is up",
+      "summary": "When I enter the battle while Tailwind is up on my side, my higher of Attack and Sp. Atk goes up by 1 stage. Example: Wind Rider with Tailwind.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "wind rider",
+        "tailwind boost",
+        "boost on entry",
+        "raise attack when tailwind is up",
+        "entry boost with a field effect",
+        "stat boost on switch in"
+      ],
+      "examples": [
+        "Raise my higher attacking stat by one stage when I enter while Tailwind is up, like Wind Rider"
+      ],
+      "params": [
+        {
+          "id": "arenaTag",
+          "label": "Field effect that must be up on my side",
+          "control": "select",
+          "default": "TAILWIND",
+          "editable": true,
+          "options": [
+            "MUD_SPORT",
+            "WATER_SPORT",
+            "SPIKES",
+            "TOXIC_SPIKES",
+            "MIST",
+            "ER_SMOKESCREEN",
+            "STEALTH_ROCK",
+            "STICKY_WEB",
+            "TRICK_ROOM",
+            "INVERSE_ROOM",
+            "MAGIC_ROOM",
+            "WONDER_ROOM",
+            "SWIRLY_ROOM",
+            "GRAVITY",
+            "REFLECT",
+            "LIGHT_SCREEN",
+            "AURORA_VEIL",
+            "QUICK_GUARD",
+            "WIDE_GUARD",
+            "MAT_BLOCK",
+            "CRAFTY_SHIELD",
+            "TAILWIND",
+            "HAPPY_HOUR",
+            "SAFEGUARD",
+            "NO_CRIT",
+            "IMPRISON",
+            "ION_DELUGE",
+            "FIRE_GRASS_PLEDGE",
+            "WATER_FIRE_PLEDGE",
+            "GRASS_WATER_PLEDGE",
+            "FAIRY_LOCK",
+            "NEUTRALIZING_GAS",
+            "PENDING_HEAL",
+            "HOT_COALS",
+            "FOAMY_WEB",
+            "CREEPING_THORNS",
+            "ER_WEATHER_LOCK",
+            "ER_INFESTATION_TRAP",
+            "SEDIMENT_BLOOM",
+            "GRAVE_MARKER",
+            "ER_DRILL_BITS"
+          ]
+        },
+        {
+          "id": "stat",
+          "label": "Which stat goes up (Higher attack picks Attack or Sp. Atk, whichever is greater)",
+          "control": "select",
+          "default": "HIGHER_ATTACK",
+          "editable": true,
+          "options": [
+            "HIGHER_ATTACK",
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The stat only moves when I really enter (a simulated preview changes nothing)",
+        "A stat that is already at its limit does not move further",
+        "The number of stages (one) and the target (me) are fixed"
+      ],
+      "gateParams": [
+        {
+          "param": "arenaTag",
+          "block": "field.arena-tag",
+          "field": "tag"
+        }
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stat"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.post-summon-terrain-change",
       "className": "PostSummonTerrainChangeAbAttr",
       "label": "Set the terrain when I enter",
@@ -7492,6 +8339,52 @@
       "uses": 9
     },
     {
+      "id": "block.prevent-bypass-speed-chance",
+      "className": "PreventBypassSpeedChanceAbAttr",
+      "label": "Stop my chosen move from jumping the turn order",
+      "summary": "While the game checks whether my move may go first in its priority bracket (Quick Claw, Quick Draw), a move that meets your rule is not allowed to. Example: status moves never jump the queue.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.speed-bypass",
+      "whenLabel": "While the game decides if I jump the turn order",
+      "synonyms": [
+        "no quick claw",
+        "no quick draw",
+        "cannot jump the turn order",
+        "mycelium might",
+        "block the speed bypass",
+        "never move first by luck"
+      ],
+      "examples": [
+        "My status moves never get Quick Claw's turn order boost, like Mycelium Might"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": false,
+          "editable": false,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only when I chose to use a move this turn (not a switch, an item or a run)",
+        "Only changes anything when something would let me jump the turn order"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.prevent-item-use",
       "className": "PreventItemUseAbAttr",
       "label": "Stop my foes from using their held items",
@@ -7806,6 +8699,45 @@
       "uses": 9
     },
     {
+      "id": "block.reduce-berry-use-threshold",
+      "className": "ReduceBerryUseThresholdAbAttr",
+      "label": "Eat my pinch berries at twice the HP",
+      "summary": "The HP level at which my stat berries are eaten is doubled. Example: a Liechi Berry that waits for 25% HP is eaten at 50% HP.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.berry-threshold",
+      "whenLabel": "While the game checks if my berry should be eaten",
+      "synonyms": [
+        "gluttony",
+        "eat berry earlier",
+        "berry sooner",
+        "early berry",
+        "pinch berry",
+        "voracity",
+        "double berry threshold"
+      ],
+      "examples": [
+        "Eat my Liechi Berry at 50% HP instead of 25%, like Gluttony"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The doubling only counts while my HP is above the berry's normal level; right at that level (25%) the berry is not eaten early"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
       "id": "block.reduce-status-effect-duration",
       "className": "ReduceStatusEffectDurationAbAttr",
       "label": "Wake up from sleep faster",
@@ -7907,6 +8839,47 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.reflect-status-move",
+      "className": "ReflectStatusMoveAbAttr",
+      "label": "Bounce status moves back at the user",
+      "summary": "Status moves that can be bounced and are aimed at me are sent back at the foe who used them, as if I had used them. Example: a foe's Toxic is bounced back onto them.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.reflect-status-move",
+      "whenLabel": "While the game checks if a status move is bounced back",
+      "synonyms": [
+        "magic bounce",
+        "magic coat",
+        "reflect status moves",
+        "bounce back",
+        "send back status moves",
+        "duplicity",
+        "conjurer of deceit"
+      ],
+      "examples": [
+        "Status moves like Toxic and Stealth Rock are bounced back, like Magic Bounce"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only moves that can be bounced (marked as reflectable) and are status moves are sent back; a move that was itself bounced is never bounced again",
+        "A Pokemon that is in the middle of a semi-invulnerable move cannot bounce",
+        "Magic Coat, when active, is used instead of this"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 4
     },
     {
       "id": "block.reverse-drain",
@@ -8469,6 +9442,59 @@
       "uses": 3
     },
     {
+      "id": "block.super-effective-move-ability-bypass",
+      "className": "SuperEffectiveMoveAbilityBypassAbAttr",
+      "label": "My super effective moves ignore the target's ability",
+      "summary": "My super effective moves ignore the target's ability, so abilities that block or weaken them do not work. Needs a known target, otherwise nothing happens.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.ability-bypass",
+      "whenLabel": "While the game decides whether my move ignores abilities",
+      "synonyms": [
+        "deadly precision",
+        "weakness breaks abilities",
+        "super effective ignores ability",
+        "type advantage ignores ability",
+        "mold breaker on weakness",
+        "flawless precision",
+        "mach 3"
+      ],
+      "examples": [
+        "Super effective hits ignore the target's damage-cutting abilities, like Deadly Precision"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": false,
+          "editable": false,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Needs a known target; without one the bypass does not happen",
+        "Does nothing when something earlier already decided that abilities are ignored"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
       "id": "block.suppress-field-abilities-when-enraged",
       "className": "SuppressFieldAbilitiesWhenEnragedAbAttr",
       "label": "Switch off other Pokemon's abilities while I am enraged",
@@ -8666,6 +9692,164 @@
       "effect": {
         "id": "effect.inflict-status",
         "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.terrain-event-type-change",
+      "className": "TerrainEventTypeChangeAbAttr",
+      "label": "Change my type to match the terrain",
+      "summary": "On entry or a terrain change I become Electric (Electric Terrain), Fairy (Misty), Grass (Grassy), Psychic (Psychic); no terrain: my own types.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.terrain-changed",
+      "whenLabel": "When the terrain changes",
+      "synonyms": [
+        "mimicry",
+        "terrain type",
+        "become the terrain's type",
+        "type follows terrain",
+        "change type with terrain",
+        "terrain adaptation"
+      ],
+      "examples": [
+        "Become a Grass type on Grassy Terrain, like Mimicry"
+      ],
+      "params": [
+        {
+          "id": "electricType",
+          "label": "Type I become on Electric Terrain",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "mistyType",
+          "label": "Type I become on Misty Terrain",
+          "control": "select",
+          "default": "FAIRY",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "grassyType",
+          "label": "Type I become on Grassy Terrain",
+          "control": "select",
+          "default": "GRASS",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "psychicType",
+          "label": "Type I become on Psychic Terrain",
+          "control": "select",
+          "default": "PSYCHIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Also reacts when I enter the battle, not only when the terrain changes later (same block, no extra setting)",
+        "Does nothing while I am Terastallized: a Terastallized Pokemon keeps its type",
+        "On a terrain with no matching type (no terrain, or the Toxic terrain) I go back to the types I was born with, which also drops a type that Soak-like moves gave me"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "electricType",
+          "mistyType",
+          "grassyType",
+          "psychicType"
+        ]
       },
       "reusableAlone": {
         "when": true,
@@ -9282,6 +10466,60 @@
         "do": true
       },
       "uses": 1
+    },
+    {
+      "id": "block.weight-multiplier",
+      "className": "WeightMultiplierAbAttr",
+      "label": "Change my weight",
+      "summary": "My weight is multiplied by 2. Example: 2 makes me twice as heavy, 0.5 makes me half as heavy. Weight-based moves such as Heavy Slam and Low Kick read it.",
+      "tier": "C",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.weight",
+      "whenLabel": "While the game calculates my weight",
+      "synonyms": [
+        "heavy metal",
+        "light metal",
+        "heavier",
+        "lighter",
+        "weigh more",
+        "weigh less",
+        "body weight",
+        "lead coat"
+      ],
+      "examples": [
+        "Twice as heavy, like Heavy Metal",
+        "Half as heavy, like Light Metal"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Weight multiplier (2 = twice as heavy, 0.5 = half)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 0.1,
+          "max": 10,
+          "step": 0.1
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A Pokemon never weighs less than 0.1 kg, whatever the multiplier"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 6
     }
   ]
 }
