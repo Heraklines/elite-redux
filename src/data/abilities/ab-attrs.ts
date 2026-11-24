@@ -7162,11 +7162,25 @@ export class MoveAbilityBypassAbAttr extends AbAttr {
  * the bypass does not fire.
  */
 export class SuperEffectiveMoveAbilityBypassAbAttr extends MoveAbilityBypassAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: MoveAbilityBypassAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `guards` (the base class check: the bypass
+   * is not already decided and the constructor's per-move closure agrees), then `gate` (a foe is known and the move is
+   * super effective against it). There is no residual and there is no random draw.
+   */
   override canApply(params: MoveAbilityBypassAbAttrParams): boolean {
-    if (!super.canApply(params)) {
-      return false;
-    }
-    const { pokemon, move, target } = params;
+    return gatedCanApply<MoveAbilityBypassAbAttrParams>(this, params);
+  }
+
+  /** The base class check, kept first and unchanged. */
+  public guards(params: MoveAbilityBypassAbAttrParams): boolean {
+    return super.canApply(params);
+  }
+
+  /** The replaceable condition: a foe is known and the move is super effective against it (fails closed without one). */
+  public gate({ pokemon, move, target }: MoveAbilityBypassAbAttrParams): boolean {
     return target != null && target.getMoveEffectiveness(pokemon, move) > 1;
   }
 }
@@ -7361,13 +7375,39 @@ export class IgnoreTypeStatusEffectImmunityAbAttr extends AbAttr {
 
 /** Gives money to the user after the battle. */
 export class MoneyAbAttr extends PostBattleAbAttr {
-  override canApply({ simulated, victory }: PostBattleAbAttrParams): boolean {
-    // TODO: Consider moving the simulated check to the apply method
-    return !simulated && victory;
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostBattleAbAttrParams) => boolean) | undefined;
+
+  /** Share of this wave's prize money that is added to the pile (0.2 = 20%). */
+  private readonly bonusFraction: number;
+
+  /** @param bonusFraction - Share of the wave's prize money added after a win (default 0.2, Honey Gather). */
+  constructor(bonusFraction = 0.2) {
+    super(true);
+    this.bonusFraction = bonusFraction;
+  }
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order `!simulated && victory`: `guards` (never pay out in a
+   * simulated preview), then `gate` (the battle was won). There is no residual and there is no random draw.
+   */
+  override canApply(params: PostBattleAbAttrParams): boolean {
+    return gatedCanApply<PostBattleAbAttrParams>(this, params);
+  }
+
+  // TODO: Consider moving the simulated check to the apply method
+  /** Feasibility that stays in the class: a preview never pays out. */
+  public guards({ simulated }: PostBattleAbAttrParams): boolean {
+    return !simulated;
+  }
+
+  /** The replaceable condition: the battle that just ended was won. */
+  public gate({ victory }: PostBattleAbAttrParams): boolean {
+    return victory;
   }
 
   override apply(_params: PostBattleAbAttrParams): void {
-    globalScene.currentBattle.moneyScattered += globalScene.getWaveMoneyAmount(0.2);
+    globalScene.currentBattle.moneyScattered += globalScene.getWaveMoneyAmount(this.bonusFraction);
   }
 }
 
@@ -7400,9 +7440,29 @@ export class PostSummonStatStageChangeOnArenaAbAttr extends PostSummonStatStageC
     this.statResolver = statResolver;
   }
 
+  /**
+   * Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. Declared with
+   * `declare` so it is not an own field of ordinary instances (the runtime configuration snapshot ignores it).
+   */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1): `gate`, then `residual`, in the original clause order and with the
+   * original short-circuiting (there are no guards and no frame rewrite).
+   */
   override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The replaceable condition (library atom `field.arena-tag`, side holder-side): the tag is up on the holder's own side. */
+  public gate(params: AbAttrBaseParams): boolean {
     const side = params.pokemon.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY;
-    return (globalScene.arena.getTagOnSide(this.arenaTagType, side) ?? false) && super.canApply(params);
+    return Boolean(globalScene.arena.getTagOnSide(this.arenaTagType, side) ?? false);
+  }
+
+  /** What stays in the class: the parent's own check (always true today), kept in its original place after the gate. */
+  public residual(params: AbAttrBaseParams): boolean {
+    return super.canApply(params);
   }
 
   override apply(params: AbAttrBaseParams): void {
@@ -7581,11 +7641,23 @@ export class IllusionBreakAbAttr extends AbAttr {
 
 /** @sealed */
 export class PostDefendIllusionBreakAbAttr extends PostDefendAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
   override apply({ pokemon }: PostMoveInteractionAbAttrParams): void {
     pokemon.breakIllusion();
   }
 
-  override canApply({ pokemon, hitResult }: PostMoveInteractionAbAttrParams): boolean {
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `gate` (a damaging hit landed), then `residual`
+   * (there is a disguise to drop). No guards, no frame rewrite and no random draw.
+   */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the hit did damage (a miss, a block, a status move or indirect damage does not count). */
+  public gate({ hitResult }: PostMoveInteractionAbAttrParams): boolean {
     // TODO: I remember this or a derivative being declared elsewhere - merge the 2 into 1
     // and store it somewhere globally accessible
     const damagingHitResults: ReadonlySet<HitResult> = new Set([
@@ -7594,7 +7666,12 @@ export class PostDefendIllusionBreakAbAttr extends PostDefendAbAttr {
       HitResult.NOT_VERY_EFFECTIVE,
       HitResult.ONE_HIT_KO,
     ]);
-    return damagingHitResults.has(hitResult) && pokemon.summonData.illusion != null;
+    return damagingHitResults.has(hitResult);
+  }
+
+  /** What stays in the class: there is a disguise to drop. */
+  public residual({ pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    return pokemon.summonData.illusion != null;
   }
 }
 
@@ -7694,8 +7771,26 @@ export class PreventBypassSpeedChanceAbAttr extends AbAttr {
  * @sealed
  */
 export class TerrainEventTypeChangeAbAttr extends PostSummonAbAttr {
-  constructor() {
+  /** Type given on Electric Terrain (public so the ability studio can read it back). */
+  public readonly electricTerrainType: PokemonType;
+  /** Type given on Misty Terrain. */
+  public readonly mistyTerrainType: PokemonType;
+  /** Type given on Grassy Terrain. */
+  public readonly grassyTerrainType: PokemonType;
+  /** Type given on Psychic Terrain. */
+  public readonly psychicTerrainType: PokemonType;
+
+  constructor(
+    electricTerrainType: PokemonType = PokemonType.ELECTRIC,
+    mistyTerrainType: PokemonType = PokemonType.FAIRY,
+    grassyTerrainType: PokemonType = PokemonType.GRASS,
+    psychicTerrainType: PokemonType = PokemonType.PSYCHIC,
+  ) {
     super(true);
+    this.electricTerrainType = electricTerrainType;
+    this.mistyTerrainType = mistyTerrainType;
+    this.grassyTerrainType = grassyTerrainType;
+    this.psychicTerrainType = psychicTerrainType;
   }
 
   override canApply({ pokemon }: AbAttrBaseParams): boolean {
@@ -7721,16 +7816,16 @@ export class TerrainEventTypeChangeAbAttr extends PostSummonAbAttr {
     const typeChange: PokemonType[] = [];
     switch (currentTerrain) {
       case TerrainType.ELECTRIC:
-        typeChange.push(PokemonType.ELECTRIC);
+        typeChange.push(this.electricTerrainType);
         break;
       case TerrainType.MISTY:
-        typeChange.push(PokemonType.FAIRY);
+        typeChange.push(this.mistyTerrainType);
         break;
       case TerrainType.GRASSY:
-        typeChange.push(PokemonType.GRASS);
+        typeChange.push(this.grassyTerrainType);
         break;
       case TerrainType.PSYCHIC:
-        typeChange.push(PokemonType.PSYCHIC);
+        typeChange.push(this.psychicTerrainType);
         break;
       default:
         pokemon.getTypes(false, false, true).forEach(t => {
