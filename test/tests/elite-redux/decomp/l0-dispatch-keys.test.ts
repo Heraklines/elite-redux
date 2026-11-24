@@ -97,6 +97,18 @@ describe("L0 dispatch keys (Step 0 worklist)", () => {
   });
 });
 
+/**
+ * Elite Redux marker classes (they extend AbAttr directly and are not in the AbilityAttrs map). They are flag keys of
+ * while.active so that L0 finds them as the WHEN's class.
+ */
+const ER_MARKER_FLAG_KEYS: ReadonlySet<string> = new Set([
+  "BallRecoveryAbAttr",
+  "BiomeRevealBonusAbAttr",
+  "ExperienceGainMultiplierAbAttr",
+  "MoneyGainMultiplierAbAttr",
+  "MoveHpCostModifierAbAttr",
+]);
+
 describe("L0 WHEN registry", () => {
   it("has unique ids and no dispatch key claimed by two WHENs", () => {
     expect(new Set(WHEN_REGISTRY.map(when => when.id)).size).toBe(WHEN_REGISTRY.length);
@@ -120,6 +132,9 @@ describe("L0 WHEN registry", () => {
       );
       for (const key of keys) {
         if (when.baseClassOnly === true && key === when.dispatchKey) {
+          continue;
+        }
+        if (when.kind === "while-active" && ER_MARKER_FLAG_KEYS.has(key)) {
           continue;
         }
         expect(mapKeys.has(key), `${when.id}: ${key} is not an AbilityAttrs key`).toBe(true);

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "096ef32b703c2f",
+  "vocabularyHash": "12fab64b4871c9",
+  "hash": "175f92c6161aa7",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -83,6 +83,65 @@
       "uses": 21
     },
     {
+      "id": "block.ball-recovery",
+      "className": "BallRecoveryAbAttr",
+      "label": "Get back used balls after a battle",
+      "summary": "After a battle, the Pokeball, Great ball I threw come back to my bag. Example: Pokeball, Great ball returns both kinds.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "ball fetch",
+        "recover pokeballs",
+        "reuse balls",
+        "free balls",
+        "get balls back",
+        "catch refund"
+      ],
+      "examples": [
+        "After the fight, return the Poke Balls and Great Balls I used, like Ball Fetch"
+      ],
+      "params": [
+        {
+          "id": "balls",
+          "label": "Ball kinds returned (comma separated, at least one)",
+          "control": "text",
+          "default": "POKEBALL,GREAT_BALL",
+          "editable": true,
+          "options": [
+            "POKEBALL",
+            "GREAT_BALL",
+            "ULTRA_BALL",
+            "ROGUE_BALL",
+            "MASTER_BALL",
+            "LUXURY_BALL"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The list must name at least one ball kind",
+        "Each ball I used comes back only once, even when several party members have this",
+        "It works from anywhere in the party, even if the holder has fainted or is benched"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "balls"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.berserk-on-threshold",
       "className": "BerserkOnThresholdAbAttr",
       "label": "Raise my best attack once when a hit drops me to half HP",
@@ -124,6 +183,172 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.biome-reveal-bonus",
+      "className": "BiomeRevealBonusAbAttr",
+      "label": "Reveal extra biome choices on the world map",
+      "summary": "While a conscious party member has this, the world map shows 1 more biome destination. Example: 1 is one extra choice.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "anticipation",
+        "telepathy",
+        "wandering spirit",
+        "see more routes",
+        "reveal biomes",
+        "map vision",
+        "extra destinations"
+      ],
+      "examples": [
+        "Show one more biome to pick from on the map, like Anticipation"
+      ],
+      "params": [
+        {
+          "id": "count",
+          "label": "Extra biome choices shown (number)",
+          "control": "slider",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 5,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only party members that have not fainted count",
+        "The bonuses of all party members add up"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "count"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.experience-gain-multiplier",
+      "className": "ExperienceGainMultiplierAbAttr",
+      "label": "Gain more (or less) experience",
+      "summary": "While I have this, the experience points I receive are multiplied by 1.2. Example: 1.2 means 20% more experience.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "lucky wings",
+        "super luck",
+        "more exp",
+        "level up faster",
+        "experience boost",
+        "xp bonus",
+        "lucky egg"
+      ],
+      "examples": [
+        "Receive 20% more experience, like Super Luck"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Experience multiplier (1.2 = 20% more)",
+          "control": "number",
+          "default": 1.2,
+          "editable": true,
+          "min": 0.1,
+          "max": 5,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "It multiplies with any other experience bonus I have, and with other copies of itself"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.first-turn-direct-damage-multiplier",
+      "className": "FirstTurnDirectDamageMultiplierAbAttr",
+      "label": "Hit harder with damaging moves on my first turn out",
+      "summary": "On the first turn after I come in, my damaging moves have their power multiplied by 2. Example: 2 means double power.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "first turn boost",
+        "opening strike",
+        "demolitionist",
+        "readied action",
+        "power up on entry",
+        "hit hard on arrival",
+        "double power first turn"
+      ],
+      "examples": [
+        "Double the power of my attacks on my first turn out, like Demolitionist"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (2 = double, 0.5 = half)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 0.05,
+          "max": 8,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.float",
@@ -309,6 +534,126 @@
       "uses": 1
     },
     {
+      "id": "block.money-gain-multiplier",
+      "className": "MoneyGainMultiplierAbAttr",
+      "label": "Earn more (or less) prize money after battles",
+      "summary": "If I am on the field when a battle ends, the prize money is multiplied by 1.2. Example: 1.2 means 20% more money.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "good as gold",
+        "more money",
+        "prize money boost",
+        "pay day",
+        "gold",
+        "cash bonus",
+        "amulet coin"
+      ],
+      "examples": [
+        "Win 20% more prize money when I am out at the end of the fight, like Good as Gold"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Prize money multiplier (1.2 = 20% more)",
+          "control": "number",
+          "default": 1.2,
+          "editable": true,
+          "min": 0.1,
+          "max": 5,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "I must be on the player's field and not fainted when the battle ends",
+        "The bonuses of every Pokemon on the field multiply together"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.move-hp-cost-modifier",
+      "className": "MoveHpCostModifierAbAttr",
+      "label": "Change how much HP a substitute move costs me",
+      "summary": "While I have this, Shed tail costs me 0.33 of my max HP instead of the usual share. Example: 0.33 is a third.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "shed skin",
+        "cheaper substitute",
+        "shed tail cost",
+        "hp cost",
+        "substitute cost",
+        "less hp to make a decoy"
+      ],
+      "examples": [
+        "Shed Tail only costs a third of my max HP, like Shed Skin"
+      ],
+      "params": [
+        {
+          "id": "moves",
+          "label": "Moves whose cost changes (comma separated; only Substitute and Shed Tail pay an HP cost)",
+          "control": "text",
+          "default": "SHED_TAIL",
+          "editable": true,
+          "options": [
+            "SUBSTITUTE",
+            "SHED_TAIL"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "fraction",
+          "label": "New cost (share of max HP: 0.25 = a quarter, 0.33 = a third)",
+          "control": "number",
+          "default": 0.3333333333333333,
+          "editable": true,
+          "min": 0.01,
+          "max": 1,
+          "step": 0.01,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only the moves that make a substitute (Substitute, Shed Tail) ask for this cost",
+        "If several of my abilities change the same move's cost, the last one wins"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "moves",
+          "fraction"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.post-damage-force-switch",
       "className": "PostDamageForceSwitchAbAttr",
       "label": "Switch out when my HP gets low",
@@ -463,6 +808,52 @@
       "uses": 9
     },
     {
+      "id": "block.post-defend-suppress-first-innate",
+      "className": "PostDefendSuppressFirstInnateAbAttr",
+      "label": "Disable the attacker's first extra ability on contact",
+      "summary": "When a foe hits me with a move that makes contact, its first extra ability stops working until it switches out. Foes with a Mummy-style ability are spared.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "mummy",
+        "lingering aroma",
+        "lingering musk",
+        "disable innate",
+        "shut off passive",
+        "contact curse"
+      ],
+      "examples": [
+        "Turn off the first extra ability of anything that makes contact with me, like Mummy"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The attacker must have an active first extra ability to disable; otherwise nothing happens",
+        "Nothing is disabled while the game is only previewing"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
       "id": "block.post-summon-copy-ability",
       "className": "PostSummonCopyAbilityAbAttr",
       "label": "Copy a foe's ability when I enter",
@@ -563,6 +954,84 @@
         "do": true
       },
       "uses": 7
+    },
+    {
+      "id": "block.provenance-bypass-speed-chance",
+      "className": "ProvenanceBypassSpeedChanceAbAttr",
+      "label": "Sometimes jump ahead in the turn order",
+      "summary": "30% chance each turn, when I choose a damaging move, to move before others of the same priority. Example: 30 is about one turn in three.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.speed-bypass",
+      "whenLabel": "While the game decides if I jump the turn order",
+      "synonyms": [
+        "quick draw",
+        "minigun",
+        "quick claw",
+        "move first",
+        "jump the queue",
+        "go first sometimes",
+        "speed jump"
+      ],
+      "examples": [
+        "30% chance to move first when I pick an attack, like Quick Draw"
+      ],
+      "params": [
+        {
+          "id": "chance",
+          "label": "Chance each turn (%)",
+          "control": "slider",
+          "default": 30,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "memoName",
+          "label": "Turn memo name that other abilities look for (leave as is)",
+          "control": "text",
+          "default": "quick-draw:proc",
+          "editable": false,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "rng.chance",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Nothing is rolled while the game is only previewing the turn order",
+        "I must have chosen a damaging (physical or special) move this turn; the chance is still rolled for a status move",
+        "I must not already have the speed jump this turn"
+      ],
+      "gateParams": [
+        {
+          "param": "chance",
+          "block": "rng.chance",
+          "field": "pct"
+        }
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "memoName"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.received-move-damage-multiplier",

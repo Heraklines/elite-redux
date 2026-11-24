@@ -1721,15 +1721,20 @@
       "flagKeys": [
         "AlwaysHitAbAttr",
         "BadDreamsImmunityAbAttr",
+        "BallRecoveryAbAttr",
+        "BiomeRevealBonusAbAttr",
         "BlockRedirectAbAttr",
         "BugPowderImmunityAbAttr",
         "DoubleSelfInflictedDamageAbAttr",
         "DrenchImmunityAbAttr",
+        "ExperienceGainMultiplierAbAttr",
         "FloatAbAttr",
         "IgnoreContactAbAttr",
         "IgnoreGenderInfatuationAbAttr",
         "IgnoreProtectByFlagAbAttr",
         "IgnoreProtectOnContactAbAttr",
+        "MoneyGainMultiplierAbAttr",
+        "MoveHpCostModifierAbAttr",
         "OverruleCritAbAttr",
         "SpreadTargetByFlagAbAttr",
         "StealthRockImmunityAbAttr",
@@ -5022,5 +5027,5 @@
       ]
     }
   ],
-  "hash": "1264fa83dbcdc7"
+  "hash": "12fab64b4871c9"
 }

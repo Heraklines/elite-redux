@@ -5,6 +5,7 @@
  */
 
 import { PostDefendAbAttr } from "#abilities/ab-attrs";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { suppressInnateSlotUntilSwitch } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import { AbilityId } from "#enums/ability-id";
 import { MoveFlags } from "#enums/move-flags";
@@ -21,12 +22,25 @@ export function hasMummyFamilyAbility(pokemon: PostMoveInteractionAbAttrParams["
  * innate for only the lifetime of its current summon.
  */
 export class PostDefendSuppressFirstInnateAbAttr extends PostDefendAbAttr {
-  override canApply({ pokemon, opponent: attacker, move }: PostMoveInteractionAbAttrParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): `gate` then `residual`, in the original clause order (no guards). */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The replaceable conditions: a contact move, and the attacker is not a Mummy-family holder. */
+  public gate({ pokemon, opponent: attacker, move }: PostMoveInteractionAbAttrParams): boolean {
     return (
       move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
       && !hasMummyFamilyAbility(attacker)
-      && attacker.getActiveAbilitySources().some(source => source.passive && source.passiveSlot === 0)
     );
+  }
+
+  /** Feasibility that stays in the class: the attacker really has an active first innate to disable. */
+  public residual({ opponent: attacker }: PostMoveInteractionAbAttrParams): boolean {
+    return attacker.getActiveAbilitySources().some(source => source.passive && source.passiveSlot === 0);
   }
 
   override apply({ opponent: attacker, simulated }: PostMoveInteractionAbAttrParams): void {

@@ -373,4 +373,6 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     power: new NumberHolder(ctx.move.power),
     simulated: false,
   }),
+  // B18 chunk 1. The turn-order jump check hands over only the holder (BypassSpeedChanceAbAttr: pokemon, simulated).
+  "calc.speed-bypass": ({ holder }) => ({ pokemon: holder, simulated: false }),
 };
