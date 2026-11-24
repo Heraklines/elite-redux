@@ -102,6 +102,7 @@ describe("L0 dispatch keys (Step 0 worklist)", () => {
  * while.active so that L0 finds them as the WHEN's class.
  */
 const ER_MARKER_FLAG_KEYS: ReadonlySet<string> = new Set([
+  "AbilityStudioRuntimeCapabilityAbAttr",
   "BallRecoveryAbAttr",
   "BiomeRevealBonusAbAttr",
   "ExperienceGainMultiplierAbAttr",

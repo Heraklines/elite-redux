@@ -505,12 +505,34 @@ export class OnceLowHpStatRaiseAbAttr extends PostDefendAbAttr {
     super(true);
   }
 
-  override canApply({ pokemon, opponent, move, damage }: PostMoveInteractionAbAttrParams): boolean {
-    if (pokemon.waveData.entryEffectsFired.has(this.key) || move.category === MoveCategory.STATUS) {
-      return false;
-    }
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1). The old `canApply` was: the once-per-wave key is already set, or the move is a status
+   * move (false), then `isOpponent(opponent) && hp <= threshold && hp + damage > threshold`, where
+   * `threshold = max(1, floor(maxHp * this.threshold))`. Every clause is a pure read (no draw, no write), so the three first
+   * clauses form the replaceable gate in the old order and the HP line crossing is the residual, still last as before.
+   * The crossing stays in the class only because the library has no `hp.crossed-below` rounding with a minimum of 1
+   * (request R-B18-30); once it exists the crossing moves into the gate.
+   */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The replaceable conditions, in the old order: not used up yet this wave, a damaging move, from an opponent. */
+  public gate({ pokemon, opponent, move }: PostMoveInteractionAbAttrParams): boolean {
+    return (
+      !pokemon.waveData.entryEffectsFired.has(this.key)
+      && move.category !== MoveCategory.STATUS
+      && pokemon.isOpponent(opponent)
+    );
+  }
+
+  /** The hit took my HP down to the line (at or below it, from above it). Moved verbatim from the old `canApply`. */
+  public residual({ pokemon, damage }: PostMoveInteractionAbAttrParams): boolean {
     const hpThreshold = Math.max(1, Math.floor(pokemon.getMaxHp() * this.threshold));
-    return pokemon.isOpponent(opponent) && pokemon.hp <= hpThreshold && pokemon.hp + damage > hpThreshold;
+    return pokemon.hp <= hpThreshold && pokemon.hp + damage > hpThreshold;
   }
 
   override apply({ pokemon, simulated }: PostMoveInteractionAbAttrParams): void {
@@ -575,10 +597,31 @@ export class OnDirectFaintRetaliationAbAttr extends PostFaintAbAttr {
     super(false);
   }
 
-  override canApply({ pokemon, attacker, move }: PostFaintAbAttrParams): boolean {
-    return (
-      !!attacker && !!move && move.category !== MoveCategory.STATUS && attacker !== pokemon && !attacker.isFainted()
-    );
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostFaintAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1). The old `canApply` was one expression, in this order: an attacker exists, a move
+   * exists (the guard: without them nothing knocked me out), the move is not a status move, the attacker is not me (the gate),
+   * the attacker has not fainted (the residual: there is still somebody to affect). Every clause is a pure read.
+   */
+  override canApply(params: PostFaintAbAttrParams): boolean {
+    return gatedCanApply<PostFaintAbAttrParams>(this, params);
+  }
+
+  /** Something knocked me out: there is an attacker and a move. Moved verbatim from the old `canApply`. */
+  public guards({ attacker, move }: PostFaintAbAttrParams): boolean {
+    return !!attacker && !!move;
+  }
+
+  /** The replaceable conditions, in the old order: the move deals damage, the attacker is not myself. */
+  public gate({ pokemon, attacker, move }: PostFaintAbAttrParams): boolean {
+    return move !== undefined && move.category !== MoveCategory.STATUS && attacker !== pokemon;
+  }
+
+  /** Feasibility: the Pokemon that knocked me out is still standing. Moved verbatim from the old `canApply`. */
+  public residual({ attacker }: PostFaintAbAttrParams): boolean {
+    return attacker !== undefined && !attacker.isFainted();
   }
 
   override apply({ attacker, simulated }: PostFaintAbAttrParams): void {
@@ -596,9 +639,9 @@ export class OnDirectFaintRetaliationAbAttr extends PostFaintAbAttr {
 
 export interface ChanceStealHeldItemOptions {
   readonly chance: number;
-  readonly berryOnly?: boolean;
-  readonly contactRequired?: boolean;
-  readonly moveIds?: readonly MoveId[];
+  readonly berryOnly?: boolean | undefined;
+  readonly contactRequired?: boolean | undefined;
+  readonly moveIds?: readonly MoveId[] | undefined;
 }
 
 /** Chance-gated item theft with optional berry/contact/move filters. */
@@ -613,10 +656,37 @@ export class ChancePostAttackStealHeldItemAbAttr extends PostAttackStealHeldItem
         || (target != null && move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user, target }))
       );
     });
+    // Every option key is kept, `undefined` when it was not given: the ability studio rebuilds this class from named settings, and a
+    // rebuild must not look different from an original that simply left a key out. The closure above reads the object it was given.
+    this.options = {
+      chance: options.chance,
+      berryOnly: options.berryOnly,
+      contactRequired: options.contactRequired,
+      moveIds: options.moveIds,
+    };
   }
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1). The old `canApply` was `(simulated || randBattleSeedInt(100) < chance) && super.canApply`:
+   * the chance roll first (the one draw of this clause, never while simulated), then the inherited rules. The roll is the gate; the
+   * inherited rules (a damaging move, not simulated, the hit dealt damage, the move and contact filters built from `options`, and
+   * the choice of a random transferable item, which draws a second number) are the residual, unchanged and still last.
+   */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    return (params.simulated || params.pokemon.randBattleSeedInt(100) < this.options.chance) && super.canApply(params);
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the chance roll. Moved verbatim from the old `canApply`. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    return params.simulated || params.pokemon.randBattleSeedInt(100) < this.options.chance;
+  }
+
+  /** The inherited rules, unchanged: they stay in the parent classes and run after the roll, as before. */
+  public residual(params: PostMoveInteractionAbAttrParams): boolean {
+    return super.canApply(params);
   }
 
   override getTargetHeldItems(target: Pokemon): PokemonHeldItemModifier[] {

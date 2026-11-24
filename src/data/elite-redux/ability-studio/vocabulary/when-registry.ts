@@ -970,6 +970,7 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     kind: "while-active",
     dispatchKey: null,
     flagKeys: [
+      "AbilityStudioRuntimeCapabilityAbAttr",
       "AlwaysHitAbAttr",
       "BadDreamsImmunityAbAttr",
       "BallRecoveryAbAttr",

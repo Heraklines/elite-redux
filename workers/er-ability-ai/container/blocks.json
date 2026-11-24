@@ -1,8 +1,140 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "12fab64b4871c9",
-  "hash": "1b6097b53204b9",
+  "vocabularyHash": "0db2a56e8a49b8",
+  "hash": "095468c9878833",
   "blocks": [
+    {
+      "id": "block.ability-studio-runtime-capability",
+      "className": "AbilityStudioRuntimeCapabilityAbAttr",
+      "label": "The game treats me as playing a certain role",
+      "summary": "While I have this, the game lets me play this role in its own rules: Skip the charge turn of charging moves. Pick the sentence that says what should happen.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "built-in game rule",
+        "runtime effect",
+        "hidden mechanic",
+        "special game rule",
+        "like levitate",
+        "like klutz",
+        "game rule flag",
+        "copy a built-in mechanic"
+      ],
+      "examples": [
+        "Float above the ground, like Levitate",
+        "Make my held item do nothing, like Klutz",
+        "Moonlight restores at least 75% of max HP"
+      ],
+      "params": [
+        {
+          "id": "capability",
+          "label": "Which game rule I take part in",
+          "control": "select",
+          "default": "Skip the charge turn of charging moves",
+          "editable": true,
+          "options": [
+            "Skip the charge turn of charging moves",
+            "Rewrite Tackle, Poison Sting, Electroweb and Bug Bite",
+            "Treat Ice weather rules as if hail or snow were active",
+            "Burned Pokemon fail their action one time in three",
+            "Burned Pokemon take 33% more damage",
+            "Weather Ball, solar moves, Growth and recovery moves act as in sun",
+            "Suppress other Pokemon that know a Dark move",
+            "Change Deoxys form to match the move it picks",
+            "Each extra hit of Minion Control deals 10% damage",
+            "Moonlight restores at least 75% of max HP",
+            "Abilities and moves act as in sun during Grassy Terrain",
+            "Remove the same-type bonus (STAB) of every other Pokemon",
+            "Block using the same sleep move twice in a row",
+            "Sleep moves work like Yawn and last one turn",
+            "Swap both Pokemon out before a hit would knock me out",
+            "Pass my held item to an ally that just lost its item",
+            "Roar of Time has 100 power, normal priority and no forced switch",
+            "Every Pokemon counts as Food for Sugar Rush",
+            "Sugar Rush deals double damage to Poison types",
+            "Reverse Dark Aura and Fairy Aura (like Aura Break)",
+            "Change into the Battle Bond form (like Battle Bond)",
+            "Raise my better attacking stat when I get confused or enraged (like Berserk)",
+            "Count as asleep without a status (like Comatose)",
+            "Hide inside an ally Dondozo and skip my turn (like Commander)",
+            "Strengthen Dark moves for everyone on the field (like Dark Aura)",
+            "Strengthen Fairy moves for everyone on the field (like Fairy Aura)",
+            "Change Cherrim form with the weather (like Flower Gift)",
+            "Change Castform form with the weather (like Forecast)",
+            "Gulp up a prey with Surf or Dive (like Gulp Missile)",
+            "Raise Attack while I have a status condition (like Guts)",
+            "Count as extra heavy (like Heavy Metal)",
+            "Block a hit with an ice face and change form (like Ice Face)",
+            "Cancel the accuracy loss in dark places (like Illuminate)",
+            "Make my held item do nothing (like Klutz)",
+            "Float above the ground (like Levitate)",
+            "Take the type of the terrain (like Mimicry)",
+            "Team up with a Plus Pokemon for a boost (like Minus)",
+            "Change form with the held plate (like Multitype)",
+            "My type cannot be changed (like Multitype)",
+            "Immune to powder moves (like Overcoat)",
+            "Team up with a Minus Pokemon for a boost (like Plus)",
+            "Heal instead of losing HP to poison (like Poison Heal)",
+            "My status moves fail against Dark types (like Prankster)",
+            "Get a boost from sun or a Booster Energy item (like Protosynthesis)",
+            "Get a boost from Electric Terrain or a Booster Energy item (like Quark Drive)",
+            "Be hit by the Quick Draw double-power bonus (like Quick Draw)",
+            "Change form with the held memory (like Silvally's ability)",
+            "My type cannot be changed (like Silvally's ability)",
+            "Let enemy move choices treat me like Sand Force",
+            "Immune to Shadow-style trapping (like the trapping ability itself)",
+            "Skip Life Orb recoil on moves with extra effects (like Sheer Force)",
+            "Let enemy move choices treat me like Snow Warning",
+            "Let enemy move choices treat me like Solar Power",
+            "Change between attack and defense stances (like Stance Change)",
+            "Keep the field safe from Toxic Terrain damage (like Stench)",
+            "Loaf around every other turn (like Truant)",
+            "My Speed is never lowered by stat stages (like Unburden)",
+            "Swap abilities with an attacker that makes contact (like Wandering Spirit)",
+            "Become charged when Tailwind starts (like Wind Power)",
+            "Raise Attack when Tailwind starts (like Wind Rider)",
+            "Can be caught while boss shield bars remain (like Wonder Guard)",
+            "Have exactly 1 max HP (like Wonder Guard on Shedinja)"
+          ]
+        },
+        {
+          "id": "componentLabel",
+          "label": "Name shown for this rule in the editor",
+          "control": "text",
+          "default": "Direct runtime effect",
+          "editable": true
+        },
+        {
+          "id": "momentId",
+          "label": "Internal name of the moment this rule is read (set by the game)",
+          "control": "text",
+          "default": "runtime-effect",
+          "editable": false
+        },
+        {
+          "id": "momentLabel",
+          "label": "Sentence shown for the moment this rule is read",
+          "control": "text",
+          "default": "While the game checks this rule",
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The game reads this by asking which role a Pokemon plays, so nothing is dispatched and no condition can switch it on or off on its own",
+        "When a composed rule restricts it to a trigger, it only counts for Pokemon that the trigger has marked"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 23
+    },
     {
       "id": "block.ally-higher-stat-multiplier",
       "className": "AllyHigherStatMultiplierAbAttr",
@@ -546,6 +678,102 @@
         "do": true
       },
       "uses": 2
+    },
+    {
+      "id": "block.chance-post-attack-steal-held-item",
+      "className": "ChancePostAttackStealHeldItemAbAttr",
+      "label": "Chance to steal an item after my attack hits",
+      "summary": "After my damaging attack hits, 30% chance to steal one of the target's items (berries only: no; contact needed: no; only these moves: any).",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "steal item on hit",
+        "thief",
+        "pickpocket",
+        "steal a berry",
+        "take the target's item",
+        "gluttony steal",
+        "low blow",
+        "cheap tactics"
+      ],
+      "examples": [
+        "30% chance to steal a berry when I hit with a contact move, like Gluttony",
+        "30% chance to steal the target's item when I use Scratch, like Cheap Tactics"
+      ],
+      "params": [
+        {
+          "id": "chance",
+          "label": "Chance to steal (%, 1-99)",
+          "control": "slider",
+          "default": 30,
+          "editable": true,
+          "min": 1,
+          "max": 99,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "berryOnly",
+          "label": "Only berries can be stolen",
+          "control": "boolean",
+          "default": false,
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "contactRequired",
+          "label": "Only moves that make contact can steal",
+          "control": "boolean",
+          "default": false,
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "moveIds",
+          "label": "Only these moves can steal (comma separated move names, empty = any move)",
+          "control": "text",
+          "default": "",
+          "editable": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "rng.chance",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must have dealt damage (a status move, or a hit that did nothing, never steals)",
+        "Nothing happens when the game only previews the hit",
+        "The target must hold an item that can be taken and I must be able to carry it; the item is picked at random"
+      ],
+      "gateParams": [
+        {
+          "param": "chance",
+          "block": "rng.chance",
+          "field": "pct"
+        }
+      ],
+      "effect": {
+        "id": "effect.steal-item",
+        "params": [
+          "berryOnly"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
     },
     {
       "id": "block.experience-gain-multiplier",
@@ -1398,6 +1626,83 @@
       "uses": 1
     },
     {
+      "id": "block.move-flag-immunity",
+      "className": "MoveFlagImmunityAbAttr",
+      "label": "Be immune to moves with certain properties",
+      "summary": "Moves with any of these properties do nothing to me: Ball and bomb moves, Throwing moves. Example: ball and bomb moves and throwing moves, like Ball Fetch.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-immunity",
+      "whenLabel": "While the game checks whether a move can hit me",
+      "synonyms": [
+        "ball fetch",
+        "bulletproof",
+        "immune to ball moves",
+        "immune to throwing moves",
+        "block moves by property",
+        "immune to sound moves",
+        "no damage from certain moves"
+      ],
+      "examples": [
+        "Ball and bomb moves and throwing moves do nothing to me, like Ball Fetch",
+        "Sound moves do nothing to me"
+      ],
+      "params": [
+        {
+          "id": "flags",
+          "label": "Move properties I block (comma separated, any one is enough)",
+          "control": "text",
+          "default": "Ball and bomb moves, Throwing moves",
+          "editable": true,
+          "options": [
+            "Contact moves",
+            "Sound moves",
+            "Biting moves",
+            "Pulse moves",
+            "Punching moves",
+            "Slicing moves",
+            "Reckless moves",
+            "Ball and bomb moves",
+            "Powder moves",
+            "Dance moves",
+            "Wind moves",
+            "Triage moves",
+            "Air and wing moves",
+            "Arrow moves",
+            "Bone moves",
+            "Drill moves",
+            "Field moves",
+            "Hammer moves",
+            "Horn moves",
+            "Kicking moves",
+            "Lunar moves",
+            "Throwing moves",
+            "Weather moves"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Nothing is blocked when another immunity has already blocked the move",
+        "The game also checks these properties on its own while it works out move matchups, so the block does not depend on the trigger alone",
+        "A move only counts if it really carries the property (properties that other abilities hand to moves are not counted)"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": [
+          "flags"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.move-hp-cost-modifier",
       "className": "MoveHpCostModifierAbAttr",
       "label": "Change how much HP a substitute move costs me",
@@ -1459,6 +1764,177 @@
       "reusableAlone": {
         "when": true,
         "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.on-direct-faint-retaliation",
+      "className": "OnDirectFaintRetaliationAbAttr",
+      "label": "Hit back at the foe that knocked me out with a move",
+      "summary": "When a foe's damaging move knocks me out and the foe is still standing, I get back at it: stop it using the same move twice in a row. Example: Ill Will, Tummyache.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.faint",
+      "whenLabel": "When I faint",
+      "synonyms": [
+        "ill will",
+        "tummyache",
+        "revenge when fainted",
+        "curse the attacker",
+        "gastro acid on faint",
+        "torment on faint",
+        "take away its ability when knocked out"
+      ],
+      "examples": [
+        "When I am knocked out by a move, the foe cannot use the same move twice in a row, like Ill Will",
+        "When I am knocked out by a move, the foe's ability stops working, like Tummyache"
+      ],
+      "params": [
+        {
+          "id": "retaliation",
+          "label": "What happens to the foe that knocked me out",
+          "control": "select",
+          "default": "Stop it using the same move twice in a row",
+          "editable": true,
+          "options": [
+            "Stop it using the same move twice in a row",
+            "Switch off its ability"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A foe and its move must have knocked me out (nothing happens after poison, weather or recoil)",
+        "The foe that knocked me out must still be standing",
+        "Nothing happens when the game only previews the faint"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "retaliation"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.once-low-hp-stat-raise",
+      "className": "OnceLowHpStatRaiseAbAttr",
+      "label": "Raise stats once per wave when a hit drops me to low HP",
+      "summary": "Once per wave, the foe's damaging hit that takes my HP to 10% or lower raises Attack, Sp. Atk, Speed by 2 stages. Example: 10%, +2, like Defeatist.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "defeatist comeback",
+        "boost at low hp",
+        "last stand",
+        "once per wave boost",
+        "comeback",
+        "power up when nearly down",
+        "raise stats when almost fainting"
+      ],
+      "examples": [
+        "Raise Attack, Sp. Atk and Speed by two stages the first time a hit drops me to 10% HP, like Defeatist",
+        "Once per battle, a hit that takes me to a quarter HP boosts my Defense by one stage"
+      ],
+      "params": [
+        {
+          "id": "key",
+          "label": "Name of the once-per-wave record (use a different name for each rule)",
+          "control": "text",
+          "default": "requested:defeatist:ten-percent-comeback",
+          "editable": true
+        },
+        {
+          "id": "threshold",
+          "label": "HP line (% of max HP, 10 = ten percent)",
+          "control": "number",
+          "default": 10,
+          "editable": true,
+          "min": 1,
+          "max": 99,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "stats",
+          "label": "Stats that rise (comma separated: Attack, Defense, Sp. Atk, Sp. Def, Speed, Accuracy, Evasion)",
+          "control": "text",
+          "default": "Attack, Sp. Atk, Speed",
+          "editable": true,
+          "options": [
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Sp. Def",
+            "Speed",
+            "Accuracy",
+            "Evasion"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "stages",
+          "label": "Number of stages each stat rises (1-6)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "My HP must have just dropped to the line or below from above it (checked by the game itself until the library can express its exact rounding, which never lets the line fall below 1 HP)",
+        "Nothing happens when the game only previews the hit"
+      ],
+      "gateParams": [
+        {
+          "param": "key",
+          "block": "time.once-per",
+          "field": "key"
+        }
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stats",
+          "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
         "do": true
       },
       "uses": 1
@@ -1812,6 +2288,73 @@
       "uses": 1
     },
     {
+      "id": "block.post-summon-snow-cloak-aurora-veil",
+      "className": "PostSummonSnowCloakAuroraVeilAbAttr",
+      "label": "Put a lasting field effect on my side when I enter",
+      "summary": "When I enter the battle, my side gets Aurora veil with no turn limit and I become its owner; one already there is replaced. Example: Aurora Veil in hail or snow, like Snow Cloak.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "snow cloak",
+        "aurora veil on entry",
+        "set a screen when entering",
+        "permanent screen",
+        "veil in hail",
+        "lasting aurora veil",
+        "screen that ends with the weather"
+      ],
+      "examples": [
+        "When I enter in hail or snow, my side gets an Aurora Veil that lasts until the weather ends, like Snow Cloak",
+        "When I enter, my side gets a lasting Light Screen"
+      ],
+      "params": [
+        {
+          "id": "tag",
+          "label": "Field effect set on my side",
+          "control": "select",
+          "default": "AURORA_VEIL",
+          "editable": false,
+          "options": [
+            "AURORA_VEIL",
+            "REFLECT",
+            "LIGHT_SCREEN",
+            "TAILWIND",
+            "MIST",
+            "SAFEGUARD"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens when the game only previews the entry",
+        "A field effect of that kind already on my side is replaced, so the new one belongs to me",
+        "The field effect has no turn count; the game ends an Aurora Veil like this when hail or snow ends"
+      ],
+      "effect": {
+        "id": "effect.arena-tag",
+        "params": [
+          "tag"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
       "id": "block.post-summon-weather-change",
       "className": "PostSummonWeatherChangeAbAttr",
       "label": "Set the weather when I enter",
@@ -1936,6 +2479,65 @@
         "do": true
       },
       "uses": 1
+    },
+    {
+      "id": "block.pre-leave-field-remove-snow-cloak-aurora-veil",
+      "className": "PreLeaveFieldRemoveSnowCloakAuroraVeilAbAttr",
+      "label": "Remove the lasting field effect I made when I leave",
+      "summary": "When I leave the field, the Aurora veil I made on my side (the one with no turn limit) ends. One that came from a move stays. Example: Aurora Veil, like Snow Cloak.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.leave-field",
+      "whenLabel": "When I leave the field",
+      "synonyms": [
+        "snow cloak",
+        "remove my aurora veil",
+        "veil ends when i leave",
+        "clean up my screen",
+        "remove my field effect on exit",
+        "lasting screen ends with me"
+      ],
+      "examples": [
+        "When I leave the field, the lasting Aurora Veil I made on my side ends, like Snow Cloak",
+        "When I switch out, my side's lasting Light Screen ends"
+      ],
+      "params": [
+        {
+          "id": "tag",
+          "label": "Field effect that ends on my side",
+          "control": "select",
+          "default": "AURORA_VEIL",
+          "editable": true,
+          "options": [
+            "AURORA_VEIL",
+            "REFLECT",
+            "LIGHT_SCREEN",
+            "TAILWIND",
+            "MIST",
+            "SAFEGUARD"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only a field effect that I made myself and that has no turn limit is removed; one from a move, or another Pokemon's, stays",
+        "Nothing happens while the game is only previewing",
+        "Only my own side loses the field effect"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "tag"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.provenance-bypass-speed-chance",
@@ -2292,6 +2894,92 @@
         "id": "effect.package",
         "params": [
           "immuneTypes"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.type-immunity-higher-defense-stat-raise",
+      "className": "TypeImmunityHigherDefenseStatRaiseAbAttr",
+      "label": "Absorb one move type and raise my better defense",
+      "summary": "Moves of the Water type do nothing to me, and my higher defensive stat (Defense or Sp. Def) goes up by 1. Example: Water, 1 stage, like Rain Dish.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-immunity",
+      "whenLabel": "While the game checks whether a move can hit me",
+      "synonyms": [
+        "rain dish absorb",
+        "water absorb and defense",
+        "immune and raise defense",
+        "absorb and boost defense",
+        "type absorb",
+        "immunity with a defense boost",
+        "bulk up on absorb"
+      ],
+      "examples": [
+        "Water moves do nothing to me and my higher defensive stat rises by one stage, like Rain Dish",
+        "Fire moves do nothing to me and my better defense goes up two stages"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Move type I absorb",
+          "control": "select",
+          "default": "WATER",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "stages",
+          "label": "Number of stages my higher defensive stat rises (1-6)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 6,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Moves that hit every Pokemon or a whole side (Spikes, Rain Dance) are never absorbed",
+        "A Pokemon never absorbs its own move",
+        "The higher defensive stat is picked from the raw stats, ignoring stat stages; Defense wins a tie",
+        "Nothing is raised when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.immune-to-type",
+        "params": [
+          "type",
+          "stages"
         ]
       },
       "reusableAlone": {

@@ -188,3 +188,53 @@ bindLegacyClosure(
   `${highestStatReason}; for the ally class the compared stats belong to the receiving ally and the frame has no slot for it`,
   "gate",
 ); // AllyHigherStatMultiplierAbAttr, Defense and Sp. Def of the ally
+
+// =============================================================================================
+// CHUNK 4. Tier B gates of OnceLowHpStatRaiseAbAttr, OnDirectFaintRetaliationAbAttr, ChancePostAttackStealHeldItemAbAttr and
+// PostSummonSnowCloakAuroraVeilAbAttr. The other four classes of the chunk need no binding: TypeImmunityHigherDefenseStatRaiseAbAttr and
+// MoveFlagImmunityAbAttr (Tier A, no closure slot: the parent's condition is always null and the property list is a setting),
+// PreLeaveFieldRemoveSnowCloakAuroraVeilAbAttr (Tier C, no condition slot) and AbilityStudioRuntimeCapabilityAbAttr (a flag, never dispatched).
+// Every gate is read by hand from the class source in the class's own clause order.
+// =============================================================================================
+
+// OnceLowHpStatRaiseAbAttr (Tier B). Slot "gate", in the class's own order:
+//   !pokemon.waveData.entryEffectsFired.has(key)  &&  move.category !== STATUS  &&  pokemon.isOpponent(opponent)
+// The HP line (`max(1, floor(maxHp * threshold))` crossed by this hit) is the class's residual (request R-B18-30). The memory key is repeated
+// in time.once-per (gateParams keeps it in step); the class's apply writes the very same key into the same wave Set.
+bindCondition(
+  129,
+  2,
+  {
+    all: [
+      { id: "time.once-per", scope: "wave", key: "requested:defeatist:ten-percent-comeback" },
+      { id: "move.damaging" },
+      { id: "side.is", kind: "foe" },
+    ],
+  },
+  "gate",
+); // Defeatist, 10% line
+
+// OnDirectFaintRetaliationAbAttr (Tier B). Slot "gate", in the class's own order:
+//   move.category !== STATUS  &&  attacker !== pokemon
+// The guard (an attacker and a move exist) runs first inside the class and the residual (the attacker has not fainted) last. `side.is self`
+// is `other === holder`, so its negation is `attacker !== pokemon`.
+const damagingMoveFromAnotherPokemon = { all: [{ id: "move.damaging" }, { not: { id: "side.is", kind: "self" } }] };
+bindCondition(5285, 1, damagingMoveFromAnotherPokemon, "gate"); // Ill Will, Torment
+bindCondition(5653, 4, damagingMoveFromAnotherPokemon, "gate"); // Tummyache, Gastro Acid
+
+// ChancePostAttackStealHeldItemAbAttr (Tier B, RNG in canApply). Slot "gate": the chance roll, `simulated || randBattleSeedInt(100) < chance`.
+// The inherited rules (damaging move, !simulated, hit result, the move and contact filters, the random item pick) are the class's residual,
+// unchanged and still after the roll. The pct is repeated from the live chance (gateParams).
+bindCondition(82, 2, { id: "rng.chance", pct: 30 }, "gate"); // Gluttony, berries on contact
+bindCondition(5121, 1, { id: "rng.chance", pct: 30 }, "gate"); // Low Blow, Feint Attack
+bindCondition(5164, 1, { id: "rng.chance", pct: 30 }, "gate"); // Cheap Tactics, Scratch
+
+// PostSummonSnowCloakAuroraVeilAbAttr (Tier B). Slot "gate" = the old canApply, one clause: arena.weatherType is HAIL or SNOW.
+const hailOrSnow = {
+  any: [
+    { id: "field.weather", weather: "HAIL" },
+    { id: "field.weather", weather: "SNOW" },
+  ],
+};
+bindCondition(81, 0, hailOrSnow, "gate"); // Snow Cloak
+bindCondition(5526, 2, hailOrSnow, "gate"); // Glacial Ghost

@@ -536,6 +536,10 @@ export async function runScenario(
     .enemyHasPassiveAbility(false);
   if (spec.weather !== undefined) {
     game.override.weather(spec.weather);
+  } else if (axes.weather !== undefined && (spec.id === "entry" || spec.id === "holder-switches-out")) {
+    // B18 chunk 4 (request R-B18-0d): for the entry and switch-out templates the weather axis is the weather the battle STARTS with. Entry
+    // effects read it at the entry, and an ability whose own condition is a weather (Snow Cloak) is never evaluated before that.
+    game.override.weather(enumValue(WeatherType as never, axes.weather, "weather") as WeatherType);
   }
   if (spec.berry === true) {
     game.override.startingHeldItems([{ name: "BERRY", type: BerryType.SITRUS, count: 1 }]);

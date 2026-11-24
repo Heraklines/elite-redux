@@ -411,4 +411,16 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
       simulated: false,
     };
   },
+  // B18 chunk 4. The faint check hands over the holder, the foe that knocked it out and that foe's move (faint-phase.ts: the newest hit it took;
+  // after poison, weather or recoil there is neither). The grid has no such axes, so the grid move's position picks the case: no attacker,
+  // the holder as its own attacker, or no move; every other position is a normal knock-out by the foe with the grid move.
+  "event.faint": ({ holder, foe, move }) => {
+    const index = Math.max(0, GRID_MOVES.indexOf(move.id));
+    return {
+      pokemon: holder,
+      attacker: index % 5 === 3 ? undefined : index % 6 === 4 ? holder : foe,
+      move: index % 7 === 5 ? undefined : move,
+      simulated: false,
+    };
+  },
 };
