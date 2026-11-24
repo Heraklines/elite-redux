@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "096ef32b703c2f",
+  "hash": "0c0f1050e46f41",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -124,6 +124,57 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.er-magician-steal",
+      "className": "ErMagicianStealAbAttr",
+      "label": "Steal a random item from the Pokemon I hit",
+      "summary": "After my attack lands, I take one random item the target holds, if I can carry it. As built, it only happens when my move does not make contact.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "magician",
+        "thief",
+        "pickpocket",
+        "steal item",
+        "take the foe's item",
+        "item theft",
+        "swipe held item"
+      ],
+      "examples": [
+        "Steal the target's item with a move that does not make contact",
+        "Steal an item after every hit"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.flag",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "My move must deal damage (a status move never steals)",
+        "The hit must have connected (not 'no effect')",
+        "It must be a real hit, not a damage preview",
+        "The target must hold at least one item that can be taken, and I must be able to carry it"
+      ],
+      "effect": {
+        "id": "effect.steal-item",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.float",
@@ -306,6 +357,383 @@
         "if": false,
         "do": true
       },
+      "uses": 1
+    },
+    {
+      "id": "block.lingering-musk-endure",
+      "className": "LingeringMuskEndureAbAttr",
+      "label": "Survive a knockout hit but be marked to faint later",
+      "summary": "When a hit would knock me out, I stay at 1 HP instead, once per turn. I am then marked, and a matching end-of-turn effect makes me faint.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.damage-taken",
+      "whenLabel": "While the game calculates damage I take",
+      "synonyms": [
+        "lingering musk",
+        "endure",
+        "sturdy",
+        "survive a lethal hit",
+        "delayed knockout",
+        "borrowed time",
+        "cannot be one shot"
+      ],
+      "examples": [
+        "Survive a knockout hit, then faint when the turn ends"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The hit must be a knockout: its damage is at least my current HP",
+        "My maximum HP must be above 1",
+        "I must not already have survived a hit this turn (the survival marker lapses at the end of the turn)",
+        "The survival really happens only for a real hit, not for a damage preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, written reason: the survive rule (clauses 1 to 4) is inherited from PreFaintReviveAbAttr (B11), whose canApply is not mine to split, and the effect (a STURDY tag that the damage pipeline reads, plus a per-switch-in marker that the matching end-of-turn attr reads) has no library effect: there is no 'survive a lethal hit' block and no 'set a marker' block. Requests R1 (split the inherited canApply into a swappable 'the hit would knock me out' condition) and R2 (effect: survive a knockout at 1 HP) in requests/B17.md. Typed params: none exist; the only number in the chain is the inherited HP rule threshold 0, which is always true. Users: Lingering Musk (6084, attr 2) only; its attr 3 is LingeringMuskPostTurnAbAttr. SUSPECTED GAME BUG, NOT FIXED: this class's apply sets tempSummonData.lingeringMuskFaint = true without checking `simulated`. PreDefendFullHpEndureAbAttr is dispatched from Pokemon.getAttackDamage with the caller's `simulated` flag, and getAttackDamage(simulated: true) is called for damage previews (move-phase.ts:682 and move-effect-phase.ts:1071 target ordering, the enemy move scoring in pokemon.ts around lines 10040 to 10360). A previewed knockout of a Lingering Musk holder (damage >= hp) therefore sets the marker although no hit landed, and the holder faints at the end of the turn. Needs a check by the owner; the declaration records simulated: ignores.",
+      "uses": 1
+    },
+    {
+      "id": "block.lingering-musk-post-turn",
+      "className": "LingeringMuskPostTurnAbAttr",
+      "label": "Make myself faint",
+      "summary": "I lose all of my remaining HP and faint. As built, it only happens when I survived a knockout hit earlier.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "lingering musk",
+        "faint",
+        "knock myself out",
+        "self knockout",
+        "delayed knockout",
+        "die at end of turn"
+      ],
+      "examples": [
+        "Faint at the end of the turn after surviving a knockout hit"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "request R3: the marker left by a survived knockout",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B (gate/residual split, canApply = gate only, base canApply was never called) with a PACKAGE effect. Written reason for the package: the effect is a single damageAndUpdate(pokemon.hp, INDIRECT) call, but no library effect 'lose all my remaining HP / faint' exists (request R4 in requests/B17.md); it cannot be expressed with inflict, heal or recoil blocks, whose amounts are shares of damage or max HP, not 'all current HP', and a recoil block needs the damage slot, which an end-of-turn trigger does not have. The gate (the marker) is legacy-closure pending request R3: bindLegacyClosure for Lingering Musk (6084, attr 3, slot gate). Marker written by LingeringMuskEndureAbAttr (tempSummonData.lingeringMuskFaint). Users: Lingering Musk (6084, attr 3) only. No game bug found in this half (the Endure half has a suspected simulated-preview bug, see its notes).",
+      "uses": 1
+    },
+    {
+      "id": "block.metallosis-poison",
+      "className": "MetallosisPoisonAbAttr",
+      "label": "Give the target a status after a critical hit",
+      "summary": "After my attack lands as a critical hit, the target gets this status if it can take it: Poison.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "metallosis",
+        "poison on crit",
+        "crit status",
+        "critical hit poison",
+        "status on critical hit",
+        "inflict status"
+      ],
+      "examples": [
+        "Poison the target after landing a critical hit",
+        "Burn the target after a critical hit"
+      ],
+      "params": [
+        {
+          "id": "status",
+          "label": "Status to give the target",
+          "control": "select",
+          "default": "POISON",
+          "editable": true,
+          "options": [
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.damaging plus request R5: the hit was a critical hit",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must have dealt at least 1 damage",
+        "The target must be able to receive the status (it is not immune and nothing blocks it)"
+      ],
+      "effect": {
+        "id": "effect.inflict-status",
+        "params": [
+          "status"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.moxibustion",
+      "className": "MoxibustionAbAttr",
+      "label": "Heal by a share of the damage I dealt",
+      "summary": "After my attack hurts a burned target, I heal 75% of the damage dealt (at least 1 HP). Example: 75 means three quarters.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "moxibustion",
+        "drain",
+        "lifesteal",
+        "leech",
+        "heal from damage",
+        "absorb hp",
+        "vampiric"
+      ],
+      "examples": [
+        "Heal 75% of the damage dealt to burned targets",
+        "Drain half the damage dealt to a burned foe"
+      ],
+      "params": [
+        {
+          "id": "healPercent",
+          "label": "Share of the damage dealt that I heal (%, 75 = three quarters)",
+          "control": "number",
+          "default": 75,
+          "editable": true,
+          "min": 1,
+          "max": 200,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.damaging and status.has",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must have dealt at least 1 damage"
+      ],
+      "effect": {
+        "id": "effect.drain",
+        "params": [
+          "healPercent"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.mutual-destruction-post-faint",
+      "className": "MutualDestructionPostFaintAbAttr",
+      "label": "Make the Pokemon that knocked me out faint too",
+      "summary": "When I faint from an attack, the Pokemon that knocked me out loses all of its remaining HP, as long as it is still standing and not on my side.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.faint",
+      "whenLabel": "When I faint",
+      "synonyms": [
+        "mutual destruction",
+        "take it down with me",
+        "destiny bond",
+        "revenge knockout",
+        "innards out",
+        "aftermath",
+        "faint together"
+      ],
+      "examples": [
+        "When I faint from an attack, the attacker faints too",
+        "Knock out my killer when I go down"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "side.is",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "An attack must have knocked me out (not poison, weather or another indirect cause)",
+        "The Pokemon that knocked me out must be known and still standing"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B with a PACKAGE effect. Written reason: the effect is one damageAndUpdate(attacker.hp, INDIRECT) call, but no library effect 'knock out another Pokemon / take all of its remaining HP' exists (request R7 in requests/B17.md); recoil and drain scale with a damage or max-HP share and apply to the holder or the damage dealt, not 'all current HP of the other Pokemon'. The trigger (when I faint) and the one real condition (the knocker is not an ally) are separate blocks. The three guards (a move, a known attacker, still standing) have no registry ids (request R8), so they are written as feasibility; they run first, in the original order, before the gate. The condition used to be `!attacker.getAllies().includes(pokemon)`: getAllies() lists the OTHER ACTIVE battlers on the attacker's side, the atom side.is(ally) compares isPlayer() and identity. They differ only if the knocker is on my side but I am no longer in the field array (not reachable: the faint dispatch runs while I am still on the field). The L1 grid never sets a same-side attacker, so test/tests/elite-redux/decomp/B17/gates.test.ts checks both directions with stand-ins (the old canApply, the refactor, the rebuild and a deliberately wrong gate), and mutual-destruction.test.ts runs the foe direction in a real battle. A real double battle for the ally direction is not possible here: the existing innards-out.test.ts double case also times out in this checkout. Users: Mutual Destruction (6104, attr 0) only. The ability also carries the ability-level flag bypassFaint (set in wireBernerdRosterAbility, not an attr), which belongs to the ability blueprint, not to this block. The ability text mentions Pain Split first; the code deals the attacker's whole current HP directly (the comment in apply says that equals the Pain Split plus Innards Out result), so no Pain Split step exists in this attr. No game bug found.",
+      "uses": 1
+    },
+    {
+      "id": "block.oracle-entry",
+      "className": "OracleEntryAbAttr",
+      "label": "Start a damage-halving guard for a few turns",
+      "summary": "The first time I enter this battle, I start a guard that lasts 3 turns. Effects that look for the guard, such as halving damage, work while it lasts.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "oracle",
+        "first entry shield",
+        "opening guard",
+        "temporary shield",
+        "enter with a barrier",
+        "start guard"
+      ],
+      "examples": [
+        "Take half damage for 3 turns after first entering the battle"
+      ],
+      "params": [
+        {
+          "id": "guardTurns",
+          "label": "How many turns the guard lasts (1-10)",
+          "control": "number",
+          "default": 3,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "request R3: this is my first entry in the battle (a marker in the battle memory)",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "It never does anything for a preview (a simulated entry)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "guardTurns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B (the gate runs through gatedCanApply inside apply, see the header) with a PACKAGE effect. Written reason: the effect writes two string markers in the ER provenance memory (battleData 'oracle:first-entry', summonData 'oracle:guard:N'), and a closure of ANOTHER attr (ReceivedMoveDamageMultiplierAbAttr in Oracle, bound legacy in the precedents) reads them back by string prefix; there is no library effect to set a typed marker (request R9) and no atom to read it (request R3). The number of turns is the typed `guardTurns` setting (1 to 10; the class itself accepts any number, 0 or less would start an already-expired guard). The gate binding is legacy-closure-pending-request R3, so the rebuild is skipped by L2. Users: Oracle (6047, attr 1) only. Oddity, not changed: the ability text says incoming attacks are 'treated as not very effective', but the damage attr halves the damage (x0.5), which is what the guard does in code. Replacing an existing guard marker means a second entry in the same battle never restarts the guard (the first-entry memory blocks it).",
+      "uses": 1
+    },
+    {
+      "id": "block.oracle-guard-tick",
+      "className": "OracleGuardTickAbAttr",
+      "label": "Count my guard down by one turn",
+      "summary": "At the end of each turn, a running guard loses one turn. When no turns are left, the guard ends and effects that look for it stop.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "oracle",
+        "tick down",
+        "shield timer",
+        "guard countdown",
+        "temporary effect wears off",
+        "turn counter"
+      ],
+      "examples": [
+        "Make a 3 turn guard run out after 3 turns"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "request R3: a guard marker is running on me",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "It never does anything for a preview (a simulated end of turn)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B (gate run through gatedCanApply inside apply) with a PACKAGE effect. Written reason: the countdown parses a number out of a string marker ('oracle:guard:3'), removes it and writes the marker back with one less; there is no library effect for 'count a timed marker down' (request R9, the same marker family as the entry half) and no atom to read it (R3). The gate binding is legacy-closure-pending-request R3. Users: Oracle (6047, attr 2) only. Oddity, not changed: the marker is written by the entry half, so the tick only does anything after that half ran; marker state lives in summonData, i.e. it is dropped on a switch.",
       "uses": 1
     },
     {
