@@ -46,6 +46,7 @@ import {
   ER_VOID_ABILITY_ID,
 } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
 import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-debuff-on-flag-attack";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { AttackStatSubstituteAbAttr } from "#data/elite-redux/archetypes/attack-stat-substitute";
 import {
   ChanceBattlerTagOnAttackAbAttr,
@@ -207,7 +208,7 @@ class VoidPostTurnStealAbAttr extends PostTurnAbAttr {
 }
 
 /** Delays direct lethal hits until end of turn, preserving Lingering Aroma separately. */
-class LingeringMuskEndureAbAttr extends PreFaintReviveAbAttr {
+export class LingeringMuskEndureAbAttr extends PreFaintReviveAbAttr {
   constructor() {
     super({ gate: { kind: "hp-threshold", threshold: 0 }, usage: { kind: "per-hit" } });
   }
@@ -218,8 +219,17 @@ class LingeringMuskEndureAbAttr extends PreFaintReviveAbAttr {
   }
 }
 
-class LingeringMuskPostTurnAbAttr extends PostTurnAbAttr {
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+export class LingeringMuskPostTurnAbAttr extends PostTurnAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole rule is the replaceable {@linkcode gate}; no guards, no residual. */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The replaceable condition: the holder carries the "fall at the end of the turn" marker its lethal-hit survival left. */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     return !!(pokemon.tempSummonData as unknown as { lingeringMuskFaint?: boolean }).lingeringMuskFaint;
   }
 
@@ -231,9 +241,23 @@ class LingeringMuskPostTurnAbAttr extends PostTurnAbAttr {
 }
 
 /** Guarantees the direct attacker is reduced to zero after the Pain Split + Innards Out sequence. */
-class MutualDestructionPostFaintAbAttr extends PostFaintAbAttr {
-  override canApply({ pokemon, attacker, move }: PostFaintAbAttrParams): boolean {
-    return !!move && !!attacker && !attacker.isFainted() && !attacker.getAllies().includes(pokemon);
+export class MutualDestructionPostFaintAbAttr extends PostFaintAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostFaintAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): `canApply = guards && gate`, the original clause order, no residual. */
+  override canApply(params: PostFaintAbAttrParams): boolean {
+    return gatedCanApply<PostFaintAbAttrParams>(this, params);
+  }
+
+  /** Clauses 1 to 3 of the old canApply (the knock-out came from a move, its user is known and still standing). */
+  public guards({ attacker, move }: PostFaintAbAttrParams): boolean {
+    return !!move && !!attacker && !attacker.isFainted();
+  }
+
+  /** Clause 4, the replaceable condition: the Pokemon that knocked me out is not on my side. */
+  public gate({ pokemon, attacker }: PostFaintAbAttrParams): boolean {
+    return !(attacker?.getAllies().includes(pokemon) ?? false);
   }
 
   override apply({ attacker, simulated }: PostFaintAbAttrParams): void {

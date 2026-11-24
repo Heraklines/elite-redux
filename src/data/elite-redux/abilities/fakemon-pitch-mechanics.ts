@@ -43,6 +43,7 @@ import type { AbBuilder } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-debuff-on-flag-attack";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { ABILITY_STUDIO_RUNTIME_CAPABILITIES } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { AbilityStudioRuntimeCapabilityAbAttr } from "#data/elite-redux/ability-studio/runtime-components";
 import {
@@ -266,18 +267,27 @@ function triggerLiveCurrent(pokemon: Pokemon): void {
   }
 }
 
-class PhoenixFoliageUseFormChangeAbAttr extends PostAttackAbAttr {
+export class PhoenixFoliageUseFormChangeAbAttr extends PostAttackAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
   constructor() {
     super((_user, _target, _move) => true, true);
   }
 
+  /** Tier B split (ability studio spec 3.1): `canApply = guards && gate`. Every clause is a pure read, no random draw. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    return (
-      !params.pokemon.isFainted()
-      && !isLiveCurrent(params.pokemon)
-      && params.pokemon.turnData.hitsLeft <= 1
-      && isPhoenixFoliageType(params.pokemon.getMoveType(params.move))
-    );
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Safety rules, in the old order: I have not fainted, and this is the final hit of the move (no hits left after it). */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    return !params.pokemon.isFainted() && params.pokemon.turnData.hitsLeft <= 1;
+  }
+
+  /** The replaceable condition: I am not in the Live Current form yet, and my move counts as Fire or Electric. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    return !isLiveCurrent(params.pokemon) && isPhoenixFoliageType(params.pokemon.getMoveType(params.move));
   }
 
   override apply(params: PostMoveInteractionAbAttrParams): void {
@@ -287,13 +297,23 @@ class PhoenixFoliageUseFormChangeAbAttr extends PostAttackAbAttr {
   }
 }
 
-class PhoenixFoliageHitFormChangeAbAttr extends PostDefendAbAttr {
+export class PhoenixFoliageHitFormChangeAbAttr extends PostDefendAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): `canApply = guards && gate`. Every clause is a pure read, no random draw. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    return (
-      !params.pokemon.isFainted()
-      && !isLiveCurrent(params.pokemon)
-      && isPhoenixFoliageType(params.opponent.getMoveType(params.move))
-    );
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Safety rule: I have not fainted. */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    return !params.pokemon.isFainted();
+  }
+
+  /** The replaceable condition: I am not in the Live Current form yet, and the move that hit me counts as Fire or Electric. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    return !isLiveCurrent(params.pokemon) && isPhoenixFoliageType(params.opponent.getMoveType(params.move));
   }
 
   override apply(params: PostMoveInteractionAbAttrParams): void {
@@ -303,16 +323,38 @@ class PhoenixFoliageHitFormChangeAbAttr extends PostDefendAbAttr {
   }
 }
 
-class MoxibustionAbAttr extends PostAttackAbAttr {
+export class MoxibustionAbAttr extends PostAttackAbAttr {
+  /** Share of the damage dealt that is healed (0.75 = three quarters). */
+  public readonly healShare: number;
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  constructor(healShare = 0.75) {
+    super();
+    this.healShare = healShare;
+  }
+
+  /** Tier B split (ability studio spec 3.1): `canApply = guards && gate`. Every clause is free of side effects and random draws. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    return super.canApply(params) && params.damage > 0 && params.opponent.status?.effect === StatusEffect.BURN;
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The hit really dealt damage (clause 2 of the old canApply; it only reads the frame, so it can run first). */
+  public guards({ damage }: PostMoveInteractionAbAttrParams): boolean {
+    return damage > 0;
+  }
+
+  /** The replaceable condition: the inherited attack condition (the move deals damage) and the target is burned. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    return super.canApply(params) && params.opponent.status?.effect === StatusEffect.BURN;
   }
 
   override apply({ pokemon, damage, simulated }: PostMoveInteractionAbAttrParams): void {
     if (simulated) {
       return;
     }
-    const amount = Math.max(1, Math.floor(damage * 0.75));
+    const amount = Math.max(1, Math.floor(damage * this.healShare));
     globalScene.phaseManager.unshiftNew("PokemonHealPhase", pokemon.getBattlerIndex(), amount, null, true, false);
   }
 }
@@ -350,19 +392,41 @@ class ThirdEyeAbAttr extends PostSummonAbAttr {
   }
 }
 
-class MetallosisPoisonAbAttr extends PostAttackAbAttr {
+export class MetallosisPoisonAbAttr extends PostAttackAbAttr {
+  /** The status given to the target (Poison for the shipped ability). */
+  public readonly status: StatusEffect;
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  constructor(status: StatusEffect = StatusEffect.POISON) {
+    super();
+    this.status = status;
+  }
+
+  /** Tier B split (ability studio spec 3.1): `canApply = guards && gate && residual`. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    return (
-      super.canApply(params)
-      && params.damage > 0
-      && !!params.opponent.turnData.attacksReceived[0]?.critical
-      && params.opponent.canSetStatus(StatusEffect.POISON, true, false, params.pokemon)
-    );
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The hit really dealt damage (clause 2 of the old canApply; it only reads the frame, so it can run first). */
+  public guards({ damage }: PostMoveInteractionAbAttrParams): boolean {
+    return damage > 0;
+  }
+
+  /** The replaceable condition: the inherited attack condition (the move deals damage) and the target took a critical hit. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    return super.canApply(params) && !!params.opponent.turnData.attacksReceived[0]?.critical;
+  }
+
+  /** Feasibility that stays in the class: the target must be able to receive the status. */
+  public residual(params: PostMoveInteractionAbAttrParams): boolean {
+    return params.opponent.canSetStatus(this.status, true, false, params.pokemon);
   }
 
   override apply({ pokemon, opponent, simulated }: PostMoveInteractionAbAttrParams): void {
     if (!simulated) {
-      opponent.trySetStatus(StatusEffect.POISON, pokemon);
+      opponent.trySetStatus(this.status, pokemon);
     }
   }
 }
@@ -372,13 +436,30 @@ export class PentaPunchMarkerAbAttr extends PostSummonAbAttr {
   override apply(_params: AbAttrBaseParams): void {}
 }
 
-class PentaPunchFuryPowerAbAttr extends VariableMovePowerAbAttr {
-  override canApply({ move }: PreAttackModifyPowerAbAttrParams): boolean {
+export class PentaPunchFuryPowerAbAttr extends VariableMovePowerAbAttr {
+  /** The power Five-Star Fury is set to (80 for the shipped ability). */
+  public readonly power: number;
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreAttackModifyPowerAbAttrParams) => boolean) | undefined;
+
+  constructor(power = 80) {
+    super();
+    this.power = power;
+  }
+
+  /** Tier B split (ability studio spec 3.1): `canApply = gate`, no guards, no residual, no random draw. Does not call super (the original never did). */
+  override canApply(params: PreAttackModifyPowerAbAttrParams): boolean {
+    return gatedCanApply<PreAttackModifyPowerAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the move is Five-Star Fury. */
+  public gate({ move }: PreAttackModifyPowerAbAttrParams): boolean {
     return move.id === (ErMoveId.FIVE_STAR_FURY as unknown as MoveId);
   }
 
   override apply({ power }: PreAttackModifyPowerAbAttrParams): void {
-    power.value = 80;
+    power.value = this.power;
   }
 }
 
@@ -546,22 +627,55 @@ class EulogyAbAttr extends PostFaintAbAttr {
   }
 }
 
-class OracleEntryAbAttr extends PostSummonAbAttr {
-  override apply({ pokemon, simulated }: AbAttrBaseParams): void {
-    if (simulated || pokemon.battleData.erAbilityProvenance.includes("oracle:first-entry")) {
+export class OracleEntryAbAttr extends PostSummonAbAttr {
+  /** How many turns the damage-halving guard lasts (3 for the shipped ability). */
+  public readonly guardTurns: number;
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  constructor(guardTurns = 3) {
+    super();
+    this.guardTurns = guardTurns;
+  }
+
+  /**
+   * The replaceable condition: this is the first time I enter this battle. It stays in `apply` (through the shared
+   * `gatedCanApply`) and not in `canApply`, because the inherited canApply is always true and the ability flyout is
+   * queued on every entry (apply-ab-attrs.ts), also on a re-entry that does nothing.
+   */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
+    return !pokemon.battleData.erAbilityProvenance.includes("oracle:first-entry");
+  }
+
+  override apply(params: AbAttrBaseParams): void {
+    const { pokemon, simulated } = params;
+    if (simulated || !gatedCanApply<AbAttrBaseParams>(this, params)) {
       return;
     }
     pokemon.battleData.erAbilityProvenance.push("oracle:first-entry");
     pokemon.summonData.erAbilityProvenance = pokemon.summonData.erAbilityProvenance.filter(
       entry => !entry.startsWith("oracle:guard:"),
     );
-    pokemon.summonData.erAbilityProvenance.push("oracle:guard:3");
+    pokemon.summonData.erAbilityProvenance.push(`oracle:guard:${this.guardTurns}`);
   }
 }
 
-class OracleGuardTickAbAttr extends PostTurnAbAttr {
-  override apply({ pokemon, simulated }: AbAttrBaseParams): void {
-    if (simulated) {
+export class OracleGuardTickAbAttr extends PostTurnAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /**
+   * The replaceable condition: a guard is running (a marker of the oracle guard is on me). It stays in `apply`, through
+   * the shared `gatedCanApply`, for the same reason as the entry half: the flyout is queued at every end of turn.
+   */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
+    return pokemon.summonData.erAbilityProvenance.some(value => value.startsWith("oracle:guard:"));
+  }
+
+  override apply(params: AbAttrBaseParams): void {
+    const { pokemon, simulated } = params;
+    if (simulated || !gatedCanApply<AbAttrBaseParams>(this, params)) {
       return;
     }
     const entry = pokemon.summonData.erAbilityProvenance.find(value => value.startsWith("oracle:guard:"));
@@ -620,11 +734,27 @@ const PERPETUAL_MOTION_SUCCESSFUL_HITS = new Set<HitResult>([
   HitResult.ONE_HIT_KO,
 ]);
 
-class PerpetualMotionTriggerAbAttr extends PostAttackAbAttr {
+export class PerpetualMotionTriggerAbAttr extends PostAttackAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): `canApply = guards && gate`. Every clause is a pure read, no random draw. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Clause 1: the inherited attack condition (constructor argument 0, a replaceable library slot; by default the move deals damage). */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    return super.canApply(params);
+  }
+
+  /**
+   * The replaceable condition, clauses 2 and 3 in the old order: my hit really landed (Effective, Super effective, Not very
+   * effective or One-hit KO) and the move is not itself the Rollout this ability queued.
+   */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
     return (
-      super.canApply(params)
-      && PERPETUAL_MOTION_SUCCESSFUL_HITS.has(params.hitResult)
+      PERPETUAL_MOTION_SUCCESSFUL_HITS.has(params.hitResult)
       && !params.move.attrs.some(attr => attr instanceof ScriptedMoveMarkerAttr && attr.key === PERPETUAL_MOTION_MARKER)
     );
   }
@@ -636,10 +766,37 @@ class PerpetualMotionTriggerAbAttr extends PostAttackAbAttr {
   }
 }
 
-class PerpetualMotionPostTurnAbAttr extends PostTurnAbAttr {
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+export class PerpetualMotionPostTurnAbAttr extends PostTurnAbAttr {
+  /** The power of the Rollout this ability queues (20 for the shipped ability). */
+  public readonly power: number;
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  constructor(power = 20) {
+    super();
+    this.power = power;
+  }
+
+  /** Tier B split (ability studio spec 3.1): `canApply = guards && gate && residual`. Every clause is a pure read, no random draw. */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** Safety rule (clause 1): I have not fainted. */
+  public guards({ pokemon }: AbAttrBaseParams): boolean {
+    return !pokemon.isFainted();
+  }
+
+  /** The replaceable condition (clause 2): I have been out for at least one turn. */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     const turn = pokemon.tempSummonData?.turnCount ?? 0;
-    return !pokemon.isFainted() && turn > 0 && pokemon.turnData.erAbilityProvenance.includes(PERPETUAL_MOTION_TRIGGER);
+    return turn > 0;
+  }
+
+  /** Stays in the class (clause 3): a successful hit of mine earlier this turn left the marker the Trigger half stores. */
+  public residual({ pokemon }: AbAttrBaseParams): boolean {
+    return pokemon.turnData.erAbilityProvenance.includes(PERPETUAL_MOTION_TRIGGER);
   }
 
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
@@ -665,7 +822,7 @@ class PerpetualMotionPostTurnAbAttr extends PostTurnAbAttr {
       "MovePhase",
       pokemon,
       [target.getBattlerIndex()],
-      scriptedPokemonMove(MoveId.ROLLOUT, 20, {
+      scriptedPokemonMove(MoveId.ROLLOUT, this.power, {
         marker: PERPETUAL_MOTION_MARKER,
         stripConsecutiveUsePower: true,
       }),
@@ -674,23 +831,40 @@ class PerpetualMotionPostTurnAbAttr extends PostTurnAbAttr {
   }
 }
 
-class PerpetualMotionResolutionAbAttr extends ExecutedMoveAbAttr {
-  override apply({ pokemon, simulated }: AbAttrBaseParams): void {
-    if (simulated) {
+export class PerpetualMotionResolutionAbAttr extends ExecutedMoveAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /**
+   * The replaceable condition: the move I just started was a Rollout. The whole rule lives in `apply` (through the shared
+   * `gatedCanApply`) and not in `canApply`, because the inherited canApply is always true and the ability flyout is queued at
+   * every move of mine (apply-ab-attrs.ts), also when nothing happens.
+   */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
+    return pokemon.getLastXMoves(1)[0]?.move === MoveId.ROLLOUT;
+  }
+
+  /**
+   * Stays in the class: the chain is still pending, that Rollout was the indirect one this ability queued, and it did not succeed.
+   * All pure reads, so asking them after the gate instead of before it changes nothing.
+   */
+  public residual({ pokemon }: AbAttrBaseParams): boolean {
+    const move = pokemon.getLastXMoves(1)[0];
+    return (
+      !!pokemon.summonData.erPerpetualMotionPending
+      && move?.useMode === MoveUseMode.INDIRECT
+      && move.result !== MoveResult.SUCCESS
+    );
+  }
+
+  override apply(params: AbAttrBaseParams): void {
+    const { pokemon, simulated } = params;
+    if (simulated || !gatedCanApply<AbAttrBaseParams>(this, params)) {
       return;
     }
     const state = pokemon.summonData;
-    if (!state.erPerpetualMotionPending) {
-      return;
-    }
-    const move = pokemon.getLastXMoves(1)[0];
-    if (move?.move !== MoveId.ROLLOUT || move.useMode !== MoveUseMode.INDIRECT) {
-      return;
-    }
-    if (move.result !== MoveResult.SUCCESS) {
-      state.erPerpetualMotionPending = false;
-      state.erPerpetualMotionStreak = 0;
-    }
+    state.erPerpetualMotionPending = false;
+    state.erPerpetualMotionStreak = 0;
   }
 }
 

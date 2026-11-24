@@ -113,6 +113,7 @@ import type { Ability } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import {
   AllyHigherStatMultiplierAbAttr,
@@ -1888,7 +1889,7 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
 // holder destroys every Berry held by opposing Pokemon (to almost any holder
 // a Black Sludge is a dead item anyway). The two lose-an-item clauses have no
 // pokerogue equivalent and are deliberately skipped.
-class ErTransmuteOpposingBerriesAbAttr extends PostSummonAbAttr {
+export class ErTransmuteOpposingBerriesAbAttr extends PostSummonAbAttr {
   constructor() {
     super(true);
   }
@@ -1931,7 +1932,7 @@ class ErTransmuteOpposingBerriesAbAttr extends PostSummonAbAttr {
   }
 }
 
-class ClearOpponentStatBuffsOnSummonAbAttr extends PostSummonAbAttr {
+export class ClearOpponentStatBuffsOnSummonAbAttr extends PostSummonAbAttr {
   constructor() {
     super(true);
   }
@@ -2719,18 +2720,31 @@ function patchMagicianPredicate(ability: MutableAbility): void {
   }
 }
 
-class ErMagicianStealAbAttr extends PostAttackStealHeldItemAbAttr {
+export class ErMagicianStealAbAttr extends PostAttackStealHeldItemAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride:
+    | ((params: Parameters<PostAttackStealHeldItemAbAttr["canApply"]>[0]) => boolean)
+    | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1): `canApply = gate && residual`, the original clause order, no guards.
+   * The residual is the inherited steal rule, which draws a random number, so it must stay behind the gate.
+   */
   public override canApply(params: Parameters<PostAttackStealHeldItemAbAttr["canApply"]>[0]): boolean {
-    // Require the move to NOT make contact (ER convention).
-    if (
-      params.move.doesFlagEffectApply({
-        flag: MoveFlags.MAKES_CONTACT,
-        user: params.pokemon,
-        target: params.opponent,
-      })
-    ) {
-      return false;
-    }
+    return gatedCanApply<Parameters<PostAttackStealHeldItemAbAttr["canApply"]>[0]>(this, params);
+  }
+
+  /** The replaceable condition (ER convention): the move does NOT make contact. */
+  public gate(params: Parameters<PostAttackStealHeldItemAbAttr["canApply"]>[0]): boolean {
+    return !params.move.doesFlagEffectApply({
+      flag: MoveFlags.MAKES_CONTACT,
+      user: params.pokemon,
+      target: params.opponent,
+    });
+  }
+
+  /** Feasibility that stays in the class: the inherited steal rule (damaging move, real hit, a takeable item, one random pick). */
+  public residual(params: Parameters<PostAttackStealHeldItemAbAttr["canApply"]>[0]): boolean {
     return super.canApply(params);
   }
 }
