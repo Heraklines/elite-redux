@@ -43,6 +43,9 @@ import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 
 const SCREEN_TAGS = [ArenaTagType.REFLECT, ArenaTagType.LIGHT_SCREEN, ArenaTagType.AURORA_VEIL] as const;
 
+/** The engine parameters of the "power of a move I use" moment, as `MovePowerBoostAbAttr.canApply` reads them. */
+type MovePowerParams = Parameters<MovePowerBoostAbAttr["canApply"]>[0];
+
 /** Marks every battler currently present as Poison-weak for this field entry. */
 export class FieldPoisonWeaknessOnEntryAbAttr extends PostSummonAbAttr {
   /** The type everyone present becomes weak to (Poison by default). */
@@ -177,6 +180,9 @@ export class BreakScreensOnAttackAbAttr extends PostAttackAbAttr {
   }
 }
 
+/** The engine parameters of the "damage I take" moment, as `ReceivedMoveDamageMultiplierAbAttr.canApply` reads them. */
+type DefendDamageParams = Parameters<ReceivedMoveDamageMultiplierAbAttr["canApply"]>[0];
+
 /**
  * Halves damage from attacks used by a Pokemon of a configured type. This is
  * intentionally attacker-type based, not move-type based.
@@ -192,6 +198,23 @@ export class AttackerTypeDamageReductionAbAttr extends ReceivedMoveDamageMultipl
       multiplier,
     );
   }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: DefendDamageParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1). The old `canApply` was the inherited `this.condition(...)`, the constructor's
+   * closure `move is not a status move && attacker.isOfType(attackerType)`. That whole rule is now the replaceable gate;
+   * there is no guard and no residual. Every clause is a pure read, so the answer for every input is unchanged.
+   */
+  override canApply(params: DefendDamageParams): boolean {
+    return gatedCanApply<DefendDamageParams>(this, params);
+  }
+
+  /** The replaceable condition: the inherited rule (the closure above), moved verbatim. */
+  public gate(params: DefendDamageParams): boolean {
+    return super.canApply(params);
+  }
 }
 
 /** Halves one incoming move type, but only while the holder is at full HP. */
@@ -206,6 +229,23 @@ export class FullHpMoveTypeDamageReductionAbAttr extends ReceivedMoveDamageMulti
       multiplier,
     );
   }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: DefendDamageParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1). The old `canApply` was the inherited `this.condition(...)`, the constructor's
+   * closure `holder is at full HP && move is not a status move && the attacker's move type is moveType`. That whole rule is
+   * now the replaceable gate, in the same clause order; there is no guard and no residual. Every clause is a pure read.
+   */
+  override canApply(params: DefendDamageParams): boolean {
+    return gatedCanApply<DefendDamageParams>(this, params);
+  }
+
+  /** The replaceable conditions: the inherited rule (the closure above), moved verbatim. */
+  public gate(params: DefendDamageParams): boolean {
+    return super.canApply(params);
+  }
 }
 
 /**
@@ -213,8 +253,31 @@ export class FullHpMoveTypeDamageReductionAbAttr extends ReceivedMoveDamageMulti
  * change. The original drop is cancelled and the reflected boost is queued.
  */
 export class ReverseNegativeStatChangesAbAttr extends PreStatStageChangeAbAttr {
-  override canApply({ cancelled, source, stages }: PreStatStageChangeAbAttrParams): boolean {
-    return !cancelled.value && stages < 0 && source !== null;
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreStatStageChangeAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1). The old `canApply` was `!cancelled.value && stages < 0 && source !== null`.
+   * The three clauses keep their order: the safety rule (guard), the stat drop test (gate), then the source test
+   * (residual: it has no library condition yet, see request R-B18-25). Every clause is a pure read.
+   */
+  override canApply(params: PreStatStageChangeAbAttrParams): boolean {
+    return gatedCanApply<PreStatStageChangeAbAttrParams>(this, params);
+  }
+
+  /** Nothing is reversed when another effect already blocked the drop. Moved verbatim from the old `canApply`. */
+  public guards({ cancelled }: PreStatStageChangeAbAttrParams): boolean {
+    return !cancelled.value;
+  }
+
+  /** The replaceable condition: the stat is being lowered. Moved verbatim from the old `canApply`. */
+  public gate({ stages }: PreStatStageChangeAbAttrParams): boolean {
+    return stages < 0;
+  }
+
+  /** The drop must come from somewhere (source is not null). Moved verbatim; it has no library condition yet. */
+  public residual({ source }: PreStatStageChangeAbAttrParams): boolean {
+    return source !== null;
   }
 
   override apply({ pokemon, stat, stages, cancelled, simulated }: PreStatStageChangeAbAttrParams): void {
@@ -240,13 +303,31 @@ export class PostDefendAddTagAbAttr extends PostDefendAbAttr {
     super(false);
   }
 
-  override canApply({ pokemon, opponent, move }: PostMoveInteractionAbAttrParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1). The old `canApply` was
+   * `pokemon !== opponent && move is not a status move && (no moveType || opponent.getMoveType(move) === moveType) && !pokemon.getTag(tag)`.
+   * The first three clauses are the replaceable gate, the last one (I do not have the effect yet) stays as the residual,
+   * in the old order. Every clause is a pure read (no draw, no write).
+   */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The replaceable conditions, in the old order. Moved verbatim from the old `canApply`. */
+  public gate({ pokemon, opponent, move }: PostMoveInteractionAbAttrParams): boolean {
     return (
       pokemon !== opponent
       && move.category !== MoveCategory.STATUS
       && (this.moveType === undefined || opponent.getMoveType(move) === this.moveType)
-      && !pokemon.getTag(this.tag)
     );
+  }
+
+  /** Feasibility: the holder does not carry the effect yet. Moved verbatim from the old `canApply`. */
+  public residual({ pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    return !pokemon.getTag(this.tag);
   }
 
   override apply({ pokemon, simulated }: PostMoveInteractionAbAttrParams): void {
@@ -268,10 +349,26 @@ export class SameTypeStabOtherwiseBoostAbAttr extends MovePowerBoostAbAttr {
     super((pokemon, _target, move) => pokemon.getMoveType(move) === type, 1);
   }
 
-  override apply(params: Parameters<MovePowerBoostAbAttr["apply"]>[0]): void {
-    if (!params.pokemon.isOfType(this.type)) {
-      params.power.value *= this.fallbackMultiplier;
-    }
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: MovePowerParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1). Two clauses, both pure reads, both now in the gate in this order:
+   * the move's type is `type` (the inherited rule, the constructor's closure) and the holder is NOT of that type
+   * (this used to be an `if` inside `apply`; `apply` only runs after `canApply` passed, so moving it here gives the same
+   * answer, and the power is multiplied exactly when both held before). No guard and no residual.
+   */
+  override canApply(params: MovePowerParams): boolean {
+    return gatedCanApply<MovePowerParams>(this, params);
+  }
+
+  /** The replaceable conditions: the inherited type rule, then "the holder is not of that type". */
+  public gate(params: MovePowerParams): boolean {
+    return super.canApply(params) && !params.pokemon.isOfType(this.type);
+  }
+
+  override apply(params: MovePowerParams): void {
+    params.power.value *= this.fallbackMultiplier;
   }
 }
 
@@ -327,10 +424,25 @@ export class HigherStatMultiplierAbAttr extends StatMultiplierAbAttr {
     super(candidates[0], multiplier);
   }
 
-  override canApply({ pokemon, stat }: StatMultiplierAbAttrParams): boolean {
-    if (stat === Stat.ACC || stat === Stat.EVA || !this.candidates.includes(stat)) {
-      return false;
-    }
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: StatMultiplierAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1). The old `canApply` was: not Accuracy or Evasion and one of the listed stats
+   * (the guard, which stat the boost may touch), then the loop that finds the highest listed stat (the gate). Both parts
+   * are pure reads and keep their order; there is no residual.
+   */
+  override canApply(params: StatMultiplierAbAttrParams): boolean {
+    return gatedCanApply<StatMultiplierAbAttrParams>(this, params);
+  }
+
+  /** Which stats the boost may touch: one of the listed stats, never Accuracy or Evasion. Moved verbatim. */
+  public guards({ stat }: StatMultiplierAbAttrParams): boolean {
+    return !(stat === Stat.ACC || stat === Stat.EVA || !this.candidates.includes(stat));
+  }
+
+  /** The replaceable condition: the stat being calculated is the highest of the listed stats (ties go to the first listed). */
+  public gate({ pokemon, stat }: StatMultiplierAbAttrParams): boolean {
     let highest = this.candidates[0];
     for (const candidate of this.candidates.slice(1)) {
       if (pokemon.getStat(candidate, false) > pokemon.getStat(highest, false)) {
@@ -350,10 +462,25 @@ export class AllyHigherStatMultiplierAbAttr extends AllyStatMultiplierAbAttr {
     super(candidates[0], multiplier);
   }
 
-  override canApply({ target, stat, ignoreAbility }: AllyStatMultiplierAbAttrParams): boolean {
-    if (ignoreAbility || stat === Stat.ACC || stat === Stat.EVA || !this.candidates.includes(stat)) {
-      return false;
-    }
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AllyStatMultiplierAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1). The old `canApply` was: abilities are being ignored, or Accuracy or Evasion, or
+   * not one of the listed stats (the guard), then the loop that finds the receiving ally's highest listed stat (the gate).
+   * Both parts are pure reads and keep their order; there is no residual.
+   */
+  override canApply(params: AllyStatMultiplierAbAttrParams): boolean {
+    return gatedCanApply<AllyStatMultiplierAbAttrParams>(this, params);
+  }
+
+  /** Mold Breaker style effects switch it off, and only the listed stats (never Accuracy or Evasion) count. Moved verbatim. */
+  public guards({ stat, ignoreAbility }: AllyStatMultiplierAbAttrParams): boolean {
+    return !(ignoreAbility || stat === Stat.ACC || stat === Stat.EVA || !this.candidates.includes(stat));
+  }
+
+  /** The replaceable condition: the stat is the highest of the listed stats of the ally that receives it (ties go to the first listed). */
+  public gate({ target, stat }: AllyStatMultiplierAbAttrParams): boolean {
     let highest = this.candidates[0];
     for (const candidate of this.candidates.slice(1)) {
       if (target.getStat(candidate, false) > target.getStat(highest, false)) {

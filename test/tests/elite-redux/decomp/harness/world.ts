@@ -382,4 +382,33 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     simulated: false,
     chance: new NumberHolder(move.chance),
   }),
+  // B18 chunk 3. A stat calculation hands over the holder, the move, the stat and the value being built (StatMultiplierAbAttr and, for the
+  // ally dispatch, AllyStatMultiplierAbAttr: `target` is the Pokemon that receives the stat and `ignoreAbility` the Mold Breaker flag). The
+  // grid has no stat axis, so the stat is picked from the grid move's position: all seven stats, Accuracy and Evasion included, are asked.
+  "calc.stat-value": ({ holder, foe, move }) => {
+    const index = Math.max(0, GRID_MOVES.indexOf(move.id));
+    const stats = [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD, Stat.ACC, Stat.EVA];
+    return {
+      pokemon: holder,
+      target: foe,
+      stat: stats[index % stats.length],
+      statVal: new NumberHolder(100),
+      move,
+      ignoreAbility: index % 4 === 3,
+      simulated: false,
+    };
+  },
+  // B18 chunk 3. The stat drop check hands over the holder, the stat, the change, the source and the cancel flag. The grid has no such axes, so
+  // the grid move's position picks the change (-1, -2, +1, 0), the source (the foe, nobody, or `undefined`) and an already blocked drop.
+  "cancel.stat-drop": ({ holder, foe, move }) => {
+    const index = Math.max(0, GRID_MOVES.indexOf(move.id));
+    return {
+      pokemon: holder,
+      stat: Stat.ATK,
+      stages: [-1, -2, 1, 0][index % 4],
+      source: index % 5 === 3 ? null : index % 7 === 5 ? undefined : foe,
+      cancelled: new BooleanHolder(index % 6 === 4),
+      simulated: false,
+    };
+  },
 };

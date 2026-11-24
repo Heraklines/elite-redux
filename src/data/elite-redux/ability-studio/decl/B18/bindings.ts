@@ -87,3 +87,104 @@ bindCondition(
 // is the class's own guard and is not in the gate.
 bindCondition(5059, 2, { all: [{ id: "move.damaging" }, { id: "move.flag", flag: "MAKES_CONTACT" }] }, "gate"); // Juggernaut: contactRequired
 bindCondition(5112, 2, { all: [{ id: "move.damaging" }, { id: "move.flag", flag: "PUNCHING_MOVE" }] }, "gate"); // Precise Fist: flag PUNCHING_MOVE
+
+// =============================================================================================
+// CHUNK 3. Tier B gates of AttackerTypeDamageReductionAbAttr, FullHpMoveTypeDamageReductionAbAttr, ReverseNegativeStatChangesAbAttr,
+// PostDefendAddTagAbAttr, SameTypeStabOtherwiseBoostAbAttr, HigherStatMultiplierAbAttr and AllyHigherStatMultiplierAbAttr.
+// FaintedAllyStatMultiplierAbAttr has no condition slot (its parent gets no closure) and needs no binding.
+// Every gate is read by hand from the class source (requested-combat-riders.ts) in the class's own clause order.
+// =============================================================================================
+
+// AttackerTypeDamageReductionAbAttr (Tier B). Slot "gate" = the constructor closure the class used to pass to its parent:
+//   move.category !== STATUS  &&  attacker.isOfType(attackerType)
+// The attacker is the frame's `other` while the holder defends. The type is repeated in mon.has-type (gateParams keeps it in step).
+const damagingMoveFromAWaterAttacker = {
+  all: [{ id: "move.damaging" }, { id: "mon.has-type", who: "other", type: "WATER" }],
+};
+const damagingMoveFromAGrassAttacker = {
+  all: [{ id: "move.damaging" }, { id: "mon.has-type", who: "other", type: "GRASS" }],
+};
+bindCondition(5127, 2, damagingMoveFromAWaterAttacker, "gate"); // Marine Apex, Water attackers
+bindCondition(5729, 2, damagingMoveFromAGrassAttacker, "gate"); // King of the Jungle, Grass attackers
+
+// FullHpMoveTypeDamageReductionAbAttr (Tier B). Slot "gate" = the constructor closure:
+//   target.isFullHp()  &&  move.category !== STATUS  &&  attacker.getMoveType(move) === moveType
+bindCondition(
+  5690,
+  2,
+  {
+    all: [
+      { id: "hp.full", who: "holder" },
+      { id: "move.damaging" },
+      { id: "move.type", type: "DRAGON", effective: true },
+    ],
+  },
+  "gate",
+); // Drakelp Head, Dragon moves at full HP
+
+// ReverseNegativeStatChangesAbAttr (Tier B). Slot "gate" = `stages < 0` (the stat is being lowered). The guard (`!cancelled.value`)
+// and the residual (`source !== null`, no atom yet: request R-B18-25) stay in the class.
+bindCondition(5234, 1, { id: "stage.just-changed", direction: "lowered" }, "gate"); // Change of Heart
+
+// PostDefendAddTagAbAttr (Tier B). Slot "gate", in the class's own order:
+//   pokemon !== opponent  &&  move.category !== STATUS  &&  opponent.getMoveType(move) === moveType
+// The residual (`!pokemon.getTag(tag)`) stays in the class. `side.is self` is `other === holder`, so its negation is `pokemon !== opponent`.
+bindCondition(
+  5548,
+  1,
+  {
+    all: [
+      { not: { id: "side.is", kind: "self" } },
+      { id: "move.damaging" },
+      { id: "move.type", type: "ELECTRIC", effective: true },
+    ],
+  },
+  "gate",
+); // Lightning Born, Electric moves
+
+// SameTypeStabOtherwiseBoostAbAttr (Tier B). Slot "gate" = the inherited rule, then the test that used to be inside `apply`:
+//   holder.getMoveType(move) === type  &&  !holder.isOfType(type)
+bindCondition(
+  5041,
+  0,
+  {
+    all: [
+      { id: "move.type", type: "ROCK", effective: true },
+      { not: { id: "mon.has-type", who: "holder", type: "ROCK" } },
+    ],
+  },
+  "gate",
+); // Fossilized, Rock moves
+bindCondition(
+  5075,
+  0,
+  {
+    all: [
+      { id: "move.type", type: "GRASS", effective: true },
+      { not: { id: "mon.has-type", who: "holder", type: "GRASS" } },
+    ],
+  },
+  "gate",
+); // Raw Wood, Grass moves
+
+// HigherStatMultiplierAbAttr and AllyHigherStatMultiplierAbAttr (Tier B). Slot "gate" = "this stat is the highest of the listed stats",
+// the loop `highest = candidates[0]; for each other candidate: if getStat(c, false) > getStat(highest, false) then highest = c;
+// stat === highest` (the holder's stats for the first class, the receiving ally's stats for the second). No library atom compares
+// the stats of a Pokemon with each other, so these four stay legacy-closure (request R-B18-23). The class's own guard (which stats
+// the boost may touch) is not part of the gate.
+const highestStatReason =
+  "Flower Gift: the gate is 'the stat being worked out is the highest of the listed stats' (a loop over getStat(candidate, false), strict greater-than, ties to the first listed); no library atom compares a Pokemon's own stats with each other (request R-B18-23)";
+bindLegacyClosure(122, 3, highestStatReason, "gate"); // HigherStatMultiplierAbAttr, Attack and Sp. Atk of the holder
+bindLegacyClosure(122, 4, highestStatReason, "gate"); // HigherStatMultiplierAbAttr, Defense and Sp. Def of the holder
+bindLegacyClosure(
+  122,
+  5,
+  `${highestStatReason}; for the ally class the compared stats belong to the receiving ally and the frame has no slot for it`,
+  "gate",
+); // AllyHigherStatMultiplierAbAttr, Attack and Sp. Atk of the ally
+bindLegacyClosure(
+  122,
+  6,
+  `${highestStatReason}; for the ally class the compared stats belong to the receiving ally and the frame has no slot for it`,
+  "gate",
+); // AllyHigherStatMultiplierAbAttr, Defense and Sp. Def of the ally

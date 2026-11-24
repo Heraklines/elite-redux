@@ -1,8 +1,112 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "12fab64b4871c9",
-  "hash": "191fc7497820ea",
+  "hash": "1b6097b53204b9",
   "blocks": [
+    {
+      "id": "block.ally-higher-stat-multiplier",
+      "className": "AllyHigherStatMultiplierAbAttr",
+      "label": "Multiply the best of my ally's chosen stats",
+      "summary": "While my ally's stats are worked out, the ally's highest of Attack, Sp. Atk is multiplied by 1.5, if the conditions hold. Example: x1.5 to the ally's better attack in sun.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "flower gift for allies",
+        "ally best stat boost",
+        "boost my partner's strongest stat",
+        "partner offense up",
+        "partner defense up",
+        "team stat boost"
+      ],
+      "examples": [
+        "Multiply my ally's higher attacking stat by 1.5 in sun, like Flower Gift",
+        "Multiply my ally's higher defensive stat by 1.5 in sun"
+      ],
+      "params": [
+        {
+          "id": "candidates",
+          "label": "Which of my ally's stats to compare (the highest of them is multiplied)",
+          "control": "select",
+          "default": "Attack, Sp. Atk",
+          "editable": true,
+          "options": [
+            "Attack, Defense",
+            "Attack, Sp. Atk",
+            "Defense, Sp. Atk",
+            "Attack, Sp. Def",
+            "Defense, Sp. Def",
+            "Sp. Atk, Sp. Def",
+            "Attack, Speed",
+            "Defense, Speed",
+            "Sp. Atk, Speed",
+            "Sp. Def, Speed",
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Attack, Defense, Sp. Atk",
+            "Sp. Def",
+            "Attack, Defense, Sp. Def",
+            "Attack, Sp. Atk, Sp. Def",
+            "Defense, Sp. Atk, Sp. Def",
+            "Speed",
+            "Attack, Defense, Speed",
+            "Attack, Sp. Atk, Speed",
+            "Defense, Sp. Atk, Speed",
+            "Attack, Sp. Def, Speed",
+            "Defense, Sp. Def, Speed",
+            "Sp. Atk, Sp. Def, Speed",
+            "Attack, Defense, Sp. Atk, Sp. Def",
+            "Attack, Defense, Sp. Atk, Speed",
+            "Attack, Defense, Sp. Def, Speed",
+            "Attack, Sp. Atk, Sp. Def, Speed",
+            "Defense, Sp. Atk, Sp. Def, Speed",
+            "Attack, Defense, Sp. Atk, Sp. Def, Speed"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "multiplier",
+          "label": "Multiplier (1.5 = half as much again, 2 = double)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Switched off when the attacker ignores my ability (Mold Breaker style)",
+        "Only the listed stats can be multiplied, never Accuracy or Evasion",
+        "The highest stat is picked by the ally's real stat value right now, before stat stages; when two are equal the one listed first wins"
+      ],
+      "effect": {
+        "id": "effect.multiply-stat",
+        "params": [
+          "candidates",
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
     {
       "id": "block.attack-type-immunity",
       "className": "AttackTypeImmunityAbAttr",
@@ -81,6 +185,102 @@
         "do": true
       },
       "uses": 21
+    },
+    {
+      "id": "block.attacker-type-damage-reduction",
+      "className": "AttackerTypeDamageReductionAbAttr",
+      "label": "Take less damage from attackers of one type",
+      "summary": "Damaging moves used by a Water-type Pokemon do damage multiplied by 0.5 to me. Example: Water and 0.5 means Water-type attackers do half damage.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.damage-taken",
+      "whenLabel": "While the game calculates damage I take",
+      "synonyms": [
+        "resist attackers of a type",
+        "half damage from water types",
+        "damage reduction against a type of Pokemon",
+        "bulky against one type",
+        "type resistance by attacker",
+        "marine apex",
+        "king of the jungle"
+      ],
+      "examples": [
+        "Take half damage from moves used by Water-type Pokemon, like Marine Apex",
+        "Take half damage from Grass-type attackers, like King of the Jungle"
+      ],
+      "params": [
+        {
+          "id": "attackerType",
+          "label": "Type of the attacker (the Pokemon using the move, not the move's own type)",
+          "control": "select",
+          "default": "WATER",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Damage multiplier (0.5 = half damage, 1 = no change, 2 = double)",
+          "control": "number",
+          "default": 0.5,
+          "editable": true,
+          "min": 0,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Skipped when the attacker ignores my ability (Mold Breaker style)"
+      ],
+      "gateParams": [
+        {
+          "param": "attackerType",
+          "block": "mon.has-type",
+          "field": "type"
+        }
+      ],
+      "effect": {
+        "id": "effect.multiply-damage-taken",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.ball-recovery",
@@ -401,6 +601,73 @@
       "uses": 2
     },
     {
+      "id": "block.fainted-ally-stat-multiplier",
+      "className": "FaintedAllyStatMultiplierAbAttr",
+      "label": "Raise an attack stat for every fainted party member",
+      "summary": "My Attack goes up by 5% for every other party member that has fainted. Example: 5% with 2 fainted gives x1.10.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "avenger",
+        "revenge boost",
+        "stronger for each fallen ally",
+        "fainted teammate boost",
+        "attack up per ko",
+        "grow stronger when allies faint"
+      ],
+      "examples": [
+        "Raise my Attack by 5% for every fainted teammate, like Avenger",
+        "Raise my Sp. Atk by 10% for each ally that has fallen"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which attack stat grows (Attack or Sp. Atk)",
+          "control": "select",
+          "default": "ATK",
+          "editable": true,
+          "options": [
+            "ATK",
+            "SPATK"
+          ]
+        },
+        {
+          "id": "perFaintedAlly",
+          "label": "Boost for each fainted party member (% of the stat, 5 = 5%)",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 0.5,
+          "max": 100,
+          "step": 0.5
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only the chosen stat is changed",
+        "Only the other members of my own side's party count (I am never counted)",
+        "Nothing changes while no party member has fainted (the count starts at 0)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "stat",
+          "perFaintedAlly"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package for the effect only, justified in the header (request R-B18-29); the trigger is a separate block and the class owns no condition. Tier C: nothing to bind (the parent gets no closure). Users (2 attrs, both in Avenger 5030): attr 3 Attack and attr 4 Sp. Atk, each 0.05 (5%). The share is stored as a fraction (0.05) and shown to staff as a whole percent (5) through fractionAsPercentCodec; 5 / 100 is exactly the literal 0.05, so a rebuild is identical. Oddities, not fixed: (a) the parent `multiplier` stays 1, so code that reads it (the studio's reflection) sees 1, not the formula; (b) the multiplier is applied on every stat query including previews and the AI, and the party is read live each time; (c) the count is not capped (a full party of 5 fainted allies gives x1.25); (d) a party of the enemy side counts the enemy party, including benched members; (e) the class declares only the offensive stats in its type, but any stat would work.",
+      "uses": 2
+    },
+    {
       "id": "block.field-poison-weakness-on-entry",
       "className": "FieldPoisonWeaknessOnEntryAbAttr",
       "label": "Make everyone on the field weak to Poison",
@@ -632,6 +899,204 @@
         "do": true
       },
       "uses": 5
+    },
+    {
+      "id": "block.full-hp-move-type-damage-reduction",
+      "className": "FullHpMoveTypeDamageReductionAbAttr",
+      "label": "Take less damage from one move type while at full HP",
+      "summary": "While I am at full HP, Dragon-type moves do damage multiplied by 0.5 to me. Example: Dragon and 0.5 means Dragon moves do half damage until I get hurt.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.damage-taken",
+      "whenLabel": "While the game calculates damage I take",
+      "synonyms": [
+        "full hp resist",
+        "half damage from a type at full health",
+        "multiscale for one type",
+        "resist dragon at full hp",
+        "damage reduction at full hp",
+        "drakelp head"
+      ],
+      "examples": [
+        "Take half damage from Dragon moves while at full HP, like Drakelp Head",
+        "Take half damage from Ice moves while at full HP"
+      ],
+      "params": [
+        {
+          "id": "moveType",
+          "label": "Type of the incoming move",
+          "control": "select",
+          "default": "DRAGON",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Damage multiplier (0.5 = half damage, 1 = no change, 2 = double)",
+          "control": "number",
+          "default": 0.5,
+          "editable": true,
+          "min": 0,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Skipped when the attacker ignores my ability (Mold Breaker style)"
+      ],
+      "gateParams": [
+        {
+          "param": "moveType",
+          "block": "move.type",
+          "field": "type"
+        }
+      ],
+      "effect": {
+        "id": "effect.multiply-damage-taken",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.higher-stat-multiplier",
+      "className": "HigherStatMultiplierAbAttr",
+      "label": "Multiply the best of my chosen stats",
+      "summary": "While my stats are worked out, the highest of Attack, Sp. Atk is multiplied by 1.5, if the conditions hold. Example: x1.5 to my better attacking stat in sun.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "flower gift",
+        "best attacking stat boost",
+        "highest stat boost",
+        "boost my strongest stat",
+        "better offense up",
+        "better defense up"
+      ],
+      "examples": [
+        "Multiply my higher attacking stat by 1.5 in sun, like Flower Gift",
+        "Multiply my higher defensive stat by 1.5 in sun"
+      ],
+      "params": [
+        {
+          "id": "candidates",
+          "label": "Which stats to compare (the highest of them is multiplied)",
+          "control": "select",
+          "default": "Attack, Sp. Atk",
+          "editable": true,
+          "options": [
+            "Attack, Defense",
+            "Attack, Sp. Atk",
+            "Defense, Sp. Atk",
+            "Attack, Sp. Def",
+            "Defense, Sp. Def",
+            "Sp. Atk, Sp. Def",
+            "Attack, Speed",
+            "Defense, Speed",
+            "Sp. Atk, Speed",
+            "Sp. Def, Speed",
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Attack, Defense, Sp. Atk",
+            "Sp. Def",
+            "Attack, Defense, Sp. Def",
+            "Attack, Sp. Atk, Sp. Def",
+            "Defense, Sp. Atk, Sp. Def",
+            "Speed",
+            "Attack, Defense, Speed",
+            "Attack, Sp. Atk, Speed",
+            "Defense, Sp. Atk, Speed",
+            "Attack, Sp. Def, Speed",
+            "Defense, Sp. Def, Speed",
+            "Sp. Atk, Sp. Def, Speed",
+            "Attack, Defense, Sp. Atk, Sp. Def",
+            "Attack, Defense, Sp. Atk, Speed",
+            "Attack, Defense, Sp. Def, Speed",
+            "Attack, Sp. Atk, Sp. Def, Speed",
+            "Defense, Sp. Atk, Sp. Def, Speed",
+            "Attack, Defense, Sp. Atk, Sp. Def, Speed"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "multiplier",
+          "label": "Multiplier (1.5 = half as much again, 2 = double)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only the listed stats can be multiplied, never Accuracy or Evasion",
+        "The highest stat is picked by the real stat value right now, before stat stages; when two are equal the one listed first wins (Attack before Sp. Atk)"
+      ],
+      "effect": {
+        "id": "effect.multiply-stat",
+        "params": [
+          "candidates",
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.holder-and-allies-recovery",
@@ -1067,6 +1532,101 @@
         "do": true
       },
       "uses": 2
+    },
+    {
+      "id": "block.post-defend-add-tag",
+      "className": "PostDefendAddTagAbAttr",
+      "label": "Get a battle effect after another Pokemon damages me",
+      "summary": "After a damaging Electric-type move from another Pokemon hits me, I get the battle effect Charged (if I do not have it yet). Example: Electric hits charge me.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "charge when hit by electric",
+        "get charged after a hit",
+        "power up when hit",
+        "gain an effect when hit",
+        "lightning born",
+        "electromorphosis for one type"
+      ],
+      "examples": [
+        "Become Charged when an Electric move hits me, like Lightning Born",
+        "Gain a battle effect whenever another Pokemon damages me"
+      ],
+      "params": [
+        {
+          "id": "tag",
+          "label": "Battle effect I gain (Charged: my next Electric move is twice as strong)",
+          "control": "select",
+          "default": "CHARGED",
+          "editable": false,
+          "options": [
+            "CHARGED"
+          ]
+        },
+        {
+          "id": "moveType",
+          "label": "Only moves of this type give it",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens if I already have the battle effect",
+        "Nothing happens when the game only previews the hit"
+      ],
+      "gateParams": [
+        {
+          "param": "moveType",
+          "block": "move.type",
+          "field": "type"
+        }
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": [
+          "tag"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.post-defend-contact-apply-status-effect",
@@ -1519,6 +2079,154 @@
         "do": true
       },
       "uses": 64
+    },
+    {
+      "id": "block.reverse-negative-stat-changes",
+      "className": "ReverseNegativeStatChangesAbAttr",
+      "label": "Turn a stat drop into a boost of the same size",
+      "summary": "When another Pokemon would lower one of my stats, the drop is blocked and I get the same stat raised by the same number of stages. Example: -2 Attack becomes +2 Attack.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "cancel.stat-drop",
+      "whenLabel": "While the game checks if a stat drop can land on me",
+      "synonyms": [
+        "reverse stat drops",
+        "stat drops become boosts",
+        "contrary for others",
+        "flip stat changes",
+        "change of heart",
+        "turn debuffs into buffs"
+      ],
+      "examples": [
+        "When a foe lowers my Speed by 1, raise my Speed by 1 instead, like Change of Heart",
+        "Intimidate makes me stronger instead of weaker"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens when another effect already blocked the drop",
+        "Only drops that have a source count (a change that comes from a Pokemon or an effect)",
+        "The boost is not queued while the game is only previewing"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package for the effect only, justified in the header (request R-B18-26); the trigger (cancel.stat-drop) and the drop test (stage.just-changed lowered, the gate) are separate blocks. User (1 attr): Change of Heart (5234 attr 1). Class change (pure move of the old canApply into guards / gate / residual, same order). OPEN REQUEST R-B18-25: `source !== null` has no atom, so it stays in the residual; when the atom exists it moves into the gate. SUSPECTED GAME BUG, NOT FIXED: no code dispatches PreStatStageChangeAbAttr (grep over src finds only the type and the phase's other keys; decomp-l2-reach.json already lists cancel.stat-drop as never evaluated), so Change of Heart's reversal never happens in a real battle; ReflectStatStageChangeAbAttr works because it has its own dispatch call. Second oddity: the parameter type says `source` is OMITTED (undefined) for self-inflicted drops, but the test is `source !== null`, which is true for undefined, so if the class were ever dispatched it would also reverse a drop the holder caused itself. Third: the boost goes out with selfTarget true and the ability pop-up shows (showAbility true), apply sets `cancelled` even for simulated calls.",
+      "uses": 1
+    },
+    {
+      "id": "block.same-type-stab-otherwise-boost",
+      "className": "SameTypeStabOtherwiseBoostAbAttr",
+      "label": "Boost moves of a type I do not have",
+      "summary": "Rock-type moves I use get their power multiplied by 1.2 while I am not Rock-type myself. Example: Rock and 1.2 gives +20% power.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "off type bonus",
+        "fake same type bonus",
+        "boost a type I am not",
+        "stab for another type",
+        "fossilized",
+        "raw wood",
+        "power up moves of a type"
+      ],
+      "examples": [
+        "Boost Rock moves by 20% when I am not a Rock type, like Fossilized",
+        "Boost Grass moves by 20% on a Pokemon that is not a Grass type, like Raw Wood"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Type of the move that gets the bonus",
+          "control": "select",
+          "default": "ROCK",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "fallbackMultiplier",
+          "label": "Power multiplier (1.2 = +20% power, 1.5 = +50%)",
+          "control": "number",
+          "default": 1.2,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "gateParams": [
+        {
+          "param": "type",
+          "block": "move.type",
+          "field": "type"
+        },
+        {
+          "param": "type",
+          "block": "mon.has-type",
+          "field": "type"
+        }
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "fallbackMultiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.telekinetic-struggle-on-entry",

@@ -86,6 +86,15 @@ export function reachProblems(
       });
     }
   }
+  // B18 chunk 3 (request R-B18-0b): a declaration with a written l2StaticReason for a trigger the engine never reaches is verified
+  // statically (its own probes drive the class directly), so "the original never evaluated the attr" is the known, explained answer.
+  if (
+    scenario.when !== undefined
+    && scenario.staticReason !== undefined
+    && unreachedWhens()[scenario.when] !== undefined
+  ) {
+    return problems;
+  }
   const events = original.attrEvents.filter(event => event.startsWith(`${abilityId}#`));
   if (reach?.presenceOnly === true) {
     return problems;
