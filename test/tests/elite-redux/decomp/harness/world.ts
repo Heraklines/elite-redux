@@ -375,4 +375,11 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
   }),
   // B18 chunk 1. The turn-order jump check hands over only the holder (BypassSpeedChanceAbAttr: pokemon, simulated).
   "calc.speed-bypass": ({ holder }) => ({ pokemon: holder, simulated: false }),
+  // B18 chunk 2. The effect-chance calc hands over the target (holder), the move and the chance as a holder; the grid uses the move's own chance.
+  "calc.incoming-effect-chance": ({ holder, move }) => ({
+    pokemon: holder,
+    move,
+    simulated: false,
+    chance: new NumberHolder(move.chance),
+  }),
 };

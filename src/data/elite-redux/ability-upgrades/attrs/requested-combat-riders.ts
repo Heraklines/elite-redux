@@ -24,6 +24,7 @@ import {
   type TypeMultiplierAbAttrParams,
 } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import type { AbilityId } from "#enums/ability-id";
@@ -55,6 +56,14 @@ export class FieldPoisonWeaknessOnEntryAbAttr extends PostSummonAbAttr {
 
 /** Forces the first living opposing lead to use Struggle for its next turn only. */
 export class TelekineticStruggleOnEntryAbAttr extends PostSummonAbAttr {
+  /** Foe types that are not affected (Psychic and Dark by default). */
+  private readonly immuneTypes: readonly PokemonType[];
+
+  constructor(immuneTypes: readonly PokemonType[] = [PokemonType.PSYCHIC, PokemonType.DARK]) {
+    super();
+    this.immuneTypes = immuneTypes;
+  }
+
   override apply({ pokemon, simulated }: Parameters<PostSummonAbAttr["apply"]>[0]): void {
     if (simulated) {
       return;
@@ -69,8 +78,7 @@ export class TelekineticStruggleOnEntryAbAttr extends PostSummonAbAttr {
     const opponent = pokemon.getOpponents(false).find(candidate => !candidate.isFainted());
     if (
       !opponent
-      || opponent.isOfType(PokemonType.PSYCHIC)
-      || opponent.isOfType(PokemonType.DARK)
+      || this.immuneTypes.some(type => opponent.isOfType(type))
       || abilityQuery(opponent, ENGINE_QUERY.HEAVY_METAL_WEIGHT)
       || (superheavyId !== undefined && opponent.hasAbility(superheavyId))
     ) {
@@ -82,12 +90,17 @@ export class TelekineticStruggleOnEntryAbAttr extends PostSummonAbAttr {
 
 /** Removes Blistering Sun's linked Tailwind when its source leaves the field. */
 export class PreLeaveFieldRemoveLinkedTailwindAbAttr extends PreLeaveFieldAbAttr {
+  /** The field effect that ends on the holder's side (Tailwind by default). */
+  private readonly tag: ArenaTagType;
+
+  constructor(tag: ArenaTagType = ArenaTagType.TAILWIND) {
+    super();
+    this.tag = tag;
+  }
+
   override apply({ pokemon, simulated }: Parameters<PreLeaveFieldAbAttr["apply"]>[0]): void {
     if (!simulated) {
-      globalScene.arena.removeTagOnSide(
-        ArenaTagType.TAILWIND,
-        pokemon.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY,
-      );
+      globalScene.arena.removeTagOnSide(this.tag, pokemon.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY);
     }
   }
 }
@@ -99,12 +112,37 @@ export interface BreakScreensOnAttackOptions {
 
 /** Removes the target side's screens after a qualifying damaging hit. */
 export class BreakScreensOnAttackAbAttr extends PostAttackAbAttr {
-  constructor(private readonly options: BreakScreensOnAttackOptions = {}) {
+  constructor(
+    private readonly options: BreakScreensOnAttackOptions = {},
+    /** The field effects removed from the target's side (the three screens by default). */
+    private readonly screens: readonly ArenaTagType[] = SCREEN_TAGS,
+  ) {
     super(undefined, false);
   }
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1). The old `canApply` was `damaging && opponent standing && contact && flag`.
+   * Every clause is a pure read (no draw, no write), so the "opponent standing" safety rule now runs first and the
+   * three replaceable clauses are one gate; the answer for every input is unchanged.
+   */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    if (!super.canApply(params) || !params.opponent || params.opponent.isFainted()) {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The target must still be standing. Moved verbatim from the old `canApply`. */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    return !!params.opponent && !params.opponent.isFainted();
+  }
+
+  /**
+   * The replaceable conditions, in the old order: the move deals damage (the inherited default attack condition),
+   * it makes contact (when the option asks for it), it carries the option's move flag. Moved verbatim from the old `canApply`.
+   */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    if (!super.canApply(params)) {
       return false;
     }
     if (
@@ -125,7 +163,7 @@ export class BreakScreensOnAttackAbAttr extends PostAttackAbAttr {
       return;
     }
     globalScene.arena.removeTagsOnSide(
-      [...SCREEN_TAGS],
+      [...this.screens],
       opponent.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY,
     );
   }

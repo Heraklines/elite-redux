@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "12fab64b4871c9",
-  "hash": "0ebbd0c0c19d67",
+  "hash": "0f07cd0fc32742",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -240,6 +240,114 @@
       "uses": 3
     },
     {
+      "id": "block.break-screens-on-attack",
+      "className": "BreakScreensOnAttackAbAttr",
+      "label": "Break the target's screens after my attack hits",
+      "summary": "After my damaging attack hits, the target's side loses Reflect, Light screen, Aurora veil. The conditions decide which hits count (move property required now: None).",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "brick break",
+        "screen breaker",
+        "shatter screens",
+        "remove reflect",
+        "juggernaut",
+        "precise fist",
+        "break light screen"
+      ],
+      "examples": [
+        "After a contact move hits, remove the foe's screens, like Juggernaut"
+      ],
+      "params": [
+        {
+          "id": "requiredProperty",
+          "label": "Only moves with this property break screens (None = any damaging move)",
+          "control": "select",
+          "default": "NONE",
+          "editable": false,
+          "options": [
+            "NONE",
+            "MAKES_CONTACT",
+            "IGNORE_PROTECT",
+            "SOUND_BASED",
+            "HIDE_USER",
+            "HIDE_TARGET",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "IGNORE_ABILITIES",
+            "CHECK_ALL_HITS",
+            "IGNORE_SUBSTITUTE",
+            "REFLECTABLE",
+            "GRAVITY",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        },
+        {
+          "id": "screens",
+          "label": "Field effects removed from the target's side (comma separated)",
+          "control": "text",
+          "default": "REFLECT,LIGHT_SCREEN,AURORA_VEIL",
+          "editable": true,
+          "options": [
+            "REFLECT",
+            "LIGHT_SCREEN",
+            "AURORA_VEIL",
+            "MIST",
+            "SAFEGUARD",
+            "TAILWIND"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The target must still be standing",
+        "Nothing is removed while the game is only previewing",
+        "Only the listed field effects are removed, and only from the target's side"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "screens"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
       "id": "block.experience-gain-multiplier",
       "className": "ExperienceGainMultiplierAbAttr",
       "label": "Gain more (or less) experience",
@@ -283,6 +391,114 @@
         "id": "effect.package",
         "params": [
           "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.field-poison-weakness-on-entry",
+      "className": "FieldPoisonWeaknessOnEntryAbAttr",
+      "label": "Make everyone on the field weak to Poison",
+      "summary": "When I enter the battle, every Pokemon on the field (mine, my allies and the foes) takes at least double damage from Poison moves while it stays in. Poison-immune Pokemon stay immune.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "toxic spill",
+        "poison weakness",
+        "everyone weak to poison",
+        "poison field",
+        "super effective poison",
+        "poison hazard"
+      ],
+      "examples": [
+        "Everyone on the field becomes weak to Poison when I come in, like Toxic Spill"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Nothing is marked while the game is only previewing"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.first-entry-party-heal",
+      "className": "FirstEntryPartyHealAbAttr",
+      "label": "Heal the whole party the first time I enter",
+      "summary": "The first time I enter the battle, every living party member that is hurt heals 10% of its max HP. Example: 10 heals a tenth. It happens once per battle.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "pastel veil",
+        "sweet veil",
+        "heal team on entry",
+        "party heal",
+        "heal everyone once",
+        "team recovery"
+      ],
+      "examples": [
+        "Heal my whole party by 10% of their max HP when I first come in, like Pastel Veil"
+      ],
+      "params": [
+        {
+          "id": "key",
+          "label": "Memory name that keeps this to once per battle (leave as is)",
+          "control": "text",
+          "default": "party-heal",
+          "editable": false
+        },
+        {
+          "id": "healFraction",
+          "label": "Heal each hurt party member by (% of its max HP)",
+          "control": "slider",
+          "default": 10,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "time.once-per",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only party members that are alive and not at full HP are healed",
+        "A member on the field is healed with the normal healing animation; a member in the back is healed at once",
+        "Nothing is healed while the game is only previewing"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "healFraction"
         ]
       },
       "reusableAlone": {
@@ -383,6 +599,59 @@
         "do": true
       },
       "uses": 5
+    },
+    {
+      "id": "block.holder-and-allies-recovery",
+      "className": "HolderAndAlliesRecoveryAbAttr",
+      "label": "Heal me and my neighbouring allies every turn",
+      "summary": "At the end of every turn, I and each ally next to me that is hurt heals 6.25% of its max HP. Example: 6.25 is one sixteenth.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "soothing aroma",
+        "butter up",
+        "end of turn heal",
+        "heal allies each turn",
+        "leftovers for the team",
+        "regenerate partner"
+      ],
+      "examples": [
+        "Heal me and my partner by a sixteenth of max HP at the end of each turn"
+      ],
+      "params": [
+        {
+          "id": "healFraction",
+          "label": "Heal each hurt Pokemon by (% of its max HP, 6.25 = one sixteenth)",
+          "control": "slider",
+          "default": 6.25,
+          "editable": true,
+          "min": 0.25,
+          "max": 100,
+          "step": 0.25
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one of me or an ally next to me must be alive and below full HP",
+        "Only allies standing next to me are healed, never one further away or in the back",
+        "Nothing is healed while the game is only previewing"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "healFraction"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.hp-threshold-form-change",
@@ -529,6 +798,49 @@
       "reusableAlone": {
         "when": true,
         "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.ignore-optional-move-effects",
+      "className": "IgnoreOptionalMoveEffectsAbAttr",
+      "label": "Block uncertain extra effects of moves that hit me",
+      "summary": "A move that hits me loses its extra effect (burn, flinch, stat drop...) when that effect only happens some of the time, between 1% and 99%. Guaranteed effects still happen.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.incoming-effect-chance",
+      "whenLabel": "While the game calculates effect chance against me",
+      "synonyms": [
+        "shield dust",
+        "aroma veil",
+        "block secondary effects",
+        "ignore added effects",
+        "no flinch chance",
+        "covert cloak"
+      ],
+      "examples": [
+        "Moves that only sometimes burn or flinch have no extra effect on me, like Shield Dust"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
         "do": true
       },
       "uses": 1
@@ -971,6 +1283,68 @@
       "uses": 7
     },
     {
+      "id": "block.pre-leave-field-remove-linked-tailwind",
+      "className": "PreLeaveFieldRemoveLinkedTailwindAbAttr",
+      "label": "End a field effect on my side when I leave the field",
+      "summary": "When I leave the field (switched out or fainted), the Tailwind on my side ends. Example: Tailwind ends with me, which keeps it tied to my own weather.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.leave-field",
+      "whenLabel": "When I leave the field",
+      "synonyms": [
+        "blistering sun",
+        "end tailwind",
+        "clear tailwind",
+        "linked tailwind",
+        "tailwind ends with me",
+        "remove my field effect"
+      ],
+      "examples": [
+        "When I leave, my side's Tailwind ends too, like Blistering Sun"
+      ],
+      "params": [
+        {
+          "id": "tag",
+          "label": "Field effect that ends on my side",
+          "control": "select",
+          "default": "TAILWIND",
+          "editable": true,
+          "options": [
+            "TAILWIND",
+            "REFLECT",
+            "LIGHT_SCREEN",
+            "AURORA_VEIL",
+            "MIST",
+            "SAFEGUARD",
+            "SPIKES",
+            "TOXIC_SPIKES",
+            "STEALTH_ROCK",
+            "STICKY_WEB",
+            "TRICK_ROOM"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens while the game is only previewing",
+        "Only the field effect on my own side is removed"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "tag"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.provenance-bypass-speed-chance",
       "className": "ProvenanceBypassSpeedChanceAbAttr",
       "label": "Sometimes jump ahead in the turn order",
@@ -1112,6 +1486,121 @@
         "do": true
       },
       "uses": 64
+    },
+    {
+      "id": "block.telekinetic-struggle-on-entry",
+      "className": "TelekineticStruggleOnEntryAbAttr",
+      "label": "Force the first foe to use only Struggle for one turn",
+      "summary": "When I enter the battle, the first living foe can only use Struggle on its next turn. Foes of these types are not affected: Psychic, Dark. Heavy Metal and super heavy foes are never affected.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "telekinetic",
+        "struggle lock",
+        "lock the foe's moves",
+        "no moves for a turn",
+        "disable all moves",
+        "one turn lockout"
+      ],
+      "examples": [
+        "The foe in front can only Struggle on its first turn, like Telekinetic"
+      ],
+      "params": [
+        {
+          "id": "immuneTypes",
+          "label": "Foe types that are not affected (comma separated)",
+          "control": "text",
+          "default": "PSYCHIC,DARK",
+          "editable": true,
+          "options": [
+            "UNKNOWN",
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "There must be a foe that is still standing",
+        "The foe must not be one of the immune types (Psychic or Dark by default)",
+        "The foe must not have Heavy Metal weight or the super heavy ability",
+        "Nothing happens while the game is only previewing"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "immuneTypes"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.user-field-ignore-optional-move-effects",
+      "className": "UserFieldIgnoreOptionalMoveEffectsAbAttr",
+      "label": "Block uncertain extra effects for me and my allies",
+      "summary": "A move that hits me or my ally loses its extra effect when that effect only happens some of the time, between 1% and 99%. Guaranteed effects still happen.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.incoming-effect-chance",
+      "whenLabel": "While the game calculates effect chance against me",
+      "synonyms": [
+        "aroma veil",
+        "side wide shield dust",
+        "protect allies from side effects",
+        "team shield dust",
+        "desert cloak"
+      ],
+      "examples": [
+        "My whole side ignores uncertain extra effects, like the ally half of Aroma Veil"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     }
   ]
 }
