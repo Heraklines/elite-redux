@@ -30,6 +30,7 @@ import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
+import { PokemonMove } from "#moves/pokemon-move";
 import type { GameManager } from "#test/framework/game-manager";
 import { BooleanHolder, NumberHolder } from "#utils/common";
 
@@ -357,6 +358,14 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
   // B03: PostKnockOutAbAttr is dispatched for every Pokemon on the field with `victim` = the Pokemon that fainted
   // (faint-phase.ts). The single-battle grid can only offer the foe as the victim.
   "event.on-ko": ({ holder, foe }) => ({ pokemon: holder, victim: foe, simulated: false }),
+  // PostMoveUsedAbAttr: the engine passes the SOURCE's PokemonMove (canApply calls move.getMove()) and the targets (B06 chunk 2).
+  "event.after-any-move": ({ holder, foe, move }) => ({
+    pokemon: holder,
+    source: foe,
+    move: new PokemonMove(move.id),
+    targets: [foe.getBattlerIndex()],
+    simulated: false,
+  }),
   "calc.damage-taken": ctx => ({
     pokemon: ctx.holder,
     opponent: ctx.foe,

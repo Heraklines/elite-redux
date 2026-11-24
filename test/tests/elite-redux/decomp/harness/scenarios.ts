@@ -391,6 +391,8 @@ const WHEN_TEMPLATE: Readonly<Record<string, string>> = {
   "event.faint": t.faint,
   "event.end-of-turn": t.quiet,
   "event.wake-up": t.quiet,
+  // BerryPhase runs on every turn, so the quiet turns reach the Cud Chew moment (B06 chunk 1).
+  "event.berry-phase-end": t.quiet,
   "event.flinched": t.hit,
   "event.berry-eaten": t.low,
   "event.before-i-use-move": t.attack,
@@ -423,6 +425,8 @@ const WHEN_TEMPLATE: Readonly<Record<string, string>> = {
   "calc.double-battle-chance": t.quiet,
   "calc.weight": t.hit,
   "calc.burn-damage": t.inflicted,
+  // The holder attacks while burned (probe axis status BURN), so the damage calculation asks it (B06 chunk 2).
+  "cancel.burn-attack-cut": t.attack,
   "calc.status-duration": t.inflicted,
   "calc.berry-effect": t.low,
   "calc.berry-threshold": t.low,

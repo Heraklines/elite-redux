@@ -5817,8 +5817,25 @@ export class PostTurnStatusHealAbAttr extends PostTurnAbAttr {
     this.effects = effects;
   }
 
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
-    return pokemon.status != null && this.effects.includes(pokemon.status.effect) && !pokemon.isFullHp();
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `guards` (I have one of the listed statuses),
+   * then the replaceable `gate` (I am not at full HP).
+   */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The listed statuses are what this ability is about (the `statuses` setting), so they stay in the class. */
+  public guards({ pokemon }: AbAttrBaseParams): boolean {
+    return pokemon.status != null && this.effects.includes(pokemon.status.effect);
+  }
+
+  /** The replaceable condition: I am not at full HP. */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
+    return !pokemon.isFullHp();
   }
 
   override apply(params: AbAttrBaseParams): void {
@@ -5850,7 +5867,21 @@ export class PostTurnResetStatusAbAttr extends PostTurnAbAttr {
     this.allyTarget = allyTarget;
   }
 
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order: `guards` picks who would be cured (and stores
+   * it in `target`, as the old `canApply` did first thing), `prepare` hands that Pokemon to the gate as its `pokemon`,
+   * `gate` is the status test. For the ally mode the pick already ran the same status test, so the gate repeats it
+   * with the same answer; the pick is the only place that looks at the ally.
+   */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** Who would be cured: me, or the first adjacent ally that has a status. No one to cure means no trigger. */
+  public guards({ pokemon }: AbAttrBaseParams): boolean {
     if (this.allyTarget) {
       // Triple: heal the first ADJACENT ally that actually has a curable status - a wing has
       // two mons beside it in effect (via the centre), and the old code only ever looked at the
@@ -5861,11 +5892,20 @@ export class PostTurnResetStatusAbAttr extends PostTurnAbAttr {
     } else {
       this.target = pokemon;
     }
+    return this.target != null;
+  }
 
-    const effect = this.target?.status?.effect;
+  /** The gate looks at the Pokemon that would be cured (me, or the picked ally). */
+  public prepare(params: AbAttrBaseParams): AbAttrBaseParams {
+    return { ...params, pokemon: this.target as Pokemon };
+  }
+
+  /** The replaceable condition: the Pokemon to cure has a status or an ER ailment. */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
+    const effect = pokemon.status?.effect;
     // ER: also fire for an ER ailment tag (FROSTBITE/BLEED/FEAR) even with no
     // vanilla status — Shed Skin / Hydration / Healer should clear those too.
-    return (!!effect && effect !== StatusEffect.FAINT) || (this.target != null && hasErAilment(this.target));
+    return (!!effect && effect !== StatusEffect.FAINT) || hasErAilment(pokemon);
   }
 
   override apply({ simulated }: AbAttrBaseParams): void {
@@ -5980,10 +6020,18 @@ export class PostTurnRestoreBerryAbAttr extends PostTurnAbAttr {
  * @sealed
  */
 export class CudChewConsumeBerryAbAttr extends AbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole old `canApply` is the replaceable `gate`. */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
   /**
    * @returns `true` if the pokemon ate anything last turn
    */
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     return pokemon.summonData.berriesEatenLast.length > 0;
   }
 
@@ -6038,7 +6086,14 @@ export class CudChewRecordBerryAbAttr extends PostTurnAbAttr {
  * @see {@link https://bulbapedia.bulbagarden.net/wiki/Moody_(Ability) | Moody (Bulbapedia)}
  */
 export class MoodyAbAttr extends PostTurnAbAttr {
-  constructor() {
+  /**
+   * @param raise - Stages the randomly chosen stat goes up by. Defaults to 2, the value of the base game.
+   * @param lower - Stages the second, different, randomly chosen stat goes down by. Defaults to 1.
+   */
+  constructor(
+    private readonly raise = 2,
+    private readonly lower = 1,
+  ) {
     super(true);
   }
   /**
@@ -6058,11 +6113,23 @@ export class MoodyAbAttr extends PostTurnAbAttr {
       if (canRaise.length > 0) {
         const raisedStat = canRaise[pokemon.randBattleSeedInt(canRaise.length)];
         canLower = canLower.filter(s => s !== raisedStat);
-        globalScene.phaseManager.unshiftNew("StatStageChangePhase", pokemon.getBattlerIndex(), true, [raisedStat], 2);
+        globalScene.phaseManager.unshiftNew(
+          "StatStageChangePhase",
+          pokemon.getBattlerIndex(),
+          true,
+          [raisedStat],
+          this.raise,
+        );
       }
       if (canLower.length > 0) {
         const loweredStat = canLower[pokemon.randBattleSeedInt(canLower.length)];
-        globalScene.phaseManager.unshiftNew("StatStageChangePhase", pokemon.getBattlerIndex(), true, [loweredStat], -1);
+        globalScene.phaseManager.unshiftNew(
+          "StatStageChangePhase",
+          pokemon.getBattlerIndex(),
+          true,
+          [loweredStat],
+          -this.lower,
+        );
       }
     }
   }
@@ -6070,17 +6137,39 @@ export class MoodyAbAttr extends PostTurnAbAttr {
 
 /** @sealed */
 export class SpeedBoostAbAttr extends PostTurnAbAttr {
-  constructor() {
+  /**
+   * @param stat - The stat that goes up. Defaults to Speed, the value of the base game.
+   * @param stages - How many stages it goes up by. Defaults to 1.
+   */
+  constructor(
+    private readonly stat: BattleStat = Stat.SPD,
+    private readonly stages = 1,
+  ) {
     super(true);
   }
 
-  override canApply({ simulated, pokemon }: AbAttrBaseParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole old `canApply` is the replaceable `gate`, clause order kept. */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The replaceable condition: a simulated call passes; a real one needs "did not switch in, did not fail to flee". */
+  public gate({ simulated, pokemon }: AbAttrBaseParams): boolean {
     // todo: Consider moving the `simulated` check to the `apply` method
     return simulated || (!pokemon.turnData.switchedInThisTurn && !pokemon.turnData.failedRunAway);
   }
 
   override apply({ pokemon }: AbAttrBaseParams): void {
-    globalScene.phaseManager.unshiftNew("StatStageChangePhase", pokemon.getBattlerIndex(), true, [Stat.SPD], 1);
+    globalScene.phaseManager.unshiftNew(
+      "StatStageChangePhase",
+      pokemon.getBattlerIndex(),
+      true,
+      [this.stat],
+      this.stages,
+    );
   }
 }
 
@@ -6274,7 +6363,26 @@ export class PostMoveUsedAbAttr extends AbAttr {
 
 /** Triggers after a dance move is used either by the opponent or the player */
 export class PostDancingMoveAbAttr extends PostMoveUsedAbAttr {
-  override canApply({ source, pokemon, move }: PostMoveUsedAbAttrParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveUsedAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): `gate` (the dance test, replaceable) then `residual`, in the original clause order. */
+  override canApply(params: PostMoveUsedAbAttrParams): boolean {
+    return gatedCanApply<PostMoveUsedAbAttrParams>(this, params);
+  }
+
+  /**
+   * The replaceable condition: only dance moves (the PostMoveUsed trigger now fires for ALL moves so ER
+   * copy-by-filter abilities can hook it; gate the vanilla Dancer here).
+   * Uses the user-aware flag check so ER move-flag injection (Taekkyeon:
+   * "all attacks are dances") makes the source's attacks count as dances.
+   */
+  public gate({ source, move }: PostMoveUsedAbAttrParams): boolean {
+    return move.getMove().doesFlagEffectApply({ flag: MoveFlags.DANCE_MOVE, user: source });
+  }
+
+  /** Kept in the class (feasibility): the move cannot come from the Dancer, and the Dancer cannot be semi-invulnerable. */
+  public residual({ source, pokemon }: PostMoveUsedAbAttrParams): boolean {
     /** Tags that prevent Dancer from replicating the move */
     const forbiddenTags = [
       BattlerTagType.FLYING,
@@ -6282,14 +6390,9 @@ export class PostDancingMoveAbAttr extends PostMoveUsedAbAttr {
       BattlerTagType.UNDERGROUND,
       BattlerTagType.HIDDEN,
     ];
-    // Only dance moves (the PostMoveUsed trigger now fires for ALL moves so ER
-    // copy-by-filter abilities can hook it; gate the vanilla Dancer here).
-    // Uses the user-aware flag check so ER move-flag injection (Taekkyeon:
-    // "all attacks are dances") makes the source's attacks count as dances.
     // The move to replicate cannot come from the Dancer.
     return (
-      move.getMove().doesFlagEffectApply({ flag: MoveFlags.DANCE_MOVE, user: source })
-      && source.getBattlerIndex() !== pokemon.getBattlerIndex()
+      source.getBattlerIndex() !== pokemon.getBattlerIndex()
       && !pokemon.summonData.tags.some(tag => forbiddenTags.includes(tag.tagType))
     );
   }
@@ -6889,11 +6992,14 @@ export interface ReduceStatusEffectDurationAbAttrParams extends AbAttrBaseParams
  */
 export class ReduceStatusEffectDurationAbAttr extends AbAttr {
   private readonly statusEffect: StatusEffect;
+  /** How many extra turns are taken off each time the duration is asked for (1 = Early Bird). */
+  private readonly turns: number;
 
-  constructor(statusEffect: StatusEffect) {
+  constructor(statusEffect: StatusEffect, turns = 1) {
     super(false);
 
     this.statusEffect = statusEffect;
+    this.turns = turns;
   }
 
   override canApply({ statusEffect }: ReduceStatusEffectDurationAbAttrParams): boolean {
@@ -6901,7 +7007,7 @@ export class ReduceStatusEffectDurationAbAttr extends AbAttr {
   }
 
   override apply({ duration }: ReduceStatusEffectDurationAbAttrParams): void {
-    duration.value -= 1;
+    duration.value -= this.turns;
   }
 }
 

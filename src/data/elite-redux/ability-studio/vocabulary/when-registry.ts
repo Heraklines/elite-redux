@@ -137,6 +137,16 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
   event("event.flinched", "FlinchEffectAbAttr", [H, SIM], "When I flinch", "Turn", {
     legacyHookId: "FlinchEffectAbAttr",
   }),
+  event(
+    "event.berry-phase-end",
+    "CudChewConsumeBerryAbAttr",
+    [H],
+    "When the berries of the turn have been eaten",
+    "Turn",
+    {
+      synonyms: ["after berry phase", "berry meal ends", "cud chew moment"],
+    },
+  ),
   event("event.berry-eaten", "HealFromBerryUseAbAttr", [H], "After I eat a berry", "Turn", {
     synonyms: ["berry consumed", "nom"],
   }),
@@ -342,8 +352,16 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     "While the game calculates burn damage on me",
     "Move flow",
     "burnDamage",
+  ),
+  calc(
+    "cancel.burn-attack-cut",
+    "BypassBurnDamageReductionAbAttr",
+    [H, SIM],
+    "While the game checks if my burn or frostbite weakens my attacks",
+    "Cancel checks",
+    "cancelled",
     {
-      alsoDispatchKeys: ["BypassBurnDamageReductionAbAttr"],
+      synonyms: ["guts", "rage point", "burn attack drop", "ignore burn"],
     },
   ),
   calc(

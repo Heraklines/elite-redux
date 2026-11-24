@@ -20,8 +20,6 @@
 export const UNEXPOSED_DISPATCH_KEYS: Readonly<Record<string, string>> = {
   AiMovegenMoveStatsAbAttr:
     "Only consulted while the enemy AI generates movesets (move.ts getMovegen stats). It is not a battle moment staff can react to.",
-  CudChewConsumeBerryAbAttr:
-    "Cud Chew's second berry meal is driven by the berry phase after turn end. A bespoke one-ability mechanic, shown as a package.",
   IllusionBreakAbAttr:
     "Internal Illusion bookkeeping, called by applySingleAbAttrs when a Pokemon leaves the field or is hit. Not a staff-facing moment.",
   PostSummonRemoveEffectAbAttr:
