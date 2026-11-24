@@ -2455,7 +2455,15 @@ function patchBadDreams(ability: MutableAbility): void {
 }
 
 /** ER Bad Dreams: 1/4 max HP per turn instead of vanilla's 1/8. */
-class ErBadDreamsAbAttr extends PostTurnHurtIfSleepingAbAttr {
+export class ErBadDreamsAbAttr extends PostTurnHurtIfSleepingAbAttr {
+  /** Share of each sleeping foe's max HP lost per turn, in percent (ability studio param; the default is ER's 25). */
+  public readonly damagePercent: number;
+
+  constructor(damagePercent = 25) {
+    super();
+    this.damagePercent = damagePercent;
+  }
+
   public override apply(params: Parameters<PostTurnHurtIfSleepingAbAttr["apply"]>[0]): void {
     if (params.simulated) {
       return;
@@ -2470,7 +2478,7 @@ class ErBadDreamsAbAttr extends PostTurnHurtIfSleepingAbAttr {
         continue;
       }
       // 1/4 max HP (ER) instead of vanilla's 1/8.
-      const damage = Math.max(1, Math.floor(opp.getMaxHp() / 4));
+      const damage = Math.max(1, Math.floor((opp.getMaxHp() * this.damagePercent) / 100));
       opp.damageAndUpdate(damage, { result: HitResult.INDIRECT });
     }
   }

@@ -43,6 +43,7 @@ import type { AbBuilder } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-debuff-on-flag-attack";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { ABILITY_STUDIO_RUNTIME_CAPABILITIES } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { AbilityStudioRuntimeCapabilityAbAttr } from "#data/elite-redux/ability-studio/runtime-components";
 import {
@@ -92,6 +93,7 @@ import { WeatherType } from "#enums/weather-type";
 import type { EnemyPokemon, Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
 import { getMoveTargets } from "#moves/move-utils";
+import type { PokemonAttackCondition } from "#types/ability-types";
 import type { Exact } from "#types/type-helpers";
 import type { NumberHolder } from "#utils/common";
 import {
@@ -207,7 +209,7 @@ class ElectromancyEffectChanceAbAttr extends MoveEffectChanceMultiplierAbAttr {
   }
 }
 
-class BallasterResetAbAttr extends PostSummonAbAttr {
+export class BallasterResetAbAttr extends PostSummonAbAttr {
   override apply({ pokemon }: AbAttrBaseParams): void {
     pokemon.summonData.erAbilityProvenance = pokemon.summonData.erAbilityProvenance.filter(
       entry => entry !== "ballaster:1",
@@ -215,9 +217,43 @@ class BallasterResetAbAttr extends PostSummonAbAttr {
   }
 }
 
-class BallasterAbAttr extends PostDefendAbAttr {
-  override canApply({ pokemon, opponent, move, damage }: PostMoveInteractionAbAttrParams): boolean {
-    return damage > 0 && !pokemon.isFainted() && !opponent.isFainted() && move.category !== MoveCategory.STATUS;
+export class BallasterAbAttr extends PostDefendAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** The move used in return (ability studio param; the default is the original Steam Eruption). */
+  public readonly retaliationMove: MoveId;
+  /** The power of that move (ability studio param; the default is the original 80). */
+  public readonly retaliationPower: number;
+  /** Hit types that set the retaliation off at once, without a stored charge (default: Fire and Water). */
+  public readonly immediateTypes: readonly PokemonType[];
+
+  constructor(
+    retaliationMove: MoveId = MoveId.STEAM_ERUPTION,
+    retaliationPower = 80,
+    immediateTypes: readonly PokemonType[] = [PokemonType.FIRE, PokemonType.WATER],
+  ) {
+    super();
+    this.retaliationMove = retaliationMove;
+    this.retaliationPower = retaliationPower;
+    this.immediateTypes = immediateTypes;
+  }
+
+  /**
+   * Tier B split (ability studio spec 3.1), original clause order: `guards` (clauses 1 to 3: the hit dealt damage and
+   * neither side has fainted), then `gate` (clause 4: the move is not a status move, the replaceable condition).
+   * All clauses are pure; there is no residual and no random draw.
+   */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  public guards({ pokemon, opponent, damage }: PostMoveInteractionAbAttrParams): boolean {
+    return damage > 0 && !pokemon.isFainted() && !opponent.isFainted();
+  }
+
+  public gate({ move }: PostMoveInteractionAbAttrParams): boolean {
+    return move.category !== MoveCategory.STATUS;
   }
 
   override apply({ pokemon, opponent, move, simulated }: PostMoveInteractionAbAttrParams): void {
@@ -227,7 +263,7 @@ class BallasterAbAttr extends PostDefendAbAttr {
     const provenance = pokemon.summonData.erAbilityProvenance;
     const hasCharge = provenance.includes("ballaster:1");
     const moveType = opponent.getMoveType(move);
-    const immediate = moveType === PokemonType.FIRE || moveType === PokemonType.WATER;
+    const immediate = this.immediateTypes.includes(moveType);
     pokemon.summonData.erAbilityProvenance = provenance.filter(entry => entry !== "ballaster:1");
     if (!immediate && !hasCharge) {
       pokemon.summonData.erAbilityProvenance.push("ballaster:1");
@@ -237,7 +273,7 @@ class BallasterAbAttr extends PostDefendAbAttr {
       "MovePhase",
       pokemon,
       [opponent.getBattlerIndex()],
-      scriptedPokemonMove(MoveId.STEAM_ERUPTION, 80),
+      scriptedPokemonMove(this.retaliationMove, this.retaliationPower),
       MoveUseMode.INDIRECT,
     );
   }
@@ -382,7 +418,7 @@ class PentaPunchFuryPowerAbAttr extends VariableMovePowerAbAttr {
   }
 }
 
-class BlindJusticeAbAttr extends PostTurnAbAttr {
+export class BlindJusticeAbAttr extends PostTurnAbAttr {
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
     if (simulated) {
       return;
@@ -408,7 +444,7 @@ function appliesContact(user: Pokemon, target: Pokemon, move: Move): boolean {
   return move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user, target });
 }
 
-class ConfectiousEntryAbAttr extends PostSummonAbAttr {
+export class ConfectiousEntryAbAttr extends PostSummonAbAttr {
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
     if (!simulated) {
       pokemon.addTag(BattlerTagType.ER_CONFECTED, 0, MoveId.NONE, pokemon.id);
@@ -416,9 +452,26 @@ class ConfectiousEntryAbAttr extends PostSummonAbAttr {
   }
 }
 
-class ConfectiousAttackAbAttr extends PostAttackAbAttr {
+export class ConfectiousAttackAbAttr extends PostAttackAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1), original clause order: `guards`, then `gate`. The inherited attack condition
+   * (constructor argument 0, a replaceable library condition) is clause 1 and sits in `guards` only to keep the order.
+   */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    return super.canApply(params) && params.damage > 0 && appliesContact(params.pokemon, params.opponent, params.move);
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Clause 1: the inherited attack condition (default: a damaging move). Clause 2: the hit dealt damage. */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    return super.canApply(params) && params.damage > 0;
+  }
+
+  /** Clause 3, the replaceable condition: my move makes contact with the foe. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    return appliesContact(params.pokemon, params.opponent, params.move);
   }
 
   override apply({ pokemon, opponent, simulated }: PostMoveInteractionAbAttrParams): void {
@@ -894,24 +947,44 @@ export function spatialMagicSwitchIfLethal(holder: Pokemon, attacker: Pokemon, m
   return spatialMagicWouldSwitch(holder, attacker, move) && spatialMagicQueuePair(holder, attacker);
 }
 
-class StellarizePowerAbAttr extends MovePowerBoostAbAttr {
-  constructor() {
-    super(
-      (_user: Pokemon, target: Pokemon | null, move: Move) =>
-        !!target
-        && move.type === PokemonType.NORMAL
-        && (target.isTerastallized || target.isMega() || /gmax|gigantamax/i.test(target.getFormKey())),
-      1.5,
-    );
+export class StellarizePowerAbAttr extends MovePowerBoostAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: Parameters<MovePowerBoostAbAttr["canApply"]>[0]) => boolean) | undefined;
+
+  /** Both arguments default to the original values: the Normal-move-against-special-form condition and x1.5. */
+  constructor(
+    condition: PokemonAttackCondition = (_user: Pokemon, target: Pokemon | null, move: Move) =>
+      !!target
+      && move.type === PokemonType.NORMAL
+      && (target.isTerastallized || target.isMega() || /gmax|gigantamax/i.test(target.getFormKey())),
+    powerMultiplier = 1.5,
+  ) {
+    super(condition, powerMultiplier);
   }
 
+  /**
+   * Tier B split (ability studio spec 3.1), original clause order: `guards` (clause 1, the constructor condition, a
+   * replaceable library condition that sits here only to keep the order), then `gate` (clause 2: I am Stellar type).
+   */
   override canApply(params: Parameters<MovePowerBoostAbAttr["canApply"]>[0]): boolean {
-    return super.canApply(params) && params.pokemon.getTypes(true, false).includes(PokemonType.STELLAR);
+    return gatedCanApply<Parameters<MovePowerBoostAbAttr["canApply"]>[0]>(this, params);
+  }
+
+  public guards(params: Parameters<MovePowerBoostAbAttr["canApply"]>[0]): boolean {
+    return super.canApply(params);
+  }
+
+  public gate(params: Parameters<MovePowerBoostAbAttr["canApply"]>[0]): boolean {
+    return params.pokemon.getTypes(true, false).includes(PokemonType.STELLAR);
   }
 }
-class StellarizeTypeAbAttr extends MoveTypeChangeAbAttr {
-  constructor() {
-    super(PokemonType.STELLAR, (_user, _target, move) => move.type === PokemonType.NORMAL);
+export class StellarizeTypeAbAttr extends MoveTypeChangeAbAttr {
+  /** Both arguments default to the original values: the Stellar type and the "Normal moves only" condition. */
+  constructor(
+    newType: PokemonType = PokemonType.STELLAR,
+    condition: PokemonAttackCondition = (_user, _target, move) => move.type === PokemonType.NORMAL,
+  ) {
+    super(newType, condition);
   }
 }
 class SleepingInAccuracyAbAttr extends SetMoveAccuracyAbAttr {

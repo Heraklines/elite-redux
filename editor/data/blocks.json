@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "096ef32b703c2f",
+  "hash": "00838726bbe2f1",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -83,6 +83,166 @@
       "uses": 21
     },
     {
+      "id": "block.ballaster",
+      "className": "BallasterAbAttr",
+      "label": "Hit back with a move after taking damaging hits",
+      "summary": "A damaging hit charges me up. After the next one (at once for a Fire, Water hit) I use Steam eruption with 80 power on the attacker.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "ballaster",
+        "counter attack",
+        "retaliate",
+        "revenge move",
+        "steam eruption",
+        "hit back after two hits",
+        "charge up then strike"
+      ],
+      "examples": [
+        "After two damaging hits I strike back with an 80 power Steam Eruption; Fire and Water hits trigger it at once"
+      ],
+      "params": [
+        {
+          "id": "moveId",
+          "label": "Move used in return (type its name, for example Steam Eruption)",
+          "control": "text",
+          "default": "STEAM_ERUPTION",
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "power",
+          "label": "Power of that move",
+          "control": "number",
+          "default": 80,
+          "editable": true,
+          "min": 1,
+          "max": 250,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "immediateTypes",
+          "label": "Hit types that make me use the move at once, with no charge needed (comma separated)",
+          "control": "text",
+          "default": "FIRE,WATER",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [
+        "not-fainted"
+      ],
+      "feasibility": [
+        "The hit must really have dealt damage (more than 0)",
+        "The attacker must still be standing",
+        "Nothing happens while the game only previews a hit",
+        "I keep only one stored charge at a time, and it is cleared every time I enter the battle"
+      ],
+      "branches": [
+        {
+          "label": "Store a charge",
+          "conditions": [
+            "the move is not one of the hit types that act at once (immediateTypes)",
+            "I have no stored charge yet"
+          ],
+          "effect": {
+            "id": "effect.arm-effect",
+            "params": []
+          }
+        },
+        {
+          "label": "Use the move on the attacker",
+          "conditions": [
+            "the move is one of the hit types that act at once (immediateTypes), or I already have a stored charge"
+          ],
+          "effect": {
+            "id": "effect.scripted-move",
+            "params": [
+              "moveId",
+              "power"
+            ]
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.ballaster-reset",
+      "className": "BallasterResetAbAttr",
+      "label": "Clear my stored hit charge when I enter",
+      "summary": "When I enter the battle, any hit charge I had stored is cleared, so I start with no hit counted.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "reset charge",
+        "forget stored hit",
+        "clear charge",
+        "fresh start on entry",
+        "ballaster",
+        "empty the counter"
+      ],
+      "examples": [
+        "Start every switch-in with no damaging hit counted yet"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified: the effect clears one marker string ('ballaster:1') from `summonData.erAbilityProvenance`, the per-Pokemon list of ability markers. The library has no memory block that can name and clear such a marker (requested as `effect.reset-memory`, R-B16-2 in requests/B16.md, the same request as R-B13-23). It is a single assignment, so there is nothing further to split; the trigger is a normal on-entry WHEN and there is no IF. The marker key is fixed on purpose: it is the private name that BallasterAbAttr (part 2) writes, so it is not a param. Users: Ballaster (6006, attr 0). ODDITY, not fixed: apply ignores `simulated`, so a simulated PostSummon call would clear the charge; no engine path simulates PostSummon today.",
+      "uses": 1
+    },
+    {
       "id": "block.berserk-on-threshold",
       "className": "BerserkOnThresholdAbAttr",
       "label": "Raise my best attack once when a hit drops me to half HP",
@@ -124,6 +284,193 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.blind-justice",
+      "className": "BlindJusticeAbAttr",
+      "label": "Lock one random move of a random other Pokemon each turn",
+      "summary": "At the end of every turn I pick a random other Pokemon on the field, and one of its moves that has PP left. It cannot use that move on the next turn.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "blind justice",
+        "disable a random move",
+        "random disable",
+        "move lock",
+        "block a move",
+        "jam a move",
+        "silence a move"
+      ],
+      "examples": [
+        "Every turn, stop a random Pokemon on the field from using one random move for a turn, like Blind Justice"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Another Pokemon on the field must be standing, must not already carry this lock and must have at least one move with PP left",
+        "Nothing happens while the game only previews the turn"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified: the effect chooses a random Pokemon among the others on the field and then a random usable move of it, and locks exactly that move. The library has no target choice 'a random other Pokemon on the field' and no 'a random usable move of the target' choice for the tag effect, so effect.apply-tag cannot express it (requested as effect.lock-random-move, R-B16-6 in requests/B16.md). The trigger (end of turn) is its own block and the class has no IF. There are no params for a stated reason (see noParamsReason). Users: Blind Justice (6009, attr 0). The two random draws keep their order (Pokemon first, move second), covered by test/tests/elite-redux/decomp/B16/chunk1.test.ts. ODDITIES, not fixed: (1) the candidate list includes the holder's own ally (the ability text says 'other active Pokemon'); (2) `isUsable(target, false, true)` ignores restriction tags, so a move that is already disabled by another effect can be picked.",
+      "uses": 1
+    },
+    {
+      "id": "block.confectious-attack",
+      "className": "ConfectiousAttackAbAttr",
+      "label": "Make a foe Food-based when my contact attack hurts it",
+      "summary": "After my damaging move touches a foe and hurts it, that foe gets the Confected marker until it leaves the field, so it counts as Food-based.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "confectious",
+        "make the foe food",
+        "sugar coat the attacker",
+        "candy touch",
+        "contact marker",
+        "food based foe"
+      ],
+      "examples": [
+        "When my contact move hurts the foe, the foe is coated in sugar and counts as Food-based"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "lib": "move.damaging",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really have dealt damage (more than 0)",
+        "Nothing happens while the game only previews a hit"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.confectious-entry",
+      "className": "ConfectiousEntryAbAttr",
+      "label": "Count as Food-based from the moment I enter",
+      "summary": "When I enter the battle, I get the Confected marker until I leave the field. While it is on, I count as a Food-based Pokemon.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "confectious",
+        "food based",
+        "sugar coated",
+        "candy coat",
+        "count as food",
+        "sweet marker"
+      ],
+      "examples": [
+        "Every time I come in, I am coated in sugar and count as Food-based, like Confectious"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens while the game only previews the entry"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.er-bad-dreams",
+      "className": "ErBadDreamsAbAttr",
+      "label": "Hurt every sleeping foe a little at the end of each turn",
+      "summary": "At the end of every turn, each sleeping foe on the field loses 25% of its max HP (at least 1 HP). 25 means a quarter.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "bad dreams",
+        "nightmare",
+        "hurt sleeping foes",
+        "damage while asleep",
+        "sleep punisher",
+        "punish sleepers",
+        "sleep damage"
+      ],
+      "examples": [
+        "Foes that are asleep lose a quarter of their max HP every turn, like Bad Dreams"
+      ],
+      "params": [
+        {
+          "id": "percent",
+          "label": "Share of the foe's max HP lost each turn (%)",
+          "control": "slider",
+          "default": 25,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one foe must be asleep (or comatose), still on the field, not about to switch out, not protected from indirect damage and not immune to Bad Dreams",
+        "Each foe that is awake, about to switch out or protected from indirect damage is skipped, and nothing changes while the game only previews the turn"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "percent"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified: the effect hurts every foe that passes a per-foe filter (asleep or comatose, not switching out, not protected from indirect damage). The effect library has no damage effect and no 'for each foe that ...' target filter, so the effect cannot be built from existing blocks (requested as effect.hurt-percent-of-max-hp with a 'only foes that are asleep' filter, R-B16-1 in requests/B16.md). The trigger (end of turn) is a separate block, the class has no IF of its own (every clause of the inherited canApply is feasibility, see the header), and the one number is a typed param. Constructor change (behaviour-neutral): damagePercent, default 25, replaces the literal /4. Users: Bad Dreams (123, attr 0) only; nothing to bind. SUSPECTED BUG, NOT FIXED: the inherited canApply refuses foes with BadDreamsImmunityAbAttr (Honk Shoo has it), but the ER apply override never tests it, so with TWO foes where one is immune and one is asleep, the immune foe is hurt as well (the vanilla apply tests it). Also the vanilla apply checks BlockNonDirectDamageAbAttr on the HOLDER by mistake (applyAbAttrs with pokemon); the ER override tests it on the foe (correct). The L2 twin cannot put a foe to sleep (the harness axis `status` sets the holder), so the sleeping-foe path is proven in test/tests/elite-redux/decomp/B16/chunk1.test.ts.",
+      "uses": 1
     },
     {
       "id": "block.float",
@@ -628,6 +975,147 @@
         "do": true
       },
       "uses": 64
+    },
+    {
+      "id": "block.stellarize-power",
+      "className": "StellarizePowerAbAttr",
+      "label": "Boost my move power while I have the Stellar type",
+      "summary": "While the game calculates my move's power, a move that passes the condition gets x1.5 power, but only while I am Stellar type. Default: Normal moves against Terastallized, Mega or Gigantamax foes.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "stellarize",
+        "stellar power boost",
+        "power boost",
+        "boost normal moves",
+        "stronger against mega",
+        "stronger against terastallized",
+        "base power multiplier"
+      ],
+      "examples": [
+        "While I am Stellar type, my Normal moves hit Terastallized, Mega and Gigantamax foes 50% harder, like Stellarize"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.5 = 50% more power)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0,
+          "max": 10,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.stellarize-type",
+      "className": "StellarizeTypeAbAttr",
+      "label": "Turn my Normal moves into another type (Stellar by default)",
+      "summary": "While the game decides the type of my move, a Normal move becomes Stellar type. Example: Stellar makes Normal moves Stellar moves.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-type",
+      "whenLabel": "While the game decides a move's type",
+      "synonyms": [
+        "stellarize",
+        "normal becomes stellar",
+        "convert normal moves",
+        "change move type",
+        "type conversion",
+        "stellar moves",
+        "pixilate style"
+      ],
+      "examples": [
+        "My Normal moves become Stellar moves, like Stellarize",
+        "Turn Normal moves into Flying moves"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Moves become this type",
+          "control": "select",
+          "default": "STELLAR",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:1",
+          "lib": "move.type",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.change-move-type",
+        "params": [
+          "type"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
     }
   ]
 }
