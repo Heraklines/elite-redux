@@ -4003,6 +4003,55 @@
       ]
     },
     {
+      "id": "effect.block-crit",
+      "kind": "calc",
+      "label": "Stop critical hits against me",
+      "requires": [],
+      "params": [],
+      "modifies": "blockCrit",
+      "implemented": false,
+      "synonyms": [
+        "no crits",
+        "crit immunity",
+        "cannot be critically hit",
+        "battle armor",
+        "shell armor"
+      ],
+      "examples": [
+        "Critical hits never land on me"
+      ]
+    },
+    {
+      "id": "effect.set-damage-roll",
+      "kind": "calc",
+      "label": "Make attacks against me use {rollPercent}% of the top damage",
+      "requires": [],
+      "params": [
+        {
+          "id": "rollPercent",
+          "label": "Damage roll (percent of the top value)",
+          "control": "slider",
+          "default": 85,
+          "min": 85,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "modifies": "rollMultiplier",
+      "implemented": false,
+      "synonyms": [
+        "lowest damage roll",
+        "minimum damage roll",
+        "bad luck",
+        "fixed damage roll",
+        "foes roll low"
+      ],
+      "examples": [
+        "Foes always roll the lowest damage against me"
+      ]
+    },
+    {
       "id": "effect.change-move-type",
       "kind": "calc",
       "label": "Change the move's type to {type}",
@@ -5120,5 +5169,5 @@
       ]
     }
   ],
-  "hash": "19b4a3aed16a8d"
+  "hash": "0ea24dd30ea814"
 }
