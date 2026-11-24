@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 // Quick Draw and Minigun (Tier B, RNG inside canApply). "While the game decides who jumps the turn order, roll a chance;
 // if I chose a damaging move, move before the others of my priority this turn and remember that this ability did it".
 //
@@ -19,7 +20,6 @@
 // Draw's own x2 power rider (attr 1 of Quick Draw), the Gunman 1.2 power rider (init-elite-redux-ability-upgrades.ts:940)
 // and the Pulse-move heal bonus (data/moves/move.ts:3301) read to know "the speed jump happened this turn").
 import { ProvenanceBypassSpeedChanceAbAttr } from "#data/elite-redux/ability-upgrades/attrs/bypass-speed-provenance";
-import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
 
 export default defineDecl(ProvenanceBypassSpeedChanceAbAttr, {
   tier: "B",
@@ -37,7 +37,7 @@ export default defineDecl(ProvenanceBypassSpeedChanceAbAttr, {
       path: "chance",
       control: "slider",
       min: 1,
-      max: 100,
+      max: 99,
       step: 1,
       integer: true,
       label: "Chance each turn (%)",

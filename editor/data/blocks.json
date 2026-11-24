@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "12fab64b4871c9",
-  "hash": "175f92c6161aa7",
+  "hash": "0ebbd0c0c19d67",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -811,7 +811,7 @@
       "id": "block.post-defend-suppress-first-innate",
       "className": "PostDefendSuppressFirstInnateAbAttr",
       "label": "Disable the attacker's first extra ability on contact",
-      "summary": "When a foe hits me with a move that makes contact, its first extra ability stops working until it switches out. Foes with a Mummy-style ability are spared.",
+      "summary": "When a foe hits me with a move that makes contact, its first extra ability stops working until it switches out. Foes with Mummy, Lingering Aroma or Wandering Spirit are spared.",
       "tier": "B",
       "kind": "event-effect",
       "status": "decomposed",
@@ -828,7 +828,20 @@
       "examples": [
         "Turn off the first extra ability of anything that makes contact with me, like Mummy"
       ],
-      "params": [],
+      "params": [
+        {
+          "id": "slot",
+          "label": "Which extra ability (0 = first, 1 = second, 2 = third)",
+          "control": "slider",
+          "default": 0,
+          "editable": true,
+          "min": 0,
+          "max": 2,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
       "conditions": [
         {
           "slot": "gate",
@@ -844,7 +857,9 @@
       ],
       "effect": {
         "id": "effect.package",
-        "params": []
+        "params": [
+          "slot"
+        ]
       },
       "reusableAlone": {
         "when": true,
@@ -985,7 +1000,7 @@
           "default": 30,
           "editable": true,
           "min": 1,
-          "max": 100,
+          "max": 99,
           "step": 1,
           "integer": true
         },
