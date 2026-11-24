@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "15e97c93ebc5f4",
+  "hash": "0503b0a476ae21",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -126,6 +126,48 @@
       "uses": 3
     },
     {
+      "id": "block.clear-opponent-stat-buffs-on-summon",
+      "className": "ClearOpponentStatBuffsOnSummonAbAttr",
+      "label": "Wipe the foes' stat boosts when I enter",
+      "summary": "When I enter the battle, every raised stat of each adjacent foe goes back to normal. Lowered stats stay lowered. Example: a foe at +2 Attack and -1 Defense ends at 0 and -1.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "pressure",
+        "clear boosts",
+        "remove stat boosts",
+        "reset foe stats",
+        "haze on entry",
+        "cancel buffs"
+      ],
+      "examples": [
+        "Remove the foes' stat boosts when I switch in",
+        "Reset every raised foe stat to normal on entry"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one foe must be on the field",
+        "Only foes next to me are affected in a double or triple battle, and fainted foes are skipped",
+        "It never changes anything for a preview (a simulated entry)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier C, PACKAGE with a written reason: effect.stat-stage only RAISES or LOWERS a chosen stat by a number of stages, so it cannot reproduce 'set every stage above zero back to zero, leave stages below zero alone, for seven stats on every adjacent foe' (the amount differs per stat and per foe). Request R21 asks for a 'reset raised stat stages' effect with who (adjacent foes, holder, all) and which stats. No typed param exists (the seven stats are fixed). The trigger is a separate block, extra IFs can be ANDed on top. Users: Pressure (46, attr 2) only. Oddity, not a bug: canApply counts all foes while apply only reaches adjacent ones, so with no adjacent foe the ability flyout shows and nothing happens; the class shows no message of its own (the Pressure entry message comes from PostSummonMessageAbAttr). No game bug found.",
+      "uses": 1
+    },
+    {
       "id": "block.er-magician-steal",
       "className": "ErMagicianStealAbAttr",
       "label": "Steal a random item from the Pokemon I hit",
@@ -174,6 +216,47 @@
         "if": true,
         "do": true
       },
+      "uses": 1
+    },
+    {
+      "id": "block.er-transmute-opposing-berries",
+      "className": "ErTransmuteOpposingBerriesAbAttr",
+      "label": "Destroy every berry the foes hold when I enter",
+      "summary": "When I enter the battle, each adjacent foe loses every berry it holds, all copies of each. A message names each foe that lost berries.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "power of alchemy",
+        "remove foe berries",
+        "berry removal",
+        "destroy berries",
+        "transmute berries",
+        "no berries for the enemy"
+      ],
+      "examples": [
+        "Remove all the berries the opposing Pokemon hold as I enter"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one foe must be on the field",
+        "Only foes next to me are affected in a double or triple battle, and fainted foes are skipped",
+        "It never removes anything for a preview (a simulated entry)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier C, PACKAGE with a written reason: the library's effect.remove-item takes only a 'who' and removes an unspecified item; this rule removes ONLY berries, ALL stacked copies, from EVERY adjacent foe, refreshes the modifier bar and shows a message per foe. There is no item-kind filter, no 'every stack' mode and no 'all adjacent foes' scope in the library, so the effect would have to be re-implemented; request R20 asks for effect.remove-item to grow those three options (kind: berries, all copies, who: adjacent foes). No typed param exists: nothing numeric or typed is used (the 99 in the code is a safety cap on the drain loop, not a setting). The trigger (on entry) is a separate block and extra IFs can be ANDed on top. Users: Power of Alchemy (223, attr 0) only. Oddity, not a bug: the Elite Redux text says berries are replaced by Black Sludge and later Big Nugget; this game has neither item, so the berries are only destroyed (documented in the class comment). Another oddity: canApply counts all foes while apply only reaches adjacent ones, so with no adjacent foe the ability flyout shows and nothing happens. No game bug found.",
       "uses": 1
     },
     {
@@ -734,6 +817,329 @@
         "do": true
       },
       "packageReason": "Tier B (gate run through gatedCanApply inside apply) with a PACKAGE effect. Written reason: the countdown parses a number out of a string marker ('oracle:guard:3'), removes it and writes the marker back with one less; there is no library effect for 'count a timed marker down' (request R9, the same marker family as the entry half) and no atom to read it (R3). The gate binding is legacy-closure-pending-request R3. Users: Oracle (6047, attr 2) only. Oddity, not changed: the marker is written by the entry half, so the tick only does anything after that half ran; marker state lives in summonData, i.e. it is dropped on a switch.",
+      "uses": 1
+    },
+    {
+      "id": "block.penta-punch-fury-power",
+      "className": "PentaPunchFuryPowerAbAttr",
+      "label": "Set one move's power to a fixed number",
+      "summary": "While the game calculates a move's power, one named move (as built: Five-Star Fury) is given exactly 80 power, whatever its normal power is. Example: 80 means power 80.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "penta-punch",
+        "fixed power",
+        "set base power",
+        "power override",
+        "make a move hit with this power",
+        "signature move power"
+      ],
+      "examples": [
+        "Make Five-Star Fury always have 80 power",
+        "Give one special move a fixed power of 100"
+      ],
+      "params": [
+        {
+          "id": "power",
+          "label": "Power the move is set to (80 = a move of power 80)",
+          "control": "number",
+          "default": 80,
+          "editable": true,
+          "min": 1,
+          "max": 250,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "request R10: the move is a named Elite Redux move",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "power"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B, effect kept as a PACKAGE only because the library has no 'set the move's power to N' effect: effect.multiply-power multiplies, and a multiplier cannot reproduce a SET for a move whose base power staff may change (request R11, effect.set-power; the formula is `power.value = N`). The package still has a typed number (power 1-250) and the trigger and condition are separate, swappable blocks. The gate is legacy-closure-pending-request R10 (move.is-move cannot name Five-Star Fury because it only exists in ErMoveId); until R10 exists the attr cannot be rebuilt from the library. Users: Penta-Punch (6015, attr 1) only; attrs 0 (marker), 2 (priority +1 for Five-Star Fury, a closure) and 3 (+1 crit stage for Five-Star Fury) belong to other classes and use the same move test, so R10 serves them too. Oddity, not a bug: apply overwrites the power instead of multiplying, so any power multiplier applied earlier in the chain is thrown away and later ones still apply; this is what the ability text asks for. No game bug found.",
+      "uses": 1
+    },
+    {
+      "id": "block.perpetual-motion-post-turn",
+      "className": "PerpetualMotionPostTurnAbAttr",
+      "label": "Hit the foe with a follow-up Rollout at the end of the turn",
+      "summary": "At the end of the turn, if my attack landed earlier this turn, I use a follow-up Rollout of power 20 on the first foe still standing. Example: 20 means power 20.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "perpetual motion",
+        "rollout",
+        "free rollout",
+        "end of turn attack",
+        "extra move at turn end",
+        "keep rolling"
+      ],
+      "examples": [
+        "Roll into the foe with a free Rollout at the end of every turn in which I landed a hit"
+      ],
+      "params": [
+        {
+          "id": "power",
+          "label": "Power of the follow-up Rollout (20 = a move of power 20)",
+          "control": "number",
+          "default": 20,
+          "editable": true,
+          "min": 1,
+          "max": 250,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "time.turn-count",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [
+        "not-fainted"
+      ],
+      "feasibility": [
+        "My attack must have landed earlier this turn: the matching 'mark that my attack landed' block leaves a marker that this block uses up",
+        "A foe must still be standing, otherwise nothing is queued (the marker is used up anyway)",
+        "It never queues anything for a preview (a simulated end of turn)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "power"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B with a PACKAGE effect. Written reason it cannot be split further: the effect is one ordered, stateful sequence (use up the marker, find the first living foe, reset the streak if a chain was already pending, mark the chain pending, queue a Rollout that carries the marker 'perpetual-motion' and has its consecutive-use power stripped). The library's effect.scripted-move cannot reproduce it: it has no marker option, no 'strip consecutive-use power' option, it needs the foe that was hit (here there is none: the first living foe is picked) and it writes none of the chain state that the Progress, Power and Resolution attrs read (request R14). Typed param: power (the Rollout's power, 1-250). The Rollout itself and the marker names are fixed. The marker check (clause 3) stays as `residual` because it is the coupling between the two halves, not a design choice, and `apply` tests it again; requests R3/R15 name the library atom and effect for the marker memory. Users: Perpetual Motion (6022, attr 1) only. The turn-count gate has the exact atom `time.turn-count` (>= 1 turn, same field tempSummonData.turnCount). Oddity, not a bug: apply removes the marker BEFORE it looks for a foe, so when no foe is standing the marker is lost with no Rollout. No game bug found.",
+      "uses": 1
+    },
+    {
+      "id": "block.perpetual-motion-resolution",
+      "className": "PerpetualMotionResolutionAbAttr",
+      "label": "End the Rollout chain when its follow-up fails",
+      "summary": "When a Rollout I queued as a follow-up has just failed, the Rollout chain is cancelled and its power bonus starts again from nothing.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.my-move-starts",
+      "whenLabel": "When my move starts to execute",
+      "synonyms": [
+        "perpetual motion",
+        "rollout",
+        "reset the chain",
+        "chain breaks",
+        "streak reset",
+        "stop the combo"
+      ],
+      "examples": [
+        "Reset the Rollout streak when the free Rollout misses or fails"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "time.last-move",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A Rollout chain must be running (the matching end-of-turn block started one)",
+        "That Rollout must be the follow-up the chain queued itself, not one I chose",
+        "That Rollout must have failed or missed (it was not a success)",
+        "It never changes anything for a preview (a simulated move)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B with a PACKAGE effect. Written reason: the effect writes two fields of per-switch-in chain state (erPerpetualMotionPending and erPerpetualMotionStreak) that the Progress and Power attrs of the same ability (B14) also read and write; there is no library effect or atom for a named chain flag and counter (request R16), and splitting it would invent behaviour. No typed param exists: nothing numeric is used. The gate (my last move was Rollout) is the exact library atom time.last-move, but its binding is legacy-closure-pending-request R22: the shared L1 proves gates through canApply, this class runs its gate inside apply, and the my-move-starts trigger has no engine-parameter builder in the harness (the equivalence is proved by hand in penta-perpetual.test.ts); the residual (pending, indirect, not a success) stays in the class as feasibility, with request R17 for the atoms that would let it be promoted into the gate. Users: Perpetual Motion (6022, attr 2) only. The gate runs inside `apply`, not `canApply` (the inherited canApply is `true`), so the ability flyout is queued at every one of my moves even when nothing happens; this is existing behaviour, kept. No game bug found.",
+      "uses": 1
+    },
+    {
+      "id": "block.perpetual-motion-trigger",
+      "className": "PerpetualMotionTriggerAbAttr",
+      "label": "Mark that my attack landed this turn",
+      "summary": "After my attack really lands, I mark this turn once, so a matching end-of-turn effect can follow up. The follow-up move it queued itself never counts.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "perpetual motion",
+        "remember a hit",
+        "arm a follow-up",
+        "rollout chain",
+        "hit this turn flag",
+        "prepare an end of turn move"
+      ],
+      "examples": [
+        "Remember that I landed a hit this turn so a Rollout can follow at the end of the turn"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.damaging plus requests R12 (the hit landed) and R13 (the move is the follow-up this ability queued)",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "It never marks anything for a preview (a simulated hit)",
+        "It marks the turn only once, however many hits land"
+      ],
+      "effect": {
+        "id": "effect.arm-effect",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.phoenix-foliage-hit-form-change",
+      "className": "PhoenixFoliageHitFormChangeAbAttr",
+      "label": "Change to the Live Current form after I am hit",
+      "summary": "After I am hit, I change into my Live Current form. As built, only when I am not in it yet and the move that hit me counts as Fire or Electric type.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "phoenix foliage",
+        "transform when hit",
+        "form change on being hit",
+        "absorb an element to transform",
+        "elemental form",
+        "shift form"
+      ],
+      "examples": [
+        "Change into my charged form after being hit by a Fire or Electric move"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "mon.in-form and move.type",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [
+        "not-fainted"
+      ],
+      "feasibility": [
+        "My species must have the Live Current form wired for the manual form change, otherwise nothing happens",
+        "It never changes form for a preview (a simulated hit)"
+      ],
+      "effect": {
+        "id": "effect.change-form",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.phoenix-foliage-use-form-change",
+      "className": "PhoenixFoliageUseFormChangeAbAttr",
+      "label": "Change to the Live Current form after I attack",
+      "summary": "After the last hit of my attack, I change into my Live Current form. As built, only when I am not in it yet and my move counts as Fire or Electric type.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "phoenix foliage",
+        "transform after attacking",
+        "form change on attack",
+        "charge up form",
+        "elemental form",
+        "shift form"
+      ],
+      "examples": [
+        "Change into my charged form after using a Fire or Electric move"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "mon.in-form and move.type",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [
+        "not-fainted"
+      ],
+      "feasibility": [
+        "Only after the final hit of a multi-hit move of mine (request R18 asks for this as a named safety rule)",
+        "My species must have the Live Current form wired for the manual form change, otherwise nothing happens",
+        "It never changes form for a preview (a simulated hit)"
+      ],
+      "effect": {
+        "id": "effect.change-form",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
       "uses": 1
     },
     {

@@ -738,23 +738,21 @@ export class PerpetualMotionTriggerAbAttr extends PostAttackAbAttr {
   /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
   public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
 
-  /** Tier B split (ability studio spec 3.1): `canApply = guards && gate`. Every clause is a pure read, no random draw. */
+  /** Tier B split (ability studio spec 3.1): `canApply = gate`. No guards, no residual, every clause is a pure read, no random draw. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
     return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
   }
 
-  /** Clause 1: the inherited attack condition (constructor argument 0, a replaceable library slot; by default the move deals damage). */
-  public guards(params: PostMoveInteractionAbAttrParams): boolean {
-    return super.canApply(params);
-  }
-
   /**
-   * The replaceable condition, clauses 2 and 3 in the old order: my hit really landed (Effective, Super effective, Not very
-   * effective or One-hit KO) and the move is not itself the Rollout this ability queued.
+   * The replaceable condition, all three clauses in the old order: (1) the inherited attack condition (by default the move
+   * deals damage), (2) my hit really landed (Effective, Super effective, Not very effective or One-hit KO), (3) the move is
+   * not itself the Rollout this ability queued. Clause 1 used to sit in a `guards` method; it is a rule staff may change
+   * (nothing breaks without it), so it moved here, in front of the other two exactly as before.
    */
   public gate(params: PostMoveInteractionAbAttrParams): boolean {
     return (
-      PERPETUAL_MOTION_SUCCESSFUL_HITS.has(params.hitResult)
+      super.canApply(params)
+      && PERPETUAL_MOTION_SUCCESSFUL_HITS.has(params.hitResult)
       && !params.move.attrs.some(attr => attr instanceof ScriptedMoveMarkerAttr && attr.key === PERPETUAL_MOTION_MARKER)
     );
   }
