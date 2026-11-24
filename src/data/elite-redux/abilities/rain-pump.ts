@@ -16,6 +16,7 @@
 
 import { PostTurnAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { WeatherType } from "#enums/weather-type";
 import type { AbAttrBaseParams } from "#types/ability-types";
 
@@ -34,17 +35,28 @@ function isRainingNow(): boolean {
   return weather.weatherType === WeatherType.RAIN || weather.weatherType === WeatherType.HEAVY_RAIN;
 }
 
-export class RainPumpAbAttr extends PostTurnAbAttr {
-  constructor() {
+export class RainPumpAbAttr extends PostTurnAbAttr implements GatedAttr<AbAttrBaseParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** @param ppRestored - PP every move recovers per end-of-turn tick in rain (default 1) */
+  constructor(public readonly ppRestored: number = RAIN_PUMP_PP_RESTORE) {
     // showAbility true — surfacing the restore reads clearly at turn end.
     super(true);
   }
 
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
-    if (!isRainingNow()) {
-      return false;
-    }
-    // Only fire when at least one move actually has spent PP to give back.
+  /** Tier B (ability studio spec 3.1): `canApply = guards && gate && residual`, in the original clause order. */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The replaceable condition: an active, non-suppressed rain (ordinary or heavy) is up. */
+  public gate(_params: AbAttrBaseParams): boolean {
+    return isRainingNow();
+  }
+
+  /** Feasibility that stays in the class: at least one move actually has spent PP to give back. */
+  public residual({ pokemon }: AbAttrBaseParams): boolean {
     return pokemon.getMoveset().some(m => !!m?.getMove() && m.ppUsed > 0);
   }
 
@@ -56,7 +68,7 @@ export class RainPumpAbAttr extends PostTurnAbAttr {
       if (!move?.getMove()) {
         continue;
       }
-      move.ppUsed = Math.max(0, move.ppUsed - RAIN_PUMP_PP_RESTORE);
+      move.ppUsed = Math.max(0, move.ppUsed - this.ppRestored);
     }
   }
 }

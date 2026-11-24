@@ -1739,7 +1739,9 @@
         "MycelialNetworkAbAttr",
         "OmniformAbAttr",
         "OverruleCritAbAttr",
+        "QuickeningGraceAbAttr",
         "RapierFlagInjectionAbAttr",
+        "RelativityAbAttr",
         "SpreadTargetByFlagAbAttr",
         "StealthRockImmunityAbAttr",
         "SuppressFieldAbilitiesWhenEnragedAbAttr",
@@ -5031,5 +5033,5 @@
       ]
     }
   ],
-  "hash": "1d0a8f2e604b58"
+  "hash": "148286b1d0b532"
 }

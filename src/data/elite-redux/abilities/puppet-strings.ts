@@ -19,6 +19,7 @@
 // =============================================================================
 
 import { PostAttackAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
@@ -27,7 +28,10 @@ import { StatusEffect } from "#enums/status-effect";
 /** Hand-authored ER-custom ability id (both the ER-source id and the pokerogue id). */
 export const ER_PUPPET_STRINGS_ABILITY_ID = 5901;
 
-export class PuppetStringsAbAttr extends PostAttackAbAttr {
+export class PuppetStringsAbAttr extends PostAttackAbAttr implements GatedAttr<PostMoveInteractionAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
   constructor() {
     // The default `attackCondition` (inherited) already requires a damaging
     // (non-status) move; `showAbility` false — the tag application shows its own
@@ -35,34 +39,48 @@ export class PuppetStringsAbAttr extends PostAttackAbAttr {
     super(undefined, false);
   }
 
+  /**
+   * Tier B (ability studio spec 3.1): `canApply = guards && gate && residual`. The original clause order was
+   * damaging move, other target / alive / damage dealt, Psychic move, poisoned target, Shield Dust, already Commanded.
+   * None of them draws a random number or has a side effect, so grouping the safety rules first changes no result.
+   */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    // Must be a damaging move (base condition) that actually dealt damage.
-    if (!super.canApply(params)) {
-      return false;
-    }
-    const { pokemon, opponent: target, move, damage } = params;
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /**
+   * Safety rules: the target is another Pokemon that is still standing, the move really dealt damage, and the target
+   * is not protected from added effects (Shield Dust and friends block ability-inflicted added effects).
+   */
+  public guards({ pokemon, opponent: target, damage }: PostMoveInteractionAbAttrParams): boolean {
     if (pokemon === target || target.isFainted() || damage <= 0) {
       return false;
     }
+    return !target.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr");
+  }
+
+  /** The replaceable conditions: a damaging move (base condition), of Psychic type, against a poisoned or badly poisoned target. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    // Must be a damaging move (base condition).
+    if (!super.canApply(params)) {
+      return false;
+    }
+    const { pokemon, opponent: target, move } = params;
     // Psychic-type move (respects the holder's type-changing effects).
     if (pokemon.getMoveType(move) !== PokemonType.PSYCHIC) {
       return false;
     }
     // Target must be poisoned or badly poisoned.
     const status = target.status?.effect;
-    if (status !== StatusEffect.POISON && status !== StatusEffect.TOXIC) {
-      return false;
-    }
-    // Shield Dust and friends block ability-inflicted added effects.
-    if (target.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr")) {
-      return false;
-    }
-    // Once-per-switch-in: skip if the target has already been Commanded this
-    // send-out, or is currently Commanded.
-    if (target.summonData.erCommandedUsedThisSwitchIn || target.getTag(BattlerTagType.ER_COMMANDED)) {
-      return false;
-    }
-    return true;
+    return status === StatusEffect.POISON || status === StatusEffect.TOXIC;
+  }
+
+  /**
+   * Feasibility that stays in the class, once-per-switch-in: not when the target has already been Commanded this
+   * send-out, or is currently Commanded.
+   */
+  public residual({ opponent: target }: PostMoveInteractionAbAttrParams): boolean {
+    return !(target.summonData.erCommandedUsedThisSwitchIn || target.getTag(BattlerTagType.ER_COMMANDED));
   }
 
   override apply({ pokemon, opponent: target, simulated }: PostMoveInteractionAbAttrParams): void {

@@ -30,7 +30,7 @@ import { globalScene } from "#app/global-scene";
 import { type EffectiveStat, Stat } from "#enums/stat";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
-import type { AbAttrBaseParams } from "#types/ability-types";
+import type { AbAttrBaseParams, PokemonDefendCondition } from "#types/ability-types";
 
 /** Hand-authored ER-custom ability id (both the ER-source id and the pokerogue id). */
 export const ER_RELATIVITY_ABILITY_ID = 5911;
@@ -68,7 +68,8 @@ export function pokemonActedBefore(first: Pokemon, second: Pokemon): boolean {
  * (`source`) acted before the `target` this turn, else `null`.
  */
 export class RelativityAbAttr extends AbAttr {
-  constructor() {
+  /** @param substituteStat - The stat used in place of the move's offensive stat when the holder acts first (default Speed) */
+  constructor(public readonly substituteStat: EffectiveStat = Stat.SPD) {
     super(false);
   }
 
@@ -80,7 +81,7 @@ export class RelativityAbAttr extends AbAttr {
    * @returns `Stat.SPD` when the offensive stat should be replaced by Speed, else `null`
    */
   public resolveOffenseStat(source: Pokemon, target: Pokemon): EffectiveStat | null {
-    return pokemonActedBefore(source, target) ? Stat.SPD : null;
+    return pokemonActedBefore(source, target) ? this.substituteStat : null;
   }
 }
 
@@ -90,10 +91,15 @@ export class RelativityAbAttr extends AbAttr {
  * only reduces damage from the specific attacker the holder out-slowed.
  */
 export class RelativityDefenseReductionAbAttr extends ReceivedMoveDamageMultiplierAbAttr {
-  constructor() {
-    super(
-      (holder: Pokemon, attacker: Pokemon, _move: Move) => pokemonActedBefore(attacker, holder),
-      RELATIVITY_DAMAGE_MULTIPLIER,
-    );
+  /**
+   * @param condition - Which hits are reduced (default: the attacker acted before the holder this turn)
+   * @param damageMultiplier - The factor applied to the damage (default 0.75)
+   */
+  constructor(
+    condition: PokemonDefendCondition = (holder: Pokemon, attacker: Pokemon, _move: Move) =>
+      pokemonActedBefore(attacker, holder),
+    damageMultiplier: number = RELATIVITY_DAMAGE_MULTIPLIER,
+  ) {
+    super(condition, damageMultiplier);
   }
 }

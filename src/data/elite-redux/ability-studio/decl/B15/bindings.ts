@@ -85,3 +85,66 @@ bindCondition(
 // move.flag calls the same Move.doesFlagEffectApply with moveUser = the attacker and the holder as target. The "hit connected" clause (hitResult < NO_EFFECT) is guards() in the class and the
 // "attacker has the move" clause is the residual.
 bindCondition(5247, 0, { id: "move.flag", flag: "MAKES_CONTACT" }, "gate"); // Spiteful
+
+// =============================================================================================
+// B15 chunk 4. Gates (slot "gate") and one constructor closure (slot "ctor:0"), keyed by (abilityId, attrIndex). QuickeningGraceAbAttr, RelativityAbAttr and RendezvousAbAttr have no
+// closure and no gate (presence markers read by engine seams), so they need no binding.
+// =============================================================================================
+
+// SetArenaTagOnHitAbAttr, gate, the contact clause: `!contactRequired || move.doesFlagEffectApply({ flag: MAKES_CONTACT, user: attacker, target: holder })`.
+// move.flag calls the same Move.doesFlagEffectApply with moveUser = the attacker and the holder as target. A user without the contact requirement is the always-true gate { all: [] }.
+// The "hit connected" clause (hitResult < NO_EFFECT) is guards() in the class.
+const CONTACT_ONLY = { id: "move.flag", flag: "MAKES_CONTACT" };
+bindCondition(5137, 0, CONTACT_ONLY, "gate"); // Scrapyard, Spikes
+bindCondition(5138, 0, CONTACT_ONLY, "gate"); // Loose Quills, Spikes
+bindCondition(5141, 0, CONTACT_ONLY, "gate"); // Loose Rocks, Stealth Rock
+bindCondition(5607, 0, { all: [] }, "gate"); // Drop Blocks, Spikes on any damaging hit (contactRequired false)
+bindCondition(5611, 0, CONTACT_ONLY, "gate"); // Loose Thorns, Creeping Thorns
+bindCondition(5698, 2, CONTACT_ONLY, "gate"); // Shattered Armor, Spikes (attr 2: Block Crit and the damage reduction come first)
+
+// PuppetStringsAbAttr, gate, in the ORIGINAL order of the three design clauses (the safety rules are guards() and the once-per-switch-in test is the residual):
+//   A. the default attackCondition: move.category !== STATUS                      -> move.damaging
+//   C. holder.getMoveType(move) === PokemonType.PSYCHIC                           -> move.type PSYCHIC, effective (moveUser.getMoveType(move); moveUser is the holder for this WHEN)
+//   D. target.status?.effect is POISON or TOXIC                                    -> status.has on the other Pokemon (the target), either of the two
+bindCondition(
+  5901, // Puppet Strings
+  0,
+  {
+    all: [
+      { id: "move.damaging" },
+      { id: "move.type", type: "PSYCHIC", effective: true },
+      {
+        any: [
+          { id: "status.has", who: "other", status: "POISON" },
+          { id: "status.has", who: "other", status: "TOXIC" },
+        ],
+      },
+    ],
+  },
+  "gate",
+);
+
+// PressureVesselAbAttr, gate: `stat === Stat.DEF || stat === Stat.SPDEF`. No atom reads the stat slot (R-B15-28).
+bindLegacyClosure(
+  5914, // Pressure Vessel
+  0,
+  "The gate tests which stat is being calculated (Defense or Sp. Def); no library atom reads the stat slot yet. Needs 'The stat being calculated is {stat}' (R-B15-28).",
+  "gate",
+);
+
+// RainPumpAbAttr, gate: isRainingNow() = arena.weather exists, !weather.isEffectSuppressed(), weatherType is RAIN or HEAVY_RAIN.
+// field.weather reads arena.weatherType, which ignores suppression (Cloud Nine, Air Lock), so it is a different predicate.
+bindLegacyClosure(
+  5915, // Rain Pump
+  0,
+  "The gate also asks weather.isEffectSuppressed() before reading the type; the library atom field.weather ignores suppression, so it is not the same predicate. Needs a 'weather is being cancelled' atom (R-B15-32).",
+  "gate",
+);
+
+// RelativityDefenseReductionAbAttr, ctor:0, the closure `(holder, attacker, _move) => pokemonActedBefore(attacker, holder)`.
+bindLegacyClosure(
+  5911, // Relativity, the damage reduction (attr 1; attr 0 is the offence marker)
+  1,
+  "The closure reads the per-turn move order list (getLastTurnOrder) to see whether the attacker moved before the holder; time.acted reads one Pokemon's acted flag, which is a different predicate. Needs 'moved before' (R-B15-36).",
+  "ctor:0",
+);

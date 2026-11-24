@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "1d0a8f2e604b58",
-  "hash": "12131119a1f27d",
+  "vocabularyHash": "148286b1d0b532",
+  "hash": "1f63b37f1895ab",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -2078,6 +2078,229 @@
       "uses": 1
     },
     {
+      "id": "block.pressure-vessel",
+      "className": "PressureVesselAbAttr",
+      "label": "Raise Defense and Sp. Def the more PP I have left",
+      "summary": "Defense and Sp. Def are multiplied by x1.5 with all my PP left and x1 with none, in a straight line between (half the PP left = x1.25).",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "pressure vessel",
+        "more pp more defense",
+        "defense from pp",
+        "bulk from remaining pp",
+        "pp based defense",
+        "scale defense with pp"
+      ],
+      "examples": [
+        "My bulk is x1.5 with every move at full PP and fades to normal as the PP runs out, like Pressure Vessel"
+      ],
+      "params": [
+        {
+          "id": "minMultiplier",
+          "label": "Multiplier with no PP left (1 = no change)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 0,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        },
+        {
+          "id": "maxMultiplier",
+          "label": "Multiplier with all PP left (1.5 = 50% more)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The PP share is the PP left of every move added up, divided by the maximum PP of every move added up",
+        "A move with unlimited PP, or one that could not be loaded, is left out of both totals",
+        "With no move that uses PP the share counts as full",
+        "It is worked out again every time the game calculates the stat"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "minMultiplier",
+          "maxMultiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.puppet-strings",
+      "className": "PuppetStringsAbAttr",
+      "label": "Take over the target's next move",
+      "summary": "After my attack lands, the target is Commanded: its next move fails, goes to its ally, or hurts itself. Once per switch-in. By default only after a Psychic hit on a poisoned target.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "puppet strings",
+        "mind control",
+        "control the foe",
+        "hijack the next move",
+        "make the foe hit its ally",
+        "make the foe hurt itself",
+        "command the target"
+      ],
+      "examples": [
+        "After a Psychic move hits a poisoned foe, its next move is taken over, like Puppet Strings",
+        "A hit on a statused foe turns its next attack on its own ally"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The target must be another Pokemon that is still standing and that the move really damaged",
+        "A target whose ability stops added effects (Shield Dust and friends) is left alone",
+        "A target that is already Commanded, or was Commanded since it came in, is left alone (once per switch-in)",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.quickening-grace",
+      "className": "QuickeningGraceAbAttr",
+      "label": "Let my ally's two-turn attack skip its charge turn",
+      "summary": "While I have this, once per turn the first damaging two-turn move my ally picks (like Solar Beam or Fly) is used at once, with no charge turn. Status charge moves do not count.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "quickening grace",
+        "skip the charge turn",
+        "instant charge",
+        "power herb for my ally",
+        "no charge turn",
+        "hasten my partner's move"
+      ],
+      "examples": [
+        "My partner's Solar Beam fires the same turn it is picked, once per turn, like Quickening Grace"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only a damaging charge move qualifies; Geomancy and other status charge moves, and recharge moves like Hyper Beam, do not",
+        "Only a move chosen by my ALLY is hastened, not my own",
+        "I can hasten one move per turn (the first one my ally picks)",
+        "The battle message is built into the game's charge handling"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.rain-pump",
+      "className": "RainPumpAbAttr",
+      "label": "Restore PP to all my moves",
+      "summary": "Every one of my moves gets 1 PP back at the end of the turn (never above its maximum). By default only while it is raining. Example: 1 = each move recovers 1 PP.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "rain pump",
+        "recover pp",
+        "pp recovery",
+        "refill pp",
+        "regain pp every turn",
+        "restore pp in rain"
+      ],
+      "examples": [
+        "At the end of each turn in rain, every move of mine regains 1 PP, like Rain Pump"
+      ],
+      "params": [
+        {
+          "id": "ppRestored",
+          "label": "PP each move gets back per turn",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "At least one of my moves must have used PP, otherwise nothing happens",
+        "A move never goes above its maximum PP",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "ppRestored"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.rapier-flag-injection",
       "className": "RapierFlagInjectionAbAttr",
       "label": "Two kinds of my moves count as each other (Rapier)",
@@ -2241,6 +2464,327 @@
         "do": true
       },
       "uses": 64
+    },
+    {
+      "id": "block.relativity",
+      "className": "RelativityAbAttr",
+      "label": "Use another stat in place of Attack when I move first",
+      "summary": "When I act before my target this turn, my damaging moves use my Speed stat in place of Attack or Sp. Atk (whichever the move would read). Follows the real turn order, so Trick Room works.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "speed as attack",
+        "use speed to hit",
+        "attack with speed",
+        "go first and hit harder",
+        "substitute the attack stat"
+      ],
+      "examples": [
+        "If I move before the target, my moves hit with my Speed instead of my Attack"
+      ],
+      "params": [
+        {
+          "id": "substituteStat",
+          "label": "Stat used in place of the attack stat",
+          "control": "select",
+          "default": "SPD",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only when I act before my target this turn, judged by the real move order of the turn (so Trick Room is respected); built into the game's damage handling today, requested as a separate condition (R-B15-36)",
+        "It reads my own current stat after stages and other boosts (for Speed, after Borrowed Time's swap too)",
+        "Only damaging moves read an attack stat, so a status move is not affected",
+        "It is worked out in the damage calculation; the choice of stat is not a dispatched ability moment"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "substituteStat"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified. 1 attr in 1 ability: Relativity (5911 attr 0, Speed). The effect 'use another stat in place of the attack stat' cannot be split because the library has no such effect and no moment for it: the engine picks the attack stat inside getBaseDamage by scanning the attacker's attrs by name, and nothing dispatches it, so the order test (resolver) cannot be a separate condition block until that seam is a WHEN. Requested as R-B15-36: the moment 'While the game picks the stat my attack uses', the condition 'I act before the target this turn' (time.acted-before, by the real turn order list) and the effect 'Use {stat} in place of the attack stat'; the same condition atom is what the defence half (RelativityDefenseReductionAbAttr) needs. The only setting is the stat, typed (constructor argument, default Speed). WHEN is 'while active' and needs RelativityAbAttr in that WHEN's flagKeys (added locally with this chunk, request R-B15-35, keep the union on merge). Suspected oddities, NOT fixed: (1) the substitution runs after the move's own attack-stat change (VariableAtkAttr, the Foul Play style) and overwrites it, so Foul Play used by a Relativity holder that moved first hits with the holder's own Speed instead of the target's Attack; (2) it sits inside the same loop as the other attack-stat substitutes (Ancient Idol, Momentum), so a holder with two of them gets whichever attr comes LAST; (3) it is skipped while the attacker's ability is being ignored, and the order is compared per target, so one spread move can use Speed against one foe and Attack against the other.",
+      "uses": 1
+    },
+    {
+      "id": "block.relativity-defense-reduction",
+      "className": "RelativityDefenseReductionAbAttr",
+      "label": "Take less damage from a foe that moved before me",
+      "summary": "Damage I take from an attacker that moved before me this turn is multiplied by 0.75. Example: 0.75 = 25% less. Follows the real turn order, so Trick Room works.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.damage-taken",
+      "whenLabel": "While the game calculates damage I take",
+      "synonyms": [
+        "relativity",
+        "slower means tougher",
+        "resist the foe that went first",
+        "reduce damage from the faster attacker",
+        "take less damage when I move second",
+        "order based damage reduction"
+      ],
+      "examples": [
+        "If the foe moves before me I take 25% less damage from it, like Relativity"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Damage multiplier (0.75 = 25% less)",
+          "control": "number",
+          "default": 0.75,
+          "editable": true,
+          "min": 0,
+          "max": 4,
+          "step": 0.05
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-damage-taken",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.rendezvous",
+      "className": "RendezvousAbAttr",
+      "label": "Link to my ally so attacks on the same foe boost and heal us",
+      "summary": "On entry I link to my nearest ally. When we both hit the same foe in a turn, the second hit gets x1.2 power and we both heal 5% of max HP, once per turn.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "team up on one target",
+        "partner attack bonus",
+        "double team boost",
+        "ally combo",
+        "linked allies",
+        "same target bonus"
+      ],
+      "examples": [
+        "In doubles, when my partner and I hit the same foe, the second hit is 20% stronger and we both heal 5%"
+      ],
+      "params": [
+        {
+          "id": "powerMultiplier",
+          "label": "Power multiplier of the second attack (1.2 = 20% stronger)",
+          "control": "number",
+          "default": 1.2,
+          "editable": true,
+          "min": 1,
+          "max": 4,
+          "step": 0.05
+        },
+        {
+          "id": "healPercent",
+          "label": "HP both partners heal (% of max HP)",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Needs a living ally on the field to link to; in singles it does nothing",
+        "Both partners must still be on the field and linked; the link ends when either leaves",
+        "Only when the partner already hit the SAME target earlier this turn",
+        "The heal happens once per pair per turn, even for a spread move, and skips a partner that has fainted or is at full HP",
+        "The power boost and the heal are built into the game's damage handling, not into this block's entry moment; the link is made on entry",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "powerMultiplier",
+          "healPercent"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified. 1 attr in 1 ability: Rendezvous (5919 attr 0, x1.2 and 5%). The entry trigger is a separate swappable WHEN and the class has no condition of its own, but the two conditions that make the ability work (the linked ally already hit THIS target this turn; the heal only once per pair per turn) live in the engine seams, not in the class, so they cannot be separate blocks today. It cannot be split because the library has none of the pieces: 'link to my nearest ally' (the same effect Heartbreak needs, R-B15-13), a calc moment 'while the game calculates my move's power' with the condition 'my linked ally already hit this target this turn' (the existing effect.multiply-power would then do the boost), and a moment 'after the second attack on a target' with the effect 'heal me and my linked ally by N% of max HP once per turn'; requested as R-B15-37. Both numbers are typed settings (constructor arguments, old constants as defaults; the heal is shown as a percent). The only draw is the partner pick in triples. Suspected oddities, NOT fixed: (1) the heal memory (healedKey) is ONE module variable shared by every pair in the game and holds only the latest key: if a second pair heals in the same turn it overwrites the first pair's key, so the first pair could heal a second time that turn; (2) the code comment says the holder's Rendezvous grants the effect to whichever of the two acts second, so the partner without the ability is boosted too; (3) with several Rendezvous holders in triples only the first attr found on the user or partner supplies the numbers; (4) singles: inert, as documented.",
+      "uses": 1
+    },
+    {
+      "id": "block.set-arena-tag-on-hit",
+      "className": "SetArenaTagOnHitAbAttr",
+      "label": "Set a hazard or field effect when I am hit",
+      "summary": "When a damaging move hits me, Spikes is set on the attacker side for 0 turns (0 = until cleared). Example: Spikes on the attacker's side.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "spikes when hit",
+        "stealth rock when hit",
+        "set a hazard on the attacker",
+        "punish contact with hazards",
+        "retaliate with a trap",
+        "drop blocks",
+        "loose rocks",
+        "scrapyard"
+      ],
+      "examples": [
+        "When a contact move hits me, Spikes land on the attacker's side, like Scrapyard",
+        "Any damaging hit sets Stealth Rock on the attacker's side"
+      ],
+      "params": [
+        {
+          "id": "tagType",
+          "label": "Hazard or field effect to set",
+          "control": "select",
+          "default": "SPIKES",
+          "editable": true,
+          "options": [
+            "MUD_SPORT",
+            "WATER_SPORT",
+            "SPIKES",
+            "TOXIC_SPIKES",
+            "MIST",
+            "ER_SMOKESCREEN",
+            "STEALTH_ROCK",
+            "STICKY_WEB",
+            "TRICK_ROOM",
+            "INVERSE_ROOM",
+            "MAGIC_ROOM",
+            "WONDER_ROOM",
+            "SWIRLY_ROOM",
+            "GRAVITY",
+            "REFLECT",
+            "LIGHT_SCREEN",
+            "AURORA_VEIL",
+            "QUICK_GUARD",
+            "WIDE_GUARD",
+            "MAT_BLOCK",
+            "CRAFTY_SHIELD",
+            "TAILWIND",
+            "HAPPY_HOUR",
+            "SAFEGUARD",
+            "NO_CRIT",
+            "IMPRISON",
+            "ION_DELUGE",
+            "FIRE_GRASS_PLEDGE",
+            "WATER_FIRE_PLEDGE",
+            "GRASS_WATER_PLEDGE",
+            "FAIRY_LOCK",
+            "NEUTRALIZING_GAS",
+            "PENDING_HEAL",
+            "HOT_COALS",
+            "FOAMY_WEB",
+            "CREEPING_THORNS",
+            "ER_WEATHER_LOCK",
+            "ER_INFESTATION_TRAP",
+            "SEDIMENT_BLOOM",
+            "GRAVE_MARKER",
+            "ER_DRILL_BITS"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "turns",
+          "label": "Number of turns it lasts (0 = until cleared, for hazards)",
+          "control": "number",
+          "default": 0,
+          "editable": true,
+          "min": 0,
+          "max": 99,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "side",
+          "label": "Which side gets it",
+          "control": "select",
+          "default": "ATTACKER_SIDE",
+          "editable": true,
+          "options": [
+            "MY_SIDE",
+            "ATTACKER_SIDE",
+            "BOTH_SIDES"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "contactRequired",
+          "label": "Only when the move makes contact",
+          "control": "boolean",
+          "default": false,
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must have connected: a miss, a block or an immunity does nothing",
+        "A field effect that is already there, or a hazard at its layer limit, is not added again (the field handles that)",
+        "It does nothing in a preview"
+      ],
+      "effect": {
+        "id": "effect.arena-tag",
+        "params": [
+          "tagType",
+          "side",
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 6
     },
     {
       "id": "block.swirlify",
