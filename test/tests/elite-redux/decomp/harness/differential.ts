@@ -346,6 +346,10 @@ export function runAttrDifferential(
       for (const move of gridMoves()) {
         for (const damage of [1, Math.max(1, Math.floor(world.holder.getMaxHp() / 10))]) {
           for (const pair of pairs) {
+            if (pair.module.decl.when === "calc.always-hit-check" && damage !== 1) {
+              // The damage amount does not enter the accuracy question: one pass per state and move.
+              continue;
+            }
             const ctx: ParamContext = { holder: world.holder, foe: world.foe, move, damage };
             evaluations++;
             const say = (what: string, a: unknown, b: unknown): void => {
@@ -371,6 +375,22 @@ export function runAttrDifferential(
             }
             if (origDraws !== newDraws) {
               say("the number of random draws in canApply", origDraws, newDraws);
+            }
+            if (pair.module.decl.when === "calc.always-hit-check") {
+              // canApply of this class is always true; the rule lives in matches(move, user, target), which is what the engine asks.
+              type Asker = { matches(move: unknown, user: unknown, target: unknown): boolean };
+              rng.reset();
+              const origMatch = (pair.site.attr as unknown as Asker).matches(move, world.holder, world.foe);
+              const origMatchDraws = rng.count;
+              rng.reset();
+              const newMatch = (pair.rebuilt as unknown as Asker).matches(move, world.holder, world.foe);
+              const newMatchDraws = rng.count;
+              if (origMatch !== newMatch) {
+                say("matches (the always-hit question)", origMatch, newMatch);
+              }
+              if (origMatchDraws !== newMatchDraws) {
+                say("the number of random draws in matches", origMatchDraws, newMatchDraws);
+              }
             }
             const origCond = pair.site.attr.getCondition();
             const newCond = pair.rebuilt.getCondition();

@@ -603,6 +603,42 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     },
   ),
   calc(
+    "calc.attack-stat",
+    "AttackStatSubstituteAbAttr",
+    [H, O, M, MU],
+    "While the game picks the stat my attack uses",
+    "Stats",
+    "statValue",
+    {
+      baseClassOnly: true,
+      synonyms: ["body press", "attack with another stat", "swap attack stat", "which stat hits"],
+    },
+  ),
+  calc(
+    "calc.my-attack-matchup",
+    "BoneMoveTypeChartAbAttr",
+    [H, O, M, MU],
+    "While the game calculates how well my attack matches the target's types",
+    "Type",
+    "typeMultiplier",
+    {
+      baseClassOnly: true,
+      synonyms: ["bone zone", "my type matchup", "immunity ignored", "resisted hits hit harder"],
+    },
+  ),
+  calc(
+    "calc.always-hit-check",
+    "ConditionalAlwaysHitAbAttr",
+    [H, O, M, MU],
+    "While the game checks whether my move can miss",
+    "Damage and power",
+    "accuracy",
+    {
+      baseClassOnly: true,
+      synonyms: ["never miss", "no guard", "sure hit", "perfect accuracy on", "cannot miss"],
+    },
+  ),
+  calc(
     "calc.defensive-stat-substitute",
     "DefensiveStatSubstituteAbAttr",
     [H],
@@ -1086,4 +1122,7 @@ export const WHEN_MOVE_USER: Readonly<Record<string, "holder" | "other">> = {
   "calc.move-type": "holder",
   "calc.incoming-move": "other",
   "calc.outgoing-move": "holder",
+  "calc.attack-stat": "holder",
+  "calc.my-attack-matchup": "holder",
+  "calc.always-hit-check": "holder",
 };

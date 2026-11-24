@@ -22,6 +22,7 @@
 // =============================================================================
 
 import { AbAttr } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
 import { type EffectiveStat, Stat } from "#enums/stat";
@@ -52,7 +53,16 @@ export interface AttackStatSubstituteOptions {
   readonly moveIds?: readonly MoveId[];
 }
 
-export class AttackStatSubstituteAbAttr extends AbAttr {
+/** What the engine knows when it asks the question: the attacker (the holder) and the move. */
+export interface AttackStatSubstituteParams {
+  readonly pokemon: Pokemon;
+  readonly move: Move;
+}
+
+export class AttackStatSubstituteAbAttr extends AbAttr implements GatedAttr<AttackStatSubstituteParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AttackStatSubstituteParams) => boolean) | undefined;
+
   private readonly physicalStat: EffectiveStat | undefined;
   private readonly specialStat: EffectiveStat | undefined;
   private readonly contactOnly: boolean;
@@ -80,13 +90,8 @@ export class AttackStatSubstituteAbAttr extends AbAttr {
    * when this ability does not substitute for the given move.
    */
   public resolveStat(move: Move, isPhysical: boolean, source: Pokemon): EffectiveStat | null {
-    if (this.moveIds !== undefined && !this.moveIds.includes(move.id)) {
-      return null;
-    }
-    if (this.contactOnly && !move.hasFlag(MoveFlags.MAKES_CONTACT)) {
-      return null;
-    }
-    if (this.flag !== undefined && !move.hasFlag(this.flag)) {
+    // Tier B: the move filters are the replaceable `gate` (no guard, no residual, no random draw).
+    if (!gatedCanApply<AttackStatSubstituteParams>(this, { pokemon: source, move })) {
       return null;
     }
     if (this.useHigherOffense) {
@@ -96,5 +101,19 @@ export class AttackStatSubstituteAbAttr extends AbAttr {
       return source.getStat(Stat.ATK, false) <= source.getStat(Stat.SPATK, false) ? Stat.ATK : Stat.SPATK;
     }
     return (isPhysical ? this.physicalStat : this.specialStat) ?? null;
+  }
+
+  /**
+   * The replaceable condition, in the ORIGINAL clause order: the move is on the allowed list, then it makes contact
+   * (the move's OWN flag, so Long Reach is ignored), then it has the required property.
+   */
+  public gate({ move }: AttackStatSubstituteParams): boolean {
+    if (this.moveIds !== undefined && !this.moveIds.includes(move.id)) {
+      return false;
+    }
+    if (this.contactOnly && !move.hasFlag(MoveFlags.MAKES_CONTACT)) {
+      return false;
+    }
+    return this.flag === undefined || move.hasFlag(this.flag);
   }
 }

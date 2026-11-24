@@ -93,7 +93,11 @@ export function buildAttr(
     const ctorValue = param.codec === undefined ? value : param.codec.toCtor(value);
     if (param.ctorOption !== undefined) {
       const bag = (args[param.ctorIndex] ??= {}) as Record<string, unknown>;
-      bag[param.ctorOption] = ctorValue;
+      // An option that is not set stays OUT of the bag, like in the live users (a class that keeps its options object,
+      // such as the always-hit class, would otherwise show an extra key with the value undefined).
+      if (ctorValue !== undefined) {
+        bag[param.ctorOption] = ctorValue;
+      }
     } else if (param.spread === true) {
       spread = { index: param.ctorIndex, list: ctorValue as unknown[] };
     } else {

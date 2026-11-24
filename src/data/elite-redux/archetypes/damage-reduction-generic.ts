@@ -55,12 +55,14 @@
 
 import { ReceivedMoveDamageMultiplierAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { MoveCategory, type MoveDamageCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
+import type { PreDefendModifyDamageAbAttrParams } from "#types/ability-types";
 
 /**
  * Discriminated filter for {@linkcode DamageReductionAbAttr}. Each variant
@@ -130,7 +132,13 @@ export interface DamageReductionOptions {
  * we only need the type chart multiplier; the parent has already filtered
  * out cancelled / immune cases by the time the predicate runs.
  */
-export class DamageReductionAbAttr extends ReceivedMoveDamageMultiplierAbAttr {
+export class DamageReductionAbAttr
+  extends ReceivedMoveDamageMultiplierAbAttr
+  implements GatedAttr<PreDefendModifyDamageAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreDefendModifyDamageAbAttrParams) => boolean) | undefined;
+
   private readonly reductionAmount: number;
   private readonly filterSpec: DamageReductionFilter;
 
@@ -158,6 +166,19 @@ export class DamageReductionAbAttr extends ReceivedMoveDamageMultiplierAbAttr {
     );
     this.reductionAmount = opts.reduction;
     this.filterSpec = filter;
+  }
+
+  /**
+   * Tier B split (ability studio spec 3.1): the whole rule is the replaceable `gate` (the filter, which the parent's
+   * closure evaluates). There are no guards and no residual, and no random draw.
+   */
+  public override canApply(params: PreDefendModifyDamageAbAttrParams): boolean {
+    return gatedCanApply<PreDefendModifyDamageAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the incoming move matches the configured filter (the parent's closure). */
+  public gate(params: PreDefendModifyDamageAbAttrParams): boolean {
+    return super.canApply(params);
   }
 
   /** Read-only accessor for the configured reduction (0 < r < 1). */

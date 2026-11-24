@@ -36,7 +36,8 @@
 // (TODO when those abilities are wired).
 // =============================================================================
 
-import { MovePowerBoostAbAttr } from "#abilities/ab-attrs";
+import { MovePowerBoostAbAttr, type PreAttackModifyPowerAbAttrParams } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { MoveCategory } from "#enums/move-category";
 import type { MoveFlags } from "#enums/move-flags";
 import { Stat } from "#enums/stat";
@@ -59,16 +60,38 @@ export interface DefenseStatSwapOnFlagOptions {
   readonly swap: "target-spdef-instead-of-def" | "target-def-instead-of-spdef" | "target-lower-defense";
 }
 
-export class DefenseStatSwapOnFlagAbAttr extends MovePowerBoostAbAttr {
+export class DefenseStatSwapOnFlagAbAttr
+  extends MovePowerBoostAbAttr
+  implements GatedAttr<PreAttackModifyPowerAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreAttackModifyPowerAbAttrParams) => boolean) | undefined;
+
   constructor(private readonly opts: DefenseStatSwapOnFlagOptions) {
     super(() => true, 1);
   }
 
-  override apply(params: Parameters<MovePowerBoostAbAttr["apply"]>[0]): void {
+  /**
+   * Tier B split (ability studio spec 3.1). The two early returns that used to open `apply` (no opponent, the move does not
+   * have the flag) are the guard and the gate now, so staff can see and change the property test; `apply` keeps the stat
+   * arithmetic only. The parent's own condition is the constant `() => true`, so nothing else was ever asked. No random draw.
+   */
+  override canApply(params: PreAttackModifyPowerAbAttrParams): boolean {
+    return gatedCanApply<PreAttackModifyPowerAbAttrParams>(this, params);
+  }
+
+  /** Safety rule that stays in the class: there must be an opponent to compare. */
+  public guards({ opponent }: PreAttackModifyPowerAbAttrParams): boolean {
+    return !!opponent;
+  }
+
+  /** The replaceable condition: the move has the configured property (its own flag, move.hasFlag). */
+  public gate({ move }: PreAttackModifyPowerAbAttrParams): boolean {
+    return move.hasFlag(this.opts.flag);
+  }
+
+  override apply(params: PreAttackModifyPowerAbAttrParams): void {
     const { opponent, move, power } = params;
-    if (!opponent || !move.hasFlag(this.opts.flag)) {
-      return;
-    }
     const def = opponent.getStat(Stat.DEF, false);
     const spdef = opponent.getStat(Stat.SPDEF, false);
     if (def <= 0 || spdef <= 0) {

@@ -16,6 +16,7 @@
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import { Gender } from "#data/gender";
+import { PokemonMove } from "#data/moves/pokemon-move";
 import { Status } from "#data/status-effect";
 import { Terrain, TerrainType } from "#data/terrain";
 import { Weather } from "#data/weather";
@@ -399,6 +400,22 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     cancelled: new BooleanHolder(false),
     simulated: false,
   }),
+  // The two engine scans that are not dispatched (Pokemon.getBaseDamage reads resolveStat, getAttackTypeEffectiveness reads fire) ask
+  // their question with the holder and the move; this is the same frame the Tier B gate of those classes reads.
+  "calc.attack-stat": ctx => ({ pokemon: ctx.holder, move: ctx.move }),
+  "calc.my-attack-matchup": ctx => ({ pokemon: ctx.holder, move: ctx.move }),
+  // The accuracy-bypass scan (MoveEffectPhase.checkBypassAccAndInvuln) asks the user attr matches(move, user, target); the user is the holder.
+  "calc.always-hit-check": ctx => ({ pokemon: ctx.holder, opponent: ctx.foe, move: ctx.move }),
+  "cancel.crit": ({ holder }) => ({ pokemon: holder, blockCrit: new BooleanHolder(false) }),
+  // The legacy PreDefend hook: what the (undispatched) dodge class would receive.
+  "calc.incoming-move": ctx => ({
+    pokemon: ctx.holder,
+    opponent: ctx.foe,
+    move: ctx.move,
+    typeMultiplier: new NumberHolder(1),
+    cancelled: new BooleanHolder(false),
+    simulated: false,
+  }),
   "calc.move-power": ctx => ({
     pokemon: ctx.holder,
     opponent: ctx.foe,
@@ -450,4 +467,19 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
   }),
   // Arena.trySetWeather (arena.ts:537): the weather it was just changed to (the arena has stored it already).
   "event.weather-changed": ctx => ({ pokemon: ctx.holder, weather: globalScene.arena.weatherType, simulated: false }),
+  // B08 chunk 4. The effect-chance hook is dispatched with the user, the move and the chance holder (Move.getMoveChance); the chance is a plain
+  // 30 so the parent's "there is a chance to change" test passes. The defensive-stat pick is dispatched on the ATTACKER (the holder) with the
+  // defender and the holder of the stat the damage formula will read.
+  "calc.effect-chance": ctx => ({
+    pokemon: ctx.holder,
+    move: ctx.move,
+    chance: new NumberHolder(30),
+    simulated: false,
+  }),
+  "calc.defensive-stat-pick": ctx => ({
+    pokemon: ctx.holder,
+    defender: ctx.foe,
+    statHolder: new NumberHolder(Stat.DEF),
+    simulated: false,
+  }),
 };

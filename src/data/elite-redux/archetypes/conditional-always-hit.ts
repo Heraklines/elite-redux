@@ -28,6 +28,7 @@
 import { AbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { TrappedTag } from "#data/battler-tags";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import type { Move } from "#data/moves/move";
 import type { BattlerTagType } from "#enums/battler-tag-type";
@@ -38,6 +39,16 @@ import { PokemonType } from "#enums/pokemon-type";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import type { AbAttrBaseParams } from "#types/ability-types";
+
+/**
+ * What the engine knows when it asks the accuracy question: the attacker (the holder), the target and the move. The ability
+ * studio reads it like the parameter object of a dispatched trigger (`pokemon`, `opponent`, `move`).
+ */
+export interface ConditionalAlwaysHitParams {
+  readonly pokemon: Pokemon;
+  readonly opponent: Pokemon;
+  readonly move: Move;
+}
 
 export interface ConditionalAlwaysHitOptions {
   /** When provided, only fires when the move has this flag set. */
@@ -63,7 +74,10 @@ export interface ConditionalAlwaysHitOptions {
  * by `MoveEffectPhase.checkBypassAccAndInvuln` via
  * {@link Pokemon.hasConditionalAlwaysHit}.
  */
-export class ConditionalAlwaysHitAbAttr extends AbAttr {
+export class ConditionalAlwaysHitAbAttr extends AbAttr implements GatedAttr<ConditionalAlwaysHitParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: ConditionalAlwaysHitParams) => boolean) | undefined;
+
   public readonly opts: ConditionalAlwaysHitOptions;
 
   constructor(opts: ConditionalAlwaysHitOptions) {
@@ -105,7 +119,17 @@ export class ConditionalAlwaysHitAbAttr extends AbAttr {
     return !this.opts.targetTrapped || !!target.getTag(TrappedTag);
   }
 
+  /**
+   * The question the engine asks (MoveEffectPhase.checkBypassAccAndInvuln). Tier B: the whole answer is the `gate`, which the
+   * ability studio can replace (`gateOverride`); there is no guard and no residual, and no random draw.
+   */
   public matches(move: Move, user: Pokemon, target: Pokemon): boolean {
+    return gatedCanApply<ConditionalAlwaysHitParams>(this, { pokemon: user, opponent: target, move });
+  }
+
+  /** The replaceable condition, in the ORIGINAL clause order: the move (property, kind, listed moves), the weather, then the target. */
+  public gate(params: ConditionalAlwaysHitParams): boolean {
+    const { pokemon: user, opponent: target, move } = params;
     return this.matchesMove(move, user) && this.matchesWeather() && this.matchesTarget(move, user, target);
   }
 }

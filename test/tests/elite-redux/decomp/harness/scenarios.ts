@@ -11,13 +11,14 @@
 //
 // A scenario is DATA (`ScenarioSpec`) plus optional state axes, so the same template can be run for
 // every condition probe of a class: "axes" are the names a declaration's `probes[].axes` may use
-// (hp, foeHp, foeMove, weather, status, stage). An axis the harness does not understand is a lint
+// (hp, foeHp, foeMove, foeType, weather, status, stage). An axis the harness does not understand is a lint
 // failure, never silently ignored.
 
 import { allAbilities } from "#data/data-lists";
 import { AbilityId } from "#enums/ability-id";
 import { BerryType } from "#enums/berry-type";
 import { MoveId } from "#enums/move-id";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
@@ -25,7 +26,7 @@ import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import type { GameManager } from "#test/framework/game-manager";
 import type { BattleTrace, TraceData } from "./battle-trace";
-import { type Axes, type AxisValue, resolveHp, setStatusOf, setWeatherOf } from "./world";
+import { type Axes, type AxisValue, resolveHp, setStatusOf, setTypesOf, setWeatherOf } from "./world";
 
 export type { Axes, AxisValue };
 export { resolveHp };
@@ -163,6 +164,17 @@ export const TEMPLATES: Readonly<Record<string, ScenarioSpec>> = {
     foe: SpeciesId.SNORLAX,
     foeLevel: 100,
     foeMoves: [MoveId.CELEBRATE],
+    turns: [use(MoveId.TACKLE), use(MoveId.DOUBLE_SLAP)],
+  },
+  /** The holder attacks and every hit is critical (the crit damage multiplier of the ATTACKER is asked). B08 form: a multi-hit follow-up. */
+  "holder-crits-foe-multihit": {
+    ...BASE,
+    id: "holder-crits-foe-multihit",
+    label: "The holder lands critical hits on the enemy (single hit, then multi hit)",
+    foe: SpeciesId.SNORLAX,
+    foeLevel: 100,
+    foeMoves: [MoveId.CELEBRATE],
+    crits: true,
     turns: [use(MoveId.TACKLE), use(MoveId.DOUBLE_SLAP)],
   },
   /** The holder uses a status move on itself and the enemy attacks in return. */
@@ -358,6 +370,7 @@ const t = {
   hit: "foe-hits-holder",
   crit: "foe-crits-holder",
   attack: "holder-hits-foe",
+  attackCrit: "holder-crits-foe-multihit",
   statusMove: "holder-uses-status-move",
   ko: "holder-kos-foe",
   faint: "holder-faints",
@@ -483,6 +496,9 @@ const WHEN_TEMPLATE: Readonly<Record<string, string>> = {
   "cancel.infiltrate": t.hit,
   "calc.incoming-move": t.hit,
   "calc.outgoing-move": t.attack,
+  "calc.attack-stat": t.attack,
+  "calc.my-attack-matchup": t.attack,
+  "calc.always-hit-check": t.attack,
   "while.active": t.flags,
 };
 
@@ -500,7 +516,7 @@ export function mappedWhenIds(): string[] {
 // Axes
 
 /** The axis names a declaration's probes may use. */
-export const KNOWN_AXES = ["hp", "foeHp", "foeMove", "weather", "status", "stage"] as const;
+export const KNOWN_AXES = ["hp", "foeHp", "foeLevel", "foeMove", "foeType", "weather", "status", "stage"] as const;
 
 export function describeAxes(axes: Axes): string {
   const entries = Object.entries(axes);
@@ -529,8 +545,20 @@ export function applyAxes(ctx: ScenarioContext, axes: Axes): void {
       case "foeHp":
         foe.hp = resolveHp(value, foe.getMaxHp());
         break;
+      case "foeLevel":
+        // A sturdier enemy: an ability that answers a hit with its own attack (counter-attack classes) would otherwise
+        // knock out the default level 30 enemy and end the battle in the middle of the scenario.
+        foe.level = Number(value);
+        foe.calculateStats();
+        foe.hp = foe.getMaxHp();
+        break;
       case "foeMove":
         game.move.changeMoveset(foe, enumValue(MoveId as never, value, "foeMove") as MoveId);
+        break;
+      case "foeType":
+        // The enemy becomes ONLY this type (the default enemy is a Normal-type Snorlax, which is immune to a Normal move that
+        // an ability turned into a Ghost move, so such an ability would never reach its after-hit trigger).
+        setTypesOf(foe, [enumValue(PokemonType as never, value, "foeType") as PokemonType]);
         break;
       case "weather":
         setWeatherOf(game, enumValue(WeatherType as never, value, "weather") as WeatherType);

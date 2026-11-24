@@ -19,6 +19,7 @@
 // =============================================================================
 
 import { PostDancingMoveAbAttr, type PostMoveUsedAbAttrParams } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import type { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
@@ -39,7 +40,10 @@ export interface CopyMoveByFilterOptions {
   readonly moveIds?: readonly MoveId[];
 }
 
-export class CopyMoveByFilterAbAttr extends PostDancingMoveAbAttr {
+export class CopyMoveByFilterAbAttr extends PostDancingMoveAbAttr implements GatedAttr<PostMoveUsedAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveUsedAbAttrParams) => boolean) | undefined;
+
   private readonly flag: MoveFlags | undefined;
   private readonly anyFlags: readonly MoveFlags[] | undefined;
   private readonly moveIds: readonly MoveId[] | undefined;
@@ -51,7 +55,16 @@ export class CopyMoveByFilterAbAttr extends PostDancingMoveAbAttr {
     this.moveIds = options.moveIds;
   }
 
-  override canApply({ source, pokemon, move }: PostMoveUsedAbAttrParams): boolean {
+  /**
+   * Tier B split (ability studio spec 3.1): `guards` (not my own move, not while semi-invulnerable), then the
+   * replaceable `gate` (the move filter).
+   */
+  override canApply(params: PostMoveUsedAbAttrParams): boolean {
+    return gatedCanApply<PostMoveUsedAbAttrParams>(this, params);
+  }
+
+  /** Safety rules that stay in the class, checked first, in the original order. */
+  public guards({ source, pokemon }: PostMoveUsedAbAttrParams): boolean {
     // Cannot copy our own move; cannot copy while semi-invulnerable.
     if (source.getBattlerIndex() === pokemon.getBattlerIndex()) {
       return false;
@@ -59,6 +72,15 @@ export class CopyMoveByFilterAbAttr extends PostDancingMoveAbAttr {
     if (pokemon.summonData.tags.some(tag => FORBIDDEN_TAGS.includes(tag.tagType))) {
       return false;
     }
+    return true;
+  }
+
+  /**
+   * The replaceable condition, in the original clause order: the move must have the flag, any one of the flags and be
+   * one of the listed moves (every setting that is present). It reads the move's OWN flags (`hasFlag`), not the
+   * user-aware flag check.
+   */
+  public gate({ move }: PostMoveUsedAbAttrParams): boolean {
     const m = move.getMove();
     if (this.flag !== undefined && !m.hasFlag(this.flag)) {
       return false;

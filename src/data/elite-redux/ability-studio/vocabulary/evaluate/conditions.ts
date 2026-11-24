@@ -8,8 +8,12 @@
 // original lambda used (isFullHp(), doesFlagEffectApply(), hpCrossedBelow(), ...). Conditions are
 // compiled ONCE into closures; they are never interpreted per call on a hot path.
 
-import { hpCrossedBelow } from "#abilities/ab-attrs";
+import { hpCrossedBelow, isComatoseLike } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { TrappedTag } from "#data/battler-tags";
+import { allMoves } from "#data/data-lists";
+import { DAMAGING_HIT_RESULTS } from "#data/elite-redux/archetypes/chance-status-on-hit";
+import { ConditionalDamageAbAttr } from "#data/elite-redux/archetypes/conditional-damage";
 import { Gender } from "#data/gender";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import { SpeciesFormChangeManualTrigger } from "#data/pokemon-forms/form-change-triggers";
@@ -87,6 +91,30 @@ const TARGET_KINDS: Readonly<Record<string, readonly MoveTarget[]>> = {
     MoveTarget.USER_AND_ALLIES,
   ],
   field: [MoveTarget.BOTH_SIDES, MoveTarget.USER_SIDE, MoveTarget.ALL, MoveTarget.PARTY],
+};
+
+/** The player word of an exact aim (MOVE_AIM_OPTIONS) and the MoveTarget it stands for. */
+const EXACT_TARGETS: Readonly<Record<string, MoveTarget>> = {
+  "one other Pokemon, any distance": MoveTarget.OTHER,
+  "one adjacent Pokemon": MoveTarget.NEAR_OTHER,
+  "one adjacent foe": MoveTarget.NEAR_ENEMY,
+  "one random adjacent foe": MoveTarget.RANDOM_NEAR_ENEMY,
+  "all adjacent Pokemon": MoveTarget.ALL_NEAR_OTHERS,
+  "all adjacent foes": MoveTarget.ALL_NEAR_ENEMIES,
+  "all foes": MoveTarget.ALL_ENEMIES,
+  "all other Pokemon": MoveTarget.ALL_OTHERS,
+  "the foe's side of the field": MoveTarget.ENEMY_SIDE,
+  "my side of the field": MoveTarget.USER_SIDE,
+  "both sides of the field": MoveTarget.BOTH_SIDES,
+  "only the user": MoveTarget.USER,
+  "an adjacent ally": MoveTarget.NEAR_ALLY,
+  "an ally, any distance": MoveTarget.ALLY,
+  "the user or an adjacent ally": MoveTarget.USER_OR_NEAR_ALLY,
+  "the user and its allies": MoveTarget.USER_AND_ALLIES,
+  "every Pokemon": MoveTarget.ALL,
+  "the whole party": MoveTarget.PARTY,
+  "the Pokemon that last hit the user": MoveTarget.ATTACKER,
+  "the Curse aim": MoveTarget.CURSE,
 };
 
 // ---- once-per / nth-use memory -----------------------------------------------------------
@@ -208,6 +236,13 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
     const targets = TARGET_KINDS[String(p.kind)];
     return frame => frame.move !== undefined && (targets ?? []).includes(frame.move.moveTarget);
   },
+  "move.aimed-at": p => {
+    const target = EXACT_TARGETS[String(p.target)];
+    if (target === undefined) {
+      throw new Error(`"${String(p.target)}" is not a way a move can be aimed`);
+    }
+    return frame => frame.move !== undefined && frame.move.moveTarget === target;
+  },
   "move.priority": p => frame =>
     frame.move !== undefined && compare(frame.move.priority, p.cmp as CompareOp, Number(p.n)),
   "move.multi-hit": () => frame => frame.hits !== undefined && frame.hits.count > 1,
@@ -224,6 +259,13 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
       && compare(defender.getMoveEffectiveness(frame.moveUser, frame.move), p.cmp as CompareOp, Number(p.n))
     );
   },
+  "move.inherent-flag": p => {
+    const flag = enumValue(MoveFlags, String(p.flag), "move property") as MoveFlags;
+    return frame => frame.move?.hasFlag(flag) ?? false;
+  },
+  "move.drains": () => frame => frame.move?.hasAttr("HitHealAttr") ?? false,
+  "hit.landed-damage": () => frame => frame.hitResult !== undefined && DAMAGING_HIT_RESULTS.has(frame.hitResult),
+  "hit.critical": () => frame => !!frame.other?.turnData?.attacksReceived?.[0]?.critical,
   "move.has-effect-chance": () => frame => frame.move !== undefined && frame.move.chance >= 0,
   "move.is-move": p => {
     const id = enumValue(MoveId, String(p.moveId), "move");
@@ -243,6 +285,10 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
     const tag = enumValue(ArenaTagType, String(p.tag), "field effect") as ArenaTagType;
     return frame => globalScene.arena.getTagOnSide(tag, sideOf(frame.holder, String(p.side))) !== undefined;
   },
+  "field.anyone-asleep": () => frame =>
+    globalScene
+      .getField(true)
+      .some(p => p.status?.effect === StatusEffect.SLEEP || (p === frame.holder && isComatoseLike(p))),
   "field.gravity": () => () => globalScene.arena.hasActiveGravity(),
   "field.trick-room": () => () => globalScene.arena.getTag(ArenaTagType.TRICK_ROOM) !== undefined,
 
@@ -273,6 +319,11 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
       const target = holderLikeOf(frame, String(p.who));
       return target !== undefined && target.getTag(tag) !== undefined;
     };
+  },
+
+  "tag.trapped": p => frame => {
+    const target = holderLikeOf(frame, String(p.who));
+    return target !== undefined && !!target.getTag(TrappedTag);
   },
 
   // Stat stages
@@ -309,6 +360,13 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
     const id = enumValue(MoveId, String(p.moveId), "move");
     return frame => holderLikeOf(frame, String(p.who))?.getLastXMoves()[0]?.move === id;
   },
+  "time.last-move-flag": p => {
+    const flag = enumValue(MoveFlags, String(p.flag), "move property") as MoveFlags;
+    return frame => {
+      const last = holderLikeOf(frame, String(p.who))?.getLastXMoves(1)[0];
+      return last !== undefined && allMoves[last.move]?.hasFlag(flag) === true;
+    };
+  },
   "time.once-per": p => {
     const scope = String(p.scope);
     // The wave scope is the per-wave memory the ER archetypes already use (pokemon.waveData.entryEffectsFired, a
@@ -335,6 +393,16 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
       deferMemoryWrite(frame, () => memory.set(key, marker));
       return true;
     };
+  },
+  "time.once-per-unused": p => {
+    const scope = String(p.scope);
+    // Read only: the same memory as time.once-per, without ever spending it.
+    if (scope === "wave") {
+      const waveKey = String(p.key);
+      return frame => !frame.holder.waveData.entryEffectsFired.has(waveKey);
+    }
+    const key = `once:${scope}:${String(p.key)}`;
+    return frame => memoryOf(frame.holder).get(key) !== scopeMarker(frame.holder, scope);
   },
   "time.acted": p => frame => holderLikeOf(frame, String(p.who))?.turnData?.acted ?? false,
   "time.nth-use": p => {
@@ -409,6 +477,12 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
   "mon.has-ability": p => {
     const ability = enumValue(AbilityId, String(p.ability), "ability") as AbilityId;
     return frame => holderLikeOf(frame, String(p.who))?.hasAbility(ability) ?? false;
+  },
+  "mon.protected-from-effects": p => frame =>
+    holderLikeOf(frame, String(p.who))?.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr") ?? false,
+  "mon.switching-out": p => frame => {
+    const target = holderLikeOf(frame, String(p.who));
+    return target !== undefined && ConditionalDamageAbAttr.isTargetMidVoluntarySwitch(target);
   },
   "mon.ability-ignorable": () => frame => frame.holder.getAbility().ignorable,
   "mon.in-form": p => frame => holderLikeOf(frame, String(p.who))?.getFormKey() === String(p.key),

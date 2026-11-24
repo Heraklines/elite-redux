@@ -29,6 +29,8 @@ export default defineConfig(async config => {
         TZ: "UTC",
       },
       isolate: false,
+      // The decomposition L1 differential (hundreds of thousands of attr evaluations over the live ER registry) needs more than node default heap.
+      execArgv: ["--max-old-space-size=6144"],
       testTimeout: TEST_TIMEOUT,
       slowTestThreshold: TEST_TIMEOUT / 2,
       // TODO: Vitest's current framework produces spurious errors for type tests with this option enabled.

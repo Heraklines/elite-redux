@@ -42,8 +42,9 @@
 //     none of the C1b targets need it; revisit if a future ER ability does.
 // =============================================================================
 
-import { isComatoseLike, MovePowerBoostAbAttr } from "#abilities/ab-attrs";
+import { isComatoseLike, MovePowerBoostAbAttr, type PreAttackModifyPowerAbAttrParams } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { Command } from "#enums/command";
 import { BATTLE_STATS, type BattleStat } from "#enums/stat";
@@ -176,7 +177,13 @@ export interface ConditionalDamageOptions {
  * `ConditionalDamageAbAttr` with a `TypeDamageBoostAbAttr` for the "x1.5 if
  * foe statused AND Fire-type move" sub-case.
  */
-export class ConditionalDamageAbAttr extends MovePowerBoostAbAttr {
+export class ConditionalDamageAbAttr
+  extends MovePowerBoostAbAttr
+  implements GatedAttr<PreAttackModifyPowerAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreAttackModifyPowerAbAttrParams) => boolean) | undefined;
+
   // NOTE: We use distinct field names from the super (`condition`,
   // `powerMultiplier`) to avoid shadowing — TypeScript collapses subclass
   // declarations that share a name with the super, and the closure passed to
@@ -203,6 +210,24 @@ export class ConditionalDamageAbAttr extends MovePowerBoostAbAttr {
     );
     this.damageCondition = opts.condition;
     this.damageMultiplier = opts.multiplier;
+  }
+
+  /**
+   * Tier B split (ability studio spec 3.1): `guards` (there is a target) and `gate` (the situation, which is the whole
+   * rule). There is no residual: the original `canApply` was exactly the closure given to the parent.
+   */
+  public override canApply(params: PreAttackModifyPowerAbAttrParams): boolean {
+    return gatedCanApply<PreAttackModifyPowerAbAttrParams>(this, params);
+  }
+
+  /** Safety rule that stays in the class: every situation needs a real target Pokemon. */
+  public guards(params: PreAttackModifyPowerAbAttrParams): boolean {
+    return params.opponent !== null;
+  }
+
+  /** The replaceable condition: the situation, as the parent's closure evaluates it. */
+  public gate(params: PreAttackModifyPowerAbAttrParams): boolean {
+    return super.canApply(params);
   }
 
   /**

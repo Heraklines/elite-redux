@@ -60,6 +60,8 @@
     "event.weather-changed"
   ],
   "unreached": {
+    "calc.always-hit-check": "holder-hits-foe: not dispatched through applyAbAttrs; MoveEffectPhase.checkBypassAccAndInvuln scans the attackers attrs and calls matches(move, user, target) on any ConditionalAlwaysHitAbAttr, so the engine never evaluates the attr through a hook",
+    "calc.attack-stat": "holder-hits-foe: not dispatched through applyAbAttrs; Pokemon.getBaseDamage scans the attackers attrs for a resolveStat function, so the engine never evaluates an AttackStatSubstituteAbAttr attr of the holder",
     "calc.berry-threshold": "holder-low-hp-turns: the engine never evaluated a ReduceBerryUseThresholdAbAttr attr of the holder",
     "calc.burn-damage": "foe-inflicts-status: the engine never evaluated a ReduceBurnDamageAbAttr attr of the holder",
     "calc.defensive-stat-pick": "foe-crits-holder: the engine never evaluated a CritUseLowerDefensiveStatAbAttr attr of the holder",
@@ -68,6 +70,7 @@
     "calc.incoming-effect-chance": "foe-hits-holder: the engine never evaluated a IgnoreMoveEffectsAbAttr attr of the holder",
     "calc.incoming-move": "foe-hits-holder: the engine never evaluated a PreDefendAbAttr attr of the holder",
     "calc.move-power": "holder-hits-foe: the engine never evaluated a MovePowerBoostAbAttr attr of the holder",
+    "calc.my-attack-matchup": "holder-hits-foe: not dispatched through applyAbAttrs; Pokemon.getAttackTypeEffectiveness finds the class by name and calls fire(), so the engine never evaluates a BoneMoveTypeChartAbAttr attr of the holder",
     "calc.outgoing-move": "holder-hits-foe: the engine never evaluated a PreAttackAbAttr attr of the holder",
     "calc.run-chance": "quiet-turns: the engine never evaluated a RunSuccessAbAttr attr of the holder",
     "calc.status-duration": "foe-inflicts-status: the engine never evaluated a ReduceStatusEffectDurationAbAttr attr of the holder",

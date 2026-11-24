@@ -17,6 +17,7 @@
 // =============================================================================
 
 import { PostDefendAbAttr } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveFlags } from "#enums/move-flags";
 import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
@@ -26,7 +27,10 @@ export interface ContactQuashOptions {
   readonly turns?: number;
 }
 
-export class ContactQuashAbAttr extends PostDefendAbAttr {
+export class ContactQuashAbAttr extends PostDefendAbAttr implements GatedAttr<PostMoveInteractionAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
   private readonly turns: number;
 
   constructor(options: ContactQuashOptions = {}) {
@@ -34,11 +38,20 @@ export class ContactQuashAbAttr extends PostDefendAbAttr {
     this.turns = options.turns ?? 5;
   }
 
+  /** Tier B split (ability studio spec 3.1): `guards` (there is an attacker and the move is an attack) then `gate` (contact). */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Safety rules that stay in the class: there is an attacker, and the move is an attacking move. */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    const { move, opponent } = params;
+    return !(!opponent || !move.is("AttackMove"));
+  }
+
+  /** The replaceable condition: the move makes contact with the holder. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
     const { move, opponent, pokemon } = params;
-    if (!opponent || !move.is("AttackMove")) {
-      return false;
-    }
     return move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: opponent, target: pokemon });
   }
 

@@ -30,7 +30,11 @@ function makeTarget(def: number, spdef: number): Pokemon {
 
 function runPower(attr: DefenseStatSwapOnFlagAbAttr, move: Move, target: Pokemon, base = 100): number {
   const power = new NumberHolder(base);
-  attr.apply({ opponent: target, move, power } as unknown as Parameters<DefenseStatSwapOnFlagAbAttr["apply"]>[0]);
+  const params = { opponent: target, move, power } as unknown as Parameters<DefenseStatSwapOnFlagAbAttr["apply"]>[0];
+  // The property test is the attr's gate since the Tier B split (B08 chunk 4): the engine asks canApply before apply.
+  if (attr.canApply(params)) {
+    attr.apply(params);
+  }
   return power.value;
 }
 
