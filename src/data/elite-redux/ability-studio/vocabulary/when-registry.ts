@@ -971,6 +971,7 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     dispatchKey: null,
     flagKeys: [
       "AbilityStudioRuntimeCapabilityAbAttr",
+      "AbilityStudioSourceAbilityAbAttr",
       "AlwaysHitAbAttr",
       "BadDreamsImmunityAbAttr",
       "BallRecoveryAbAttr",
