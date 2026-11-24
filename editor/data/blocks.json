@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "00838726bbe2f1",
+  "hash": "0e4915b66e1fa9",
   "blocks": [
     {
       "id": "block.attack-type-immunity",
@@ -380,6 +380,53 @@
       "uses": 1
     },
     {
+      "id": "block.confectious-defend",
+      "className": "ConfectiousDefendAbAttr",
+      "label": "Make an attacker Food-based when its contact move hurts me",
+      "summary": "After a move that touches me hurts me, the attacker gets the Confected marker until it leaves the field, so it counts as Food-based.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "confectious",
+        "make the attacker food",
+        "sugar coat the attacker",
+        "candy touch",
+        "food based attacker",
+        "sticky sweet",
+        "contact marker"
+      ],
+      "examples": [
+        "When a contact move hurts me, the attacker is coated in sugar and counts as Food-based"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really have dealt damage (more than 0)",
+        "Nothing happens while the game only previews a hit"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.confectious-entry",
       "className": "ConfectiousEntryAbAttr",
       "label": "Count as Food-based from the moment I enter",
@@ -408,6 +455,224 @@
       ],
       "effect": {
         "id": "effect.apply-tag",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.contaminated-hit-multiplier",
+      "className": "ContaminatedHitMultiplierAbAttr",
+      "label": "Hit extra times for each poisoned Pokemon on the field",
+      "summary": "While any Pokemon on the field is poisoned, my moves hit 1 extra time(s) for each poisoned Pokemon (both sides count). Charging, status and multi-hit moves are left alone.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.hit-count",
+      "whenLabel": "While the game decides how many times a move hits",
+      "synonyms": [
+        "contaminated",
+        "hit more when poisoned",
+        "extra hits per poisoned",
+        "poison multi hit",
+        "toxic strikes",
+        "parental bond",
+        "more hits with poison around"
+      ],
+      "examples": [
+        "While a Pokemon is poisoned, my attacks hit one extra time per poisoned Pokemon on the field"
+      ],
+      "params": [
+        {
+          "id": "extraHitsPerPoisoned",
+          "label": "Extra hits for each poisoned Pokemon on the field (1 = one extra hit each)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 4,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:1",
+          "removable": false,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must be one a multi-hit ability can add hits to: not a status move, a charging move (unless I skip the charge), a move aimed at several foes, a move that already hits many times, or Fling, Uproar, Rollout, Ice Ball and Endeavor",
+        "The number of extra hits counts every poisoned or badly poisoned Pokemon on both sides, me included"
+      ],
+      "effect": {
+        "id": "effect.hit-n-times",
+        "params": [
+          "extraHitsPerPoisoned"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.cyberkinetic",
+      "className": "CyberkineticAbAttr",
+      "label": "Turn a foe pure Electric when my contact attack hurts it",
+      "summary": "After my damaging move touches a foe and hurts it, that foe becomes a pure Electric type until it leaves the field.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "cyberkinetic",
+        "make the foe electric",
+        "change the foe's type",
+        "electrify the target",
+        "type swap on touch",
+        "breach",
+        "pure electric"
+      ],
+      "examples": [
+        "When my contact move hurts the foe, the foe turns into a pure Electric type"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "lib": "move.damaging",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really have dealt damage (more than 0)",
+        "Nothing happens while the game only previews a hit"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.decay-entry",
+      "className": "DecayEntryAbAttr",
+      "label": "Poison myself and remember it when I enter",
+      "summary": "When I enter the battle, I become poisoned and get the Decay marker, so the poison can be put back every turn if it is ever cured.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "decay",
+        "start poisoned",
+        "poison myself on entry",
+        "self poison",
+        "zombie",
+        "poison heal setup",
+        "toxic start"
+      ],
+      "examples": [
+        "Every time I come in I am poisoned and remember it, so poison comes back at the end of each turn, like Decay"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "I only get poisoned if I do not already have a status and nothing stops it (the same checks as any poisoning)",
+        "Nothing happens while the game only previews the entry"
+      ],
+      "branches": [
+        {
+          "label": "Mark myself as carrying Decay",
+          "conditions": [],
+          "effect": {
+            "id": "effect.apply-tag",
+            "params": []
+          }
+        },
+        {
+          "label": "Poison myself unless I already am",
+          "conditions": [
+            "I am not already poisoned"
+          ],
+          "effect": {
+            "id": "effect.inflict-status",
+            "params": []
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.decay-restore",
+      "className": "DecayRestoreAbAttr",
+      "label": "Poison myself again each turn while I carry the marker",
+      "summary": "At the end of every turn, if I carry the Decay marker and am not poisoned, I become poisoned again (if no other status stops it).",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "decay",
+        "re poison myself",
+        "poison comes back",
+        "permanent poison",
+        "keep myself poisoned",
+        "restore poison each turn",
+        "poison upkeep"
+      ],
+      "examples": [
+        "At the end of every turn I get poisoned again if poison was cured, like Decay"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens while the game only previews the end of the turn",
+        "I only get poisoned if I do not already have another status and nothing stops it (the same checks as any poisoning)"
+      ],
+      "effect": {
+        "id": "effect.inflict-status",
         "params": []
       },
       "reusableAlone": {
@@ -471,6 +736,265 @@
       },
       "packageReason": "PACKAGE, justified: the effect hurts every foe that passes a per-foe filter (asleep or comatose, not switching out, not protected from indirect damage). The effect library has no damage effect and no 'for each foe that ...' target filter, so the effect cannot be built from existing blocks (requested as effect.hurt-percent-of-max-hp with a 'only foes that are asleep' filter, R-B16-1 in requests/B16.md). The trigger (end of turn) is a separate block, the class has no IF of its own (every clause of the inherited canApply is feasibility, see the header), and the one number is a typed param. Constructor change (behaviour-neutral): damagePercent, default 25, replaces the literal /4. Users: Bad Dreams (123, attr 0) only; nothing to bind. SUSPECTED BUG, NOT FIXED: the inherited canApply refuses foes with BadDreamsImmunityAbAttr (Honk Shoo has it), but the ER apply override never tests it, so with TWO foes where one is immune and one is asleep, the immune foe is hurt as well (the vanilla apply tests it). Also the vanilla apply checks BlockNonDirectDamageAbAttr on the HOLDER by mistake (applyAbAttrs with pokemon); the ER override tests it on the foe (correct). The L2 twin cannot put a foe to sleep (the harness axis `status` sets the holder), so the sleeping-foe path is proven in test/tests/elite-redux/decomp/B16/chunk1.test.ts.",
       "uses": 1
+    },
+    {
+      "id": "block.er-biome-change-weather",
+      "className": "ErBiomeChangeWeatherAbAttr",
+      "label": "Set the weather again for set turns on a new area",
+      "summary": "When the game moves on to a new area, I set the weather to Rain again for 8 turns, but only while a lasting weather is still active. Example: 8 = 8 turns.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.biome-changed",
+      "whenLabel": "When the biome changes",
+      "synonyms": [
+        "keep weather after new area",
+        "weather on new biome",
+        "re summon weather",
+        "drizzle",
+        "drought",
+        "sand stream",
+        "snow warning"
+      ],
+      "examples": [
+        "Set rain again for 8 turns when the area changes, like Drizzle"
+      ],
+      "params": [
+        {
+          "id": "weather",
+          "label": "Which weather",
+          "control": "select",
+          "default": "RAIN",
+          "editable": true,
+          "options": [
+            "NONE",
+            "SUNNY",
+            "RAIN",
+            "SANDSTORM",
+            "HAIL",
+            "SNOW",
+            "FOG",
+            "HEAVY_RAIN",
+            "HARSH_SUN",
+            "STRONG_WINDS",
+            "TEMPEST_STORM",
+            "SNOWY_WRATH",
+            "EERIE_FOG"
+          ]
+        },
+        {
+          "id": "turns",
+          "label": "How many turns the weather lasts (a Mystical Rock adds 2 per item)",
+          "control": "number",
+          "default": 8,
+          "editable": true,
+          "min": 1,
+          "max": 20,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A lasting weather (Extremely harsh sunlight, Heavy rain or Strong winds) must be active when the area changes",
+        "The weather must differ from the current one, and no weather lock may be up",
+        "The new length is written to whatever weather is active afterwards, if it has turns left",
+        "Nothing happens while the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.set-weather",
+        "params": [
+          "weather",
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 10
+    },
+    {
+      "id": "block.er-defeatist-stat-multiplier",
+      "className": "ErDefeatistStatMultiplierAbAttr",
+      "label": "Multiply a stat while my HP is at or below a set share",
+      "summary": "While my HP is at most 33% of my maximum, my Attack is multiplied by 0.5. Example: 0.5 = half, so a Pokemon on low HP hits half as hard.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "defeatist",
+        "weaker when hurt",
+        "lose attack on low hp",
+        "halve a stat at low hp",
+        "stat drop when weak",
+        "low health penalty",
+        "slump"
+      ],
+      "examples": [
+        "Halve my Attack and Sp. Atk while I am at a third of my HP or less, like Defeatist"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat (Attack, Defense, Sp. Atk, Sp. Def, Speed, Accuracy or Evasion)",
+          "control": "select",
+          "default": "ATK",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "multiplier",
+          "label": "Stat multiplier (1.5 = 50% higher, 0.5 = half)",
+          "control": "number",
+          "default": 0.5,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        },
+        {
+          "id": "hpPercent",
+          "label": "Applies while my HP is at most this share of my maximum (% of max HP)",
+          "control": "number",
+          "default": 33,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:2",
+          "removable": true,
+          "editable": true,
+          "optional": true
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "gateParams": [
+        {
+          "param": "hpPercent",
+          "block": "hp.ratio-at-most",
+          "field": "pct"
+        }
+      ],
+      "effect": {
+        "id": "effect.multiply-stat",
+        "params": [
+          "stat",
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.er-weather-summon",
+      "className": "ErWeatherSummonAbAttr",
+      "label": "Set the weather for a set number of turns when I enter",
+      "summary": "When I enter the battle, I set the weather to Rain for 8 turns (a Mystical Rock adds more). Example: 8 = the weather lasts 8 turns.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "drizzle",
+        "drought",
+        "sand stream",
+        "snow warning",
+        "summon weather",
+        "timed weather",
+        "long weather",
+        "weather setter"
+      ],
+      "examples": [
+        "Summon rain for 8 turns when I enter the battle, like Drizzle"
+      ],
+      "params": [
+        {
+          "id": "weather",
+          "label": "Which weather",
+          "control": "select",
+          "default": "RAIN",
+          "editable": true,
+          "options": [
+            "NONE",
+            "SUNNY",
+            "RAIN",
+            "SANDSTORM",
+            "HAIL",
+            "SNOW",
+            "FOG",
+            "HEAVY_RAIN",
+            "HARSH_SUN",
+            "STRONG_WINDS",
+            "TEMPEST_STORM",
+            "SNOWY_WRATH",
+            "EERIE_FOG"
+          ]
+        },
+        {
+          "id": "turns",
+          "label": "How many turns the weather lasts (a Mystical Rock adds 2 per item)",
+          "control": "number",
+          "default": 8,
+          "editable": true,
+          "min": 1,
+          "max": 20,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The weather must be replaceable: a lasting weather (Extremely harsh sunlight, Heavy rain, Strong winds) cannot be overwritten by an ordinary one",
+        "The weather must differ from the current one, and no weather lock may be up",
+        "The new length is only written if the weather that is active afterwards is the one I set",
+        "Nothing happens while the game only previews the entry"
+      ],
+      "effect": {
+        "id": "effect.set-weather",
+        "params": [
+          "weather",
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 10
     },
     {
       "id": "block.float",

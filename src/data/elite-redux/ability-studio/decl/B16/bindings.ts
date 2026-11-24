@@ -40,3 +40,50 @@ const FOE_SPECIAL_FORM_REASON =
   "The closure is `!!target && move.type === NORMAL && (target.isTerastallized || target.isMega() || /gmax|gigantamax/i.test(target.getFormKey()))`. The first two tests map to move.type (printed type, effective false) and to an atom that answers false without a foe, but 'the foe is Terastallized', 'the foe is Mega Evolved' and 'the foe is Gigantamax (form key)' have no library atom; requested as R-B16-8, R-B16-9 and R-B16-10 in requests/B16.md.";
 bindLegacyClosure(6053, 2, FOE_SPECIAL_FORM_REASON, "ctor:0"); // Stellarize
 bindLegacyClosure(6111, 4, FOE_SPECIAL_FORM_REASON, "ctor:0"); // Bejeweled
+
+// ===========================================================================================================================
+// Chunk 2. attrIndex read from the live game (throwaway dump of every attr of every user).
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// ConfectiousDefendAbAttr, Confectious (6034) attr 2. Gate = [appliesContact(attacker, holder, move)]
+// = move.doesFlagEffectApply({ flag: MAKES_CONTACT, user: attacker, target: holder }); the clause before it (damage > 0) is a class guard.
+bindCondition(6034, 2, { id: "move.flag", flag: "MAKES_CONTACT" }, "gate");
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// CyberkineticAbAttr, Cyberkinetic (6040) attr 0 (the only attr). ctor:0 = the inherited attackCondition
+// `(_user, _target, move) => move.category !== STATUS`; gate = [appliesContact(holder, foe, move)].
+bindCondition(6040, 0, { id: "move.damaging" }, "ctor:0");
+bindCondition(6040, 0, { id: "move.flag", flag: "MAKES_CONTACT" }, "gate");
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// ContaminatedHitMultiplierAbAttr, Contaminated (6050) attr 0 (attr 1 is HitMultiplierPowerAbAttr). ctor:1 = `anyPoisonedOnField`:
+// `globalScene.getField(true).some(p => p.status?.effect === POISON || p.status?.effect === TOXIC)`, every active Pokemon of BOTH sides.
+bindLegacyClosure(
+  6050,
+  0,
+  "The closure is `getField(true).some(poisoned or badly poisoned)` over every active Pokemon of both sides. status.has reads one Pokemon (holder, other or ally), and no atom asks whether ANY Pokemon on the field has a status; requested as R-B16-12 in requests/B16.md.",
+  "ctor:1",
+);
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// DecayRestoreAbAttr, Decay (6051) attr 1 (attr 0 is DecayEntryAbAttr, attr 2 BlockStatusDamageAbAttr). Gate (read inside `apply`) =
+// [holder.getTag(ER_DECAY_POISON) && holder.status?.effect !== POISON]. DecayEntryAbAttr has no closure and needs no binding.
+bindCondition(
+  6051,
+  1,
+  {
+    all: [
+      { id: "tag.has", who: "holder", tag: "ER_DECAY_POISON" },
+      { not: { id: "status.has", who: "holder", status: "POISON" } },
+    ],
+  },
+  "gate",
+);
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// ErDefeatistStatMultiplierAbAttr, Defeatist (129) attrs 0 (Attack) and 1 (Sp. Atk); attr 2 is OnceLowHpStatRaiseAbAttr. ctor:2 (the
+// parent's optional attack condition) is absent on both instances, so it needs no binding. Gate = [pokemon.getHpRatio() <= 1 / 3].
+const DEFEATIST_GATE_REASON =
+  "The gate is `pokemon.getHpRatio() <= 1 / 3`, and getHpRatio() rounds the ratio to two decimals (round(hp / max * 100) / 100), so at 33.4 percent HP it passes. hp.at-most (exact) tests hp * 100 <= max * 33 and fails there, and floor-half differs again; no atom calls the game's rounded ratio. Requested as R-B16-11 (hp.ratio-at-most) in requests/B16.md.";
+bindLegacyClosure(129, 0, DEFEATIST_GATE_REASON, "gate");
+bindLegacyClosure(129, 1, DEFEATIST_GATE_REASON, "gate");

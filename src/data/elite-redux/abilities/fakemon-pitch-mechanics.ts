@@ -481,9 +481,23 @@ export class ConfectiousAttackAbAttr extends PostAttackAbAttr {
   }
 }
 
-class ConfectiousDefendAbAttr extends PostDefendAbAttr {
+export class ConfectiousDefendAbAttr extends PostDefendAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), original clause order: `guards`, then `gate`. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    return params.damage > 0 && appliesContact(params.opponent, params.pokemon, params.move);
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Clause 1: the hit really dealt damage. */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    return params.damage > 0;
+  }
+
+  /** Clause 2, the replaceable condition: the attacker's move makes contact with me. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    return appliesContact(params.opponent, params.pokemon, params.move);
   }
 
   override apply({ pokemon, opponent, simulated }: PostMoveInteractionAbAttrParams): void {
@@ -514,9 +528,26 @@ class IrradiatedFistAbAttr extends PostAttackAbAttr {
   }
 }
 
-class CyberkineticAbAttr extends PostAttackAbAttr {
+export class CyberkineticAbAttr extends PostAttackAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), original clause order: `guards`, then `gate`. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    return super.canApply(params) && params.damage > 0 && appliesContact(params.pokemon, params.opponent, params.move);
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /**
+   * Clause 1: the inherited attack condition (constructor argument 0, a replaceable library condition; default: a damaging
+   * move) sits here only to keep the order. Clause 2: the hit really dealt damage.
+   */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    return super.canApply(params) && params.damage > 0;
+  }
+
+  /** Clause 3, the replaceable condition: my move makes contact with the foe. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    return appliesContact(params.pokemon, params.opponent, params.move);
   }
 
   override apply({ pokemon, opponent, simulated }: PostMoveInteractionAbAttrParams): void {
@@ -526,31 +557,42 @@ class CyberkineticAbAttr extends PostAttackAbAttr {
   }
 }
 
-class ContaminatedHitMultiplierAbAttr extends HitMultiplierAbAttr {
-  constructor() {
+/** True when a Pokemon is poisoned or badly poisoned. */
+function isPoisonedOrToxic(target: Pokemon): boolean {
+  return target.status?.effect === StatusEffect.POISON || target.status?.effect === StatusEffect.TOXIC;
+}
+
+/** The original "is anybody poisoned" test of Contaminated: any active Pokemon on the field, either side, holder included. */
+function anyPoisonedOnField(_holder: Pokemon): boolean {
+  return globalScene.getField(true).some(isPoisonedOrToxic);
+}
+
+export class ContaminatedHitMultiplierAbAttr extends HitMultiplierAbAttr {
+  /**
+   * Ability studio (Tier A): the former literal `1` (one extra hit for every poisoned Pokemon) and the former inline
+   * "somebody on the field is poisoned" test are now constructor arguments whose defaults equal the old behaviour.
+   * The parent keeps its own `extraStrikes: 1`, which this class never reads (its `apply` is its own).
+   */
+  private readonly extraHitsPerPoisoned: number;
+  private readonly poisonedFieldCondition: (holder: Pokemon) => boolean;
+
+  constructor(extraHitsPerPoisoned = 1, poisonedFieldCondition: (holder: Pokemon) => boolean = anyPoisonedOnField) {
     super({ extraStrikes: 1 });
+    this.extraHitsPerPoisoned = extraHitsPerPoisoned;
+    this.poisonedFieldCondition = poisonedFieldCondition;
   }
 
   override canApply(params: Parameters<HitMultiplierAbAttr["canApply"]>[0]): boolean {
-    return (
-      super.canApply(params)
-      && globalScene
-        .getField(true)
-        .some(target => target.status?.effect === StatusEffect.POISON || target.status?.effect === StatusEffect.TOXIC)
-    );
+    return super.canApply(params) && this.poisonedFieldCondition(params.pokemon);
   }
 
   override apply(params: Parameters<HitMultiplierAbAttr["apply"]>[0]): void {
-    const poisoned = globalScene
-      .getField(true)
-      .filter(
-        target => target.status?.effect === StatusEffect.POISON || target.status?.effect === StatusEffect.TOXIC,
-      ).length;
-    params.hitCount.value += Math.min(globalScene.getField(true).length, poisoned);
+    const poisoned = globalScene.getField(true).filter(isPoisonedOrToxic).length;
+    params.hitCount.value += Math.min(globalScene.getField(true).length, poisoned) * this.extraHitsPerPoisoned;
   }
 }
 
-class DecayEntryAbAttr extends PostSummonAbAttr {
+export class DecayEntryAbAttr extends PostSummonAbAttr {
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
     if (simulated) {
       return;
@@ -562,14 +604,25 @@ class DecayEntryAbAttr extends PostSummonAbAttr {
   }
 }
 
-class DecayRestoreAbAttr extends PostTurnAbAttr {
-  override apply({ pokemon, simulated }: AbAttrBaseParams): void {
-    if (
-      !simulated
-      && pokemon.getTag(BattlerTagType.ER_DECAY_POISON)
-      && pokemon.status?.effect !== StatusEffect.POISON
-    ) {
-      pokemon.trySetStatus(StatusEffect.POISON, pokemon);
+export class DecayRestoreAbAttr extends PostTurnAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /**
+   * The conditions of this class live in `apply`, not in `canApply` (which is always true, so the ability pop-up shows every
+   * turn). Moving them into `canApply` would change when the pop-up shows, so the studio split stays inside `apply`:
+   * `!simulated`, then {@linkcode gate} (replaceable), in the original clause order.
+   */
+  public gate(params: AbAttrBaseParams): boolean {
+    return (
+      !!params.pokemon.getTag(BattlerTagType.ER_DECAY_POISON) && params.pokemon.status?.effect !== StatusEffect.POISON
+    );
+  }
+
+  override apply(params: AbAttrBaseParams): void {
+    const gate = this.gateOverride ?? this.gate.bind(this);
+    if (!params.simulated && gate(params)) {
+      params.pokemon.trySetStatus(StatusEffect.POISON, params.pokemon);
     }
   }
 }
