@@ -1172,6 +1172,73 @@
       ]
     },
     {
+      "id": "calc.attack-stat",
+      "kind": "calc",
+      "dispatchKey": "AttackStatSubstituteAbAttr",
+      "provides": [
+        "holder",
+        "other",
+        "move",
+        "moveUser"
+      ],
+      "label": "While the game picks the stat my attack uses",
+      "group": "Stats",
+      "modifies": "statValue",
+      "baseClassOnly": true,
+      "synonyms": [
+        "body press",
+        "attack with another stat",
+        "swap attack stat",
+        "which stat hits"
+      ],
+      "moveUserIs": "holder"
+    },
+    {
+      "id": "calc.my-attack-matchup",
+      "kind": "calc",
+      "dispatchKey": "BoneMoveTypeChartAbAttr",
+      "provides": [
+        "holder",
+        "other",
+        "move",
+        "moveUser"
+      ],
+      "label": "While the game calculates how well my attack matches the target's types",
+      "group": "Type",
+      "modifies": "typeMultiplier",
+      "baseClassOnly": true,
+      "synonyms": [
+        "bone zone",
+        "my type matchup",
+        "immunity ignored",
+        "resisted hits hit harder"
+      ],
+      "moveUserIs": "holder"
+    },
+    {
+      "id": "calc.always-hit-check",
+      "kind": "calc",
+      "dispatchKey": "ConditionalAlwaysHitAbAttr",
+      "provides": [
+        "holder",
+        "other",
+        "move",
+        "moveUser"
+      ],
+      "label": "While the game checks whether my move can miss",
+      "group": "Damage and power",
+      "modifies": "accuracy",
+      "baseClassOnly": true,
+      "synonyms": [
+        "never miss",
+        "no guard",
+        "sure hit",
+        "perfect accuracy on",
+        "cannot miss"
+      ],
+      "moveUserIs": "holder"
+    },
+    {
       "id": "calc.defensive-stat-substitute",
       "kind": "calc",
       "dispatchKey": "DefensiveStatSubstituteAbAttr",
@@ -2336,6 +2403,59 @@
       ]
     },
     {
+      "id": "move.aimed-at",
+      "group": "Move",
+      "label": "The move is aimed at {target}",
+      "requires": [
+        "move"
+      ],
+      "params": [
+        {
+          "id": "target",
+          "label": "Aim",
+          "control": "select",
+          "default": "one adjacent Pokemon",
+          "options": [
+            "one other Pokemon, any distance",
+            "one adjacent Pokemon",
+            "one adjacent foe",
+            "one random adjacent foe",
+            "all adjacent Pokemon",
+            "all adjacent foes",
+            "all foes",
+            "all other Pokemon",
+            "the foe's side of the field",
+            "my side of the field",
+            "both sides of the field",
+            "only the user",
+            "an adjacent ally",
+            "an ally, any distance",
+            "the user or an adjacent ally",
+            "the user and its allies",
+            "every Pokemon",
+            "the whole party",
+            "the Pokemon that last hit the user",
+            "the Curse aim"
+          ]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "move.moveTarget === MoveTarget[target]  (one exact aim; use several of these in an ANY group for a set such as Ole's single-target test: one adjacent Pokemon, one other Pokemon, one adjacent foe, the foe's side)",
+        "source": "src/data/elite-redux/archetypes/chance-dodge.ts SINGLE_TARGET_KINDS"
+      },
+      "synonyms": [
+        "move target",
+        "who the move hits",
+        "aimed at",
+        "single target exactly",
+        "targeting"
+      ],
+      "examples": [
+        "Only when the move is aimed at one adjacent foe"
+      ]
+    },
+    {
       "id": "move.priority",
       "group": "Move",
       "label": "The move's priority is {cmp} {n}",
@@ -2521,6 +2641,135 @@
       ]
     },
     {
+      "id": "move.inherent-flag",
+      "group": "Move",
+      "label": "The move itself has the {flag} property (whatever the attacker's abilities do)",
+      "requires": [
+        "move"
+      ],
+      "params": [
+        {
+          "id": "flag",
+          "label": "Move property",
+          "control": "select",
+          "default": "MAKES_CONTACT",
+          "options": [
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "move.hasFlag(MoveFlags[flag])  (NOT doesFlagEffectApply: Long Reach style abilities and substitutes do not change it)",
+        "source": "src/data/elite-redux/archetypes/chance-status-on-hit.ts gate (inherentlyMakesContact, issue #254)"
+      },
+      "synonyms": [
+        "real contact",
+        "move property by itself",
+        "base move property",
+        "ignores long reach",
+        "never touches"
+      ],
+      "examples": [
+        "A burn only on moves that never make contact, even when the attacker has Long Reach"
+      ]
+    },
+    {
+      "id": "move.drains",
+      "group": "Move",
+      "label": "The move heals its user by a share of the damage it deals",
+      "requires": [
+        "move"
+      ],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "move.hasAttr(\"HitHealAttr\")",
+        "source": "src/data/elite-redux/archetypes/absorbant.ts (the fixed attackCondition passed to PostAttackAbAttr)"
+      },
+      "synonyms": [
+        "draining move",
+        "drain punch",
+        "giga drain",
+        "absorb health",
+        "heals the user",
+        "leech life"
+      ],
+      "examples": [
+        "Plant Leech Seed after a draining move like Drain Punch"
+      ]
+    },
+    {
+      "id": "hit.landed-damage",
+      "group": "Move",
+      "label": "The hit dealt damage to the target",
+      "requires": [
+        "hitResult"
+      ],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "hitResult is EFFECTIVE, SUPER_EFFECTIVE, NOT_VERY_EFFECTIVE or ONE_HIT_KO (not a status move, a miss or an immune target)",
+        "source": "src/data/elite-redux/archetypes/chance-status-on-hit.ts DAMAGING_HIT_RESULTS"
+      },
+      "synonyms": [
+        "damaging hit",
+        "the attack connected",
+        "not a status move hit",
+        "it hurt",
+        "real attack"
+      ],
+      "examples": [
+        "Only react when the hit really damaged me, not when a status move like Growl reaches me"
+      ]
+    },
+    {
+      "id": "hit.critical",
+      "group": "Move",
+      "label": "The hit was a critical hit",
+      "requires": [
+        "other"
+      ],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "!!other.turnData?.attacksReceived?.[0]?.critical  (the first hit the other Pokemon took this turn)",
+        "source": "src/data/elite-redux/archetypes/chance-status-on-hit.ts ChanceStatusOnAttackAbAttr.canApply (critRequired)"
+      },
+      "synonyms": [
+        "crit",
+        "critical hit",
+        "lucky hit",
+        "crits only",
+        "when I crit"
+      ],
+      "examples": [
+        "Burn the target only when my attack was a critical hit"
+      ]
+    },
+    {
       "id": "move.has-effect-chance",
       "group": "Move",
       "label": "The move has a secondary effect chance",
@@ -2694,6 +2943,28 @@
       ]
     },
     {
+      "id": "field.anyone-asleep",
+      "group": "Field",
+      "label": "A Pokemon on the field is asleep (my own Comatose counts for me)",
+      "requires": [],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "getField(true).some(p => p.status?.effect === SLEEP || (p === holder && isComatoseLike(p)))",
+        "source": "src/data/elite-redux/archetypes/conditional-damage.ts evaluateCondition (any-active-asleep)"
+      },
+      "synonyms": [
+        "someone is sleeping",
+        "sleeping pokemon",
+        "any sleeper",
+        "dream",
+        "asleep on the field"
+      ],
+      "examples": [
+        "Double my power while any Pokemon on the field is asleep"
+      ]
+    },
+    {
       "id": "field.gravity",
       "group": "Field",
       "label": "Gravity is active",
@@ -2855,6 +3126,42 @@
       ],
       "examples": [
         "React when the foe is taunted"
+      ]
+    },
+    {
+      "id": "tag.trapped",
+      "group": "Status",
+      "label": "{who} is trapped and cannot switch out",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "other",
+          "options": [
+            "holder",
+            "other",
+            "ally"
+          ]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "pokemon.getTag(TrappedTag) !== undefined  (the class test: every trapping effect such as Bind or Wrap counts, not only the plain Trapped one)",
+        "source": "src/data/elite-redux/archetypes/conditional-always-hit.ts matchesTarget (targetTrapped)"
+      },
+      "synonyms": [
+        "cannot switch",
+        "cannot escape",
+        "bound",
+        "wrapped",
+        "trapping move",
+        "stuck"
+      ],
+      "examples": [
+        "Never miss a target that cannot switch out"
       ]
     },
     {
@@ -3104,6 +3411,71 @@
       ]
     },
     {
+      "id": "time.last-move-flag",
+      "group": "Time",
+      "label": "{who}'s last move had the {flag} property",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "other",
+          "options": [
+            "holder",
+            "other",
+            "ally"
+          ]
+        },
+        {
+          "id": "flag",
+          "label": "Move property",
+          "control": "select",
+          "default": "SOUND_BASED",
+          "options": [
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "const last = pokemon.getLastXMoves(1)[0]; last !== undefined && allMoves[last.move]?.hasFlag(MoveFlags[flag])",
+        "source": "src/data/elite-redux/init-elite-redux-ability-upgrades.ts (Radio Jam chanceResolver)"
+      },
+      "synonyms": [
+        "previous move was a sound move",
+        "last move type of move",
+        "used a sound move before",
+        "last used"
+      ],
+      "examples": [
+        "A better chance when the foe's last move was a sound move"
+      ]
+    },
+    {
       "id": "time.once-per",
       "group": "Time",
       "label": "Only once per {scope}",
@@ -3143,6 +3515,48 @@
       ],
       "examples": [
         "Only the first time per battle"
+      ]
+    },
+    {
+      "id": "time.once-per-unused",
+      "group": "Time",
+      "label": "The one-time effect {key} has not been used up yet this {scope}",
+      "requires": [],
+      "params": [
+        {
+          "id": "scope",
+          "label": "Scope",
+          "control": "select",
+          "default": "wave",
+          "options": [
+            "entry",
+            "wave",
+            "battle",
+            "turn",
+            "switch"
+          ]
+        },
+        {
+          "id": "key",
+          "label": "Memory key",
+          "control": "text",
+          "default": "once"
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "wave: !holder.waveData.entryEffectsFired.has(key) ; other scopes: WeakMap<battleData>(key) !== scope marker. Only READS the memory, never writes it (time.once-per is the one that spends it)",
+        "source": "src/data/elite-redux/archetypes/consume-on-first-defend.ts FirstDefendDamageReductionAbAttr.gate (the damage half only reads the shield that the Attack-drop half spends)"
+      },
+      "synonyms": [
+        "still unused",
+        "not used yet",
+        "shield still up",
+        "one time effect available",
+        "first hit only"
+      ],
+      "examples": [
+        "Halve the first hit only, while the shield that the other half spends is still up"
       ]
     },
     {
@@ -3691,6 +4105,76 @@
       ],
       "examples": [
         "Only against Pokemon with Levitate"
+      ]
+    },
+    {
+      "id": "mon.protected-from-effects",
+      "group": "Pokemon",
+      "label": "{who} is protected from the added effects of moves (like Shield Dust)",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "other",
+          "options": [
+            "holder",
+            "other",
+            "ally"
+          ]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "pokemon.hasAbilityWithAttr(\"IgnoreMoveEffectsAbAttr\")",
+        "source": "src/data/elite-redux/archetypes/absorbant.ts (Shield Dust test), src/data/moves/move.ts:2060"
+      },
+      "synonyms": [
+        "shield dust",
+        "covert cloak",
+        "blocks added effects",
+        "immune to secondary effects",
+        "no side effects"
+      ],
+      "examples": [
+        "Do not plant Leech Seed on a target that has Shield Dust"
+      ]
+    },
+    {
+      "id": "mon.switching-out",
+      "group": "Pokemon",
+      "label": "{who} is about to switch out",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Whose",
+          "control": "select",
+          "default": "other",
+          "options": [
+            "holder",
+            "other",
+            "ally"
+          ]
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "turnCommands[pokemon.getBattlerIndex()]?.command === 2 && !command.skip",
+        "source": "src/data/elite-redux/archetypes/conditional-damage.ts isTargetMidVoluntarySwitch"
+      },
+      "synonyms": [
+        "leaving the field",
+        "pivoting out",
+        "being recalled",
+        "mid-switch",
+        "switching"
+      ],
+      "examples": [
+        "Do not boost the hit on a sleeping foe that is leaving"
       ]
     },
     {
@@ -5336,5 +5820,5 @@
       ]
     }
   ],
-  "hash": "0f077ae1c65fbf"
+  "hash": "011bb577fc9c15"
 }
