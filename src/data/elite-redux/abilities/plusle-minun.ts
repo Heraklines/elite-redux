@@ -41,6 +41,7 @@
 import { AbAttr, PostAttackAbAttr, PostTurnAbAttr, VariableMovePowerAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { Command } from "#enums/command";
 import { MoveCategory } from "#enums/move-category";
@@ -205,7 +206,27 @@ function syncCurrentPartner(user: Pokemon, target: Pokemon): Pokemon | undefined
  * end up boosted. The two attacks need NOT share a target. Inert in singles.
  */
 export class SynchronizedCurrentBothAttackPowerAbAttr extends VariableMovePowerAbAttr {
-  override canApply({ pokemon, move }: PreAttackModifyPowerAbAttrParams): boolean {
+  /** Power multiplier of each attack (1.25 for the shipped ability). */
+  public readonly powerMultiplier: number;
+
+  constructor(powerMultiplier = SYNC_CURRENT_BOTH_ATTACK_MULTIPLIER) {
+    super();
+    this.powerMultiplier = powerMultiplier;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreAttackModifyPowerAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole original `canApply` is the gate; there is no guard and no residual. */
+  override canApply(params: PreAttackModifyPowerAbAttrParams): boolean {
+    return gatedCanApply<PreAttackModifyPowerAbAttrParams>(this, params);
+  }
+
+  /**
+   * The replaceable condition, in the original order: the move deals damage, an ally is on the field, and that ally selected
+   * a damaging move this turn. (The class never called the parent `canApply`, and still does not.)
+   */
+  public gate({ pokemon, move }: PreAttackModifyPowerAbAttrParams): boolean {
     if (move.category === MoveCategory.STATUS) {
       return false;
     }
@@ -214,7 +235,7 @@ export class SynchronizedCurrentBothAttackPowerAbAttr extends VariableMovePowerA
   }
 
   override apply({ power }: PreAttackModifyPowerAbAttrParams): void {
-    power.value *= SYNC_CURRENT_BOTH_ATTACK_MULTIPLIER;
+    power.value *= this.powerMultiplier;
   }
 }
 
@@ -222,13 +243,13 @@ export class SynchronizedCurrentBothAttackPowerAbAttr extends VariableMovePowerA
 let syncHealTurnKey = "";
 const syncHealedThisTurn = new Set<number>();
 
-/** Restore 1/4 max HP to `mon` once per turn, tracked by the shared guard. */
-function syncCurrentHealOnce(mon: Pokemon): void {
+/** Restore `fraction` (1/4 for the shipped ability) of max HP to `mon` once per turn, tracked by the shared guard. */
+function syncCurrentHealOnce(mon: Pokemon, fraction: number): void {
   if (syncHealedThisTurn.has(mon.id) || mon.isFullHp() || !mon.isActive(true)) {
     return;
   }
   syncHealedThisTurn.add(mon.id);
-  mon.heal(toDmgValue(mon.getMaxHp() * SYNC_CURRENT_HEAL_FRACTION, 1));
+  mon.heal(toDmgValue(mon.getMaxHp() * fraction, 1));
 }
 
 /**
@@ -242,7 +263,24 @@ function syncCurrentHealOnce(mon: Pokemon): void {
  * carry the ability the pair still heals 1/4 (not 1/2). Inert in singles.
  */
 export class SynchronizedCurrentHealAbAttr extends PostTurnAbAttr {
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+  /** Share of max HP each of the pair restores (0.25 for the shipped ability). */
+  public readonly healFraction: number;
+
+  constructor(healFraction = SYNC_CURRENT_HEAL_FRACTION) {
+    super();
+    this.healFraction = healFraction;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole original `canApply` is the gate; there is no guard and no residual. */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The replaceable condition, in the original order: an ally is on the field, and neither it nor I attacked this turn. */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     const ally = activeAlly(pokemon);
     return ally !== undefined && !attackedThisTurn(pokemon) && !attackedThisTurn(ally);
   }
@@ -263,8 +301,8 @@ export class SynchronizedCurrentHealAbAttr extends PostTurnAbAttr {
       syncHealedThisTurn.clear();
     }
     // Heal the whole pair, each mon at most once per turn.
-    syncCurrentHealOnce(pokemon);
-    syncCurrentHealOnce(ally);
+    syncCurrentHealOnce(pokemon, this.healFraction);
+    syncCurrentHealOnce(ally, this.healFraction);
   }
 }
 

@@ -107,3 +107,60 @@ bindCondition(6059, 2, { id: "field.terrain", terrain: "ELECTRIC" }, "gate");
 bindCondition(6059, 3, { id: "field.terrain", terrain: "ELECTRIC" }, "gate");
 bindCondition(6060, 2, { id: "field.terrain", terrain: "ELECTRIC" }, "gate");
 bindCondition(6060, 3, { id: "field.terrain", terrain: "ELECTRIC" }, "gate");
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// Chunk 5. attrIndex read from the live game (golden-attr-order.json, checked by a throwaway dump of ability.attrs). The marker
+// SynchronizedCurrentAbAttr (5921 attr 0) has no closure and no gate, so it needs no binding (its declaration is parked).
+// ---------------------------------------------------------------------------------------------------------------------------
+
+// Surges Up (6061), attr 2 (RaichuAllTerrainSurgeSurferAbAttr), ctor:2 = `() => isAnyTerrainActive()` = the terrain is not None.
+bindCondition(6061, 2, { not: { id: "field.terrain", terrain: "NONE" } }, "ctor:2");
+
+// Psionic (6063), attr 0 (PsionicTerrainPowerAbAttr), ctor:0 = getRaichuTerrainMoveMultiplier(user, effective move type) > 1.
+bindLegacyClosure(
+  6063,
+  0,
+  "Needs two atoms the library does not have: 'my battle slot is charged' (isElectrodynamicsPosition, R-B14-5.2) and 'has the ability' for an ER ability id such as Psionic and Electrodynamics, which are not in the AbilityId enum the atom accepts (R-B14-5.3). The rest maps to move.type (with ability changes), field.terrain and mon.grounded; the exact planned tree is in PsionicTerrainPowerAbAttr.decl.ts.",
+  "ctor:0",
+);
+
+// Electrodynamics (6062), attr 0 (ElectrodynamicsTerrainPowerAbAttr), ctor:0 = not Psionic and the same terrain rule.
+bindLegacyClosure(
+  6062,
+  0,
+  "Needs 'my battle slot is charged' (isElectrodynamicsPosition, R-B14-5.2) and 'has the ability' for the ER abilities Psionic and Electrodynamics (not in the AbilityId enum, R-B14-5.3). The rest maps to move.type (with ability changes) and field.terrain; the exact planned tree is in ElectrodynamicsTerrainPowerAbAttr.decl.ts.",
+  "ctor:0",
+);
+
+// Electrodynamics (6062), attrs 4 and 5 (ElectrodynamicsGalvanizeAbAttr ctor:1, ElectrodynamicsGalvanizePowerAbAttr ctor:0):
+// both closures are canElectrodynamicsConvert(move, user).
+bindLegacyClosure(
+  6062,
+  4,
+  "canElectrodynamicsConvert needs four atoms the library does not have: 'an ability may change this move's type' (not in noAbilityTypeOverrideMoves, R-B14-5.4), 'is Terastallized' (R-B14-5.5), 'Tera type is' (R-B14-5.6) and 'is the species' (R-B14-5.7). The rest maps to move.type (own type), has-ability (Aerilate, Pixilate, Refrigerate) and move.is-move (Tera Blast, Tera Starstorm); the planned tree is in ElectrodynamicsGalvanizeAbAttr.decl.ts.",
+  "ctor:1",
+);
+bindLegacyClosure(
+  6062,
+  5,
+  "The same function as attr 4 (canElectrodynamicsConvert), so it needs the same four atoms: R-B14-5.4 (an ability may change this move's type), R-B14-5.5 (is Terastallized), R-B14-5.6 (Tera type is) and R-B14-5.7 (is the species).",
+  "ctor:0",
+);
+
+// Synchronized Current (5921), attr 1 (SynchronizedCurrentBothAttackPowerAbAttr). Gate = [the move deals damage, an active ally has
+// chosen a damaging move this turn]. No guard, no residual.
+bindLegacyClosure(
+  5921,
+  1,
+  "Clause 1 (the move deals damage) is move.damaging, but clauses 2 and 3 (an ACTIVE ally exists and its selected command this turn is a damaging move, read from currentBattle.turnCommands) have no atom: party.ally-chose-damaging-move is requested in requests/B14.md (R-B14-5.9). The library party.ally-exists uses getAlly(), which is not active-filtered.",
+  "gate",
+);
+
+// Synchronized Current (5921), attr 2 (SynchronizedCurrentHealAbAttr). Gate = [an active ally exists, I did not attack this turn,
+// the ally did not attack this turn]. No guard, no residual.
+bindLegacyClosure(
+  5921,
+  2,
+  "Needs 'an active ally is on the field' (R-B14-5.8, the first ally with isActive(true); party.ally-exists uses getAlly() which is not active-filtered) and 'attacked this turn' (R-B14-5.10: turnData.acted and a last move that is neither None nor a status move; time.acted reads only turnData.acted).",
+  "gate",
+);

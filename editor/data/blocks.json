@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1264fa83dbcdc7",
-  "hash": "132b8e9db70b9b",
+  "hash": "0452d4209833b5",
   "blocks": [
     {
       "id": "block.astral-project-star-marker",
@@ -500,6 +500,138 @@
       "uses": 1
     },
     {
+      "id": "block.electrodynamics-galvanize",
+      "className": "ElectrodynamicsGalvanizeAbAttr",
+      "label": "Change my move's type (Electrodynamics Galvanize style)",
+      "summary": "A Normal move I use becomes Electric type, unless an -ate ability or a Tera rule takes it first. Example: Normal moves become Electric, like Galvanize.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-type",
+      "whenLabel": "While the game decides a move's type",
+      "synonyms": [
+        "galvanize",
+        "electrodynamics",
+        "normal to electric",
+        "ate ability",
+        "convert move type",
+        "retype normal moves",
+        "type conversion"
+      ],
+      "examples": [
+        "Normal moves become Electric, with Aerilate, Pixilate and Refrigerate going first, like Electrodynamics"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Type the move becomes",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:1",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.change-move-type",
+        "params": [
+          "type"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.electrodynamics-galvanize-power",
+      "className": "ElectrodynamicsGalvanizePowerAbAttr",
+      "label": "Boost power of the converted move (Electrodynamics style)",
+      "summary": "The power of a Normal move that my type conversion turns into another type is multiplied by 1.2. Example: 1.2 = 20% more, like Galvanize.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "galvanize power",
+        "electrodynamics",
+        "ate ability boost",
+        "converted move boost",
+        "retyped move power",
+        "type conversion power",
+        "20 percent boost"
+      ],
+      "examples": [
+        "Normal moves that become Electric hit 20% harder, like Galvanize and Electrodynamics"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.2 = 20% more, 0.5 = half)",
+          "control": "number",
+          "default": 1.2,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.electrodynamics-position",
       "className": "ElectrodynamicsPositionAbAttr",
       "label": "Mark my battle slot as charged for the rest of the battle",
@@ -533,6 +665,63 @@
       "effect": {
         "id": "effect.package",
         "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.electrodynamics-terrain-power",
+      "className": "ElectrodynamicsTerrainPowerAbAttr",
+      "label": "Boost move power from a charged slot (Electrodynamics style)",
+      "summary": "The power of my Electric moves is multiplied by 1.3 while my battle slot is charged, as if Electric Terrain were on. Example: 1.3 = 30% more.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "electrodynamics",
+        "electric terrain boost",
+        "charged slot power",
+        "virtual electric terrain",
+        "electric move boost",
+        "terrain power boost",
+        "slot power up"
+      ],
+      "examples": [
+        "Electric moves get the 30% Electric Terrain boost from my charged slot, like Electrodynamics"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.3 = 30% more, 0.5 = half)",
+          "control": "number",
+          "default": 1.3,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
       },
       "reusableAlone": {
         "when": true,
@@ -1422,6 +1611,140 @@
       "uses": 1
     },
     {
+      "id": "block.psionic-terrain-power",
+      "className": "PsionicTerrainPowerAbAttr",
+      "label": "Boost move power from a virtual terrain (Psionic style)",
+      "summary": "The power of my Electric and Psychic moves is multiplied by 1.3 when their terrain is not really on the field but counts for me. Example: 1.3 = 30% more.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "psionic",
+        "terrain power boost",
+        "psychic terrain boost",
+        "electric terrain boost",
+        "virtual terrain",
+        "terrain move boost",
+        "as if terrain were on"
+      ],
+      "examples": [
+        "Electric and Psychic moves get the 30% terrain boost even without the terrain, like Psionic"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.3 = 30% more, 0.5 = half)",
+          "control": "number",
+          "default": 1.3,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.raichu-all-terrain-surge-surfer",
+      "className": "RaichuAllTerrainSurgeSurferAbAttr",
+      "label": "Multiply one of my stats (Surges Up style)",
+      "summary": "While any terrain is on the field, my Speed is multiplied by 2. Example: Speed x2 in any terrain, so I outrun foes.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "surges up",
+        "surge surfer",
+        "speed in any terrain",
+        "terrain speed boost",
+        "double speed in terrain",
+        "swift swim style",
+        "stat boost under terrain"
+      ],
+      "examples": [
+        "Double my Speed while any terrain is on the field, like Surges Up"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat (Attack, Defense, Sp. Atk, Sp. Def, Speed, Accuracy or Evasion)",
+          "control": "select",
+          "default": "SPD",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Stat multiplier (2 = double, 0.5 = half)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:2",
+          "lib": "field.terrain",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only the chosen stat is multiplied; every other stat is left alone"
+      ],
+      "effect": {
+        "id": "effect.multiply-stat",
+        "params": [
+          "stat",
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.raichu-ally-stat-multiplier",
       "className": "RaichuAllyStatMultiplierAbAttr",
       "label": "Boost my partner's stat in a terrain (more if magnetized)",
@@ -1708,7 +2031,7 @@
       "id": "block.sharing-is-scaring",
       "className": "SharingIsScaringAbAttr",
       "label": "Pass my own stat drops on to the foes",
-      "summary": "When my own move would lower my stats, I take no drop and every foe still standing is lowered by the same amount. Example: Close Combat lowers each foe's Defense and Sp. Def by 1.",
+      "summary": "When my own move lowers my stats, I take no drop and every foe still standing gets it instead. This pass-on always happens and cannot be conditioned.",
       "tier": "A",
       "kind": "calc-modifier",
       "status": "decomposed",
@@ -1749,6 +2072,7 @@
       "conditions": [],
       "guards": [],
       "feasibility": [
+        "The pass-on to the foes always happens together with the block and cannot be limited by an extra condition (the game does not ask conditions before passing it on), so no IF can be added to this block",
         "Only drops I cause myself are handled here (a drop from another Pokemon is the job of the other stat-protection block)",
         "Only stat drops are blocked and passed on (a boost I give myself always lands)",
         "A drop that another ability or effect already blocked is left alone and is not passed on",
@@ -1763,7 +2087,7 @@
       },
       "reusableAlone": {
         "when": true,
-        "if": true,
+        "if": false,
         "do": true
       },
       "uses": 1
@@ -1891,6 +2215,128 @@
         "do": true
       },
       "packageReason": "Package, reason: the effect rewrites `battle.turnCommands[*].targets` and `command.move.targets` for every queued command; no library effect touches the turn queue (requested as effect.rotate-queued-targets). Users (1): Southern Cross Punch (6016) attr 0 (its only attr). Gate legacy-closure pending move.has-own-flag; the guards need not-simulated and hit-dealt-damage (requested). The inherited attackCondition (constructor argument 0, default `move.category !== STATUS`) is never read: this canApply does not call super. Oddities, not fixed: (1) the class rewrites commands that already executed this turn as well as later ones, harmless but wider than the description 'later intended targets'; (2) the rotation also re-aims the holder's own queued command and its ally's; (3) clause 5 is redundant for the shipped ability.",
+      "uses": 1
+    },
+    {
+      "id": "block.synchronized-current-both-attack-power",
+      "className": "SynchronizedCurrentBothAttackPowerAbAttr",
+      "label": "Boost move power (Synchronized Current style)",
+      "summary": "My damaging moves have their power multiplied by 1.25 while my ally has also chosen to attack this turn. Example: 1.25 = 25% more for both of us.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "synchronized current",
+        "team attack boost",
+        "ally attack bonus",
+        "both attack boost",
+        "partner attack bonus",
+        "double attack bonus",
+        "pair power up"
+      ],
+      "examples": [
+        "If both my ally and I attack this turn, each attack gets 25% more power, like Synchronized Current"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.25 = 25% more, 0.5 = half)",
+          "control": "number",
+          "default": 1.25,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.synchronized-current-heal",
+      "className": "SynchronizedCurrentHealAbAttr",
+      "label": "Heal me and my ally by a share of max HP (once a turn each)",
+      "summary": "At the end of the turn, my ally and I each recover 25% of our max HP, at most once per turn. Example: 25 = a quarter of max HP.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "synchronized current",
+        "heal both",
+        "heal the pair",
+        "heal my partner",
+        "team recovery",
+        "rest together",
+        "ally regeneration"
+      ],
+      "examples": [
+        "If neither my ally nor I attacked this turn, we both recover a quarter of our max HP, like Synchronized Current"
+      ],
+      "params": [
+        {
+          "id": "healPercent",
+          "label": "Share of max HP each one recovers (% of max HP)",
+          "control": "number",
+          "default": 25,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Does nothing while the game is only previewing",
+        "Each of the two recovers at most once per turn, even when both of them have this",
+        "A partner that is at full HP or no longer on the field is skipped",
+        "Every recovery is a whole number of at least 1 HP"
+      ],
+      "effect": {
+        "id": "effect.heal-percent",
+        "params": [
+          "healPercent"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
       "uses": 1
     }
   ]
