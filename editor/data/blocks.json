@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "12cfcf0d1d55d3",
-  "hash": "0712b331bb29a8",
+  "vocabularyHash": "0f077ae1c65fbf",
+  "hash": "127347ae079e67",
   "blocks": [
     {
       "id": "block.allied-field-damage-reduction",
@@ -2770,6 +2770,40 @@
       "uses": 2
     },
     {
+      "id": "block.ignore-protect-first-turn",
+      "className": "IgnoreProtectFirstTurnAbAttr",
+      "label": "My moves go through protection on my first turn",
+      "summary": "While I have this, every move I use on my first turn after coming in ignores protection moves such as Protect and hits anyway. Example: my Tackle breaks Protect, but not on turn two.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "demolitionist",
+        "readied action",
+        "first turn ignores protect",
+        "break through protect once",
+        "bypass protect on entry",
+        "opening move ignores protection"
+      ],
+      "examples": [
+        "All my moves ignore Protect on the turn I come in, like Demolitionist"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only until the holder has used a move since it was sent out; the engine tests that itself (the first turn rule is built into the flag)"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.ignore-protect-on-contact",
       "className": "IgnoreProtectOnContactAbAttr",
       "label": "My contact moves go through protection",
@@ -3067,6 +3101,40 @@
       "reusableAlone": {
         "when": true,
         "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.increase-pp",
+      "className": "IncreasePpAbAttr",
+      "label": "Foes' moves aimed at me cost 1 extra PP",
+      "summary": "While I have this, each foe that aims a move at me spends 1 extra PP on it. Example: a move with 10 PP uses 2 PP when it targets me.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "pressure",
+        "drain pp",
+        "extra pp",
+        "pp cost",
+        "waste pp",
+        "pp pressure"
+      ],
+      "examples": [
+        "Foes use 2 PP for every move aimed at me, like Pressure"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The extra PP only counts for foes that are among the targets of the move"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
         "do": true
       },
       "uses": 1
@@ -3553,6 +3621,78 @@
         "do": true
       },
       "uses": 4
+    },
+    {
+      "id": "block.no-fusion-ability",
+      "className": "NoFusionAbilityAbAttr",
+      "label": "This ability stops working on a fused Pokemon",
+      "summary": "While I have this, the ability it belongs to does nothing if the Pokemon is a fusion of two Pokemon. Example: a fused Pokemon with Multitype loses its Multitype effect.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "no fusion",
+        "disabled when fused",
+        "fusion blocks ability",
+        "multitype",
+        "disguise",
+        "does not work on fusions",
+        "fusion breaks ability"
+      ],
+      "examples": [
+        "The ability is switched off while the Pokemon is a fusion, like Multitype or Disguise"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only matters while the Pokemon is a fusion; the engine tests that itself",
+        "An extra condition added to the flag (as Two-Faced does) decides when it counts; the engine asks it"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 18
+    },
+    {
+      "id": "block.no-transform-ability",
+      "className": "NoTransformAbilityAbAttr",
+      "label": "This ability stops working on a transformed Pokemon",
+      "summary": "While I have this, the ability it belongs to does nothing if the Pokemon has transformed into another one. Example: a Pokemon that has transformed loses its Ice Face.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "no transform",
+        "disabled when transformed",
+        "transform blocks ability",
+        "disguise",
+        "ice face",
+        "does not work after transforming",
+        "transform breaks ability"
+      ],
+      "examples": [
+        "The ability is switched off while the Pokemon is transformed, like Disguise or Ice Face"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only matters while the Pokemon is transformed; the engine tests that itself",
+        "An extra condition added to the flag (as Two-Faced does) decides when it counts; the engine asks it"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 16
     },
     {
       "id": "block.non-super-effective-immunity",

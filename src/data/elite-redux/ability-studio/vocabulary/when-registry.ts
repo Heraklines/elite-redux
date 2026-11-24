@@ -1005,6 +1005,10 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     kind: "while-active",
     dispatchKey: null,
     flagKeys: [
+      "IgnoreProtectFirstTurnAbAttr",
+      "IncreasePpAbAttr",
+      "NoFusionAbilityAbAttr",
+      "NoTransformAbilityAbAttr",
       "PreserveBaseStatAbilitiesAbAttr",
       "AlwaysHitAbAttr",
       "BadDreamsImmunityAbAttr",

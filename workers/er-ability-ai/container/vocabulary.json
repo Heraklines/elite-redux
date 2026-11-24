@@ -1783,6 +1783,10 @@
       "kind": "while-active",
       "dispatchKey": null,
       "flagKeys": [
+        "IgnoreProtectFirstTurnAbAttr",
+        "IncreasePpAbAttr",
+        "NoFusionAbilityAbAttr",
+        "NoTransformAbilityAbAttr",
         "PreserveBaseStatAbilitiesAbAttr",
         "AlwaysHitAbAttr",
         "BadDreamsImmunityAbAttr",
@@ -5332,5 +5336,5 @@
       ]
     }
   ],
-  "hash": "12cfcf0d1d55d3"
+  "hash": "0f077ae1c65fbf"
 }

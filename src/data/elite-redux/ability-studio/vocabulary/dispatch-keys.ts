@@ -31,12 +31,6 @@ export const UNEXPOSED_DISPATCH_KEYS: Readonly<Record<string, string>> = {
     "Abstract base of the field type power boosters; only its subclasses are used.",
   FieldMoveTypePowerBoostAbAttr:
     "Not dispatched with applyAbAttrs: move.ts reads it with getAbilityAttrs inside the move power calculation (same moment as calc.move-power). It will be wired to that WHEN when the class gets its declaration.",
-  IncreasePpAbAttr:
-    "Presence check only (move-phase.ts hasAbilityWithAttr): the engine adds PP cost to a move aimed at the holder. It is a flag-like rule that needs its own WHEN once a class agent declares it.",
-  NoFusionAbilityAbAttr:
-    "Presence check only (pokemon.ts getAttrs): disables the ability while the Pokemon is fused. A rule about fusion state, not a battle moment.",
-  NoTransformAbilityAbAttr:
-    "Presence check only (pokemon.ts getAttrs): disables the ability while the Pokemon is transformed. A rule about transform state, not a battle moment.",
 };
 
 /**
