@@ -1085,6 +1085,11 @@ export class SetlistAccuracyAbAttr extends SetMoveAccuracyAbAttr implements Gate
     return setlistNextLevel(pokemon, move) > 0;
   }
 
+  /** The parent's residual (never-miss and "only raises" test) is not part of this class's rules: it has none (merge captain, B05 x B13). */
+  public override residual(): boolean {
+    return true;
+  }
+
   override apply({ pokemon, move, accuracy }: SetMoveAccuracyAbAttrParams): void {
     accuracy.value *= 1 + setlistNextLevel(pokemon, move) * (this.bonusPercentPerStep / 100);
   }
@@ -1164,6 +1169,11 @@ export class FanFavoriteAccuracyAbAttr extends SetMoveAccuracyAbAttr implements 
 
   public gate({ pokemon }: SetMoveAccuracyAbAttrParams): boolean {
     return livingBenchCount(pokemon, this.maxBenched) > 0;
+  }
+
+  /** The parent's residual (never-miss and "only raises" test) is not part of this class's rules: it has none (merge captain, B05 x B13). */
+  public override residual(): boolean {
+    return true;
   }
 
   override apply({ pokemon, accuracy }: SetMoveAccuracyAbAttrParams): void {
