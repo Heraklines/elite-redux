@@ -178,9 +178,13 @@ export class StarHitMultiplierAbAttr extends HitMultiplierAbAttr {
     return gatedCanApply<Parameters<HitMultiplierAbAttr["canApply"]>[0]>(this, params);
   }
 
-  /** The replaceable condition, in the old order: the inherited multi-strike test of the base class, then the move is Star-based. */
+  /**
+   * The replaceable condition, in the old order: the inherited multi-strike test of the base class, then the move is Star-based.
+   * The base class is itself split now (guards = the multi-strike test, run first by `gatedCanApply`; gate = its filter), so this
+   * calls the base class's gate and not its `canApply`, which would call this gate again (merge captain, B09 x B17).
+   */
   public gate(params: Parameters<HitMultiplierAbAttr["canApply"]>[0]): boolean {
-    return super.canApply(params) && isStarMove(params.pokemon, params.move);
+    return super.gate(params) && isStarMove(params.pokemon, params.move);
   }
 }
 
@@ -198,9 +202,13 @@ export class StarHitPowerAbAttr extends HitMultiplierPowerAbAttr {
     return gatedCanApply<Parameters<HitMultiplierPowerAbAttr["canApply"]>[0]>(this, params);
   }
 
-  /** The replaceable condition, in the old order: the inherited condition of the base class (always true here), then the move is Star-based. */
+  /**
+   * The replaceable condition, in the old order: the inherited condition of the base class (its filter; always true here), then the
+   * move is Star-based. The base class is itself split now (gate = its filter, residual = its strike rule), so this calls the base
+   * class's gate and not its `canApply`, which would call this gate again (merge captain, B09 x B17).
+   */
   public gate(params: Parameters<HitMultiplierPowerAbAttr["canApply"]>[0]): boolean {
-    return super.canApply(params) && isStarMove(params.pokemon, params.move);
+    return super.gate(params) && isStarMove(params.pokemon, params.move);
   }
 }
 
@@ -1409,6 +1417,11 @@ export class SleepingInAccuracyAbAttr extends SetMoveAccuracyAbAttr {
   /** The replaceable condition: the move can put its target to sleep (a sleep effect or the drowsy effect). */
   public gate({ move }: SetMoveAccuracyAbAttrParams): boolean {
     return isSleepInducingMove(move);
+  }
+
+  /** The parent's residual (accuracy below the set value) is not a rule of this class: it has none (merge captain, B05 x B17). */
+  public override residual(): boolean {
+    return true;
   }
 }
 

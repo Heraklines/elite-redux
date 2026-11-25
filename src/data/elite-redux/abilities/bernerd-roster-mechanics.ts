@@ -235,7 +235,15 @@ export class PushKickAbAttr extends StatDebuffOnFlagAttackAbAttr {
    */
   public gate(params: PostMoveInteractionAbAttrParams): boolean {
     const turn = params.pokemon.tempSummonData.waveTurnCount;
-    return PUSH_KICK_TURN.get(params.pokemon) !== turn && super.canApply(params);
+    // The base class is itself split now (guards = hit connected and first strike; gate = damaging move, property, chance), so
+    // this asks both parts of it and not its canApply, which would call this gate again (merge captain, parent batch x B17). Push Kick
+    // keeps ONE condition (a replaced gate is the whole condition), so its own guards say yes and the base guards sit here.
+    return PUSH_KICK_TURN.get(params.pokemon) !== turn && super.guards(params) && super.gate(params);
+  }
+
+  /** Push Kick has no safety rule of its own; the base class's guards are asked inside {@linkcode gate} (see there). */
+  public override guards(): boolean {
+    return true;
   }
 
   override apply(params: PostMoveInteractionAbAttrParams): void {
