@@ -1947,8 +1947,12 @@
         "NoFusionAbilityAbAttr",
         "NoTransformAbilityAbAttr",
         "PreserveBaseStatAbilitiesAbAttr",
+        "AbilityStudioRuntimeCapabilityAbAttr",
+        "AbilityStudioSourceAbilityAbAttr",
         "AlwaysHitAbAttr",
         "BadDreamsImmunityAbAttr",
+        "BallRecoveryAbAttr",
+        "BiomeRevealBonusAbAttr",
         "BlockRedirectAbAttr",
         "BugPowderImmunityAbAttr",
         "CenterOfAttentionAbAttr",
@@ -1961,6 +1965,7 @@
         "EntryHazardImmunityAbAttr",
         "FieldCritBoostAbAttr",
         "EclipseWingMarkerAbAttr",
+        "ExperienceGainMultiplierAbAttr",
         "FloatAbAttr",
         "GroundEntryHazardImmunityAbAttr",
         "GroundedEntryHazardImmunityAbAttr",
@@ -1973,6 +1978,8 @@
         "MoveFlagInjectionAbAttr",
         "OverrideMultiHitCountAbAttr",
         "IgnoreResistancesAbAttr",
+        "MoneyGainMultiplierAbAttr",
+        "MoveHpCostModifierAbAttr",
         "OverruleCritAbAttr",
         "PostDefendSuppressOpponentDamageBoostAbAttr",
         "LivingChromeMarkerAbAttr",
@@ -5997,5 +6004,5 @@
       ]
     }
   ],
-  "hash": "09871358dbb340"
+  "hash": "16c4e1ebc5863a"
 }
