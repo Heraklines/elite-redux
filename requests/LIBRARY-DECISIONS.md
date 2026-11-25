@@ -217,6 +217,9 @@ stays legacy until the owner decides whether it deserves a block.
 - No batch declaration was rebound. The atoms of sections 1 and 2 are available, but `decl/**/bindings.ts` still holds
   `bindLegacyClosure` for the clauses that wait for them; section 1 lists which classes can now take which atom.
 - The WHEN splits of section 5 and the effect wiring of section 4 are the completion pass's work.
+- Closed afterwards (2026-11-25): every entry named above now has its own line-by-line decision in `requests/triage/`
+  (612 entries, B03, B04, B10, B11, B13 to B18). Where those files disagree with this document, they carry the evidence;
+  `requests/triage/README.md` lists the aliases and planned effects here that must NOT be used for rebinding as written.
 
 ## 9. Request index (ids of the numbered entries, for lookup)
 
