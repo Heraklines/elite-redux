@@ -37,10 +37,23 @@ export const SOULMATE_DAMAGE_REDIRECT_FRACTION = 0.25;
 /** Share of the holder's direct healing copied to the linked ally. */
 export const SOULMATE_HEAL_COPY_FRACTION = 0.5;
 
-/** PostSummon marker: forms the link on entry. The redirect/heal-copy run via the `erSoulmate*` helpers. */
+/**
+ * PostSummon marker: forms the link on entry. The redirect/heal-copy run via the `erSoulmate*` helpers, which read the two shares below
+ * from the holder's live attr (ability studio params; the defaults are the original 25% and 50%).
+ */
 export class SoulmateAbAttr extends PostSummonAbAttr {
-  constructor() {
+  /** Share of the linked ally's direct damage that the holder takes (default 0.25). */
+  public readonly damageShare: number;
+  /** Share of the holder's direct healing that is copied to the linked ally (default 0.5). */
+  public readonly healShare: number;
+
+  constructor(
+    damageShare: number = SOULMATE_DAMAGE_REDIRECT_FRACTION,
+    healShare: number = SOULMATE_HEAL_COPY_FRACTION,
+  ) {
     super(false);
+    this.damageShare = damageShare;
+    this.healShare = healShare;
   }
 
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
@@ -50,11 +63,12 @@ export class SoulmateAbAttr extends PostSummonAbAttr {
   }
 }
 
-/** Whether a living, active pokemon carries an unsuppressed Soulmate. */
-function hasSoulmate(pokemon: Pokemon): boolean {
-  return (
-    pokemon.isActive(true) && pokemon.getAllActiveAbilityAttrs().some(a => a?.constructor?.name === "SoulmateAbAttr")
-  );
+/** The unsuppressed Soulmate attr of a living, active pokemon (its shares drive the transfer), if it carries one. */
+function soulmateAttrOf(pokemon: Pokemon): SoulmateAbAttr | undefined {
+  if (!pokemon.isActive(true)) {
+    return;
+  }
+  return pokemon.getAllActiveAbilityAttrs().find((a): a is SoulmateAbAttr => a?.constructor?.name === "SoulmateAbAttr");
 }
 
 /**
@@ -67,10 +81,11 @@ export function erApplySoulmateRedirect(victim: Pokemon, incomingDamage: number)
     return 0;
   }
   const partner = getLinkedAlly(victim);
-  if (!partner || !hasSoulmate(partner) || partner.isFainted()) {
+  const soulmate = partner ? soulmateAttrOf(partner) : undefined;
+  if (!partner || !soulmate || partner.isFainted()) {
     return 0;
   }
-  const share = toDmgValue(incomingDamage * SOULMATE_DAMAGE_REDIRECT_FRACTION, 1);
+  const share = toDmgValue(incomingDamage * soulmate.damageShare, 1);
   if (share <= 0) {
     return 0;
   }
@@ -88,14 +103,15 @@ let copyingHeal = false;
  * from `Pokemon.heal` with the ACTUAL amount healed.
  */
 export function erApplySoulmateHealCopy(holder: Pokemon, healedAmount: number): void {
-  if (copyingHeal || healedAmount <= 0 || !hasSoulmate(holder)) {
+  const soulmate = copyingHeal || healedAmount <= 0 ? undefined : soulmateAttrOf(holder);
+  if (!soulmate) {
     return;
   }
   const ally = getLinkedAlly(holder);
   if (!ally || ally.isFainted() || ally.isFullHp()) {
     return;
   }
-  const copy = toDmgValue(healedAmount * SOULMATE_HEAL_COPY_FRACTION, 1);
+  const copy = toDmgValue(healedAmount * soulmate.healShare, 1);
   if (copy <= 0) {
     return;
   }

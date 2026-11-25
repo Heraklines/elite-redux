@@ -22,9 +22,10 @@
 
 import { PostDamageAbAttr, type PostDamageAbAttrParams } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveId } from "#enums/move-id";
-import { Stat } from "#enums/stat";
+import { type BattleStat, Stat } from "#enums/stat";
 import type { Pokemon } from "#field/pokemon";
 
 /** Hand-authored ER-custom ability id (both the ER-source id and the pokerogue id). */
@@ -38,20 +39,44 @@ export const DANDELION_BURST_COTTON_SPORE_STAGES = -2;
 /** Per-holder record of the wave (battle) in which Dandelion Burst last fired. */
 const DANDELION_BURST_USED = new WeakMap<Pokemon, number>();
 
-export class DandelionBurstAbAttr extends PostDamageAbAttr {
-  override canApply({ pokemon, damage }: PostDamageAbAttrParams): boolean {
+export class DandelionBurstAbAttr extends PostDamageAbAttr implements GatedAttr<PostDamageAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostDamageAbAttrParams) => boolean) | undefined;
+
+  /**
+   * @param hpRatio - The share of max HP the holder must fall to (or below) for the ability to trigger (default 0.5).
+   * @param stat - The stat each foe loses (default Speed, the automatic Cotton Spore).
+   * @param stages - How many stages that stat changes (default -2).
+   */
+  constructor(
+    public readonly hpRatio: number = DANDELION_BURST_THRESHOLD,
+    public readonly stat: BattleStat = Stat.SPD,
+    public readonly stages: number = DANDELION_BURST_COTTON_SPORE_STAGES,
+  ) {
+    super();
+  }
+
+  /** Tier B (ability studio spec 3.1): `canApply` is `guards && gate && residual`, the original clause order. */
+  override canApply(params: PostDamageAbAttrParams): boolean {
+    return gatedCanApply<PostDamageAbAttrParams>(this, params);
+  }
+
+  /** Safety rules, in the original order: not fainted, then the ability's own once-per-battle memory. */
+  public guards({ pokemon }: PostDamageAbAttrParams): boolean {
     if (pokemon.hp <= 0) {
       return false;
     }
-    if (DANDELION_BURST_USED.get(pokemon) === (globalScene.currentBattle?.waveIndex ?? 0)) {
-      return false;
-    }
-    const threshold = pokemon.getMaxHp() * DANDELION_BURST_THRESHOLD;
-    // Fired only on the hit that CROSSES to at-or-below half (was above before it).
-    if (!(pokemon.hp <= threshold && pokemon.hp + damage > threshold)) {
-      return false;
-    }
-    // At least one living opposing Pokemon to act on.
+    return DANDELION_BURST_USED.get(pokemon) !== (globalScene.currentBattle?.waveIndex ?? 0);
+  }
+
+  /** The replaceable condition: the hit CROSSED to at-or-below the ratio (it was above before the hit). */
+  public gate({ pokemon, damage }: PostDamageAbAttrParams): boolean {
+    const threshold = pokemon.getMaxHp() * this.hpRatio;
+    return pokemon.hp <= threshold && pokemon.hp + damage > threshold;
+  }
+
+  /** What stays in the class: at least one living opposing Pokemon to act on. */
+  public residual({ pokemon }: PostDamageAbAttrParams): boolean {
     return pokemon.getOpponents().some(o => o?.isActive(true));
   }
 
@@ -72,8 +97,8 @@ export class DandelionBurstAbAttr extends PostDamageAbAttr {
         "StatStageChangePhase",
         opponent.getBattlerIndex(),
         false,
-        [Stat.SPD],
-        DANDELION_BURST_COTTON_SPORE_STAGES,
+        [this.stat],
+        this.stages,
       );
     }
   }

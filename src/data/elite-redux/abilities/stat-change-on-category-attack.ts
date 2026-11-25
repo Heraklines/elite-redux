@@ -33,6 +33,7 @@
 
 import { PostAttackAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { MoveCategory } from "#enums/move-category";
 import type { BattleStat } from "#enums/stat";
 
@@ -73,7 +74,13 @@ export interface StatChangeOnCategoryAttackOptions {
  * Pokerogue's stat-stage cap ([-6, +6]) is handled by `StatStageChangePhase`;
  * we unconditionally queue the phase and let the cap apply naturally.
  */
-export class StatChangeOnCategoryAttackAbAttr extends PostAttackAbAttr {
+export class StatChangeOnCategoryAttackAbAttr
+  extends PostAttackAbAttr
+  implements GatedAttr<PostMoveInteractionAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
   private readonly category: MoveCategory;
   private readonly stat: BattleStat;
   private readonly stages: number;
@@ -110,7 +117,13 @@ export class StatChangeOnCategoryAttackAbAttr extends PostAttackAbAttr {
     return this.target;
   }
 
+  /** Tier B (ability studio spec 3.1): `canApply = guards && gate && residual`, in the original clause order (no guard, no residual here). */
   public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The replaceable conditions, in the original order: a damaging move (base condition), then the move category. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
     if (!super.canApply(params)) {
       return false;
     }

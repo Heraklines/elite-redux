@@ -47,20 +47,20 @@ function opponentAcross(holder: Pokemon): Pokemon | undefined {
   return across ?? opponents[0];
 }
 
-/** Whether `move` (as used by `user`) is a biting move or resolves to Dragon type. */
-function isBitingOrDragon(user: Pokemon, move: Move): boolean {
-  return move.hasFlag(MoveFlags.BITING_MOVE) || user.getMoveType(move) === PokemonType.DRAGON;
+/** Whether `move` (as used by `user`) is a biting move or resolves to the granted type (Dragon by default). */
+function isBitingOrDragon(user: Pokemon, move: Move, type: PokemonType): boolean {
+  return move.hasFlag(MoveFlags.BITING_MOVE) || user.getMoveType(move) === type;
 }
 
-/** Graft Dragon onto `target` and announce it (no-op / silent if already Dragon-typed). */
-function graftDragon(target: Pokemon): void {
-  if (target.isOfType(PokemonType.DRAGON)) {
+/** Graft `type` (Dragon by default) onto `target` and announce it (no-op / silent if it already has that type). */
+function graftDragon(target: Pokemon, type: PokemonType): void {
+  if (target.isOfType(type)) {
     return;
   }
-  if (graftType(target, PokemonType.DRAGON)) {
+  if (graftType(target, type)) {
     globalScene.phaseManager.queueMessage(
       i18next.t("moveTriggers:addType", {
-        typeName: i18next.t(`pokemonInfo:type.${toCamelCase(PokemonType[PokemonType.DRAGON])}`),
+        typeName: i18next.t(`pokemonInfo:type.${toCamelCase(PokemonType[type])}`),
         pokemonName: getPokemonNameWithAffix(target),
       }),
     );
@@ -69,7 +69,8 @@ function graftDragon(target: Pokemon): void {
 
 /** PostSummon half: graft Dragon onto the opponent directly across on entry. */
 export class DraconicVoodooAbAttr extends PostSummonAbAttr {
-  constructor() {
+  /** @param graftedType - The type added to foes, on entry and by a biting or same-type move (default Dragon). */
+  constructor(public readonly graftedType: PokemonType = PokemonType.DRAGON) {
     super(false);
   }
 
@@ -79,17 +80,19 @@ export class DraconicVoodooAbAttr extends PostSummonAbAttr {
     }
     const target = opponentAcross(pokemon);
     if (target) {
-      graftDragon(target);
+      graftDragon(target, this.graftedType);
     }
   }
 }
 
-/** Whether `pokemon` carries an unsuppressed, active Draconic Voodoo. */
-function hasDraconicVoodoo(pokemon: Pokemon): boolean {
-  return (
-    pokemon.isActive(true)
-    && pokemon.getAllActiveAbilityAttrs().some(a => a?.constructor?.name === "DraconicVoodooAbAttr")
-  );
+/** The unsuppressed, active Draconic Voodoo attr `pokemon` carries, if any (found by name, like the engine seam does). */
+function draconicVoodooOf(pokemon: Pokemon): DraconicVoodooAbAttr | undefined {
+  if (!pokemon.isActive(true)) {
+    return;
+  }
+  return pokemon.getAllActiveAbilityAttrs().find(a => a?.constructor?.name === "DraconicVoodooAbAttr") as
+    | DraconicVoodooAbAttr
+    | undefined;
 }
 
 /**
@@ -98,11 +101,16 @@ function hasDraconicVoodoo(pokemon: Pokemon): boolean {
  * that target. `damaging` gates out immune / no-damage connects.
  */
 export function erDraconicVoodooOnHit(user: Pokemon, target: Pokemon, move: Move, damaging: boolean): void {
-  if (!damaging || target.isFainted() || !hasDraconicVoodoo(user)) {
+  if (!damaging || target.isFainted()) {
     return;
   }
-  if (!isBitingOrDragon(user, move)) {
+  const attr = draconicVoodooOf(user);
+  if (attr === undefined) {
     return;
   }
-  graftDragon(target);
+  const type = attr.graftedType ?? PokemonType.DRAGON;
+  if (!isBitingOrDragon(user, move, type)) {
+    return;
+  }
+  graftDragon(target, type);
 }

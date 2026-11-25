@@ -23,6 +23,7 @@
 // =============================================================================
 
 import { StatMultiplierAbAttr, type StatMultiplierAbAttrParams } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { Stat } from "#enums/stat";
 import type { Pokemon } from "#field/pokemon";
 
@@ -65,13 +66,29 @@ export function pressureVesselPpFraction(pokemon: Pokemon): number {
  * `StatMultiplierAbAttr` whose factor scales linearly with the holder's total
  * remaining PP fraction. Applies only to DEF and SPDEF.
  */
-export class PressureVesselAbAttr extends StatMultiplierAbAttr {
-  constructor() {
+export class PressureVesselAbAttr extends StatMultiplierAbAttr implements GatedAttr<StatMultiplierAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: StatMultiplierAbAttrParams) => boolean) | undefined;
+
+  /**
+   * @param minMultiplier - The factor with no PP left (default 1.0, no boost)
+   * @param maxMultiplier - The factor with all PP left (default 1.5)
+   */
+  constructor(
+    public readonly minMultiplier: number = PRESSURE_VESSEL_MIN_MULTIPLIER,
+    public readonly maxMultiplier: number = PRESSURE_VESSEL_MAX_MULTIPLIER,
+  ) {
     // multiplier=1 is ignored; the real factor is computed in apply().
     super(Stat.DEF, 1);
   }
 
-  override canApply({ stat }: StatMultiplierAbAttrParams): boolean {
+  /** Tier B (ability studio spec 3.1): `canApply = guards && gate && residual`; here only the gate exists. */
+  override canApply(params: StatMultiplierAbAttrParams): boolean {
+    return gatedCanApply<StatMultiplierAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the stat being calculated is Defense or Special Defense. */
+  public gate({ stat }: StatMultiplierAbAttrParams): boolean {
     return stat === Stat.DEF || stat === Stat.SPDEF;
   }
 
@@ -85,8 +102,6 @@ export class PressureVesselAbAttr extends StatMultiplierAbAttr {
    */
   public multiplierFor(pokemon: Pokemon): number {
     const fraction = pressureVesselPpFraction(pokemon);
-    return (
-      PRESSURE_VESSEL_MIN_MULTIPLIER + (PRESSURE_VESSEL_MAX_MULTIPLIER - PRESSURE_VESSEL_MIN_MULTIPLIER) * fraction
-    );
+    return this.minMultiplier + (this.maxMultiplier - this.minMultiplier) * fraction;
   }
 }

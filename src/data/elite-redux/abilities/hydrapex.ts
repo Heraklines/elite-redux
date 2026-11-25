@@ -49,23 +49,35 @@ export const HYDRAPEX_MAX_SIDE_HEADS = 2;
 
 /** Pure marker: Hydrapex is entirely driven by the on-hit seam below. */
 export class HydrapexAbAttr extends PostSummonAbAttr {
-  constructor() {
+  /**
+   * @param sidePowerShare - Share of the move's base power each side head deals (default 0.35).
+   * @param maxSideHeads - Most side heads (extra foes struck) per move (default 2).
+   * @param sideType - The type that makes a move trigger it and that an extra foe must have (default Dragon).
+   */
+  constructor(
+    public readonly sidePowerShare: number = HYDRAPEX_SIDE_HEAD_POWER,
+    public readonly maxSideHeads: number = HYDRAPEX_MAX_SIDE_HEADS,
+    public readonly sideType: PokemonType = PokemonType.DRAGON,
+  ) {
     super(false);
   }
 
   override apply(_params: AbAttrBaseParams): void {}
 }
 
-/** Whether `pokemon` carries an unsuppressed, active Hydrapex. */
-function hasHydrapex(pokemon: Pokemon): boolean {
-  return (
-    pokemon.isActive(true) && pokemon.getAllActiveAbilityAttrs().some(a => a?.constructor?.name === "HydrapexAbAttr")
-  );
+/** The unsuppressed, active Hydrapex attr `pokemon` carries, if any (found by name, like the engine seam does). */
+function hydrapexOf(pokemon: Pokemon): HydrapexAbAttr | undefined {
+  if (!pokemon.isActive(true)) {
+    return;
+  }
+  return pokemon.getAllActiveAbilityAttrs().find(a => a?.constructor?.name === "HydrapexAbAttr") as
+    | HydrapexAbAttr
+    | undefined;
 }
 
-/** Whether `move` (as used by `user`) is a biting move or resolves to Dragon type. */
-function isBitingOrDragon(user: Pokemon, move: Move): boolean {
-  return move.hasFlag(MoveFlags.BITING_MOVE) || user.getMoveType(move) === PokemonType.DRAGON;
+/** Whether `move` (as used by `user`) is a biting move or resolves to `type` (Dragon by default). */
+function isBitingOrDragon(user: Pokemon, move: Move, type: PokemonType): boolean {
+  return move.hasFlag(MoveFlags.BITING_MOVE) || user.getMoveType(move) === type;
 }
 
 /** Per-move-execution guard so side heads fire once, not once per multi-hit. */
@@ -77,10 +89,12 @@ let hydrapexFiredKey = "";
  * side heads at OTHER active Dragon-typed opponents at 35% power.
  */
 export function erHydrapexOnHit(user: Pokemon, primaryTarget: Pokemon, move: Move): void {
-  if (!hasHydrapex(user) || move.isMultiTarget() || move.power <= 0) {
+  const attr = hydrapexOf(user);
+  if (attr === undefined || move.isMultiTarget() || move.power <= 0) {
     return;
   }
-  if (!isBitingOrDragon(user, move)) {
+  const sideType = attr.sideType ?? PokemonType.DRAGON;
+  if (!isBitingOrDragon(user, move, sideType)) {
     return;
   }
   const battle = globalScene.currentBattle;
@@ -92,13 +106,13 @@ export function erHydrapexOnHit(user: Pokemon, primaryTarget: Pokemon, move: Mov
 
   const others = user
     .getOpponents()
-    .filter(o => o !== primaryTarget && !o.isFainted() && o.isOfType(PokemonType.DRAGON))
-    .slice(0, HYDRAPEX_MAX_SIDE_HEADS);
+    .filter(o => o !== primaryTarget && !o.isFainted() && o.isOfType(sideType))
+    .slice(0, attr.maxSideHeads ?? HYDRAPEX_MAX_SIDE_HEADS);
   if (others.length === 0) {
     return;
   }
 
-  const sidePower = Math.max(1, Math.round(move.power * HYDRAPEX_SIDE_HEAD_POWER));
+  const sidePower = Math.max(1, Math.round(move.power * (attr.sidePowerShare ?? HYDRAPEX_SIDE_HEAD_POWER)));
   for (const other of others) {
     const sideMove = scriptedPokemonMove(move.id, sidePower);
     // Strip every attr so the side head carries NO secondary effect (guaranteed

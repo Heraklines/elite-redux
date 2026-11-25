@@ -359,14 +359,6 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     hitResult: HitResult.EFFECTIVE,
     simulated: false,
   }),
-  // PostMoveUsedAbAttr: the engine passes the SOURCE's PokemonMove (canApply calls move.getMove()) and the targets (B06 chunk 2).
-  "event.after-any-move": ({ holder, foe, move }) => ({
-    pokemon: holder,
-    source: foe,
-    move: new PokemonMove(move.id),
-    targets: [foe.getBattlerIndex()],
-    simulated: false,
-  }),
   // StatStageChangePhase passes pokemon, stats, stages and selfTarget to PostStatStageChangeAbAttr; here a drop of one stage.
   "event.stat-changed": ({ holder }) => ({
     pokemon: holder,
@@ -581,4 +573,15 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
   }),
   // B14 chunk 2 (Booby Trap): the item-loss code hands over the Pokemon that took or knocked off the item.
   "event.item-lost": ({ holder, foe }) => ({ pokemon: holder, opponent: foe, simulated: false }),
+  // B15 chunk 2. The holder's own move was just used (PostMoveUsed hands over a PokemonMove and the user as `source`).
+  // The "someone else used it" half of the gate is proven in test/tests/elite-redux/decomp/B15/chunk2.test.ts.
+  "event.after-any-move": ctx => ({
+    pokemon: ctx.holder,
+    // B06 (a foe's dance) and B15 (the holder's own move) read different sides; the second damage value of the grid
+    // takes the holder's side, so both readings are exercised, identically for both builds.
+    source: ctx.damage > 1 ? ctx.holder : ctx.foe,
+    move: new PokemonMove(ctx.move.id),
+    targets: [ctx.foe.getBattlerIndex()],
+    simulated: false,
+  }),
 };

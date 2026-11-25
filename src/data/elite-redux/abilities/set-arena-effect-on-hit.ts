@@ -40,6 +40,7 @@
 
 import { PostDefendAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { TerrainType } from "#data/terrain";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { ArenaTagType } from "#enums/arena-tag-type";
@@ -90,7 +91,10 @@ export interface SetArenaTagOnHitOptions {
  * hazard "can be added" (e.g. SPIKES has a layer cap); the arena layer's
  * `addTag` is idempotent past the cap, so a no-op on the third call is fine.
  */
-export class SetArenaTagOnHitAbAttr extends PostDefendAbAttr {
+export class SetArenaTagOnHitAbAttr extends PostDefendAbAttr implements GatedAttr<PostMoveInteractionAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
   private readonly tagType: ArenaTagType;
   private readonly turns: number;
   private readonly side: "self" | "attacker" | "both";
@@ -124,19 +128,22 @@ export class SetArenaTagOnHitAbAttr extends PostDefendAbAttr {
     return this.contactRequired;
   }
 
+  /** Tier B (ability studio spec 3.1): `canApply = guards && gate && residual`, in the original clause order. */
   public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { move, opponent: attacker, pokemon, hitResult } = params;
-    // Must be a damaging move that actually landed.
-    if (hitResult >= HitResult.NO_EFFECT) {
-      return false;
-    }
-    if (
-      this.contactRequired
-      && !move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
-    ) {
-      return false;
-    }
-    return true;
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Safety rule: must be a damaging move that actually landed (not a miss, a block or an immunity). */
+  public guards({ hitResult }: PostMoveInteractionAbAttrParams): boolean {
+    return hitResult < HitResult.NO_EFFECT;
+  }
+
+  /** The replaceable condition: the move makes contact (always true when contact is not required). */
+  public gate({ move, opponent: attacker, pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    return (
+      !this.contactRequired
+      || move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
+    );
   }
 
   public override apply(params: PostMoveInteractionAbAttrParams): void {
@@ -188,7 +195,10 @@ export interface SetTerrainOnHitOptions {
  * overwritten by a lower-priority one). `trySetTerrain` already silently
  * no-ops when the requested state is already active.
  */
-export class SetTerrainOnHitAbAttr extends PostDefendAbAttr {
+export class SetTerrainOnHitAbAttr extends PostDefendAbAttr implements GatedAttr<PostMoveInteractionAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
   private readonly terrain: TerrainType;
   private readonly contactRequired: boolean;
 
@@ -208,18 +218,22 @@ export class SetTerrainOnHitAbAttr extends PostDefendAbAttr {
     return this.contactRequired;
   }
 
+  /** Tier B (ability studio spec 3.1): `canApply = guards && gate && residual`, in the original clause order. */
   public override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { move, opponent: attacker, pokemon, hitResult } = params;
-    if (hitResult >= HitResult.NO_EFFECT) {
-      return false;
-    }
-    if (
-      this.contactRequired
-      && !move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
-    ) {
-      return false;
-    }
-    return true;
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Safety rule: must be a damaging move that actually landed (not a miss, a block or an immunity). */
+  public guards({ hitResult }: PostMoveInteractionAbAttrParams): boolean {
+    return hitResult < HitResult.NO_EFFECT;
+  }
+
+  /** The replaceable condition: the move makes contact (always true when contact is not required). */
+  public gate({ move, opponent: attacker, pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    return (
+      !this.contactRequired
+      || move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: attacker, target: pokemon })
+    );
   }
 
   public override apply(params: PostMoveInteractionAbAttrParams): void {

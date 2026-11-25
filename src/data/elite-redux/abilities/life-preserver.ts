@@ -30,7 +30,8 @@ export const ER_LIFE_PRESERVER_ABILITY_ID = 5916;
 
 /** Marker attribute; the save + drench is applied by {@linkcode erTryLifePreserver}. */
 export class LifePreserverAbAttr extends AbAttr {
-  constructor() {
+  /** @param drenchTurns - How many turns the attacker stays Drenched (default 2). */
+  constructor(public readonly drenchTurns: number = 2) {
     super(false);
   }
 
@@ -40,12 +41,14 @@ export class LifePreserverAbAttr extends AbAttr {
 /** Per-holder record of the wave (battle) in which Life Preserver last fired. */
 const LIFE_PRESERVER_USED = new WeakMap<Pokemon, number>();
 
-/** Whether a living, active pokemon carries an unsuppressed Life Preserver. */
-function hasLifePreserver(pokemon: Pokemon): boolean {
-  return (
-    pokemon.isActive(true)
-    && pokemon.getAllActiveAbilityAttrs().some(a => a?.constructor?.name === "LifePreserverAbAttr")
-  );
+/** The unsuppressed Life Preserver attr a living, active pokemon carries, if any (found by name). */
+function lifePreserverOf(pokemon: Pokemon): LifePreserverAbAttr | undefined {
+  if (!pokemon.isActive(true)) {
+    return;
+  }
+  return pokemon.getAllActiveAbilityAttrs().find(a => a?.constructor?.name === "LifePreserverAbAttr") as
+    | LifePreserverAbAttr
+    | undefined;
 }
 
 /**
@@ -62,16 +65,17 @@ export function erTryLifePreserver(defender: Pokemon, source: Pokemon | undefine
   const wave = globalScene.currentBattle?.waveIndex ?? 0;
   // The holder is a LIVING ALLY of the defender carrying Life Preserver, that
   // has not spent its charge this battle.
-  const holder = defender.getAllies().find(a => hasLifePreserver(a) && LIFE_PRESERVER_USED.get(a) !== wave);
+  const holder = defender.getAllies().find(a => lifePreserverOf(a) !== undefined && LIFE_PRESERVER_USED.get(a) !== wave);
   if (!holder) {
     return false;
   }
+  const attr = lifePreserverOf(holder);
   LIFE_PRESERVER_USED.set(holder, wave);
   globalScene.phaseManager.queueMessage(
     `${holder.getNameToRender()}'s Life Preserver kept ${defender.getNameToRender()} afloat!`,
   );
   // Drench the attacker (Water-types / drench-immune mons are filtered by canAdd).
-  source.addTag(BattlerTagType.ER_DRENCHED, 2, MoveId.NONE, holder.id);
+  source.addTag(BattlerTagType.ER_DRENCHED, attr?.drenchTurns ?? 2, MoveId.NONE, holder.id);
   return true;
 }
 
