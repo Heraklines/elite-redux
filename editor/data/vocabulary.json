@@ -1951,10 +1951,14 @@
         "BadDreamsImmunityAbAttr",
         "BlockRedirectAbAttr",
         "BugPowderImmunityAbAttr",
+        "CenterOfAttentionAbAttr",
+        "CrackedVesselMarkerAbAttr",
+        "DeadeyeMarkerAbAttr",
         "DoubleSelfInflictedDamageAbAttr",
         "DrenchImmunityAbAttr",
         "EntryHazardImmunityAbAttr",
         "FieldCritBoostAbAttr",
+        "EclipseWingMarkerAbAttr",
         "FloatAbAttr",
         "GroundEntryHazardImmunityAbAttr",
         "GroundedEntryHazardImmunityAbAttr",
@@ -1968,11 +1972,15 @@
         "IgnoreResistancesAbAttr",
         "OverruleCritAbAttr",
         "PostDefendSuppressOpponentDamageBoostAbAttr",
+        "LivingChromeMarkerAbAttr",
+        "SedimentBloomMarkerAbAttr",
         "SpreadTargetByFlagAbAttr",
         "StealthRockImmunityAbAttr",
+        "SuperegoMarkerAbAttr",
         "SuppressFieldAbilitiesWhenEnragedAbAttr",
         "SuppressFieldEffectsAbAttr",
-        "SwitchWhileRampagingAbAttr"
+        "SwitchWhileRampagingAbAttr",
+        "VaporBodyAccuracyAbAttr"
       ],
       "provides": [
         "holder"
@@ -5976,5 +5984,5 @@
       ]
     }
   ],
-  "hash": "0afdc52c3a464e"
+  "hash": "1e254dabb157d4"
 }
