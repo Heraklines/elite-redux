@@ -36,6 +36,7 @@
 import { PostFaintAbAttr, type PostFaintAbAttrParams } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { TerrainType } from "#data/terrain";
 import type { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
@@ -59,10 +60,13 @@ const PENDING_REVIVE = new WeakMap<Pokemon, number>();
 /** Per-Pokemon once-per-battle latch — the revive arms at most once per battle. */
 const USED_THIS_BATTLE = new WeakMap<Pokemon, boolean>();
 
-export class PostFaintDeferredReviveAbAttr extends PostFaintAbAttr {
+export class PostFaintDeferredReviveAbAttr extends PostFaintAbAttr implements GatedAttr<PostFaintAbAttrParams> {
   private readonly hpFraction: number;
   private readonly requireWeather: readonly WeatherType[] | null;
   private readonly requireTerrain: readonly TerrainType[] | null;
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostFaintAbAttrParams) => boolean) | undefined;
 
   constructor(options: PostFaintDeferredReviveOptions) {
     if (options.hpFraction <= 0 || options.hpFraction > 1) {
@@ -79,10 +83,21 @@ export class PostFaintDeferredReviveAbAttr extends PostFaintAbAttr {
     return this.hpFraction;
   }
 
-  override canApply({ pokemon }: PostFaintAbAttrParams): boolean {
-    if (USED_THIS_BATTLE.get(pokemon)) {
-      return false;
-    }
+  /**
+   * Tier B split (ability studio spec 3.1), in the original clause order: `guards` (the once-per-battle latch), then `gate`
+   * (the weather and terrain that must be active at faint time). No `prepare`, no `residual`, no random draw.
+   */
+  override canApply(params: PostFaintAbAttrParams): boolean {
+    return gatedCanApply<PostFaintAbAttrParams>(this, params);
+  }
+
+  /** The revive arms at most once per battle: a per-Pokemon latch kept in this file (not a rule staff can switch off). */
+  public guards({ pokemon }: PostFaintAbAttrParams): boolean {
+    return !USED_THIS_BATTLE.get(pokemon);
+  }
+
+  /** The replaceable condition: the required weather and the required terrain (each only when the class has one). */
+  public gate(_params: PostFaintAbAttrParams): boolean {
     if (this.requireWeather !== null) {
       const w = globalScene.arena.weather?.weatherType;
       if (w === undefined || !this.requireWeather.includes(w)) {

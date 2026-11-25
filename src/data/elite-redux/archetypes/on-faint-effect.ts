@@ -60,6 +60,7 @@ import { PostFaintAbAttr, type PostFaintAbAttrParams } from "#abilities/ab-attrs
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { TerrainType } from "#data/terrain";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { ArenaTagType } from "#enums/arena-tag-type";
@@ -220,7 +221,10 @@ export interface OnFaintEffectOptions {
  * mutation. This lets the dispatcher's preview / record-only modes inspect
  * the trigger without firing it.
  */
-export class OnFaintEffectAbAttr extends PostFaintAbAttr {
+export class OnFaintEffectAbAttr extends PostFaintAbAttr implements GatedAttr<PostFaintAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostFaintAbAttrParams) => boolean) | undefined;
+
   private readonly effect: OnFaintEffect;
 
   constructor(opts: OnFaintEffectOptions) {
@@ -239,16 +243,25 @@ export class OnFaintEffectAbAttr extends PostFaintAbAttr {
     return this.effect.kind;
   }
 
+  /**
+   * Tier B split (ability studio spec 3.1) of the old per-kind `canApply`, in the ORIGINAL clause order of each kind:
+   * `gate` holds the clauses about the Pokemon that knocked me out (is there one, is it still standing, is it of a skipped
+   * type, was the move a damaging one), `residual` holds what stays in the class (the field accepts the weather or terrain,
+   * the attacker does not block indirect damage, the move still has PP in the attacker's moveset). Every clause is a pure
+   * read, so moving the check between the two halves changes no answer.
+   */
   public override canApply(params: PostFaintAbAttrParams): boolean {
+    return gatedCanApply<PostFaintAbAttrParams>(this, params);
+  }
+
+  public gate(params: PostFaintAbAttrParams): boolean {
     switch (this.effect.kind) {
       case "set-weather":
-        return globalScene.arena.canSetWeather(this.effect.weather);
       case "set-terrain":
-        return globalScene.arena.canSetTerrain(this.effect.terrain);
-      case "attacker-damage-flat":
-        return OnFaintEffectAbAttr.canApplyAttackerDamage(params);
       case "set-hazard":
         return true;
+      case "attacker-damage-flat":
+        return params.attacker !== undefined && params.move !== undefined;
       case "attacker-battler-tag":
         return (
           params.attacker !== undefined
@@ -258,7 +271,22 @@ export class OnFaintEffectAbAttr extends PostFaintAbAttr {
       case "attacker-stat-change":
         return params.attacker !== undefined && !params.attacker.isFainted();
       case "attacker-pp-drain":
-        return OnFaintEffectAbAttr.canApplyPpDrain(params);
+        return OnFaintEffectAbAttr.gatePpDrain(params);
+    }
+  }
+
+  public residual(params: PostFaintAbAttrParams): boolean {
+    switch (this.effect.kind) {
+      case "set-weather":
+        return globalScene.arena.canSetWeather(this.effect.weather);
+      case "set-terrain":
+        return globalScene.arena.canSetTerrain(this.effect.terrain);
+      case "attacker-damage-flat":
+        return OnFaintEffectAbAttr.residualAttackerDamage(params);
+      case "attacker-pp-drain":
+        return OnFaintEffectAbAttr.residualPpDrain(params);
+      default:
+        return true;
     }
   }
 
@@ -367,10 +395,8 @@ export class OnFaintEffectAbAttr extends PostFaintAbAttr {
   }
 
   /**
-   * canApply for the attacker-damage variant: only fires if there's a known
-   * attacker, a known move that caused the faint, and the attacker isn't
-   * blocking indirect damage (Magic Guard etc.). Mirrors what
-   * `PostFaintHPDamageAbAttr.apply` checks inline.
+   * Residual of the attacker-damage variant: the attacker isn't blocking indirect damage (Magic Guard etc.). The gate half
+   * (a known attacker and a known move) is checked first, as in the old single method.
    *
    * @remarks
    * The Magic-Guard check goes through `applyAbAttrs("BlockNonDirectDamageAbAttr", …)`,
@@ -379,8 +405,8 @@ export class OnFaintEffectAbAttr extends PostFaintAbAttr {
    * canApply gate here so the dispatcher records a NO-OP rather than a spurious
    * fire when Magic Guard absorbs the damage.
    */
-  private static canApplyAttackerDamage({ attacker, move }: PostFaintAbAttrParams): boolean {
-    if (attacker === undefined || move === undefined) {
+  private static residualAttackerDamage({ attacker }: PostFaintAbAttrParams): boolean {
+    if (attacker === undefined) {
       return false;
     }
     const cancelled = new BooleanHolder(false);
@@ -489,15 +515,18 @@ export class OnFaintEffectAbAttr extends PostFaintAbAttr {
   }
 
   /**
-   * canApply for the PP-drain variant (Ill Will): requires a living attacker,
-   * a DAMAGING move that caused the faint ("direct hit"), and that move present
-   * in the attacker's moveset with PP still remaining to drain.
+   * Gate of the PP-drain variant (Ill Will): a living attacker and a DAMAGING move that caused the faint ("direct hit").
    */
-  private static canApplyPpDrain({ attacker, move }: PostFaintAbAttrParams): boolean {
+  private static gatePpDrain({ attacker, move }: PostFaintAbAttrParams): boolean {
     if (attacker === undefined || move === undefined || attacker.isFainted()) {
       return false;
     }
-    if (move.category === MoveCategory.STATUS) {
+    return move.category !== MoveCategory.STATUS;
+  }
+
+  /** Residual of the PP-drain variant: that move is in the attacker's moveset with PP still remaining to drain. */
+  private static residualPpDrain({ attacker, move }: PostFaintAbAttrParams): boolean {
+    if (attacker === undefined || move === undefined) {
       return false;
     }
     const movesetMove = attacker.getMoveset().find(m => m.moveId === move.id);

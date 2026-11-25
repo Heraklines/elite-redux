@@ -88,8 +88,14 @@ export function buildAttr(
     args[Number(index)] = value;
   }
   let spread: { index: number; list: unknown[] } | undefined;
+  const assembled = decl.assembleCtorArg;
+  const withDefaults: Record<string, string | number | boolean> = {};
   for (const param of decl.params) {
     const value = params[param.id] ?? param.default;
+    withDefaults[param.id] = value;
+    if (assembled !== undefined && param.ctorIndex === assembled.index) {
+      continue;
+    }
     const ctorValue = param.codec === undefined ? value : param.codec.toCtor(value);
     if (param.ctorOption !== undefined) {
       const bag = (args[param.ctorIndex] ??= {}) as Record<string, unknown>;
@@ -103,6 +109,9 @@ export function buildAttr(
     } else {
       args[param.ctorIndex] = ctorValue;
     }
+  }
+  if (assembled !== undefined) {
+    args[assembled.index] = assembled.build(withDefaults);
   }
   let gate: Closure | undefined;
   let gateCommit: ((params: never) => void) | undefined;
@@ -171,24 +180,35 @@ export function readDeclParams(module: DeclModule, attr: AbAttr): ParamValues {
 }
 
 /** Copies `spec` with the live param values written into the atoms named by the declaration's `gateParams`. */
-function applyGateParams(spec: unknown, gateParams: readonly DeclGateParam[], params: ParamValues): unknown {
+function applyGateParams(
+  spec: unknown,
+  gateParams: readonly DeclGateParam[],
+  params: ParamValues,
+  seen: Map<string, number> = new Map(),
+): unknown {
   if (typeof spec !== "object" || spec === null) {
     return spec;
   }
   const node = spec as Record<string, unknown>;
   for (const key of ["all", "any"] as const) {
     if (Array.isArray(node[key])) {
-      return { [key]: (node[key] as unknown[]).map(child => applyGateParams(child, gateParams, params)) };
+      return { [key]: (node[key] as unknown[]).map(child => applyGateParams(child, gateParams, params, seen)) };
     }
   }
   if ("not" in node) {
-    return { not: applyGateParams(node.not, gateParams, params) };
+    return { not: applyGateParams(node.not, gateParams, params, seen) };
   }
   const patched = { ...((node.params as Record<string, unknown> | undefined) ?? {}) };
+  // The position of this atom among the atoms of its block (reading order), for entries that name an `occurrence`.
+  const nth = seen.get(String(node.block)) ?? 0;
+  seen.set(String(node.block), nth + 1);
   for (const entry of gateParams) {
     const value = params[entry.param];
-    if (node.block !== entry.block) {
+    if (node.block !== entry.block || (entry.occurrence !== undefined && entry.occurrence !== nth)) {
       continue;
+    }
+    if (entry.unusedValue !== undefined && value === entry.unusedValue) {
+      return { any: [] };
     }
     if (typeof value === "number") {
       // toPrecision drops float noise from the scale (0.35 * 100 is 35.00000000000001 otherwise).

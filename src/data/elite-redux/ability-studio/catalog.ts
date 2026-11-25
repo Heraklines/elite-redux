@@ -98,6 +98,8 @@ export function blockFor(module: DeclModule, uses: number, vocabulary: Vocabular
             block: entry.block,
             field: entry.field,
             ...(entry.scale === undefined ? {} : { scale: entry.scale }),
+            ...(entry.occurrence === undefined ? {} : { occurrence: entry.occurrence }),
+            ...(entry.unusedValue === undefined ? {} : { unusedValue: entry.unusedValue }),
           })),
         }),
     ...(decl.effect === undefined ? {} : { effect: { id: decl.effect.id, params: decl.effect.params } }),

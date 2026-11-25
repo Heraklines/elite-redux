@@ -1,0 +1,372 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// Instance bindings of batch B10 (spec 2.1), keyed by (abilityId, attrIndex); "attr N" is the position in `ability.attrs`.
+//
+// Chunk 1 of 5 (NullifyFirstNHitsAbAttr, IgnoreResistancesAbAttr, OffensiveTypeChartOverrideAbAttr, OnCritStatBoostLowestAbAttr,
+// OnFaintEffectAbAttr, OnOpponentStatRaiseAbAttr, OnOpponentStatRaiseScriptedMoveAbAttr, OnOpponentSwitchOutAbAttr):
+// none of them takes a constructor closure (NullifyFirstNHits hands the parent `() => true` itself). Three of them are Tier B and have
+// a gate slot, bound below by hand after reading each class and every user; the other five have nothing to bind (checked class by
+// class): Ignore resistances is a flag, the type-chart class and the two scripted-move classes are Tier C, and Egoist has no condition.
+// The only closure in any user of the type-chart class is the attr-level holder condition that Draconize and Draconic Might add with
+// `addCondition`; `recomposeAttr` copies it onto the rebuild, so it is not a constructor slot.
+//
+// The three gates are legacy on purpose: each needs a library atom that does not exist yet (requests in requests/B10.md), and a
+// bound atom that tests something else would be a lie.
+//  - NullifyFirstNHits: `used(pokemon) < n`, the per-battle counter of hits already cancelled (R-B10-01 time.hits-taken-this-battle).
+//  - OnCritStatBoostLowest: once per turn (R-B10-05) and "the target's first hit this turn was critical" (R-B10-04).
+//  - OnFaintEffect: the clauses about the Pokemon that knocked me out, "it is still standing" (R-B10-c1-05 mon.is-standing), for
+//    the curse also "it is not of the skipped type" (mon.has-type, who other, which exists) and for the PP drain "the move was a
+//    damaging move" (move.damaging, which exists).
+// Chunk 2 of 5 binds the Tier B gates (slot "gate") of OncePerEntryContactDamageReductionAbAttr, OneShotTypeBoostAbAttr,
+// OneShotTypeBoostFollowupAbAttr, PassiveRecoveryAbAttr and PoisonedFoePurgeAbAttr, written by hand after reading each class and its live users. The other three classes of the chunk are Tier C
+// and have nothing to bind: OutgoingStatDropMultiplierAbAttr,
+// PartyCountMultiHitAbAttr (no closure anywhere: each takes a number or an options object of plain values) and
+// PersistentFieldAuraAbAttr (its only closure, the ally filter, sits under an options key that no constructor slot reaches, so it is
+// carried by the `allies` param instead).
+// The L1 differential evaluates the class's own gate and the compiled library gate over the state grid and fails on any
+// difference; the B10 test chunk2-gates.test.ts adds the states the grid does not have (fog, terrains, types, poison).
+// Chunk 5 binds the Tier B gates of PostSummonScriptedMoveAbAttr (the per-battle memory) and PostTurnDrainAbAttr (the weather list); the other three
+// classes of the chunk (PostSummonQuashFoesAbAttr, PostSummonStackSetEffectsAbAttr, PostTurnApplyTagOnFoesAbAttr) are Tier A with no closure.
+// Later chunks of B10 add their bindings below this comment.
+import { bindCondition, bindLegacyClosure } from "#data/elite-redux/ability-studio/bindings";
+
+// =============================================================================================
+// Chunk 1 gates (Tier B, all legacy until the requested atoms exist).
+// =============================================================================================
+const HITS_COUNTER =
+  "Fewer than n hits cancelled so far in this battle: the count lives in the class's own per-Pokemon, per-battle memory and the library has no atom that reads it, request R-B10-01 in requests/B10.md";
+bindLegacyClosure(5163, 0, HITS_COUNTER, "gate"); // Cheating Death: the first 2 hits
+bindLegacyClosure(5292, 0, HITS_COUNTER, "gate"); // Gallantry: the first hit
+
+bindLegacyClosure(
+  5615,
+  0,
+  "Once per turn (the class's own turn flag on the Pokemon) AND the target's first hit this turn was a critical hit: the library has neither a shared once-per-turn memory nor a was-critical atom, requests R-B10-05 and R-B10-04 in requests/B10.md",
+  "gate",
+); // Home Run
+
+const KNOCKER_STANDING =
+  "The Pokemon that knocked me out is still standing (and, for the curse, is not of the skipped type): the library has no is-still-standing atom for the other Pokemon, request R-B10-c1-05 in requests/B10.md";
+bindLegacyClosure(5073, 0, KNOCKER_STANDING, "gate"); // Haunted Spirit: curse unless Ghost
+bindLegacyClosure(5283, 0, KNOCKER_STANDING, "gate"); // Vengeful Spirit: curse unless Ghost
+bindLegacyClosure(5280, 0, KNOCKER_STANDING, "gate"); // Guilt Trip: attacker still standing
+bindLegacyClosure(5285, 0, KNOCKER_STANDING, "gate"); // Ill Will: attacker standing and the move was damaging
+bindLegacyClosure(6095, 0, KNOCKER_STANDING, "gate"); // Cursed Spirit: attacker standing and the move was damaging
+
+// =============================================================================================
+// OncePerEntryContactDamageReductionAbAttr (Tier B). Slot "gate" = the parent's closure = move.doesFlagEffectApply(MAKES_CONTACT,
+// user: attacker, target: holder). The once-per-entry charge test is the guard and stays in the class.
+// =============================================================================================
+bindCondition(5565, 0, { id: "move.flag", flag: "MAKES_CONTACT" }, "gate"); // Chuckster: contact moves
+
+// =============================================================================================
+// PoisonedFoePurgeAbAttr (Tier B). Slot "gate" = the target's status is POISON or TOXIC (params.opponent?.status?.effect). A missing
+// target makes both atoms false, like the class.
+// =============================================================================================
+bindCondition(
+  5483,
+  0,
+  {
+    any: [
+      { id: "status.has", who: "other", status: "POISON" },
+      { id: "status.has", who: "other", status: "TOXIC" },
+    ],
+  },
+  "gate",
+); // Hemolysis
+
+// =============================================================================================
+// PassiveRecoveryAbAttr (Tier B, 17 attrs). Slot "gate" = matchesCondition(conditionSpec, holder). The parent's not-at-full-HP test is
+// the guard and stays in the class. One library tree per situation:
+// =============================================================================================
+
+// always: the condition is `() => true`; an empty ALL group is always true.
+const always = (): unknown => ({ all: [] });
+bindCondition(5045, 0, always(), "gate"); // Self Sufficient: 1/16 every turn
+bindCondition(5151, 0, always(), "gate"); // Self Repair: 1/16 every turn
+bindCondition(5220, 2, always(), "gate"); // Peaceful Slumber (second part): 1/16 every turn
+bindCondition(5417, 0, always(), "gate"); // Apple Pie: 1/16 every turn
+bindCondition(5604, 2, always(), "gate"); // Dune Veil: 1/16 every turn
+bindCondition(5951, 0, always(), "gate"); // Self Sufficient (second id): 1/16 every turn
+bindCondition(6057, 2, always(), "gate"); // Honk Shoo: 1/8 every turn
+
+// terrain: arena.terrainType is in the list; every live list has one terrain.
+bindCondition(5082, 2, { id: "field.terrain", terrain: "TOXIC" }, "gate"); // Poison Absorb: 1/8 in Toxic Terrain
+bindCondition(5298, 0, { id: "field.terrain", terrain: "MISTY" }, "gate"); // Celestial Blessing: 1/8 in Misty Terrain
+bindCondition(5355, 0, { id: "field.terrain", terrain: "MISTY" }, "gate"); // Eternal Blessing: 1/8 in Misty Terrain
+bindCondition(5310, 1, { id: "field.terrain", terrain: "GRASSY" }, "gate"); // Flourish: 1/8 in Grassy Terrain
+
+// weather: arena.weatherType is in [FOG, EERIE_FOG], so ANY of the two exact weather checks.
+const fogGate = (): unknown => ({
+  any: [
+    { id: "field.weather", weather: "FOG" },
+    { id: "field.weather", weather: "EERIE_FOG" },
+  ],
+});
+bindCondition(5357, 0, fogGate(), "gate"); // Rest in Peace: 1/8 in fog
+bindCondition(5358, 4, fogGate(), "gate"); // White Noise: 1/8 in fog
+
+// self-type: pokemon.getTypes().includes(ICE); getTypes() includes the Tera type like isOfType does.
+bindCondition(5575, 1, { id: "mon.has-type", who: "holder", type: "ICE" }, "gate"); // Winter Throne: 1/8 for Ice types
+
+// hp-below-fraction 0.5: pokemon.hp <= toDmgValue(maxHp * 0.5), floor-half is hp <= floor(maxHp * 50 / 100). They differ only at max
+// HP 1, which the parent's not-at-full-HP guard has already excluded (see the declaration notes).
+bindCondition(5692, 0, { id: "hp.at-most", who: "holder", pct: 50, rounding: "floor-half" }, "gate"); // Resilience: 1/4 at half HP or less
+
+// status SLEEP: matchesCondition is true when the status is SLEEP OR isComatoseLike(pokemon) (an ability with the Comatose rule, or
+// an active Honk Shoo). The library has no atom for the second half, so these two stay legacy (request R-B10-23); a plain
+// status.has SLEEP would give a different answer for a Comatose holder.
+bindLegacyClosure(
+  5071,
+  0,
+  "Asleep OR Comatose-like (isComatoseLike): the library has no atom for the Comatose half, request R-B10-23 in requests/B10.md",
+  "gate",
+); // Sweet Dreams: 1/8 while asleep
+bindLegacyClosure(
+  5220,
+  0,
+  "Asleep OR Comatose-like (isComatoseLike): the library has no atom for the Comatose half, request R-B10-23 in requests/B10.md",
+  "gate",
+); // Peaceful Slumber (first part): 1/8 while asleep
+
+// =============================================================================================
+// OneShotTypeBoostAbAttr and OneShotTypeBoostFollowupAbAttr (Tier B, Power Outage). Slot "gate" = pokemon.getMoveType(move) === opts.type
+// (the effective type, so effective: true). The type is also the class's `type` param (gateParams). The one-time flag is the guard and
+// stays in the class (request R-B10-19).
+// =============================================================================================
+bindCondition(5706, 0, { id: "move.type", type: "ELECTRIC", effective: true }, "gate"); // Power Outage: boost, Electric moves
+bindCondition(5706, 1, { id: "move.type", type: "ELECTRIC", effective: true }, "gate"); // Power Outage: lose Electric after one
+
+// =============================================================================================
+// Chunk 3 gates (Tier B, slot "gate"). Every class of the chunk split canApply into guards, gate and residual by hand after reading
+// the class and every one of its users; each binding below repeats ONE user's gate with library atoms, in the class's own clause
+// order. The L1 attr differential evaluates the class's own canApply and the rebuild's over the state grid, and the B10 test
+// chunk3-gates.test.ts adds the states the grid cannot reach (pulse, dance and sound moves, a Tera target, a poisoned target,
+// every status, an immune hit).
+// =============================================================================================
+
+// "The move deals damage" is the parent's attack rule (move.category != STATUS), and "makes contact" asks doesFlagEffectApply with the
+// moving Pokemon as the user, like every one of the classes below.
+const damagingContact = (): unknown => ({
+  all: [{ id: "move.damaging" }, { id: "move.flag", flag: "MAKES_CONTACT" }],
+});
+
+// ---- PostAttackChangeTargetTypeAbAttr: damaging move, then contact (contactOnly) and the flag (requireFlag) ----
+bindCondition(6, 2, damagingContact(), "gate"); // Damp (offense half): Water on a contact move
+bindCondition(5042, 1, damagingContact(), "gate"); // Magical Dust (offense half): Psychic on a contact move
+bindCondition(5581, 0, { all: [{ id: "move.damaging" }, { id: "move.flag", flag: "PULSE_MOVE" }] }, "gate"); // Paint Shot: pulse moves, no contact rule
+
+// ---- PostDefendChangeAttackerTypeAbAttr: the attack-move class test is a guard in the class; the gate is contact only ----
+bindCondition(6, 0, { id: "move.flag", flag: "MAKES_CONTACT" }, "gate"); // Damp (defense half)
+bindCondition(5042, 0, { id: "move.flag", flag: "MAKES_CONTACT" }, "gate"); // Magical Dust (defense half)
+
+// ---- PostAttackRemoveTargetTypeAbAttr (the ab-attrs class): damaging move, then the target has the type. The type is the class's
+// `type` setting (gateParams). ----
+const ghostStrip = (): unknown => ({
+  all: [{ id: "move.damaging" }, { id: "mon.has-type", who: "other", type: "GHOST" }],
+});
+bindCondition(35, 1, ghostStrip(), "gate"); // Illuminate
+bindCondition(5229, 2, ghostStrip(), "gate"); // Refrigerator (its Illuminate copy)
+bindCondition(5603, 2, ghostStrip(), "gate"); // Depth Explorer
+bindCondition(5665, 1, ghostStrip(), "gate"); // Chandelier
+bindCondition(5960, 3, ghostStrip(), "gate"); // Spectacle
+bindLegacyClosure(
+  5229,
+  3,
+  "Instance of the ARCHETYPE class that shares the name PostAttackRemoveTargetTypeAbAttr with the ab-attrs class this declaration builds (fields stripType and contactOnly, falls back to NORMAL, no Tera exception, no self check): one declaration cannot rebuild both, so this attr is not rebuilt; it strips the same Ghost type as attr 2",
+  "gate",
+); // Refrigerator (the dispatcher's extra copy)
+
+// ---- PostAttackContactSuppressTargetAbilityAbAttr: (the attack-move class test is a guard) contact, then the target's status ----
+bindCondition(
+  5533,
+  0,
+  {
+    all: [
+      { id: "move.flag", flag: "MAKES_CONTACT" },
+      {
+        any: [
+          { id: "status.has", who: "other", status: "POISON" },
+          { id: "status.has", who: "other", status: "TOXIC" },
+        ],
+      },
+    ],
+  },
+  "gate",
+); // Hemotoxin: a contact attack on a poisoned or badly poisoned target
+
+// ---- PostAttackScriptedMoveAbAttr: the clauses move list, stat-drop test, category, type, flag (each only when set) ----
+const noRule = (): unknown => ({ all: [] }); // no filter at all: an empty ALL group is always true
+const hasFlag = (flag: string): unknown => ({ id: "move.flag", flag });
+bindCondition(5221, 0, noRule(), "gate"); // Aftershock: any move (Magnitude)
+bindCondition(5554, 0, noRule(), "gate"); // Purple Haze: any move (Poison Gas)
+bindCondition(5577, 0, noRule(), "gate"); // Sludge Spit: any move (Venom Bolt)
+bindCondition(5673, 0, noRule(), "gate"); // Break it Down: any move (Rapid Spin)
+bindCondition(5694, 0, { id: "move.category", category: "SPECIAL" }, "gate"); // Thunder Clouds: special moves
+bindCondition(5246, 0, hasFlag("DANCE_MOVE"), "gate"); // Two Step: dance moves
+bindCondition(5434, 0, hasFlag("DANCE_MOVE"), "gate"); // Blade Dance: dance moves
+bindCondition(5676, 0, hasFlag("DANCE_MOVE"), "gate"); // Backflip: dance moves
+bindCondition(5345, 0, hasFlag("SOUND_BASED"), "gate"); // Chunky Bass Line: sound moves
+bindCondition(5513, 1, hasFlag("SOUND_BASED"), "gate"); // Reverberate: sound moves
+bindCondition(5134, 0, hasFlag("PULSE_MOVE"), "gate"); // Pyro Shells: pulse moves
+bindCondition(5192, 1, { id: "move.is-move", moveId: "TICKLE" }, "gate"); // Monkey Business: only Tickle
+const TYPE_LIST =
+  "The move's type OR any type another of my abilities lets it count as (getTriggeredMoveTypes, Sea Specter) is on the list: the library move.type atom reads only the move's own type, request R-B10-c3-07 in requests/B10.md";
+bindLegacyClosure(5119, 0, TYPE_LIST, "gate"); // Volcano Rage: Fire moves
+bindLegacyClosure(5206, 0, TYPE_LIST, "gate"); // Frost Burn: Fire moves
+bindLegacyClosure(5233, 0, TYPE_LIST, "gate"); // High Tide: Water moves
+bindLegacyClosure(6073, 1, TYPE_LIST, "gate"); // Ebb and Flow: Water moves
+bindLegacyClosure(5489, 0, TYPE_LIST, "gate"); // Glacial Rage: Ice moves
+bindLegacyClosure(5710, 0, TYPE_LIST, "gate"); // Frost Dragon: Ice moves
+bindLegacyClosure(5596, 0, TYPE_LIST, "gate"); // Lunar Wrath: Ghost moves
+
+// ---- PostAttackSetTerrainByMoveTypeAbAttr and PostAttackSetHazardByMoveTypeAbAttr: damaging move, the move's PRINTED type (move.type,
+// so `effective: false`), then the chance roll LAST (the class's one random draw). The chance and the hazard's type are settings
+// repeated here through gateParams. ----
+const printedType = (type: string): unknown => ({ id: "move.type", type, effective: false });
+const terrainGate = (): unknown => ({
+  all: [
+    { id: "move.damaging" },
+    { any: [printedType("ELECTRIC"), printedType("PSYCHIC"), printedType("GRASS"), printedType("FAIRY")] },
+    { id: "rng.chance", pct: 30 },
+  ],
+});
+const hazardGate = (): unknown => ({
+  all: [{ id: "move.damaging" }, printedType("ROCK"), { id: "rng.chance", pct: 30 }],
+});
+bindCondition(5186, 12, terrainGate(), "gate"); // Archmage: terrain by move type
+bindCondition(5941, 13, terrainGate(), "gate"); // Familiar: terrain by move type
+bindCondition(5186, 13, hazardGate(), "gate"); // Archmage: Stealth Rock on Rock moves
+bindCondition(5941, 14, hazardGate(), "gate"); // Familiar: Stealth Rock on Rock moves
+
+// ---- PostDamageForceAttackerOutAbAttr: the attacker's last move makes contact (contactRequired) ----
+const ATTACKER_MOVE =
+  "The attacker's last move makes contact: the frame of 'after I take any damage' has no move, so the library move.flag atom cannot read it, request R-B10-c3-02 in requests/B10.md";
+bindLegacyClosure(5393, 0, ATTACKER_MOVE, "gate"); // Restraining Order
+bindLegacyClosure(5565, 1, ATTACKER_MOVE, "gate"); // Chuckster
+
+// =============================================================================================
+// Chunk 4 (Tier B gates). Written by hand after reading each class and every live user.
+//   PostDefendHpGatedSelfTagAbAttr (No Turning Back): legacy, the class line is toDmgValue(maxHp * gate) = max(floor, 1) and the library
+//     crossing atoms use floor(..) (they differ at max HP 1), request R-B10-c4-01.
+//   PostFaintDeferredReviveAbAttr: Shallow Grave has an exact two-atom form but is legacy until L1 can drive event.faint (R-B10-c4-12); Backup Power is legacy (terrain object vs Clueless, R-B10-c4-02).
+//   PostFaintDetonateAbAttr (4 users): legacy, "the hit would knock me out" has no atom, request R-B10-c4-03.
+//   PostSummonClearTerrainAbAttr (3 users): legacy, the class tests the terrain object, request R-B10-c4-02.
+// The other four classes of the chunk have nothing to bind: PostDefendSuppressOpponentDamageBoostAbAttr is a presence flag,
+// PostFaintSpreadDetonateAbAttr, PostItemLostScriptedMoveAbAttr and PostSummonApplyTagOnFoesAbAttr take only plain values.
+// =============================================================================================
+bindLegacyClosure(
+  5372,
+  1,
+  "damaging move, the hit crossed the line toDmgValue(maxHp * gate) = max(floor(..), 1), and the tag is not on me yet: the library crossing atoms floor the line without the minimum of 1 (they differ at max HP 1), request R-B10-c4-01 in requests/B10.md",
+  "gate",
+); // No Turning Back
+
+// ---- PostFaintDeferredReviveAbAttr: the weather requirement is exact with the library weather atom (arena.weatherType), the terrain
+// requirement is not. Shallow Grave's gate IS exactly `any[ field.weather FOG, field.weather EERIE_FOG ]` (chunk4-gates.test.ts proves it by
+// compiling that tree over every weather, terrain and latch state), but it stays legacy for now: the L1 differential has no
+// engine-parameter builder for the trigger `event.faint` (harness/world.ts, not a batch file), and L1 refuses a Tier B class whose library
+// gate it cannot drive (request R-B10-c4-12). Replace this line with the bindCondition shown in the request once the builder exists. ----
+bindLegacyClosure(
+  5333,
+  0,
+  "Fog or Eerie fog must be active when I faint: this is exactly any-of two field.weather atoms (proved in chunk4-gates.test.ts), but the L1 harness has no engine-parameter builder for the trigger 'when I faint' yet, so it cannot drive a library gate for this class, request R-B10-c4-12 in requests/B10.md",
+  "gate",
+); // Shallow Grave
+bindLegacyClosure(
+  5600,
+  0,
+  "The Electric terrain must be active when I faint: the class reads the terrain object (arena.terrain?.terrainType) while the library terrain atom reads arena.terrainType, which is None while Clueless negates the terrain, request R-B10-c4-02 in requests/B10.md",
+  "gate",
+); // Backup Power
+
+// ---- PostFaintDetonateAbAttr: "the hit would knock me out" (max HP above 1 and damage at least my current HP) ----
+const LETHAL_HIT =
+  "The hit would knock me out (max HP above 1 and the damage is at least my current HP): the library has no would-knock-out atom, request R-B10-c4-03 in requests/B10.md";
+bindLegacyClosure(106, 0, LETHAL_HIT, "gate"); // Aftermath
+bindLegacyClosure(253, 1, LETHAL_HIT, "gate"); // Perish Body
+bindLegacyClosure(5721, 2, LETHAL_HIT, "gate"); // Unstable Core
+bindLegacyClosure(6085, 1, LETHAL_HIT, "gate"); // Pungency
+
+// ---- PostSummonClearTerrainAbAttr: a terrain is active (the terrain object is set and is not None) ----
+const TERRAIN_OBJECT =
+  "A terrain is active: the class tests the terrain object (arena.terrain?.terrainType is set and not None), so a terrain negated by Clueless still counts, while the library terrain atom answers None then, request R-B10-c4-02 in requests/B10.md";
+bindLegacyClosure(5309, 0, TERRAIN_OBJECT, "gate"); // Lawnmower
+bindLegacyClosure(5587, 0, TERRAIN_OBJECT, "gate"); // Curse of Famine
+bindLegacyClosure(5608, 0, TERRAIN_OBJECT, "gate"); // Turf War
+
+// =============================================================================================
+// Chunk 5 gates (Tier B). Quash foes, stack set effects and apply tag on foes (turn end) are Tier A with no closure and nothing to bind.
+// =============================================================================================
+
+// ---- PostSummonScriptedMoveAbAttr: the gate is the per-battle memory. A user without `oncePerBattleKey` tests nothing (an empty ALL group). ----
+const noMemory = (): unknown => ({ all: [] });
+const noMemoryUsers: ReadonlyArray<readonly [number, number, string]> = [
+  [15, 3, "Insomnia: Torment"],
+  [5031, 0, "Let's Roll: Defense Curl on me"],
+  [5121, 0, "Low Blow: 40 power"],
+  [5164, 0, "Cheap Tactics"],
+  [5192, 0, "Monkey Business: Tickle"],
+  [5212, 0, "Trickster: Disable"],
+  [5215, 0, "Soothing Aroma: Heal Bell on me"],
+  [5225, 0, "Doombringer"],
+  [5228, 0, "Suppress: Torment"],
+  [5234, 0, "Change of Heart"],
+  [5243, 0, "Powder Burst"],
+  [5245, 0, "Monster Mash"],
+  [5250, 0, "Phantom Thief: 40 power Spectral Thief"],
+  [5269, 0, "Web Spinner: String Shot on every foe"],
+  [5374, 0, "Draco Morale: on me"],
+  [5389, 1, "Butter Up: on me"],
+  [5413, 0, "Dream Whimsy"],
+  [5420, 0, "Wildfire: 50 power Fire Spin"],
+  [5422, 0, "Tar Toss"],
+  [5430, 0, "Wind Rage"],
+  [5446, 0, "Sand Pit: 20 power Sand Tomb on every foe, cannot miss"],
+  [5485, 0, "Poseidon's Dominion: 50 power Whirlpool"],
+  [5524, 0, "Chilling Presence: 10 power Icy Wind"],
+  [5540, 0, "Neutralizing Fog"],
+  [5579, 0, "Frosty Prescence: Mist on me"],
+  [5618, 0, "Let's Dance"],
+  [5648, 0, "I Am Steve: on me"],
+  [5681, 1, "Overcast: Mist on me"],
+  [5687, 0, "Curlipede: Defense Curl on me"],
+  [5707, 0, "Electro Booster: Magnet Rise on me"],
+  [5707, 1, "Electro Booster: second entry move"],
+  [5940, 6, "Brainpower: Torment"],
+  [6012, 0, "Daydreamer"],
+  [6027, 2, "Dirty Snowball: Defense Curl on me"],
+  [6047, 0, "Oracle"],
+  [6097, 0, "Mudball: on me"],
+];
+for (const [abilityId, attrIndex] of noMemoryUsers) {
+  bindCondition(abilityId, attrIndex, noMemory(), "gate");
+}
+// Once per battle, written on the same per-wave Set the class uses (pokemon.waveData.entryEffectsFired, the plain key).
+bindCondition(5421, 0, { id: "time.once-per", scope: "wave", key: "jumpscare-scripted-move" }, "gate"); // Jumpscare: Astonish, once
+bindCondition(6114, 0, { id: "time.once-per", scope: "wave", key: "jackpot-happy-hour" }, "gate"); // Jackpot: Happy Hour on me, once
+// A cap of three casts: the class counts `key#N` markers in that Set, the library has no counted memory (R-B10-c5-01).
+const CAST_CAP =
+  "At most 3 casts per battle: the class counts the markers wishmaker#0, wishmaker#1, ... in the per-battle memory and stops at the cap, while the library only has a one-time flag (time.once-per) and a counter that lives elsewhere (time.nth-use), request R-B10-c5-01 in requests/B10.md";
+bindLegacyClosure(5226, 0, CAST_CAP, "gate"); // Wishmaker
+bindLegacyClosure(6012, 1, CAST_CAP, "gate"); // Daydreamer (second copy of the Wishmaker rule, same memory key)
+
+// ---- PostTurnDrainAbAttr: the gate is the weather list; Life Steal and Poseidon's Dominion require none (an empty ALL group). ----
+bindCondition(5439, 0, noMemory(), "gate"); // Life Steal: any weather
+bindCondition(5485, 3, noMemory(), "gate"); // Poseidon's Dominion: any weather (drains only trapped foes: a setting, not the gate)
+// Fog or Eerie fog: arena.weather?.weatherType ?? NONE is in the list, the same value as arena.weatherType.
+bindCondition(
+  5521,
+  0,
+  {
+    any: [
+      { id: "field.weather", weather: "FOG" },
+      { id: "field.weather", weather: "EERIE_FOG" },
+    ],
+  },
+  "gate",
+); // Soul Tap: in fog

@@ -18,6 +18,7 @@
 // =============================================================================
 
 import { PostDefendAbAttr } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 import { MoveFlags } from "#enums/move-flags";
 import type { PokemonType } from "#enums/pokemon-type";
@@ -46,11 +47,17 @@ export interface PostDefendChangeAttackerTypeOptions {
   readonly side: "attacker" | "self";
 }
 
-export class PostDefendChangeAttackerTypeAbAttr extends PostDefendAbAttr {
+export class PostDefendChangeAttackerTypeAbAttr
+  extends PostDefendAbAttr
+  implements GatedAttr<PostMoveInteractionAbAttrParams>
+{
   private readonly type: PokemonType | "moveType";
   private readonly contactOnly: boolean;
   private readonly requireFlag: MoveFlags | null;
   private readonly side: "attacker" | "self";
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
 
   constructor(options: PostDefendChangeAttackerTypeOptions) {
     super(false);
@@ -60,14 +67,24 @@ export class PostDefendChangeAttackerTypeAbAttr extends PostDefendAbAttr {
     this.side = options.side;
   }
 
+  /**
+   * Tier B split (ability studio spec 3.1), in the original clause order: `guards` (there is an attacker, the move is an
+   * attack move), then `gate` (contact when `contactOnly`, the required flag). No `prepare`, no `residual`, no random draw.
+   */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { move, pokemon, opponent } = params;
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** There must be an attacker and the move must be an attack move (a class test, see the contact-suppress class). */
+  public guards({ move, opponent }: PostMoveInteractionAbAttrParams): boolean {
     if (!opponent) {
       return false;
     }
-    if (!move.is("AttackMove")) {
-      return false;
-    }
+    return move.is("AttackMove");
+  }
+
+  /** The replaceable condition: the move makes contact (when `contactOnly`) and has the required flag (when set). */
+  public gate({ move, pokemon, opponent }: PostMoveInteractionAbAttrParams): boolean {
     if (this.contactOnly) {
       if (!move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: opponent, target: pokemon })) {
         return false;

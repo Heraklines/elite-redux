@@ -19,6 +19,7 @@
 import { PostTurnAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { applyAbilityDrainRecovery } from "#data/elite-redux/archetypes/lifesteal";
 import { HitResult } from "#enums/hit-result";
 import { WeatherType } from "#enums/weather-type";
@@ -35,7 +36,10 @@ export interface PostTurnDrainOptions {
   readonly onlyIfTrapped?: boolean;
 }
 
-export class PostTurnDrainAbAttr extends PostTurnAbAttr {
+export class PostTurnDrainAbAttr extends PostTurnAbAttr implements GatedAttr<AbAttrBaseParams> {
+  /** Set by the ability studio compiler; replaces `gate` for this instance only. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
   private readonly fraction: number;
   private readonly weather: readonly WeatherType[] | null;
   private readonly onlyIfTrapped: boolean;
@@ -47,13 +51,23 @@ export class PostTurnDrainAbAttr extends PostTurnAbAttr {
     this.onlyIfTrapped = options.onlyIfTrapped ?? false;
   }
 
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The replaceable condition: one of the required weathers is active (always true when no weather is required). */
+  public gate(_params: AbAttrBaseParams): boolean {
     if (this.weather) {
       const current = globalScene.arena.weather?.weatherType ?? WeatherType.NONE;
       if (!this.weather.includes(current)) {
         return false;
       }
     }
+    return true;
+  }
+
+  /** What stays in the class: some foe is still standing (and trapped, when only trapped foes are drained). */
+  public residual({ pokemon }: AbAttrBaseParams): boolean {
     return pokemon.getOpponents().some(o => o && !o.isFainted() && o.hp > 0 && (!this.onlyIfTrapped || o.isTrapped()));
   }
 

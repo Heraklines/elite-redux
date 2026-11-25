@@ -27,6 +27,7 @@ function applyGateParams(
   spec: unknown,
   gateParams: readonly DeclGateParam[],
   params: Record<string, unknown>,
+  seen: Map<string, number> = new Map(),
 ): unknown {
   if (typeof spec !== "object" || spec === null) {
     return spec;
@@ -34,17 +35,22 @@ function applyGateParams(
   const node = spec as Json;
   for (const key of ["all", "any"] as const) {
     if (Array.isArray(node[key])) {
-      return { [key]: (node[key] as unknown[]).map(child => applyGateParams(child, gateParams, params)) };
+      return { [key]: (node[key] as unknown[]).map(child => applyGateParams(child, gateParams, params, seen)) };
     }
   }
   if ("not" in node) {
-    return { not: applyGateParams(node.not, gateParams, params) };
+    return { not: applyGateParams(node.not, gateParams, params, seen) };
   }
   const patched = { ...((node.params as Json | undefined) ?? {}) };
+  const nth = seen.get(String(node.block)) ?? 0;
+  seen.set(String(node.block), nth + 1);
   for (const entry of gateParams) {
     const value = params[entry.param];
-    if (node.block !== entry.block) {
+    if (node.block !== entry.block || (entry.occurrence !== undefined && entry.occurrence !== nth)) {
       continue;
+    }
+    if (entry.unusedValue !== undefined && value === entry.unusedValue) {
+      return { any: [] };
     }
     if (typeof value === "number") {
       patched[entry.field] = Number((value * (entry.scale ?? 1)).toPrecision(12));

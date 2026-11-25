@@ -7,6 +7,7 @@
 // L0 (static lint) for Step 0: every dispatch key must have a hand-assigned WHEN or an explicit
 // unexposed reason. The key list comes from the worklist script, which emits a WORKLIST only.
 import { AbilityAttrs } from "#abilities/ab-attrs";
+import { allAbilities } from "#data/data-lists";
 import {
   ABILITY_STUDIO_RUNTIME_HOOK_CONTEXTS,
   ABILITY_STUDIO_RUNTIME_HOOK_TYPES,
@@ -114,6 +115,11 @@ describe("L0 WHEN registry", () => {
 
   it("every dispatch key of a WHEN is a real class; only base-class legacy hooks may be missing from AbilityAttrs", () => {
     const mapKeys = new Set(Object.keys(AbilityAttrs));
+    // Archetype classes (elite-redux/archetypes) are not in the AbilityAttrs map: the engine finds some of them BY NAME (a stat scan, a
+    // type-chart scan) or by presence. A key that is the class of a live attr is a real class too.
+    const liveClasses = new Set(
+      allAbilities.flatMap(ability => (ability?.attrs ?? []).map(attr => attr.constructor.name)),
+    );
     for (const when of WHEN_REGISTRY) {
       const keys = [when.dispatchKey, ...(when.alsoDispatchKeys ?? []), ...(when.flagKeys ?? [])].filter(
         (key): key is string => key !== null,
@@ -122,7 +128,10 @@ describe("L0 WHEN registry", () => {
         if (when.baseClassOnly === true && key === when.dispatchKey) {
           continue;
         }
-        expect(mapKeys.has(key), `${when.id}: ${key} is not an AbilityAttrs key`).toBe(true);
+        expect(
+          mapKeys.has(key) || liveClasses.has(key),
+          `${when.id}: ${key} is neither an AbilityAttrs key nor the class of a live attr`,
+        ).toBe(true);
       }
       if (when.kind === "while-active") {
         expect(when.dispatchKey, `${when.id}: flags are never dispatched`).toBeNull();

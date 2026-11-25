@@ -17,6 +17,7 @@
 
 import { PostAttackAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { TerrainType } from "#data/terrain";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { ArenaTagType } from "#enums/arena-tag-type";
@@ -34,9 +35,15 @@ function landedDamagingHit(params: PostMoveInteractionAbAttrParams): boolean {
  * (e.g. Electric move → Electric Terrain), with a `chance` roll. `force=false`
  * so terrain-priority rules apply and a no-op is silent.
  */
-export class PostAttackSetTerrainByMoveTypeAbAttr extends PostAttackAbAttr {
+export class PostAttackSetTerrainByMoveTypeAbAttr
+  extends PostAttackAbAttr
+  implements GatedAttr<PostMoveInteractionAbAttrParams>
+{
   private readonly chance: number;
   private readonly terrainByType: ReadonlyMap<PokemonType, TerrainType>;
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
 
   constructor(chance: number, terrainByType: ReadonlyMap<PokemonType, TerrainType>) {
     super();
@@ -44,8 +51,24 @@ export class PostAttackSetTerrainByMoveTypeAbAttr extends PostAttackAbAttr {
     this.terrainByType = terrainByType;
   }
 
+  /**
+   * Tier B split (ability studio spec 3.1): `guards` (the hit really landed), then `gate` (damaging move, a type that has
+   * a terrain, the chance roll), no `prepare`, no `residual`. The old order was damaging move, landed, type, roll; the
+   * first two are pure reads, so the landed test now comes first without changing anything observable. The one random
+   * draw is still the LAST clause, so it is only drawn when every other test passed.
+   */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    if (!super.canApply(params) || !landedDamagingHit(params)) {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The hit was a real damaging hit that was not blocked (`hitResult` below NO_EFFECT). */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    return landedDamagingHit(params);
+  }
+
+  /** The replaceable condition: a damaging move whose type has a terrain, then the chance roll (random draw). */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    if (!super.canApply(params)) {
       return false;
     }
     if (!this.terrainByType.has(params.move.type)) {
@@ -74,10 +97,16 @@ export class PostAttackSetTerrainByMoveTypeAbAttr extends PostAttackAbAttr {
  * On a damaging hit with a move of `moveType`, deploy an entry-hazard arena tag
  * (e.g. Stealth Rock) on the FOE's side, with a `chance` roll.
  */
-export class PostAttackSetHazardByMoveTypeAbAttr extends PostAttackAbAttr {
+export class PostAttackSetHazardByMoveTypeAbAttr
+  extends PostAttackAbAttr
+  implements GatedAttr<PostMoveInteractionAbAttrParams>
+{
   private readonly chance: number;
   private readonly moveType: PokemonType;
   private readonly tagType: ArenaTagType;
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
 
   constructor(chance: number, moveType: PokemonType, tagType: ArenaTagType) {
     super();
@@ -86,8 +115,22 @@ export class PostAttackSetHazardByMoveTypeAbAttr extends PostAttackAbAttr {
     this.tagType = tagType;
   }
 
+  /**
+   * Tier B split (ability studio spec 3.1), same shape as the terrain class: `guards` (the hit really landed), then
+   * `gate` (damaging move of the wanted type, the chance roll). The random draw is still the LAST clause.
+   */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    if (!super.canApply(params) || !landedDamagingHit(params)) {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The hit was a real damaging hit that was not blocked (`hitResult` below NO_EFFECT). */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    return landedDamagingHit(params);
+  }
+
+  /** The replaceable condition: a damaging move of the wanted type, then the chance roll (random draw). */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    if (!super.canApply(params)) {
       return false;
     }
     if (params.move.type !== this.moveType) {

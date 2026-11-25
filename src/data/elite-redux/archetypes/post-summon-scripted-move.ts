@@ -21,6 +21,7 @@
 
 import { PostSummonAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
 import type { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
@@ -77,7 +78,10 @@ export interface PostSummonScriptedMoveOptions {
   readonly nonReflectable?: boolean;
 }
 
-export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
+export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr implements GatedAttr<AbAttrBaseParams> {
+  /** Set by the ability studio compiler; replaces `gate` for this instance only. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
   constructor(private readonly opts: PostSummonScriptedMoveOptions) {
     // showAbility = true (default): casting a scripted move on switch-in is a
     // discrete, player-visible activation, so the ability banner must flash —
@@ -114,10 +118,18 @@ export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
   }
 
   override canApply(params: AbAttrBaseParams): boolean {
-    const { pokemon, simulated } = params;
-    if (simulated) {
+    // A preview always passes (it is the first clause of the original, before any memory is read).
+    if (params.simulated) {
       return true;
     }
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /**
+   * The replaceable condition: the per-battle memory (a once-per-battle flag, or a cap on the number of casts). Only a class
+   * constructed with `oncePerBattleKey` has one; the rest of the time it is always true.
+   */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     if (this.opts.oncePerBattleKey !== undefined) {
       // Count-capped variant (Wishmaker: 3/battle): count `key#N` markers.
       if (this.opts.maxUsesPerBattle !== undefined) {
@@ -128,6 +140,11 @@ export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
         return false;
       }
     }
+    return true;
+  }
+
+  /** What stays in the class: someone to aim at (a self-targeting cast needs nobody). */
+  public residual({ pokemon }: AbAttrBaseParams): boolean {
     // Self-targeting buffs (Tailwind) fire regardless of who's on the field.
     if (this.opts.targetsSelf) {
       return true;

@@ -22,6 +22,7 @@
 // =============================================================================
 
 import { PostAttackAbAttr } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { MoveFlags } from "#enums/move-flags";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
@@ -45,10 +46,16 @@ export interface PostAttackChangeTargetTypeOptions {
  * types to a single configured type. Offense-side mirror of
  * {@linkcode PostDefendChangeAttackerTypeAbAttr}.
  */
-export class PostAttackChangeTargetTypeAbAttr extends PostAttackAbAttr {
+export class PostAttackChangeTargetTypeAbAttr
+  extends PostAttackAbAttr
+  implements GatedAttr<PostMoveInteractionAbAttrParams>
+{
   private readonly newType: PokemonType | "moveType";
   private readonly contactOnly: boolean;
   private readonly requireFlag: MoveFlags | undefined;
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
 
   constructor(options: PostAttackChangeTargetTypeOptions) {
     // Default attackCondition (damaging move) + don't flash the ability banner.
@@ -58,14 +65,29 @@ export class PostAttackChangeTargetTypeAbAttr extends PostAttackAbAttr {
     this.requireFlag = options.requireFlag;
   }
 
+  /**
+   * Tier B split (ability studio spec 3.1): `guards` (there is a target), then `gate` (the moves that count), no
+   * `prepare` and no `residual`. The old order was damaging move, target, contact, flag; the first two are pure reads, so
+   * putting the target test first changes nothing observable.
+   */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** There must be a target. */
+  public guards({ opponent }: PostMoveInteractionAbAttrParams): boolean {
+    return !!opponent;
+  }
+
+  /**
+   * The replaceable condition: the move is a damaging move (the parent's rule), makes contact when `contactOnly`, and has
+   * the required flag when one is set. Moved verbatim out of the old `canApply`.
+   */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
     if (!super.canApply(params)) {
       return false;
     }
     const { move, pokemon, opponent } = params;
-    if (!opponent) {
-      return false;
-    }
     if (
       this.contactOnly
       && !move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: pokemon, target: opponent })

@@ -19,15 +19,22 @@
 // =============================================================================
 
 import { PostDefendAbAttr } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveCategory } from "#enums/move-category";
 import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 import { toDmgValue } from "#utils/common";
 
-export class PostDefendHpGatedSelfTagAbAttr extends PostDefendAbAttr {
+export class PostDefendHpGatedSelfTagAbAttr
+  extends PostDefendAbAttr
+  implements GatedAttr<PostMoveInteractionAbAttrParams>
+{
   private readonly hpGate: number;
   private readonly tagType: BattlerTagType;
   private readonly turnCount: number;
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
 
   constructor(hpGate: number, tagType: BattlerTagType, turnCount = 0) {
     super(true);
@@ -36,7 +43,16 @@ export class PostDefendHpGatedSelfTagAbAttr extends PostDefendAbAttr {
     this.turnCount = turnCount;
   }
 
-  override canApply({ pokemon, move, damage }: PostMoveInteractionAbAttrParams): boolean {
+  /**
+   * Tier B split (ability studio spec 3.1): no guards, no residual; every clause of the old `canApply` is the replaceable
+   * `gate` (a damaging move, the hit crossed the HP line, the effect is not already on me), in the original clause order.
+   */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: a damaging move, the hit just crossed the HP line, and the tag is not on me yet. */
+  public gate({ pokemon, move, damage }: PostMoveInteractionAbAttrParams): boolean {
     if (move.category === MoveCategory.STATUS) {
       return false;
     }
