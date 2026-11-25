@@ -90,7 +90,7 @@ export default defineDecl(StatMultiplierAbAttr, {
     {
       // The boundary of the status-gated closures (Determination, Rage Point) and of the weather-gated abilities.
       name: "no status and a status",
-      axes: { status: ["NONE", "BURN", "PARALYSIS"], foeMove: ["TACKLE", "WATER_GUN"] },
+      axes: { status: ["NONE", "BURN", "PARALYSIS"], foeMove: ["TACKLE", "WATER_GUN"], weather: ["NONE", "RAIN", "SANDSTORM"] },
     },
   ],
   status: "decomposed",

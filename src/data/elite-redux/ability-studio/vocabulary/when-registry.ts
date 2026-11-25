@@ -422,6 +422,7 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     {
       alsoDispatchKeys: [
         "VariableMovePowerAbAttr",
+        "FieldMoveTypePowerBoostAbAttr",
         "UserFieldMoveTypePowerBoostAbAttr",
         "AllyMoveCategoryPowerBoostAbAttr",
       ],
@@ -1087,6 +1088,7 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     kind: "while-active",
     dispatchKey: null,
     flagKeys: [
+      "AddMoveFlagAbAttr",
       "IgnoreProtectFirstTurnAbAttr",
       "IncreasePpAbAttr",
       "NoFusionAbilityAbAttr",

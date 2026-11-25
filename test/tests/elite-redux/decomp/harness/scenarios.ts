@@ -14,6 +14,7 @@
 // (hp, foeHp, foeMove, foeType, weather, status, stage). An axis the harness does not understand is a lint
 // failure, never silently ignored.
 
+import { MoveRestrictionBattlerTag } from "#data/battler-tags";
 import { allAbilities } from "#data/data-lists";
 import { AbilityId } from "#enums/ability-id";
 import { BerryType } from "#enums/berry-type";
@@ -679,12 +680,24 @@ export async function runScenario(
     spec.setup?.(ctx);
     trace.snapshot("start");
     let turn = 0;
+    let lastHolderMove: MoveId | undefined;
     for (const action of spec.turns) {
       turn++;
       if ("move" in action) {
         // A holder that transformed (Imposter) only has the copied moves: fall back to its first move.
         const known = holder.getMoveset().some(m => m.moveId === action.move);
-        game.move.select(known ? action.move : (holder.getMoveset()[0]?.moveId ?? action.move));
+        let chosen = known ? action.move : (holder.getMoveset()[0]?.moveId ?? action.move);
+        // A move lock (Gorilla Tactics, Sage Power) refuses any other move: repeat the move the holder is locked into
+        // instead of freezing the prompt (merge captain, B02-40). Both builds of an evaluation take the same path.
+        if (
+          lastHolderMove !== undefined
+          && lastHolderMove !== chosen
+          && holder.findTag(t => t instanceof MoveRestrictionBattlerTag && t.isMoveRestricted(chosen, holder)) !== undefined
+        ) {
+          chosen = lastHolderMove;
+        }
+        lastHolderMove = chosen;
+        game.move.select(chosen);
         action.afterSelect?.(ctx);
         if (action.until === "BerryPhase") {
           await game.phaseInterceptor.to("BerryPhase");

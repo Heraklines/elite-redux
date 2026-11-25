@@ -897,6 +897,7 @@
       "modifies": "power",
       "alsoDispatchKeys": [
         "VariableMovePowerAbAttr",
+        "FieldMoveTypePowerBoostAbAttr",
         "UserFieldMoveTypePowerBoostAbAttr",
         "AllyMoveCategoryPowerBoostAbAttr"
       ],
@@ -1942,6 +1943,7 @@
       "kind": "while-active",
       "dispatchKey": null,
       "flagKeys": [
+        "AddMoveFlagAbAttr",
         "IgnoreProtectFirstTurnAbAttr",
         "IncreasePpAbAttr",
         "NoFusionAbilityAbAttr",
@@ -6004,5 +6006,5 @@
       ]
     }
   ],
-  "hash": "16c4e1ebc5863a"
+  "hash": "19eb767c559761"
 }
