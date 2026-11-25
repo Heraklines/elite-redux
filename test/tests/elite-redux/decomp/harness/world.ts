@@ -336,6 +336,8 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     damage,
     simulated: false,
   }),
+  // PostFaintAbAttrParams: the fainted holder, the Pokemon that knocked it out and the move it used (faint-phase.ts:256).
+  "event.faint": ({ holder, foe, move }) => ({ pokemon: holder, attacker: foe, move, simulated: false }),
   "event.after-hit": ({ holder, foe, move, damage }) => ({
     pokemon: holder,
     opponent: foe,
