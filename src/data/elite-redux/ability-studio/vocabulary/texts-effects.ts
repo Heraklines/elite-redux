@@ -18,6 +18,7 @@ export const EFFECT_TEXTS: Readonly<Record<string, VocabularyText>> = {
   "effect.multiply-damage-taken": {
     summary: "Multiplies the damage this Pokemon takes by the amount you set. Example: 0.5 means half damage.",
     category: "Damage",
+    synonyms: ["reduce damage", "less damage", "damage taken", "multiscale"],
   },
   "effect.multiply-damage-dealt": {
     summary: "Multiplies the damage this Pokemon deals by the amount you set. Example: 1.3 means 30% more damage.",
@@ -115,10 +116,34 @@ export const EFFECT_TEXTS: Readonly<Record<string, VocabularyText>> = {
     summary:
       "Multiplies one of this Pokemon's stats by the amount you set. Example: 2 on Attack doubles it, like Huge Power.",
     category: "Stats",
+    synonyms: ["swift swim", "double speed", "multiply attack"],
   },
   "effect.stat-stage": {
     summary: "Raises or lowers one stat by a number of stages. Example: +1 on Attack, or -1 on a foe's Speed.",
     category: "Stats",
+    synonyms: [
+      "raise attack",
+      "lower attack",
+      "raise defense",
+      "lower defense",
+      "raise speed",
+      "lower speed",
+      "raise sp. atk",
+      "raise special attack",
+      "lower sp. atk",
+      "raise sp. def",
+      "raise special defense",
+      "lower sp. def",
+      "raise evasion",
+      "lower evasion",
+      "raise accuracy",
+      "lower accuracy",
+      "speed boost",
+      "attack down",
+      "defense down",
+      "speed down",
+      "attack up",
+    ],
   },
   "effect.stat-stages": {
     summary: "Raises or lowers several stats at once. Example: Attack and Sp. Atk +1 together, like Anger Shell.",
@@ -269,6 +294,7 @@ export const EFFECT_TEXTS: Readonly<Record<string, VocabularyText>> = {
   "effect.apply-tag": {
     summary: "Puts a battle effect such as confusion or Taunt on the chosen Pokemon. Example: confuse the attacker.",
     category: "Status conditions",
+    synonyms: ["flinch", "make it flinch", "infatuate"],
   },
   "effect.remove-tag": {
     summary: "Removes a battle effect from the chosen Pokemon. Example: shake off confusion when I enter.",

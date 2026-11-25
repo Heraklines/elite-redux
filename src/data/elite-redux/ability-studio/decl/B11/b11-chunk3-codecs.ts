@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { playerName } from "#data/elite-redux/ability-studio/decl-naming";
 import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
+import { playerName } from "#data/elite-redux/ability-studio/vocabulary/player-names";
 import { Stat } from "#enums/stat";
 // Hand-written codecs for the B11 chunk 3 declarations. Staff see and pick player words ("Attack, Sp. Atk", "Any move",
 // "My max HP", "All"); the classes want enum numbers, an options object value that may be absent, a keyword or a rest list.

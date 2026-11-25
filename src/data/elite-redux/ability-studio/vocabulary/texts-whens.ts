@@ -16,6 +16,7 @@ export const WHEN_TEXTS: Readonly<Record<string, VocabularyText>> = {
     summary:
       "Runs when this Pokemon comes into the battle, at the start or after a switch. Example: Intimidate lowers the foes' Attack as soon as it enters.",
     category: "Switching",
+    synonyms: ["come in", "enters the field", "on entry"],
   },
   "event.ally-entered": {
     summary:
@@ -41,7 +42,7 @@ export const WHEN_TEXTS: Readonly<Record<string, VocabularyText>> = {
     summary:
       "Runs just before this Pokemon appears, while the game still prepares the entry. Example: prepare a disguise before the Pokemon shows up.",
     category: "Switching",
-    synonyms: ["before switch in", "pre entry", "about to enter"],
+    synonyms: ["before switch in", "pre entry", "about to enter", "just before I enter the battle"],
   },
   "event.battle-start": {
     summary:
@@ -52,7 +53,7 @@ export const WHEN_TEXTS: Readonly<Record<string, VocabularyText>> = {
   "event.after-battle": {
     summary: "Runs once when the battle is over. Example: Pickup-style abilities hand out loot after the win.",
     category: "Other",
-    synonyms: ["post battle", "battle over", "after the fight"],
+    synonyms: ["post battle", "battle over", "after the fight", "after the battle ends"],
   },
   "event.switch-out": {
     summary:
@@ -80,10 +81,12 @@ export const WHEN_TEXTS: Readonly<Record<string, VocabularyText>> = {
     summary:
       "Runs at the end of every turn this Pokemon is on the field. Example: Speed Boost raises Speed by 1 stage each turn.",
     category: "Other",
+    synonyms: ["end of turn", "end of each turn", "end of every turn", "at the end of the turn", "each turn"],
   },
   "event.turn-start": {
     summary: "Runs at the start of a turn, before anyone moves. Example: choose a free move before the foes act.",
     category: "Other",
+    synonyms: ["at the start of the turn", "start of turn", "start of each turn"],
   },
   "event.wake-up": {
     summary: "Runs when this Pokemon wakes from sleep. Example: raise Attack the first time it wakes up.",
@@ -104,7 +107,7 @@ export const WHEN_TEXTS: Readonly<Record<string, VocabularyText>> = {
   "event.berry-eaten": {
     summary: "Runs after this Pokemon eats a berry. Example: Cheek Pouch heals a third of max HP right after a berry.",
     category: "Items",
-    synonyms: ["ate a berry", "cheek pouch", "berry used"],
+    synonyms: ["ate a berry", "cheek pouch", "berry used", "after I eat a berry"],
   },
 
   // ---- Attacking --------------------------------------------------------------------------
@@ -112,49 +115,54 @@ export const WHEN_TEXTS: Readonly<Record<string, VocabularyText>> = {
     summary:
       "Runs just before this Pokemon uses a move, once the move is chosen. Example: change my type to match the move I am about to use.",
     category: "Moves",
-    synonyms: ["about to attack", "move chosen", "libero protean"],
+    synonyms: ["about to attack", "move chosen", "libero protean", "just before I use a move"],
   },
   "event.my-move-starts": {
     summary:
       "Runs when this Pokemon's chosen move starts to execute. Example: lock the Pokemon into its first move, like Gorilla Tactics.",
     category: "Moves",
-    synonyms: ["move begins", "move executes", "when I move"],
+    synonyms: ["move begins", "move executes", "when I move", "when my move starts to execute"],
   },
   "event.after-my-hit": {
     summary:
       "Runs after this Pokemon's attack lands on a target. Example: Poison Touch may poison the target after a contact hit.",
     category: "Moves",
+    synonyms: ["after my attack lands", "after I hit", "when I hit"],
   },
   "event.on-ko": {
-    summary:
-      "Runs after this Pokemon knocks out a Pokemon, or any Pokemon faints. Example: Moxie raises Attack by 1 stage after a knockout.",
+    summary: "Runs after this Pokemon knocks out a Pokemon. Example: Moxie raises Attack by 1 stage after a knockout.",
     category: "Moves",
+    synonyms: ["knockout", "knocked out", "after a knockout"],
   },
   "event.on-win": {
-    summary: "Runs when this Pokemon's side wins the fight. Example: earn bonus prize money after winning.",
-    category: "Other",
-    synonyms: ["win the battle", "victory", "after winning"],
+    summary:
+      "Runs for the Pokemon whose attack just knocked another out, once per knockout. Example: +1 Attack after each knockout.",
+    category: "Moves",
+    synonyms: ["knockout", "ko", "moxie", "made a Pokemon faint"],
   },
   "event.after-any-move": {
     summary: "Runs after any Pokemon on the field uses a move. Example: Dancer copies a dance move that was just used.",
     category: "Moves",
-    synonyms: ["someone moved", "dancer", "any move used"],
+    synonyms: ["someone moved", "dancer", "any move used", "after anyone uses a move"],
   },
   "event.after-inflicting-status": {
     summary:
       "Runs after this Pokemon gives a foe a status condition. Example: confuse a foe right after it gets burned.",
     category: "Status conditions",
+    synonyms: ["after I inflict a status", "inflict status", "gave a status"],
   },
 
   // ---- Being hit --------------------------------------------------------------------------
   "event.after-hit": {
     summary: "Runs after a move has hit this Pokemon. Example: Static may paralyze an attacker that made contact.",
     category: "Damage",
+    synonyms: ["hit by", "attacked", "after I am hit", "got hit"],
   },
   "event.after-taking-damage": {
     summary:
       "Runs after this Pokemon takes any damage, from a move or not. Example: Wimp Out switches me out when a hit drops my HP below half.",
     category: "Damage",
+    synonyms: ["after taking damage", "after damage", "after I take damage", "after I take any damage"],
   },
   "event.after-crit-taken": {
     summary:
@@ -166,7 +174,7 @@ export const WHEN_TEXTS: Readonly<Record<string, VocabularyText>> = {
     summary:
       "Runs just before a hit lands on this Pokemon, when the game still lets the ability react. Example: change my type to resist the incoming move.",
     category: "Damage",
-    synonyms: ["incoming hit", "about to be hit", "before damage"],
+    synonyms: ["incoming hit", "about to be hit", "before damage", "just before a hit lands on me"],
   },
   "event.got-status": {
     summary:
@@ -194,7 +202,7 @@ export const WHEN_TEXTS: Readonly<Record<string, VocabularyText>> = {
     summary:
       "Runs every turn while a weather is active. Example: Rain Dish heals 1/16 of max HP each turn in the rain.",
     category: "Weather & terrain",
-    synonyms: ["each turn in weather", "weather tick", "residual weather"],
+    synonyms: ["each turn in weather", "weather tick", "residual weather", "each turn while weather is active"],
   },
   "event.terrain-changed": {
     summary: "Runs when the terrain changes. Example: Quark Drive gets a boost when Electric Terrain is set.",
@@ -212,6 +220,7 @@ export const WHEN_TEXTS: Readonly<Record<string, VocabularyText>> = {
     summary:
       "Runs when one of this Pokemon's stats goes up or down. Example: Defiant raises Attack by 2 stages when a foe lowers a stat.",
     category: "Stats",
+    synonyms: ["stat lowered", "stat raised", "defiant", "stat drop"],
   },
   "event.ally-stat-changed": {
     summary:
@@ -240,6 +249,7 @@ export const WHEN_TEXTS: Readonly<Record<string, VocabularyText>> = {
     summary:
       "Runs while the game works out the damage this Pokemon takes. Example: Multiscale halves the damage at full HP.",
     category: "Damage",
+    synonyms: ["damage taken", "reduce damage", "less damage", "take less damage"],
   },
   "calc.stab": {
     summary:
@@ -328,13 +338,13 @@ export const WHEN_TEXTS: Readonly<Record<string, VocabularyText>> = {
     summary:
       "Runs while the game prepares a hit against this Pokemon, before type and damage are worked out. Example: block a move that meets a rule.",
     category: "Damage",
-    synonyms: ["incoming move", "hit against me", "before damage"],
+    synonyms: ["incoming move", "hit against me", "before damage", "before I take a hit"],
   },
   "calc.outgoing-move": {
     summary:
       "Runs while the game prepares this Pokemon's attack, before type and damage are worked out. Example: change a stat used for the hit.",
     category: "Damage",
-    synonyms: ["my attack", "outgoing move", "before my damage"],
+    synonyms: ["my attack", "outgoing move", "before my damage", "before I attack"],
   },
 
   // ---- Calc triggers: move flow -----------------------------------------------------------
@@ -405,6 +415,7 @@ export const WHEN_TEXTS: Readonly<Record<string, VocabularyText>> = {
   "calc.stat-value": {
     summary: "Runs while the game works out one of this Pokemon's stats. Example: Huge Power doubles Attack.",
     category: "Stats",
+    synonyms: ["swift swim", "huge power", "stat boost"],
   },
   "calc.foe-stat-value": {
     summary: "Runs while the game works out a stat of a foe. Example: an aura that lowers every foe's Speed by 10%.",
@@ -450,6 +461,7 @@ export const WHEN_TEXTS: Readonly<Record<string, VocabularyText>> = {
     summary:
       "Runs while the game rates how well my attack matches the target's types. Example: bone moves hit immune types for full damage.",
     category: "Types & immunities",
+    synonyms: ["how well my attack matches the target's types", "attack matchup", "effectiveness of my attack"],
   },
   "calc.move-type": {
     summary: "Runs while the game decides a move's type. Example: Pixilate turns Normal moves into Fairy moves.",
@@ -474,12 +486,13 @@ export const WHEN_TEXTS: Readonly<Record<string, VocabularyText>> = {
     summary:
       "Runs while the game applies my own type chart to my attacks. Example: my attacks count as super effective against one type.",
     category: "Types & immunities",
+    synonyms: ["how well my attacks match", "own type chart", "type chart override"],
   },
   "calc.ability-bypass": {
     summary:
       "Runs while the game decides whether my move ignores the target's ability. Example: Mold Breaker ignores Levitate.",
     category: "Moves",
-    synonyms: ["mold breaker", "ignore abilities", "teravolt"],
+    synonyms: ["mold breaker", "ignore abilities", "teravolt", "ignore ability"],
   },
 
   // ---- Cancel checks ----------------------------------------------------------------------
@@ -487,7 +500,7 @@ export const WHEN_TEXTS: Readonly<Record<string, VocabularyText>> = {
     summary:
       "Runs while the game checks whether burn halves my attacks. Example: Guts keeps full strength while burned.",
     category: "Status conditions",
-    synonyms: ["guts", "burn attack drop", "frostbite cut"],
+    synonyms: ["guts", "burn attack drop", "frostbite cut", "burn or frostbite weakens my attacks"],
   },
   "cancel.stat-drop": {
     summary:

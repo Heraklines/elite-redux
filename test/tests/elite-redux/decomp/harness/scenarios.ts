@@ -245,6 +245,9 @@ export const TEMPLATES: Readonly<Record<string, ScenarioSpec>> = {
     ...BASE,
     id: "foe-drops-stat",
     label: "The enemy lowers the holder's attack (Growl never misses)",
+    // Infiltrator lets the drop pass Mist: Elite Redux White Smoke sets Mist on entry, so with an ordinary foe the drop
+    // stops at Mist and the stat-protection attr is never asked (the L2 failure the merge captain left open).
+    foeAbility: AbilityId.INFILTRATOR,
     foeMoves: [MoveId.GROWL],
     turns: [celebrate(), celebrate()],
   },

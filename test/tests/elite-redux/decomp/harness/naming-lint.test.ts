@@ -9,10 +9,10 @@ import {
   duplicateLabelProblems,
   type NamingInput,
   namingProblems,
-  playerName,
   playerParams,
 } from "#data/elite-redux/ability-studio/decl-naming";
 import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
+import { constantName, playerName } from "#data/elite-redux/ability-studio/vocabulary/player-names";
 import { describe, expect, it } from "vitest";
 
 const good: NamingInput = {
@@ -71,6 +71,9 @@ describe("L0 naming lint", () => {
 
   it("renders enum values with player-facing names", () => {
     expect(playerName("GROUND")).toBe("Ground");
+    expect(constantName("Heavy rain")).toBe("HEAVY_RAIN");
+    expect(constantName(" sp. atk ")).toBe("SPATK");
+    expect(constantName("HEAVY_RAIN")).toBe("HEAVY_RAIN");
     expect(playerName("HEAVY_RAIN")).toBe("Heavy rain");
     expect(playerName("SPATK")).toBe("Sp. Atk");
     expect(playerName("Already fine")).toBe("Already fine");

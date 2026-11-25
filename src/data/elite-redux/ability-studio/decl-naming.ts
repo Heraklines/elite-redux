@@ -6,48 +6,13 @@
 
 // PURE vocabulary file: no game imports. Spec section 8 (naming and descriptions), made checkable.
 //
-//  - `playerName` / `playerParams`: turn enum constants ("GROUND", "HEAVY_RAIN", "SPATK") into the words a player
-//    uses ("Ground", "Heavy rain", "Sp. Atk"). `defineDecl` runs every `summary` through `playerParams`, so a summary
-//    template can print `params.type` and still show "Ground".
+//  - `playerParams`: turn enum constants ("GROUND", "HEAVY_RAIN", "SPATK") into the words a player uses ("Ground",
+//    "Heavy rain", "Sp. Atk") through `playerName` (vocabulary/player-names.ts). `defineDecl` runs every `summary`
+//    through `playerParams`, so a summary template can print `params.type` and still show "Ground".
 //  - `namingProblems`: the L0 naming lint for one declaration's visible text.
 
 import type { ParamValue, ParamValues } from "./vocabulary/params";
-
-/** Player-facing words for enum constants whose plain title-casing would read badly. */
-const PLAYER_NAMES: Readonly<Record<string, string>> = {
-  ATK: "Attack",
-  DEF: "Defense",
-  SPATK: "Sp. Atk",
-  SPDEF: "Sp. Def",
-  SPD: "Speed",
-  ACC: "Accuracy",
-  EVA: "Evasion",
-  SUNNY: "Sun",
-  HARSH_SUN: "Extremely harsh sunlight",
-  HEAVY_RAIN: "Heavy rain",
-  STRONG_WINDS: "Strong winds",
-  TEMPEST_STORM: "Tempest storm",
-  SNOWY_WRATH: "Snowy wrath",
-  EERIE_FOG: "Eerie fog",
-  TOXIC: "Toxic",
-  NONE: "None",
-};
-
-/** A single constant such as GROUND or HEAVY_RAIN (not a lone letter, not a sentence). */
-const CONSTANT = /^[A-Z][A-Z0-9_]+$/;
-
-/** "GROUND" -> "Ground", "HEAVY_RAIN" -> "Heavy rain", "SPATK" -> "Sp. Atk". Anything else is returned unchanged. */
-export function playerName(token: string): string {
-  if (!CONSTANT.test(token)) {
-    return token;
-  }
-  const known = PLAYER_NAMES[token];
-  if (known !== undefined) {
-    return known;
-  }
-  const words = token.toLowerCase().split("_");
-  return words.map((word, index) => (index === 0 ? word.charAt(0).toUpperCase() + word.slice(1) : word)).join(" ");
-}
+import { CONSTANT, playerName } from "./vocabulary/player-names";
 
 function playerValue(value: ParamValue): ParamValue {
   if (typeof value !== "string") {
@@ -87,6 +52,8 @@ const CODE_WORDS: readonly { readonly name: string; readonly pattern: RegExp }[]
   { name: "PostSummon", pattern: /PostSummon/ },
   { name: "a camelCase name", pattern: /\b[a-z]+[A-Z][A-Za-z0-9]*\b/ },
   { name: "an underscore name", pattern: /\b[A-Za-z0-9]+_[A-Za-z0-9_]+\b/ },
+  { name: "enum", pattern: /\benum\b/i },
+  { name: "id", pattern: /\bid\b/i },
 ];
 
 const CAPS_WORD = /\b[A-Z][A-Z0-9_]+\b/g;

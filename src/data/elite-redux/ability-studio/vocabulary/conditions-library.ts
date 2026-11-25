@@ -73,7 +73,7 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "move.is-attack-move",
     group: "Move",
-    label: "The move is an attacking move",
+    label: "The move is on the game's attacking-move list (advanced)",
     requires: ["move"],
     params: [],
     pure: true,
@@ -99,12 +99,14 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
     id: "move.effective-priority",
     group: "Move",
     label: "The move's real priority is {cmp} {n}",
-    requires: ["move", "moveUser"],
+    // `other`, not `moveUser`: calc.move-immunity (the Queenly Majesty family) names no move user, and calc.priority
+    // (which has no `other`) must stay out, since getPriority there would run the rule again.
+    requires: ["move", "other"],
     params: [CMP(), numberParam("n", "Priority (0 = normal)", 0, -7, 7, 1, true)],
     pure: true,
     formula: {
-      expr: "compare(move.getPriority(moveUser), cmp, n)  (simulated = true: includes Prankster, Gale Wings and the other priority abilities of the user)",
-      source: `${MOVE_TS}:1442 Move.getPriority`,
+      expr: "compare(move.getPriority(moveUser ?? other), cmp, n)  (simulated = true: includes Prankster, Gale Wings and the other priority abilities of the user)",
+      source: `${MOVE_TS}:1442 Move.getPriority; ab-attrs.ts FieldPriorityMoveImmunityAbAttr.gate`,
     },
     synonyms: ["priority", "goes first", "prankster", "gale wings", "quick moves", "queenly majesty"],
     examples: ["Block moves with priority above 0, like Dazzling"],
@@ -137,7 +139,7 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "move.type-chart-effectiveness",
     group: "Move",
-    label: "The type chart makes the move {cmp} {n}x against the target",
+    label: "By the type chart alone, the move is {cmp} {n}x (advanced)",
     requires: ["move", "moveUser", "other"],
     params: [CMP(), numberParam("n", "Effectiveness (1 = normal, 2 = super effective)", 1, 0, 8, 0.25)],
     pure: true,
@@ -151,7 +153,7 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "move.type-multiplier",
     group: "Move",
-    label: "The type matchup worked out so far is {cmp} {n}x",
+    label: "The type matchup worked out so far is {cmp} {n}x (advanced)",
     requires: ["typeMultiplier"],
     params: [CMP(), numberParam("n", "Effectiveness (1 = normal, 2 = super effective)", 2, 0, 8, 0.25)],
     pure: true,
@@ -187,7 +189,7 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "move.ability-can-change-type",
     group: "Move",
-    label: "An ability is allowed to change this move's type",
+    label: "An ability may change this move's type (advanced)",
     requires: ["move"],
     params: [],
     pure: true,
@@ -202,7 +204,7 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "mon.is-first-ally",
     group: "Pokemon",
-    label: "The other Pokemon is my partner on the field",
+    label: "The other Pokemon is my partner slot (advanced)",
     requires: ["other"],
     params: [],
     pure: true,
@@ -215,10 +217,10 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "field.weather-in-effect",
     group: "Field",
-    label: "One of these weathers is on and not switched off",
+    label: "The weather is one of {weathers} (and not switched off)",
     requires: ["holder"],
     params: [
-      textParam("weathers", "Weathers (comma separated list)", "RAIN,HEAVY_RAIN"),
+      textParam("weathers", "Weathers (names, separated by commas)", "Rain, Heavy rain"),
       booleanParam("reapAndSow", "Grassy Terrain counts as sun for a Reap and Sow Pokemon", false),
     ],
     pure: true,
@@ -264,9 +266,9 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "field.terrain-unhidden",
     group: "Field",
-    label: "One of these terrains is really there, even if hidden",
+    label: "The terrain is one of {terrains}, even if hidden",
     requires: [],
-    params: [textParam("terrains", "Terrains (comma separated list)", "GRASSY")],
+    params: [textParam("terrains", "Terrains (names, separated by commas)", "Grassy")],
     pure: true,
     formula: {
       expr: "!!arena.terrain?.terrainType && terrains.includes(arena.terrain.terrainType)  (the raw terrain object)",
@@ -278,9 +280,9 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "field.terrain-just-set",
     group: "Field",
-    label: "The terrain that was just set is one of these",
+    label: "The terrain that was just set is one of {terrains}",
     requires: ["terrain"],
-    params: [textParam("terrains", "Terrains (comma separated list)", "ELECTRIC")],
+    params: [textParam("terrains", "Terrains (names, separated by commas)", "Electric")],
     pure: true,
     formula: {
       expr: "terrains.includes(frame.terrain)  (the terrain the trigger passed, not the arena's current one)",
@@ -294,10 +296,10 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "status.has-any",
     group: "Status",
-    label: "{who} has one of these status problems",
+    label: "{who} has one of these status problems: {statuses}",
     requires: [],
     whoParam: "who",
-    params: [WHO(), textParam("statuses", "Status problems (comma separated list, empty = any status problem)", "")],
+    params: [WHO(), textParam("statuses", "Status problems (names, separated by commas; empty = any)", "")],
     pure: true,
     formula: {
       expr: "pokemon.status != null && (list is empty || list.includes(pokemon.status.effect))",
@@ -309,10 +311,10 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "tag.has-any",
     group: "Status",
-    label: "{who} is affected by one of these battle effects",
+    label: "{who} is affected by one of these: {tags}",
     requires: [],
     whoParam: "who",
-    params: [WHO(), textParam("tags", "Battle effects (comma separated list)", "CONFUSED")],
+    params: [WHO(), textParam("tags", "Battle effects (names, separated by commas)", "Confused")],
     pure: true,
     formula: {
       expr: "tags.some(t => !!pokemon.getTag(BattlerTagType[t]))",
@@ -324,9 +326,9 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "status.just-set",
     group: "Status",
-    label: "The status I just got is one of these",
+    label: "The status I just got is one of {statuses}",
     requires: ["status"],
-    params: [textParam("statuses", "Status problems (comma separated list)", "BURN,PARALYSIS,POISON,TOXIC")],
+    params: [textParam("statuses", "Status problems (names, separated by commas)", "Burn, Paralysis, Poison, Toxic")],
     pure: true,
     formula: {
       expr: "list.includes(frame.status)  (the status the trigger passed; status.has reads the current status instead)",
@@ -503,7 +505,7 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "time.last-move-was-follow-up",
     group: "Time",
-    label: "{who}'s last move was a free follow-up from an ability",
+    label: "{who}'s last move was a free follow-up (advanced)",
     requires: [],
     whoParam: "who",
     params: [WHO()],
@@ -518,14 +520,21 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "time.marker-set",
     group: "Time",
-    label: "A marker called {key} is set on {who}",
+    label: "A marker called {key} is set on {who} (advanced)",
     requires: [],
     whoParam: "who",
     params: [
       WHO(),
-      selectParam("scope", "How long the marker lasts", ["battle", "switch-in", "turn"], "battle"),
+      selectParam("scope", "How long the marker lasts", ["battle", "switch-in", "turn"], "battle", {
+        battle: "The whole battle",
+        "switch-in": "Until I switch out",
+        turn: "This turn only",
+      }),
       textParam("key", "Marker name", "marker"),
-      selectParam("match", "Match the name", ["exact", "prefix"], "exact"),
+      selectParam("match", "Match the name", ["exact", "prefix"], "exact", {
+        exact: "Exactly this name",
+        prefix: "Starts with this name",
+      }),
     ],
     pure: true,
     formula: {
@@ -543,7 +552,7 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "rng.chance-float",
     group: "Chance",
-    label: "{pct}% chance, rolled as a decimal number",
+    label: "Harvest-style chance, rolled as a decimal (advanced)",
     requires: [],
     params: [numberParam("pct", "Chance (%)", 50, 1, 100, 1, true)],
     pure: false,

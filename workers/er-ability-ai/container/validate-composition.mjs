@@ -20,6 +20,30 @@ function isBlockRef(node) {
   return typeof node === "object" && node !== null && "block" in node;
 }
 
+// src/data/elite-redux/ability-studio/vocabulary/player-names.ts
+var PLAYER_NAMES = {
+  ATK: "Attack",
+  DEF: "Defense",
+  SPATK: "Sp. Atk",
+  SPDEF: "Sp. Def",
+  SPD: "Speed",
+  ACC: "Accuracy",
+  EVA: "Evasion",
+  SUNNY: "Sun",
+  HARSH_SUN: "Extremely harsh sunlight",
+  HEAVY_RAIN: "Heavy rain",
+  STRONG_WINDS: "Strong winds",
+  TEMPEST_STORM: "Tempest storm",
+  SNOWY_WRATH: "Snowy wrath",
+  EERIE_FOG: "Eerie fog",
+  TOXIC: "Toxic",
+  NONE: "None",
+  BALLBOMB_MOVE: "Ball or bomb move"
+};
+var CONSTANT_BY_PLAYER_NAME = Object.fromEntries(
+  Object.entries(PLAYER_NAMES).map(([constant, name]) => [name.toUpperCase(), constant])
+);
+
 // src/data/elite-redux/ability-studio/vocabulary/params.ts
 function validateParamValues(owner, defs, values) {
   const errors = [];

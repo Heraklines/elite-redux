@@ -5,12 +5,12 @@
  */
 
 import { FLAG_WORDS, PROPERTY_CHOICES, propertyCodec } from "#data/elite-redux/ability-studio/decl/B08/tag-choices";
+import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
+import { MOVE_FLAG_OPTIONS, TYPE_OPTIONS, WEATHER_OPTIONS } from "#data/elite-redux/ability-studio/vocabulary/enums";
 // Shared by the B08 chunk 4 declarations (damage reduction, defense-stat swap, effect chance): the player-facing words for
 // the choices of those classes and the codecs that turn them into what the constructors want.
 // This is not a declaration (the registry only collects `*.decl.ts` and `bindings.ts`).
-import { playerName } from "#data/elite-redux/ability-studio/decl-naming";
-import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
-import { MOVE_FLAG_OPTIONS, TYPE_OPTIONS, WEATHER_OPTIONS } from "#data/elite-redux/ability-studio/vocabulary/enums";
+import { playerName } from "#data/elite-redux/ability-studio/vocabulary/player-names";
 import type { DamageReductionFilter } from "#data/elite-redux/archetypes/damage-reduction-generic";
 import { MoveFlags } from "#enums/move-flags";
 import { PokemonType } from "#enums/pokemon-type";

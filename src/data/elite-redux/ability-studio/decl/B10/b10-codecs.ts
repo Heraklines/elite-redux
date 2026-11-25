@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { playerName } from "#data/elite-redux/ability-studio/decl-naming";
 // Hand-written codecs and constructor-argument builders for the B10 declarations. Several classes take ONE structured
 // object (a list of type matchup rules, one of seven "when I faint" payloads, `{ moveId, power? }`). Staff edit every
 // field as its own setting (a type, a number of percent, a stat, a number of stages); the `build...` functions below turn
@@ -12,6 +11,7 @@ import { playerName } from "#data/elite-redux/ability-studio/decl-naming";
 // back out of a live instance. Nothing is parsed from free text: an unknown name throws a plain-language error.
 import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
 import type { ParamValue, ParamValues } from "#data/elite-redux/ability-studio/vocabulary/params";
+import { playerName } from "#data/elite-redux/ability-studio/vocabulary/player-names";
 import { TerrainType } from "#data/terrain";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";

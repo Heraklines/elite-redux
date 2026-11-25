@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { playerName } from "#data/elite-redux/ability-studio/decl-naming";
 import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
 import { TYPE_OPTIONS } from "#data/elite-redux/ability-studio/vocabulary/enums";
+import { playerName } from "#data/elite-redux/ability-studio/vocabulary/player-names";
 import { PokemonType } from "#enums/pokemon-type";
 
 // Hand-written codecs for the B11 chunk 5 declarations. Staff see and pick player words ("Fire", "Any type", "Myself"); the

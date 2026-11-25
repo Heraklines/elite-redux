@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { playerName } from "./player-names";
+
 // PURE vocabulary file: no game imports. Typed parameter schemas shared by conditions, effects,
 // guards and class declarations. The worker validates composition params against these.
 
@@ -29,8 +31,9 @@ export interface ParamDef {
 
 /**
  * Player-facing words for the plain (lowercase) choice values that settings use, so a picker never shows a code word
- * such as "gte" or "holder-side" (spec 8.3). Enum constants (GROUND, HEAVY_RAIN) are renamed by playerName instead.
- * Only values with one clear meaning are listed here; a context-specific choice names its words in `optionLabels`.
+ * such as "gte" or "holder-side" (spec 8.3). Enum constants (GROUND, HEAVY_RAIN) get their words from playerName.
+ * Only values with one clear meaning are listed here; a context-specific choice names its words in `optionLabels`,
+ * which always wins over this table.
  */
 export const PLAYER_OPTION_LABELS: Readonly<Record<string, string>> = {
   holder: "The ability owner",
@@ -47,7 +50,6 @@ export const PLAYER_OPTION_LABELS: Readonly<Record<string, string>> = {
   both: "Both sides of the field",
   self: "Myself",
   foe: "A foe",
-  exact: "Exact HP (whole numbers)",
   "floor-half": "Rounded down to a whole HP",
   "rounded-ratio": "The game's two-decimal HP ratio",
   "damage-value": "Rounded down, never below 1 HP",
@@ -103,7 +105,10 @@ export function selectParam(
 ): ParamDef {
   const labels = Object.fromEntries(
     options.flatMap(option => {
-      const words = optionLabels?.[option] ?? PLAYER_OPTION_LABELS[option];
+      const words =
+        optionLabels?.[option]
+        ?? PLAYER_OPTION_LABELS[option]
+        ?? (playerName(option) === option ? undefined : playerName(option));
       return words === undefined ? [] : [[option, words]];
     }),
   );

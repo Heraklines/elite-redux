@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "07239b9907e2bd",
-  "hash": "0c58e6c9778af4",
+  "vocabularyHash": "1005f9e03d00ba",
+  "hash": "1d8060185b8aa1",
   "blocks": [
     {
       "id": "block.ability-studio-runtime-capability",
@@ -7212,7 +7212,7 @@
       "status": "decomposed",
       "category": "Healing",
       "when": "event.on-win",
-      "whenLabel": "When I win the fight",
+      "whenLabel": "When my attack makes a Pokemon faint",
       "synonyms": [
         "cleansing light",
         "heal ally on ko",
@@ -9189,7 +9189,7 @@
         },
         {
           "id": "regainOnKo",
-          "label": "A knock-out gives the bonus back",
+          "label": "A knockout gives the bonus back",
           "control": "boolean",
           "default": false,
           "editable": false
@@ -11121,14 +11121,14 @@
     {
       "id": "block.crit-stack-on-ko",
       "className": "CritStackOnKoAbAttr",
-      "label": "Land critical hits more often after each knock-out",
-      "summary": "Each time I knock out a Pokemon, my critical-hit stage goes up by 1, up to 6 in total. Example: +1 per knock-out, at most +6.",
+      "label": "Land critical hits more often after each knockout",
+      "summary": "Each time I knock out a Pokemon, my critical-hit stage goes up by 1, up to 6 in total. Example: +1 per knockout, at most +6.",
       "tier": "A",
       "kind": "event-effect",
       "status": "decomposed",
       "category": "Damage",
       "when": "event.on-win",
-      "whenLabel": "When I win the fight",
+      "whenLabel": "When my attack makes a Pokemon faint",
       "synonyms": [
         "crit stack",
         "snowball crits",
@@ -11138,12 +11138,12 @@
         "grows crit rate with kills"
       ],
       "examples": [
-        "Each knock-out raises my critical-hit stage by one"
+        "Each knockout raises my critical-hit stage by one"
       ],
       "params": [
         {
           "id": "perKo",
-          "label": "Critical-hit stages gained per knock-out (1-6)",
+          "label": "Critical-hit stages gained per knockout (1-6)",
           "control": "number",
           "default": 1,
           "editable": true,
@@ -36621,7 +36621,7 @@
       "status": "decomposed",
       "category": "Moves",
       "when": "event.on-win",
-      "whenLabel": "When I win the fight",
+      "whenLabel": "When my attack makes a Pokemon faint",
       "synonyms": [
         "rampage",
         "no recharge on ko",
@@ -36669,7 +36669,7 @@
       "status": "decomposed",
       "category": "Form changes",
       "when": "event.on-win",
-      "whenLabel": "When I win the fight",
+      "whenLabel": "When my attack makes a Pokemon faint",
       "synonyms": [
         "battle bond",
         "ash greninja",
@@ -36716,7 +36716,7 @@
       "status": "decomposed",
       "category": "Stats",
       "when": "event.on-win",
-      "whenLabel": "When I win the fight",
+      "whenLabel": "When my attack makes a Pokemon faint",
       "synonyms": [
         "moxie",
         "beast boost",
@@ -40437,7 +40437,7 @@
       "status": "decomposed",
       "category": "Damage",
       "when": "event.on-win",
-      "whenLabel": "When I win the fight",
+      "whenLabel": "When my attack makes a Pokemon faint",
       "synonyms": [
         "energized",
         "charge after electric ko",
@@ -50814,7 +50814,7 @@
       "status": "decomposed",
       "category": "Types & immunities",
       "when": "event.on-win",
-      "whenLabel": "When I win the fight",
+      "whenLabel": "When my attack makes a Pokemon faint",
       "synonyms": [
         "world in pieces",
         "regain a type",

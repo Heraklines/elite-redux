@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
 // Hand-written codecs for the B18 chunk 3 stat declarations. Staff see and pick player words ("Attack, Sp. Atk", "5");
 // the classes want enum numbers and fractions. Every parser throws a plain-language error for text it does not understand.
-import { playerName } from "#data/elite-redux/ability-studio/decl-naming";
-import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
+import { playerName } from "#data/elite-redux/ability-studio/vocabulary/player-names";
 import { Stat } from "#enums/stat";
 
 // ---------------------------------------------------------------------------------------------------------------

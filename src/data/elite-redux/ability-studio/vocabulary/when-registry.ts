@@ -97,7 +97,7 @@ const WHEN_BASE: readonly WhenBase[] = [
   // ---- Entry and exit -------------------------------------------------------------------
   event("event.on-entry", "PostSummonAbAttr", [H, SIM], "When I enter the battle", "Entry and exit", {
     legacyHookId: "PostSummonAbAttr",
-    synonyms: ["switch in", "send out", "on summon"],
+    synonyms: ["switch in", "on summon"],
 
     composable: true,
   }),
@@ -201,9 +201,9 @@ const WHEN_BASE: readonly WhenBase[] = [
 
     composable: true,
   }),
-  event("event.on-win", "PostVictoryAbAttr", [H, SIM], "When I win the fight", "Attacking", {
+  event("event.on-win", "PostVictoryAbAttr", [H, SIM], "When my attack makes a Pokemon faint", "Attacking", {
     legacyHookId: "PostVictoryAbAttr",
-    synonyms: ["victory", "battle won"],
+    synonyms: ["knock out", "made it faint"],
   }),
   event("event.after-any-move", "PostMoveUsedAbAttr", [H, O, M, MU, SIM], "When anyone uses a move", "Attacking", {
     legacyHookId: "PostMoveUsedAbAttr",

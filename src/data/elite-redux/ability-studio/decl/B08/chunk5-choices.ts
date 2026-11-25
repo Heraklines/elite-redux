@@ -12,9 +12,9 @@
 // not use must stay OUT of the object (the build leaves an option out when its codec answers undefined), so every kind-specific
 // setting has a "Not used" choice (or 0 for a number) that the codec turns into undefined, and reads an absent key back as that.
 import { ALL_MOVE_NAMES, singleMoveCodec } from "#data/elite-redux/ability-studio/decl/B08/chunk3-choices";
-import { playerName } from "#data/elite-redux/ability-studio/decl-naming";
 import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
 import { TYPE_OPTIONS, WEATHER_OPTIONS } from "#data/elite-redux/ability-studio/vocabulary/enums";
+import { playerName } from "#data/elite-redux/ability-studio/vocabulary/player-names";
 import { TerrainType } from "#data/terrain";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { PokemonType } from "#enums/pokemon-type";

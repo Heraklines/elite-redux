@@ -72,6 +72,20 @@
     terrain: { NONE: "none" },
   };
   const PERCENT_PARAMS = new Set(["pct", "minPct", "maxPct", "percent"]);
+  // Possessive forms of the target and who words, so "{target}'s" reads "my Attack" and "the foes' Attack".
+  const POSSESSIVE_WORDS = {
+    me: "my",
+    myself: "my",
+    "me and my allies": "my side's",
+    "all foes": "the foes'",
+  };
+  const ordinalSuffix = n => {
+    const tens = n % 100;
+    if (tens >= 11 && tens <= 13) {
+      return "th";
+    }
+    return { 1: "st", 2: "nd", 3: "rd" }[n % 10] ?? "th";
+  };
 
   // ---- small helpers --------------------------------------------------------------------------
 
@@ -239,32 +253,46 @@
         if (VALUE_WORDS[value] !== undefined) {
           return VALUE_WORDS[value];
         }
+        const given = def?.optionLabels?.[value];
+        if (given !== undefined) {
+          // Enum choices keep their capitals ("Sp. Atk", "Heavy rain"); plain choices read inside the sentence.
+          return /^[A-Z][A-Z0-9_]+$/.test(value) ? given : lowerFirst(given);
+        }
         if (def?.control === "select") {
           return pretty(value);
+        }
+        if (value.includes(",")) {
+          return value
+            .split(",")
+            .map(part => part.trim())
+            .filter(part => part.length > 0)
+            .map(part => (/^[A-Z][A-Z0-9_]+$/.test(part) ? upperFirst(pretty(part).toLowerCase()) : part))
+            .join(", ");
         }
         return value.length > 0 ? pretty(value) : "…";
       }
       return String(value);
     }
 
+    /** "me" -> "my", "all foes" -> "the foes'", "the other Pokemon" -> "the other Pokemon's". */
+    function possessive(word) {
+      return POSSESSIVE_WORDS[word] ?? (word.endsWith("s") ? `${word}'` : `${word}'s`);
+    }
+
     function renderLabel(template, values, defs) {
-      return template.replace(/\{([A-Za-z0-9_]+)\}/g, (whole, key) => {
-        if (!(key in values)) {
-          const fallback = defs?.find(param => param.id === key)?.default;
-          return fallback === undefined
-            ? whole
-            : wordFor(
-                key,
-                fallback,
-                defs?.find(param => param.id === key),
-              );
+      const text = template.replace(/\{([A-Za-z0-9_]+)\}('s\b)?/g, (whole, key, owner) => {
+        const def = defs?.find(param => param.id === key);
+        const value = key in values ? values[key] : def?.default;
+        if (value === undefined) {
+          return whole;
         }
-        return wordFor(
-          key,
-          values[key],
-          defs?.find(param => param.id === key),
-        );
+        const word = wordFor(key, value, def);
+        return owner === undefined ? word : possessive(word);
       });
+      // "1 stages" -> "1 stage", "2th" -> "2nd".
+      return text
+        .replace(/(^|[^\d.])(-?1) (stage|turn|time|hit)s\b/g, "$1$2 $3")
+        .replace(/\b(\d+)th\b/g, (_whole, digits) => `${digits}${ordinalSuffix(Number(digits))}`);
     }
 
     const valuesOf = (def, ref) => ({ ...defaultParams(def), ...(isObject(ref?.params) ? ref.params : {}) });
@@ -396,11 +424,16 @@
 
     // ---- search ----
 
+    // Filler words a block need not contain ("end of the turn" finds "When every turn ends").
+    const STOP_WORDS = new Set(["of", "the", "a", "an", "at", "my", "i", "me", "to"]);
+
     function tokensOf(query) {
-      return String(query || "")
+      const tokens = String(query || "")
         .toLowerCase()
         .split(/[^a-z0-9%]+/)
         .filter(Boolean);
+      const meaningful = tokens.filter(token => !STOP_WORDS.has(token));
+      return meaningful.length > 0 ? meaningful : tokens;
     }
 
     function tokenScore(token, fields) {

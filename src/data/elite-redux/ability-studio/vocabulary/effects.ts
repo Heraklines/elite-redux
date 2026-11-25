@@ -427,7 +427,7 @@ const BASE_EFFECTS: readonly EffectBase[] = [
     label: "Use {moveId} with {power} power",
     requires: ["other"],
     params: [
-      textParam("moveId", "Move id (enum name)", "STEAM_ERUPTION"),
+      textParam("moveId", "Which move (type its name)", "STEAM_ERUPTION"),
       numberParam("power", "Move power", 50, 1, 250, 1, true),
     ],
     feasibility: [
@@ -578,7 +578,7 @@ const BASE_EFFECTS: readonly EffectBase[] = [
     kind: "package",
     label: "Works as one piece: {block}",
     requires: [],
-    params: [textParam("block", "Class declaration (block id)", "")],
+    params: [textParam("block", "Which mechanic", "")],
     implemented: false,
     synonyms: ["one piece", "whole mechanic", "package", "built in mechanic"],
     examples: ["A single-use mechanic that cannot be split"],

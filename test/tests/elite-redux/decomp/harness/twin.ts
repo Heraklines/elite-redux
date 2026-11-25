@@ -203,7 +203,8 @@ export function signatureSites(sites: readonly AttrSite[], module: DeclModule): 
 /** Abilities the engine identifies by id, so their rebuild is twinned inside the live ability (see twinById). */
 // 112 Slow Start: SlowStartTag is an AbilityBattlerTag and ends when the holder lacks the real ability id.
 // 150 Imposter: PokemonTransformPhase checks the id of a copied Imposter.
-const ID_CHECKED_BY_ENGINE: ReadonlySet<number> = new Set([112, 150]);
+// 5572 Blistering Sun: syncBlisteringSunFieldPair (turn-end-phase) finds its holders by the real ability id.
+const ID_CHECKED_BY_ENGINE: ReadonlySet<number> = new Set([112, 150, 5572]);
 
 let nextShadow = SHADOW_ID_BASE;
 export function allocateShadowId(): number {

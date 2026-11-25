@@ -124,10 +124,9 @@ B13-15: several stats and every-adjacent-foe targets), `effect.change-own-type` 
 - `move.has-built-in-flag`, `move.has-flag-intrinsic`, `move.has-own-flag`, `move.has-property-itself` (B01-10, B01-26, B03, B12-04, B12-25, B14, B15-6, B18): `move.inherent-flag`.
 - `move.drains-hp` (B01-20): `move.drains`.
 - `mon.is-trapped` (B03): `tag.trapped` (`getTag(TrappedTag)`).
-- `status.any-problem` (B06-3): `status.has` with ANY (and `status.has-any` with an empty list).
+- `status.any-problem` (B06-3): `status.has` with ANY plus `tag.has-any` ER_BLEED, ER_FROSTBITE, ER_FEAR (in an any-group); FAINT not excluded. The requested formula is `(status && status !== FAINT) || hasErAilment`, so a rebind must accept that a fainted Pokemon counts.
 - `hit.critical-taken`, `hit.was-critical` (B08-38, B17 R5): `hit.critical{who}`.
 - `effect.block-crits` (B08-27): `effect.block-crit`. `effect.hurt-percent`, `effect.lose-hp-percent`, `effect.damage-share-of-max-hp`, `effect.take-max-hp-percent-damage`, `effect.lose-sixteenths-of-max-hp`: `effect.hurt-percent-of-max-hp`. `effect.heal-sixteenths-of-max-hp`, `effect.heal-fraction`: `effect.heal-fraction-of-max-hp`.
-- `time.once-per` with scope wave already reads the class's own wave memory (B08-26, B08-48, B15-7): no new scope needed.
 - `matchup.compare` (B01-14), `move.type-multiplier` (B08-37): one atom, `move.type-multiplier`.
 - `move.can-inflict-status` (B16-15) and `move.inflicts-status` (B12-11): one atom, `move.inflicts-status`. The only difference is the frostbite tag for FREEZE; the B16 user (Electromancy, paralysis) is unaffected. The B16 `gateParams` must be renamed to `move.inflicts-status` in the completion pass.
 
@@ -148,11 +147,12 @@ B13-15: several stats and every-adjacent-foe targets), `effect.change-own-type` 
 - Number-valued picker atoms `form.fixed`, `form.step-back`, `form.colour-of-current`, `form.by-hp-line` (B01-3, B06-8): they are not yes/no atoms; they need a binding kind in `build-attr.ts`. The conditions they pair with (`mon.level`, `mon.form-number`, rounded HP ratio) now exist.
 - `effect.apply-tag` and `effect.arena-tag` with curated lists and turn counts (B01-17, B01-25, B01-28, B03, B05-21, B09-19, B15-18): the registry entries exist and stay `implemented: false`; the curated list of vetted battle effects needs the owner to name which effects staff may use.
 - Wiring the planned effects of section 4 to their classes, and renaming the legacy-closure bindings to the new atoms.
+- `time.once-per` with scope wave for B08-26, B08-48 and B15-7 (moved here from Aliases after the formula review). B08-26 (Coward, Anticipation) is battle scope against the class's own field (`battleData.cowardProtectUsed`, `anticipationDodgeUsed`), and the library's WeakMap is a twin memory that a Pokemon rebuilt from data loses. B15-7 (Dandelion Burst) reads a different memory, and writing there changes the serialised AI state. Only B08-48 shares the Set, and only if its check moves into `canApply`, which changes the ability flyout. Rebinding any of them on `time.once-per` would change behaviour silently (the twin is self-consistent in L1), so each needs its own decision.
 - Harness items (B01-7, B01-8, B02-9, B02-16, B02-17, B02-37, B02-39 to B02-43, B05-8, B05-17, B05-24, B06-H1 to H3, B09-08, B09-15, B09-27, B09-30, B12-09, B12-18, B12-26, B12-37, B12-38, B12-42): forwarded to B20; no library file is involved.
 
 ## 6. Naming consistency pass (spec section 8)
 
-- Every one of the 111 triggers, 103 conditions, 83 effects and 18 safety rules now has a hand-written one-line `summary` with a
+- Every one of the 112 triggers, 102 conditions, 83 effects and 18 safety rules now has a hand-written one-line `summary` with a
   concrete example and one browse category of spec 8.4 (`vocabulary/texts-*.ts`, merged by `vocabulary/texts.ts`; a
   definition without a text fails at load).
 - All 605 blocks have a browse category (`vocabulary/block-categories.ts`, in `blocks.json` as `category`).
@@ -164,22 +164,48 @@ B13-15: several stats and every-adjacent-foe targets), `effect.change-own-type` 
   explanation moved into the summary.
 - Settings: every label says what it controls and its unit; choices show player words through the new
   `optionLabels` (`PLAYER_OPTION_LABELS`: "at least", "The ability owner", "My side of the field", ...); code
-  names in labels ("BattlerTagType name", "Move id (enum name)") were replaced.
+  names in labels ("BattlerTagType name", "Move id (enum name)") were replaced (the last five went in the fix round, section 7).
 - Block labels: one spelling per word ("defense", "knockout"), "foe" for the opposing Pokemon, and the near-duplicate
   pairs now say how they differ (Sturdy: "...while at full HP"; PreFaintRevive: "...at an HP level you set"; the two
   stat-boost wipes: "adjacent foes" versus "every active foe"). 10 declaration files changed, labels and examples only.
-- Pairs left as they are, on purpose (two classes with the same visible behaviour, each the live code of different abilities): CritImmunity and BlockCrit, StatusEffectImmunity and StatusEffectImmunityAbAttrEr, IntimidateImmunity and IntimidateImmunityAbAttrEr, TypeAbsorb* and TypeImmunity*. Their labels are unique, and the picker shows "Used by: ..." to tell them apart; merging them is a behaviour decision for the owner.
+- Pairs left as they are, on purpose (two classes with the same visible behaviour, each the live code of different abilities): CritImmunity and BlockCrit, StatusEffectImmunity and StatusEffectImmunityAbAttrEr, IntimidateImmunity and IntimidateImmunityAbAttrEr, TypeAbsorb* and TypeImmunity*. Their labels are unique; the composition builder does not show `blocks.json` yet, so a "Used by" line to tell them apart is editor work for the owner. Merging them is a behaviour decision for the owner.
 - L0 now lints the vocabulary entries too (`vocabulary-lint.ts`, test `harness/vocabulary-naming.test.ts`): no code words,
   length limits (label 60, summary 200), unique labels per column, triggers "When/While", effects start with a verb,
   at least 3 search words, an example for every condition and effect, valid category, no code-word choices without
   player words, and no text without an entry. `KO` joins `HP`, `PP`, `STAB` as an allowed capital word.
 
-## 7. Open issues
+## 7. Fix round after the staff and formula reviews
 
-- Single-use atoms and effects were not built (section 5). Every legacy-closure clause that depends on one of them
-  stays legacy until the owner decides whether it deserves a block.
-- `optionLabels` are in the data (`vocabulary.json`); the editor picker still prints raw choice values for selects until
-  `editor/composition-builder.js` reads them.
+- Search: the editor search ignores filler words (of, the, a, an, at, my, I, me, to) unless the query is only filler. Every
+  trigger renamed by this pass keeps its old wording as a synonym ("end of turn", "after taking damage", ...).
+- Choices: `selectParam` gives every enum-constant choice player words through `playerName` ("Attack", "Sp. Atk",
+  "Heavy rain"); the editor sentence reads `optionLabels`; the lint now rejects an enum-constant choice without player
+  words. A per-setting label always wins over `PLAYER_OPTION_LABELS`; `exact` left the global table (the HP rounding
+  settings name "Exact HP (whole numbers)" themselves, `time.marker-set` says "Exactly this name" and "The whole battle /
+  Until I switch out / This turn only").
+- Sentences: `{target}'s` reads "my", "the other Pokemon's", "my side's", "the foes'"; "1 stage(s)" and "2nd" are
+  written properly; `effect.hurt-percent-of-max-hp` names whose max HP.
+- Typed names: the list settings (`field.weather-in-effect`, `field.terrain-unhidden`, `field.terrain-just-set`,
+  `status.has-any`, `tag.has-any`, `status.just-set`, `effect.stat-stages`) and the move and ability settings accept
+  player names ("Heavy rain", "Sp. Atk", "Steam eruption"): the evaluator tries the text as written, then trimmed,
+  upper-cased, with spaces and hyphens as underscores (or the constant a player name stands for). ALL_CAPS values give the
+  same result as before. Defaults are shown as player names, and the list is part of the label. `moveIdOf` rejects digit
+  strings ("33").
+- Setting labels "Move id (enum name)", "Ability id (enum name)", "Class declaration (block id)" became "Which move (type
+  its name)", "Which ability (type its name)", "Which mechanic"; `enum` and `id` are code words for the lint.
+- Summaries corrected: `event.on-win` (fires per knockout for the attacker; label "When my attack makes a Pokemon
+  faint"), `event.on-ko` (no "any Pokemon faints"), `field.weather` (stays true under Cloud Nine and Air Lock).
+- Engine-parity atoms (`rng.chance-float`, `move.type-chart-effectiveness`, `move.is-attack-move`, `mon.is-first-ally`,
+  `move.type-multiplier`, `time.marker-set`, `time.once-per-unused`, `time.last-move-was-follow-up`,
+  `move.ability-can-change-type`, `field.terrain-unhidden`) say "(advanced)" or "Advanced:" and name the everyday block to
+  use instead. The editor has no hide-from-picker flag other than `escapeHatch`, which also blocks authoring, so they stay
+  in the picker.
+- Synonyms added from the staff table (damage taken, reduce damage, knockout, hit by, slicing, kick, bite, iron fist,
+  pulse, flinch, stat lowered, defiant, ignore ability, swift swim, raise/lower each stat); "send out" left
+  `event.on-entry`. "knock-out" became "knockout" in two declarations (labels and examples only).
+
+Open: single-use atoms and effects were not built (section 5); every legacy-closure clause that depends on one of them
+stays legacy until the owner decides whether it deserves a block.
 
 ## 8. What this pass did not do, stated plainly
 

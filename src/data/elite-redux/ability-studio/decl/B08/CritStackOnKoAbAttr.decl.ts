@@ -22,9 +22,9 @@ export default defineDecl(CritStackOnKoAbAttr, {
   tier: "A",
   kind: "event-effect",
   when: "event.on-win",
-  label: "Land critical hits more often after each knock-out",
+  label: "Land critical hits more often after each knockout",
   summary: params =>
-    `Each time I knock out a Pokemon, my critical-hit stage goes up by ${params.perKo}, up to ${params.cap} in total. Example: +1 per knock-out, at most +6.`,
+    `Each time I knock out a Pokemon, my critical-hit stage goes up by ${params.perKo}, up to ${params.cap} in total. Example: +1 per knockout, at most +6.`,
   synonyms: [
     "crit stack",
     "snowball crits",
@@ -33,7 +33,7 @@ export default defineDecl(CritStackOnKoAbAttr, {
     "pretentious",
     "grows crit rate with kills",
   ],
-  examples: ["Each knock-out raises my critical-hit stage by one"],
+  examples: ["Each knockout raises my critical-hit stage by one"],
   params: [
     {
       id: "perKo",
@@ -44,7 +44,7 @@ export default defineDecl(CritStackOnKoAbAttr, {
       max: 6,
       step: 1,
       integer: true,
-      label: "Critical-hit stages gained per knock-out (1-6)",
+      label: "Critical-hit stages gained per knockout (1-6)",
       editable: true,
       default: 1,
     },

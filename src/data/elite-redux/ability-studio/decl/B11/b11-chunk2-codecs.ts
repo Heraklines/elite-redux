@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
 // Hand-written codecs for the B11 chunk 2 declarations. Staff see plain numbers ("percent of max HP", "how many hits",
 // "priority change", "recoil multiplier"); the classes want small option objects. Every parser throws a plain-language
 // error for a value the class would refuse, so a bad setting never builds a half-formed attr.
-import { playerName } from "#data/elite-redux/ability-studio/decl-naming";
-import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
+import { playerName } from "#data/elite-redux/ability-studio/vocabulary/player-names";
 import { MoveFlags } from "#enums/move-flags";
 import { PokemonType } from "#enums/pokemon-type";
 

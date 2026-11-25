@@ -96,8 +96,10 @@
       "legacyHookId": "PostSummonAbAttr",
       "synonyms": [
         "switch in",
-        "send out",
-        "on summon"
+        "on summon",
+        "come in",
+        "enters the field",
+        "on entry"
       ],
       "composable": true,
       "summary": "Runs when this Pokemon comes into the battle, at the start or after a switch. Example: Intimidate lowers the foes' Attack as soon as it enters.",
@@ -158,7 +160,8 @@
         "wild pokemon appears",
         "encounter start",
         "synchronize",
-        "new wild pokemon"
+        "new wild pokemon",
+        "wild spawn"
       ],
       "summary": "Runs while a wild Pokemon is being made for an encounter, before any battle starts. Example: Synchronize gives the wild Pokemon my nature.",
       "category": "Other"
@@ -195,7 +198,8 @@
       "synonyms": [
         "before switch in",
         "pre entry",
-        "about to enter"
+        "about to enter",
+        "just before I enter the battle"
       ],
       "summary": "Runs just before this Pokemon appears, while the game still prepares the entry. Example: prepare a disguise before the Pokemon shows up.",
       "category": "Switching"
@@ -234,7 +238,8 @@
         "end of battle",
         "post battle",
         "battle over",
-        "after the fight"
+        "after the fight",
+        "after the battle ends"
       ],
       "summary": "Runs once when the battle is over. Example: Pickup-style abilities hand out loot after the win.",
       "category": "Other"
@@ -316,7 +321,11 @@
       "synonyms": [
         "each turn",
         "end turn",
-        "residual"
+        "residual",
+        "end of turn",
+        "end of each turn",
+        "end of every turn",
+        "at the end of the turn"
       ],
       "composable": true,
       "summary": "Runs at the end of every turn this Pokemon is on the field. Example: Speed Boost raises Speed by 1 stage each turn.",
@@ -336,7 +345,9 @@
         "turn begins",
         "before moves",
         "after commands are chosen",
-        "surprise"
+        "surprise",
+        "at the start of the turn",
+        "start of each turn"
       ],
       "summary": "Runs at the start of a turn, before anyone moves. Example: choose a free move before the foes act.",
       "category": "Other"
@@ -409,7 +420,8 @@
         "nom",
         "ate a berry",
         "cheek pouch",
-        "berry used"
+        "berry used",
+        "after I eat a berry"
       ],
       "summary": "Runs after this Pokemon eats a berry. Example: Cheek Pouch heals a third of max HP right after a berry.",
       "category": "Items"
@@ -431,7 +443,8 @@
         "before attacking",
         "about to attack",
         "move chosen",
-        "libero protean"
+        "libero protean",
+        "just before I use a move"
       ],
       "summary": "Runs just before this Pokemon uses a move, once the move is chosen. Example: change my type to match the move I am about to use.",
       "category": "Moves",
@@ -449,7 +462,8 @@
       "synonyms": [
         "move begins",
         "move executes",
-        "when I move"
+        "when I move",
+        "when my move starts to execute"
       ],
       "summary": "Runs when this Pokemon's chosen move starts to execute. Example: lock the Pokemon into its first move, like Gorilla Tactics.",
       "category": "Moves"
@@ -474,7 +488,9 @@
         "on hit",
         "after attacking",
         "after damaging",
-        "when I hit"
+        "when I hit",
+        "after my attack lands",
+        "after I hit"
       ],
       "composable": true,
       "summary": "Runs after this Pokemon's attack lands on a target. Example: Poison Touch may poison the target after a contact hit.",
@@ -496,10 +512,13 @@
       "synonyms": [
         "kill",
         "ko",
-        "defeat a foe"
+        "defeat a foe",
+        "knockout",
+        "knocked out",
+        "after a knockout"
       ],
       "composable": true,
-      "summary": "Runs after this Pokemon knocks out a Pokemon, or any Pokemon faints. Example: Moxie raises Attack by 1 stage after a knockout.",
+      "summary": "Runs after this Pokemon knocks out a Pokemon. Example: Moxie raises Attack by 1 stage after a knockout.",
       "category": "Moves"
     },
     {
@@ -510,17 +529,19 @@
         "holder",
         "simulated"
       ],
-      "label": "When I win the fight",
+      "label": "When my attack makes a Pokemon faint",
       "group": "Attacking",
       "legacyHookId": "PostVictoryAbAttr",
       "synonyms": [
-        "victory",
-        "battle won",
-        "win the battle",
-        "after winning"
+        "knock out",
+        "made it faint",
+        "knockout",
+        "ko",
+        "moxie",
+        "made a Pokemon faint"
       ],
-      "summary": "Runs when this Pokemon's side wins the fight. Example: earn bonus prize money after winning.",
-      "category": "Other"
+      "summary": "Runs for the Pokemon whose attack just knocked another out, once per knockout. Example: +1 Attack after each knockout.",
+      "category": "Moves"
     },
     {
       "id": "event.after-any-move",
@@ -541,7 +562,8 @@
         "after a move",
         "someone moved",
         "dancer",
-        "any move used"
+        "any move used",
+        "after anyone uses a move"
       ],
       "summary": "Runs after any Pokemon on the field uses a move. Example: Dancer copies a dance move that was just used.",
       "category": "Moves",
@@ -561,7 +583,10 @@
       "synonyms": [
         "status landed",
         "after poisoning",
-        "after burning"
+        "after burning",
+        "after I inflict a status",
+        "inflict status",
+        "gave a status"
       ],
       "summary": "Runs after this Pokemon gives a foe a status condition. Example: confuse a foe right after it gets burned.",
       "category": "Status conditions"
@@ -586,7 +611,11 @@
         "when hit",
         "on being hit",
         "after defending",
-        "contact"
+        "contact",
+        "hit by",
+        "attacked",
+        "after I am hit",
+        "got hit"
       ],
       "composable": true,
       "summary": "Runs after a move has hit this Pokemon. Example: Static may paralyze an attacker that made contact.",
@@ -611,7 +640,11 @@
         "lose hp",
         "damaged",
         "below half",
-        "wimp out"
+        "wimp out",
+        "after taking damage",
+        "after damage",
+        "after I take damage",
+        "after I take any damage"
       ],
       "composable": true,
       "summary": "Runs after this Pokemon takes any damage, from a move or not. Example: Wimp Out switches me out when a hit drops my HP below half.",
@@ -658,7 +691,8 @@
       "synonyms": [
         "incoming hit",
         "about to be hit",
-        "before damage"
+        "before damage",
+        "just before a hit lands on me"
       ],
       "summary": "Runs just before a hit lands on this Pokemon, when the game still lets the ability react. Example: change my type to resist the incoming move.",
       "category": "Damage",
@@ -762,7 +796,8 @@
       "synonyms": [
         "each turn in weather",
         "weather tick",
-        "residual weather"
+        "residual weather",
+        "each turn while weather is active"
       ],
       "summary": "Runs every turn while a weather is active. Example: Rain Dish heals 1/16 of max HP each turn in the rain.",
       "category": "Weather & terrain"
@@ -826,7 +861,11 @@
       "synonyms": [
         "stat boosted",
         "stat dropped",
-        "stat stage"
+        "stat stage",
+        "stat lowered",
+        "stat raised",
+        "defiant",
+        "stat drop"
       ],
       "summary": "Runs when one of this Pokemon's stats goes up or down. Example: Defiant raises Attack by 2 stages when a foe lowers a stat.",
       "category": "Stats"
@@ -977,7 +1016,8 @@
         "shadow tag",
         "arena trap",
         "magnet pull",
-        "trap"
+        "trap",
+        "stop switching"
       ],
       "summary": "Runs while the game checks whether a foe may switch or run. Example: Arena Trap stops every foe from leaving.",
       "category": "Switching"
@@ -1069,7 +1109,9 @@
         "guts",
         "rage point",
         "burn attack drop",
-        "ignore burn"
+        "ignore burn",
+        "frostbite cut",
+        "burn or frostbite weakens my attacks"
       ],
       "summary": "Runs while the game checks whether burn halves my attacks. Example: Guts keeps full strength while burned.",
       "category": "Status conditions"
@@ -1208,7 +1250,11 @@
         "resist",
         "damage reduction",
         "half damage",
-        "tank"
+        "tank",
+        "damage taken",
+        "reduce damage",
+        "less damage",
+        "take less damage"
       ],
       "composable": true,
       "summary": "Runs while the game works out the damage this Pokemon takes. Example: Multiscale halves the damage at full HP.",
@@ -1481,7 +1527,9 @@
         "stat boost",
         "attack up",
         "speed up",
-        "defense up"
+        "defense up",
+        "swift swim",
+        "huge power"
       ],
       "summary": "Runs while the game works out one of this Pokemon's stats. Example: Huge Power doubles Attack.",
       "category": "Stats"
@@ -1643,7 +1691,10 @@
         "bone zone",
         "my type matchup",
         "immunity ignored",
-        "resisted hits hit harder"
+        "resisted hits hit harder",
+        "how well my attack matches the target's types",
+        "attack matchup",
+        "effectiveness of my attack"
       ],
       "summary": "Runs while the game rates how well my attack matches the target's types. Example: bone moves hit immune types for full damage.",
       "category": "Types & immunities",
@@ -1838,7 +1889,10 @@
         "hit immune types",
         "change type matchup",
         "corrosion",
-        "molten down"
+        "molten down",
+        "how well my attacks match",
+        "own type chart",
+        "type chart override"
       ],
       "summary": "Runs while the game applies my own type chart to my attacks. Example: my attacks count as super effective against one type.",
       "category": "Types & immunities"
@@ -1857,7 +1911,8 @@
       "synonyms": [
         "mold breaker",
         "ignore abilities",
-        "teravolt"
+        "teravolt",
+        "ignore ability"
       ],
       "summary": "Runs while the game decides whether my move ignores the target's ability. Example: Mold Breaker ignores Levitate.",
       "category": "Moves"
@@ -2071,7 +2126,10 @@
       "synonyms": [
         "confusion immunity",
         "volatile immunity",
-        "flinch immunity"
+        "flinch immunity",
+        "volatile status",
+        "confusion block",
+        "effect immunity"
       ],
       "summary": "Runs while the game checks whether a battle effect such as confusion can land on me. Example: Own Tempo blocks confusion.",
       "category": "Status conditions"
@@ -2388,7 +2446,8 @@
       "synonyms": [
         "incoming move",
         "hit against me",
-        "before damage"
+        "before damage",
+        "before I take a hit"
       ],
       "summary": "Runs while the game prepares a hit against this Pokemon, before type and damage are worked out. Example: block a move that meets a rule.",
       "category": "Damage",
@@ -2413,7 +2472,8 @@
       "synonyms": [
         "my attack",
         "outgoing move",
-        "before my damage"
+        "before my damage",
+        "before I attack"
       ],
       "summary": "Runs while the game prepares this Pokemon's attack, before type and damage are worked out. Example: change a stat used for the hit.",
       "category": "Damage",
@@ -2871,7 +2931,28 @@
             "DARK",
             "FAIRY",
             "STELLAR"
-          ]
+          ],
+          "optionLabels": {
+            "NORMAL": "Normal",
+            "FIGHTING": "Fighting",
+            "FLYING": "Flying",
+            "POISON": "Poison",
+            "GROUND": "Ground",
+            "ROCK": "Rock",
+            "BUG": "Bug",
+            "GHOST": "Ghost",
+            "STEEL": "Steel",
+            "FIRE": "Fire",
+            "WATER": "Water",
+            "GRASS": "Grass",
+            "ELECTRIC": "Electric",
+            "PSYCHIC": "Psychic",
+            "ICE": "Ice",
+            "DRAGON": "Dragon",
+            "DARK": "Dark",
+            "FAIRY": "Fairy",
+            "STELLAR": "Stellar"
+          }
         },
         {
           "id": "effective",
@@ -2914,7 +2995,12 @@
             "PHYSICAL",
             "SPECIAL",
             "STATUS"
-          ]
+          ],
+          "optionLabels": {
+            "PHYSICAL": "Physical",
+            "SPECIAL": "Special",
+            "STATUS": "Status"
+          }
         }
       ],
       "pure": true,
@@ -2972,7 +3058,32 @@
             "LUNAR_MOVE",
             "THROW_BASED",
             "WEATHER_BASED"
-          ]
+          ],
+          "optionLabels": {
+            "MAKES_CONTACT": "Makes contact",
+            "SOUND_BASED": "Sound based",
+            "BITING_MOVE": "Biting move",
+            "PULSE_MOVE": "Pulse move",
+            "PUNCHING_MOVE": "Punching move",
+            "SLICING_MOVE": "Slicing move",
+            "RECKLESS_MOVE": "Reckless move",
+            "BALLBOMB_MOVE": "Ball or bomb move",
+            "POWDER_MOVE": "Powder move",
+            "DANCE_MOVE": "Dance move",
+            "WIND_MOVE": "Wind move",
+            "TRIAGE_MOVE": "Triage move",
+            "AIR_BASED": "Air based",
+            "ARROW_BASED": "Arrow based",
+            "BONE_BASED": "Bone based",
+            "DRILL_BASED": "Drill based",
+            "FIELD_BASED": "Field based",
+            "HAMMER_BASED": "Hammer based",
+            "HORN_BASED": "Horn based",
+            "KICKING_MOVE": "Kicking move",
+            "LUNAR_MOVE": "Lunar move",
+            "THROW_BASED": "Throw based",
+            "WEATHER_BASED": "Weather based"
+          }
         }
       ],
       "pure": true,
@@ -2985,7 +3096,17 @@
         "sound move",
         "punching move",
         "biting move",
-        "move flag"
+        "move flag",
+        "slicing",
+        "kick",
+        "bite",
+        "iron fist",
+        "pulse",
+        "sharpness",
+        "strong jaw",
+        "dance",
+        "wind",
+        "bullet"
       ],
       "examples": [
         "Trigger only on contact moves"
@@ -3070,7 +3191,7 @@
       "examples": [
         "Only react to damaging moves"
       ],
-      "summary": "Yes when the move deals damage, which means it is physical or special. Example: a status move like Growl is a no.",
+      "summary": "Yes when the move deals damage, which means it is physical or special. Example: a status move like Growl is a no. Use this one in most rules.",
       "category": "Moves"
     },
     {
@@ -3386,7 +3507,7 @@
       "examples": [
         "Take less damage from super effective moves (Filter)"
       ],
-      "summary": "Yes when the move's type matchup against the target passes the comparison. Example: at least 2 means super effective, like Filter checks.",
+      "summary": "Yes when the move's type matchup against the target passes the comparison, abilities included. Example: at least 2 means super effective, like Filter. Use this one in most rules.",
       "category": "Types & immunities"
     },
     {
@@ -3426,7 +3547,32 @@
             "LUNAR_MOVE",
             "THROW_BASED",
             "WEATHER_BASED"
-          ]
+          ],
+          "optionLabels": {
+            "MAKES_CONTACT": "Makes contact",
+            "SOUND_BASED": "Sound based",
+            "BITING_MOVE": "Biting move",
+            "PULSE_MOVE": "Pulse move",
+            "PUNCHING_MOVE": "Punching move",
+            "SLICING_MOVE": "Slicing move",
+            "RECKLESS_MOVE": "Reckless move",
+            "BALLBOMB_MOVE": "Ball or bomb move",
+            "POWDER_MOVE": "Powder move",
+            "DANCE_MOVE": "Dance move",
+            "WIND_MOVE": "Wind move",
+            "TRIAGE_MOVE": "Triage move",
+            "AIR_BASED": "Air based",
+            "ARROW_BASED": "Arrow based",
+            "BONE_BASED": "Bone based",
+            "DRILL_BASED": "Drill based",
+            "FIELD_BASED": "Field based",
+            "HAMMER_BASED": "Hammer based",
+            "HORN_BASED": "Horn based",
+            "KICKING_MOVE": "Kicking move",
+            "LUNAR_MOVE": "Lunar move",
+            "THROW_BASED": "Throw based",
+            "WEATHER_BASED": "Weather based"
+          }
         }
       ],
       "pure": true,
@@ -3574,7 +3720,7 @@
       "params": [
         {
           "id": "moveId",
-          "label": "Move id (enum name)",
+          "label": "Which move (type its name)",
           "control": "text",
           "default": "SPLASH"
         }
@@ -3620,7 +3766,22 @@
             "TEMPEST_STORM",
             "SNOWY_WRATH",
             "EERIE_FOG"
-          ]
+          ],
+          "optionLabels": {
+            "NONE": "None",
+            "SUNNY": "Sun",
+            "RAIN": "Rain",
+            "SANDSTORM": "Sandstorm",
+            "HAIL": "Hail",
+            "SNOW": "Snow",
+            "FOG": "Fog",
+            "HEAVY_RAIN": "Heavy rain",
+            "HARSH_SUN": "Extremely harsh sunlight",
+            "STRONG_WINDS": "Strong winds",
+            "TEMPEST_STORM": "Tempest storm",
+            "SNOWY_WRATH": "Snowy wrath",
+            "EERIE_FOG": "Eerie fog"
+          }
         }
       ],
       "pure": true,
@@ -3639,7 +3800,7 @@
       "examples": [
         "Boost Speed in rain"
       ],
-      "summary": "Yes when the chosen weather is on the field. Example: rain is on. It ignores weather that Cloud Nine switches off.",
+      "summary": "Yes when the chosen weather is on the field, even while Cloud Nine or Air Lock switches its effects off. To respect them, use 'The weather is one of'.",
       "category": "Weather & terrain"
     },
     {
@@ -3660,7 +3821,15 @@
             "GRASSY",
             "PSYCHIC",
             "TOXIC"
-          ]
+          ],
+          "optionLabels": {
+            "NONE": "None",
+            "MISTY": "Misty",
+            "ELECTRIC": "Electric",
+            "GRASSY": "Grassy",
+            "PSYCHIC": "Psychic",
+            "TOXIC": "Toxic"
+          }
         }
       ],
       "pure": true,
@@ -3837,7 +4006,17 @@
             "SLEEP",
             "FREEZE",
             "BURN"
-          ]
+          ],
+          "optionLabels": {
+            "ANY": "Any",
+            "NONE": "None",
+            "POISON": "Poison",
+            "TOXIC": "Toxic",
+            "PARALYSIS": "Paralysis",
+            "SLEEP": "Sleep",
+            "FREEZE": "Freeze",
+            "BURN": "Burn"
+          }
         }
       ],
       "pure": true,
@@ -4027,7 +4206,17 @@
             "SPD",
             "ACC",
             "EVA"
-          ]
+          ],
+          "optionLabels": {
+            "ANY": "Any",
+            "ATK": "Attack",
+            "DEF": "Defense",
+            "SPATK": "Sp. Atk",
+            "SPDEF": "Sp. Def",
+            "SPD": "Speed",
+            "ACC": "Accuracy",
+            "EVA": "Evasion"
+          }
         },
         {
           "id": "cmp",
@@ -4219,7 +4408,7 @@
         },
         {
           "id": "moveId",
-          "label": "Move id (enum name)",
+          "label": "Which move (type its name)",
           "control": "text",
           "default": "SPLASH"
         }
@@ -4333,7 +4522,32 @@
             "LUNAR_MOVE",
             "THROW_BASED",
             "WEATHER_BASED"
-          ]
+          ],
+          "optionLabels": {
+            "MAKES_CONTACT": "Makes contact",
+            "SOUND_BASED": "Sound based",
+            "BITING_MOVE": "Biting move",
+            "PULSE_MOVE": "Pulse move",
+            "PUNCHING_MOVE": "Punching move",
+            "SLICING_MOVE": "Slicing move",
+            "RECKLESS_MOVE": "Reckless move",
+            "BALLBOMB_MOVE": "Ball or bomb move",
+            "POWDER_MOVE": "Powder move",
+            "DANCE_MOVE": "Dance move",
+            "WIND_MOVE": "Wind move",
+            "TRIAGE_MOVE": "Triage move",
+            "AIR_BASED": "Air based",
+            "ARROW_BASED": "Arrow based",
+            "BONE_BASED": "Bone based",
+            "DRILL_BASED": "Drill based",
+            "FIELD_BASED": "Field based",
+            "HAMMER_BASED": "Hammer based",
+            "HORN_BASED": "Horn based",
+            "KICKING_MOVE": "Kicking move",
+            "LUNAR_MOVE": "Lunar move",
+            "THROW_BASED": "Throw based",
+            "WEATHER_BASED": "Weather based"
+          }
         }
       ],
       "pure": true,
@@ -4407,7 +4621,7 @@
     {
       "id": "time.once-per-unused",
       "group": "Time",
-      "label": "The one-time effect {key} is still unused this {scope}",
+      "label": "The one-time effect {key} is unused this {scope} (advanced)",
       "requires": [],
       "params": [
         {
@@ -4452,7 +4666,7 @@
       "examples": [
         "Halve the first hit only, while the shield that the other half spends is still up"
       ],
-      "summary": "Yes while the once-per effect has not been used up yet, without using it up. Example: show a hint only while the one-time effect is still available.",
+      "summary": "Advanced: yes while a once-per effect is still unused, without using it up. Most rules want 'Only once per'. Example: show a hint while it is unused.",
       "category": "Other"
     },
     {
@@ -4742,7 +4956,7 @@
       "params": [
         {
           "id": "ability",
-          "label": "Ability id (enum name)",
+          "label": "Which ability (type its name)",
           "control": "text",
           "default": "PLUS"
         }
@@ -4962,7 +5176,28 @@
             "DARK",
             "FAIRY",
             "STELLAR"
-          ]
+          ],
+          "optionLabels": {
+            "NORMAL": "Normal",
+            "FIGHTING": "Fighting",
+            "FLYING": "Flying",
+            "POISON": "Poison",
+            "GROUND": "Ground",
+            "ROCK": "Rock",
+            "BUG": "Bug",
+            "GHOST": "Ghost",
+            "STEEL": "Steel",
+            "FIRE": "Fire",
+            "WATER": "Water",
+            "GRASS": "Grass",
+            "ELECTRIC": "Electric",
+            "PSYCHIC": "Psychic",
+            "ICE": "Ice",
+            "DRAGON": "Dragon",
+            "DARK": "Dark",
+            "FAIRY": "Fairy",
+            "STELLAR": "Stellar"
+          }
         }
       ],
       "pure": true,
@@ -5071,7 +5306,7 @@
         },
         {
           "id": "ability",
-          "label": "Ability id (enum name)",
+          "label": "Which ability (type its name)",
           "control": "text",
           "default": "LEVITATE"
         }
@@ -5375,12 +5610,16 @@
         "random",
         "percent chance",
         "luck",
-        "sometimes"
+        "sometimes",
+        "50% chance",
+        "25% chance",
+        "10% chance",
+        "coin flip"
       ],
       "examples": [
         "30% chance to paralyze on contact"
       ],
-      "summary": "Yes by chance, with the percent you set, rolled where the original ability rolled it. Example: 30% chance to paralyze on contact.",
+      "summary": "Yes by chance, with the percent you set, rolled where the original ability rolled it. Example: 30% or 50% chance to paralyze on contact. Use this one.",
       "category": "Other"
     },
     {
@@ -5508,7 +5747,10 @@
         "would faint",
         "fatal damage",
         "ko hit",
-        "sturdy check"
+        "sturdy check",
+        "knockout",
+        "would knock out",
+        "finishing blow"
       ],
       "examples": [
         "Survive with 1 HP when the hit would knock me out, like Sturdy"
@@ -5558,7 +5800,7 @@
     {
       "id": "move.is-attack-move",
       "group": "Move",
-      "label": "The move is an attacking move",
+      "label": "The move is on the game's attacking-move list (advanced)",
       "requires": [
         "move"
       ],
@@ -5577,7 +5819,7 @@
       "examples": [
         "Only block attacking moves, like Wonder Guard"
       ],
-      "summary": "Yes when the move belongs to the attacking kind of moves in the game's own list. Example: Wonder Guard only blocks attacking moves.",
+      "summary": "Advanced: yes when the move is on the game's own list of attacking moves, which Wonder Guard reads. Most rules want 'The move deals damage'.",
       "category": "Moves"
     },
     {
@@ -5612,7 +5854,7 @@
       "label": "The move's real priority is {cmp} {n}",
       "requires": [
         "move",
-        "moveUser"
+        "other"
       ],
       "params": [
         {
@@ -5648,8 +5890,8 @@
       ],
       "pure": true,
       "formula": {
-        "expr": "compare(move.getPriority(moveUser), cmp, n)  (simulated = true: includes Prankster, Gale Wings and the other priority abilities of the user)",
-        "source": "src/data/moves/move.ts:1442 Move.getPriority"
+        "expr": "compare(move.getPriority(moveUser ?? other), cmp, n)  (simulated = true: includes Prankster, Gale Wings and the other priority abilities of the user)",
+        "source": "src/data/moves/move.ts:1442 Move.getPriority; ab-attrs.ts FieldPriorityMoveImmunityAbAttr.gate"
       },
       "synonyms": [
         "priority",
@@ -5720,7 +5962,7 @@
     {
       "id": "move.type-chart-effectiveness",
       "group": "Move",
-      "label": "The type chart makes the move {cmp} {n}x against the target",
+      "label": "By the type chart alone, the move is {cmp} {n}x (advanced)",
       "requires": [
         "move",
         "moveUser",
@@ -5774,13 +6016,13 @@
       "examples": [
         "Take less damage from super effective moves, like Filter"
       ],
-      "summary": "Yes when the type chart alone, without caches or status-move rules, rates the move above or below the number. Example: more than 1 is super effective.",
+      "summary": "Advanced: reads the type chart directly, skipping the status-move and saved-result rules of the normal check. Most rules want 'The move's effectiveness'.",
       "category": "Types & immunities"
     },
     {
       "id": "move.type-multiplier",
       "group": "Move",
-      "label": "The type matchup worked out so far is {cmp} {n}x",
+      "label": "The type matchup worked out so far is {cmp} {n}x (advanced)",
       "requires": [
         "typeMultiplier"
       ],
@@ -5832,7 +6074,7 @@
       "examples": [
         "Only block moves that are not super effective, like Wonder Guard"
       ],
-      "summary": "Yes when the type matchup worked out so far passes the comparison. Example: below 2 lets Wonder Guard block every move that is not super effective.",
+      "summary": "Advanced: the matchup number the game has worked out so far for this hit. Example: below 2 lets Wonder Guard block moves that are not super effective.",
       "category": "Types & immunities"
     },
     {
@@ -5855,7 +6097,15 @@
             "SLEEP",
             "FREEZE",
             "BURN"
-          ]
+          ],
+          "optionLabels": {
+            "POISON": "Poison",
+            "TOXIC": "Toxic",
+            "PARALYSIS": "Paralysis",
+            "SLEEP": "Sleep",
+            "FREEZE": "Freeze",
+            "BURN": "Burn"
+          }
         }
       ],
       "pure": true,
@@ -5880,7 +6130,7 @@
     {
       "id": "move.ability-can-change-type",
       "group": "Move",
-      "label": "An ability is allowed to change this move's type",
+      "label": "An ability may change this move's type (advanced)",
       "requires": [
         "move"
       ],
@@ -5901,13 +6151,13 @@
       "examples": [
         "Turn Normal moves into Fairy moves, but leave Judgment alone"
       ],
-      "summary": "Yes when abilities are allowed to change the move's type. Example: Weather Ball and Judgment keep their type, a normal move does not.",
+      "summary": "Advanced: yes unless the move keeps its own type whatever abilities do. Example: Weather Ball and Judgment keep their type, a normal move does not.",
       "category": "Types & immunities"
     },
     {
       "id": "mon.is-first-ally",
       "group": "Pokemon",
-      "label": "The other Pokemon is my partner on the field",
+      "label": "The other Pokemon is my partner slot (advanced)",
       "requires": [
         "other"
       ],
@@ -5927,22 +6177,22 @@
       "examples": [
         "Ignore attacks from my partner, like Telepathy"
       ],
-      "summary": "Yes when the other Pokemon is my partner on the field. Example: Telepathy ignores attacks from my partner.",
+      "summary": "Advanced: yes when the other Pokemon sits in my partner slot. Most rules want 'The other Pokemon is my ally'. Example: Telepathy ignores my partner.",
       "category": "Other"
     },
     {
       "id": "field.weather-in-effect",
       "group": "Field",
-      "label": "One of these weathers is on and not switched off",
+      "label": "The weather is one of {weathers} (and not switched off)",
       "requires": [
         "holder"
       ],
       "params": [
         {
           "id": "weathers",
-          "label": "Weathers (comma separated list)",
+          "label": "Weathers (names, separated by commas)",
           "control": "text",
-          "default": "RAIN,HEAVY_RAIN"
+          "default": "Rain, Heavy rain"
         },
         {
           "id": "reapAndSow",
@@ -5968,7 +6218,7 @@
       "examples": [
         "Heal at the end of every turn while it rains, unless Cloud Nine is out"
       ],
-      "summary": "Yes when one of the chosen weathers is on and its effect is not switched off by Cloud Nine or Air Lock. Example: rain or heavy rain for Rain Dish.",
+      "summary": "Yes when one of the chosen weathers is on and Cloud Nine or Air Lock is not switching it off. Type names, e.g. Rain, Heavy rain. Example: Rain Dish.",
       "category": "Weather & terrain"
     },
     {
@@ -6022,14 +6272,14 @@
     {
       "id": "field.terrain-unhidden",
       "group": "Field",
-      "label": "One of these terrains is really there, even if hidden",
+      "label": "The terrain is one of {terrains}, even if hidden",
       "requires": [],
       "params": [
         {
           "id": "terrains",
-          "label": "Terrains (comma separated list)",
+          "label": "Terrains (names, separated by commas)",
           "control": "text",
-          "default": "GRASSY"
+          "default": "Grassy"
         }
       ],
       "pure": true,
@@ -6047,22 +6297,22 @@
       "examples": [
         "Boost Grass moves on Grassy Terrain even when Clueless hides the terrain"
       ],
-      "summary": "Yes when one of the chosen terrains is really there, even if Clueless hides it from the rest of the game. Example: Grassy Terrain under Clueless.",
+      "summary": "Advanced: yes when one of the chosen terrains is really there, even while Clueless hides it. Most rules want 'The terrain is'. Example: Grassy.",
       "category": "Weather & terrain"
     },
     {
       "id": "field.terrain-just-set",
       "group": "Field",
-      "label": "The terrain that was just set is one of these",
+      "label": "The terrain that was just set is one of {terrains}",
       "requires": [
         "terrain"
       ],
       "params": [
         {
           "id": "terrains",
-          "label": "Terrains (comma separated list)",
+          "label": "Terrains (names, separated by commas)",
           "control": "text",
-          "default": "ELECTRIC"
+          "default": "Electric"
         }
       ],
       "pure": true,
@@ -6086,7 +6336,7 @@
     {
       "id": "status.has-any",
       "group": "Status",
-      "label": "{who} has one of these status problems",
+      "label": "{who} has one of these status problems: {statuses}",
       "requires": [],
       "whoParam": "who",
       "params": [
@@ -6108,7 +6358,7 @@
         },
         {
           "id": "statuses",
-          "label": "Status problems (comma separated list, empty = any status problem)",
+          "label": "Status problems (names, separated by commas; empty = any)",
           "control": "text",
           "default": ""
         }
@@ -6135,7 +6385,7 @@
     {
       "id": "tag.has-any",
       "group": "Status",
-      "label": "{who} is affected by one of these battle effects",
+      "label": "{who} is affected by one of these: {tags}",
       "requires": [],
       "whoParam": "who",
       "params": [
@@ -6157,9 +6407,9 @@
         },
         {
           "id": "tags",
-          "label": "Battle effects (comma separated list)",
+          "label": "Battle effects (names, separated by commas)",
           "control": "text",
-          "default": "CONFUSED"
+          "default": "Confused"
         }
       ],
       "pure": true,
@@ -6183,16 +6433,16 @@
     {
       "id": "status.just-set",
       "group": "Status",
-      "label": "The status I just got is one of these",
+      "label": "The status I just got is one of {statuses}",
       "requires": [
         "status"
       ],
       "params": [
         {
           "id": "statuses",
-          "label": "Status problems (comma separated list)",
+          "label": "Status problems (names, separated by commas)",
           "control": "text",
-          "default": "BURN,PARALYSIS,POISON,TOXIC"
+          "default": "Burn, Paralysis, Poison, Toxic"
         }
       ],
       "pure": true,
@@ -6698,7 +6948,13 @@
             "FAIL",
             "MISS",
             "OTHER"
-          ]
+          ],
+          "optionLabels": {
+            "SUCCESS": "Success",
+            "FAIL": "Fail",
+            "MISS": "Miss",
+            "OTHER": "Other"
+          }
         },
         {
           "id": "negate",
@@ -6727,7 +6983,7 @@
     {
       "id": "time.last-move-was-follow-up",
       "group": "Time",
-      "label": "{who}'s last move was a free follow-up from an ability",
+      "label": "{who}'s last move was a free follow-up (advanced)",
       "requires": [],
       "whoParam": "who",
       "params": [
@@ -6763,13 +7019,13 @@
       "examples": [
         "Skip when the last move was only an extra move from an ability"
       ],
-      "summary": "Yes when the last move was an extra move that an ability triggered and not one the player chose. Example: an echo move.",
+      "summary": "Advanced: yes when the last move was an extra move an ability triggered, not one the player chose. Example: do not echo an echo move.",
       "category": "Moves"
     },
     {
       "id": "time.marker-set",
       "group": "Time",
-      "label": "A marker called {key} is set on {who}",
+      "label": "A marker called {key} is set on {who} (advanced)",
       "requires": [],
       "whoParam": "who",
       "params": [
@@ -6800,9 +7056,9 @@
             "turn"
           ],
           "optionLabels": {
-            "battle": "Each battle",
+            "battle": "The whole battle",
             "switch-in": "Until I switch out",
-            "turn": "Each turn"
+            "turn": "This turn only"
           }
         },
         {
@@ -6821,7 +7077,7 @@
             "prefix"
           ],
           "optionLabels": {
-            "exact": "Exact HP (whole numbers)",
+            "exact": "Exactly this name",
             "prefix": "Starts with this name"
           }
         }
@@ -6842,13 +7098,13 @@
       "examples": [
         "Only if my entry marker is not set yet"
       ],
-      "summary": "Yes when a named marker is set on the Pokemon for the battle, the switch-in or the turn. Example: only if my entry marker is not set yet.",
+      "summary": "Advanced: yes when a named marker that another block set is on the Pokemon. Example: only if my entry marker is not set yet.",
       "category": "Other"
     },
     {
       "id": "rng.chance-float",
       "group": "Chance",
-      "label": "{pct}% chance, rolled as a decimal number",
+      "label": "Harvest-style chance, rolled as a decimal (advanced)",
       "requires": [],
       "params": [
         {
@@ -6877,7 +7133,7 @@
       "examples": [
         "50% chance to bring a berry back each turn"
       ],
-      "summary": "Yes by chance, rolled as one decimal number. Same percent as a normal chance, but the game's random numbers shift differently. Example: Harvest's 50%.",
+      "summary": "Advanced: the same percent, rolled as one decimal number like Harvest, so the game's random numbers shift differently. Most rules want the plain chance.",
       "category": "Other"
     }
   ],
@@ -6947,7 +7203,11 @@
         "resist",
         "half damage",
         "damage reduction",
-        "tank"
+        "tank",
+        "reduce damage",
+        "less damage",
+        "damage taken",
+        "multiscale"
       ],
       "examples": [
         "Halve damage at full HP"
@@ -7151,7 +7411,28 @@
             "DARK",
             "FAIRY",
             "STELLAR"
-          ]
+          ],
+          "optionLabels": {
+            "NORMAL": "Normal",
+            "FIGHTING": "Fighting",
+            "FLYING": "Flying",
+            "POISON": "Poison",
+            "GROUND": "Ground",
+            "ROCK": "Rock",
+            "BUG": "Bug",
+            "GHOST": "Ghost",
+            "STEEL": "Steel",
+            "FIRE": "Fire",
+            "WATER": "Water",
+            "GRASS": "Grass",
+            "ELECTRIC": "Electric",
+            "PSYCHIC": "Psychic",
+            "ICE": "Ice",
+            "DRAGON": "Dragon",
+            "DARK": "Dark",
+            "FAIRY": "Fairy",
+            "STELLAR": "Stellar"
+          }
         }
       ],
       "modifies": "moveType",
@@ -7288,7 +7569,16 @@
             "SPD",
             "ACC",
             "EVA"
-          ]
+          ],
+          "optionLabels": {
+            "ATK": "Attack",
+            "DEF": "Defense",
+            "SPATK": "Sp. Atk",
+            "SPDEF": "Sp. Def",
+            "SPD": "Speed",
+            "ACC": "Accuracy",
+            "EVA": "Evasion"
+          }
         },
         {
           "id": "multiplier",
@@ -7307,7 +7597,10 @@
         "stat boost",
         "attack up",
         "speed up",
-        "huge power"
+        "huge power",
+        "swift swim",
+        "double speed",
+        "multiply attack"
       ],
       "examples": [
         "Double Attack"
@@ -7466,7 +7759,28 @@
             "DARK",
             "FAIRY",
             "STELLAR"
-          ]
+          ],
+          "optionLabels": {
+            "NORMAL": "Normal",
+            "FIGHTING": "Fighting",
+            "FLYING": "Flying",
+            "POISON": "Poison",
+            "GROUND": "Ground",
+            "ROCK": "Rock",
+            "BUG": "Bug",
+            "GHOST": "Ghost",
+            "STEEL": "Steel",
+            "FIRE": "Fire",
+            "WATER": "Water",
+            "GRASS": "Grass",
+            "ELECTRIC": "Electric",
+            "PSYCHIC": "Psychic",
+            "ICE": "Ice",
+            "DRAGON": "Dragon",
+            "DARK": "Dark",
+            "FAIRY": "Fairy",
+            "STELLAR": "Stellar"
+          }
         }
       ],
       "modifies": "cancelled",
@@ -7525,7 +7839,16 @@
             "SPD",
             "ACC",
             "EVA"
-          ]
+          ],
+          "optionLabels": {
+            "ATK": "Attack",
+            "DEF": "Defense",
+            "SPATK": "Sp. Atk",
+            "SPDEF": "Sp. Def",
+            "SPD": "Speed",
+            "ACC": "Accuracy",
+            "EVA": "Evasion"
+          }
         },
         {
           "id": "stages",
@@ -7546,7 +7869,28 @@
         "boost",
         "drop",
         "intimidate",
-        "stat stage"
+        "stat stage",
+        "raise attack",
+        "lower attack",
+        "raise defense",
+        "lower defense",
+        "raise speed",
+        "lower speed",
+        "raise sp. atk",
+        "raise special attack",
+        "lower sp. atk",
+        "raise sp. def",
+        "raise special defense",
+        "lower sp. def",
+        "raise evasion",
+        "lower evasion",
+        "raise accuracy",
+        "lower accuracy",
+        "speed boost",
+        "attack down",
+        "defense down",
+        "speed down",
+        "attack up"
       ],
       "examples": [
         "Raise Speed by 1 stage"
@@ -7590,7 +7934,15 @@
             "SLEEP",
             "FREEZE",
             "BURN"
-          ]
+          ],
+          "optionLabels": {
+            "POISON": "Poison",
+            "TOXIC": "Toxic",
+            "PARALYSIS": "Paralysis",
+            "SLEEP": "Sleep",
+            "FREEZE": "Freeze",
+            "BURN": "Burn"
+          }
         }
       ],
       "v1Kind": "status",
@@ -7646,7 +7998,16 @@
             "SLEEP",
             "FREEZE",
             "BURN"
-          ]
+          ],
+          "optionLabels": {
+            "ANY": "Any",
+            "POISON": "Poison",
+            "TOXIC": "Toxic",
+            "PARALYSIS": "Paralysis",
+            "SLEEP": "Sleep",
+            "FREEZE": "Freeze",
+            "BURN": "Burn"
+          }
         }
       ],
       "v1Kind": "cure-status",
@@ -7737,7 +8098,22 @@
             "TEMPEST_STORM",
             "SNOWY_WRATH",
             "EERIE_FOG"
-          ]
+          ],
+          "optionLabels": {
+            "NONE": "None",
+            "SUNNY": "Sun",
+            "RAIN": "Rain",
+            "SANDSTORM": "Sandstorm",
+            "HAIL": "Hail",
+            "SNOW": "Snow",
+            "FOG": "Fog",
+            "HEAVY_RAIN": "Heavy rain",
+            "HARSH_SUN": "Extremely harsh sunlight",
+            "STRONG_WINDS": "Strong winds",
+            "TEMPEST_STORM": "Tempest storm",
+            "SNOWY_WRATH": "Snowy wrath",
+            "EERIE_FOG": "Eerie fog"
+          }
         }
       ],
       "v1Kind": "set-weather",
@@ -7773,7 +8149,15 @@
             "GRASSY",
             "PSYCHIC",
             "TOXIC"
-          ]
+          ],
+          "optionLabels": {
+            "NONE": "None",
+            "MISTY": "Misty",
+            "ELECTRIC": "Electric",
+            "GRASSY": "Grassy",
+            "PSYCHIC": "Psychic",
+            "TOXIC": "Toxic"
+          }
         }
       ],
       "v1Kind": "set-terrain",
@@ -7826,7 +8210,10 @@
         "taunt",
         "confuse",
         "leech seed",
-        "apply volatile"
+        "apply volatile",
+        "flinch",
+        "make it flinch",
+        "infatuate"
       ],
       "examples": [
         "Confuse the attacker"
@@ -8021,7 +8408,7 @@
       "params": [
         {
           "id": "moveId",
-          "label": "Move id (enum name)",
+          "label": "Which move (type its name)",
           "control": "text",
           "default": "STEAM_ERUPTION"
         },
@@ -8375,7 +8762,7 @@
       "params": [
         {
           "id": "block",
-          "label": "Class declaration (block id)",
+          "label": "Which mechanic",
           "control": "text",
           "default": ""
         }
@@ -9088,7 +9475,11 @@
           "options": [
             "PHYSICAL",
             "SPECIAL"
-          ]
+          ],
+          "optionLabels": {
+            "PHYSICAL": "Physical",
+            "SPECIAL": "Special"
+          }
         }
       ],
       "modifies": "moveCategory",
@@ -9109,7 +9500,7 @@
     {
       "id": "effect.stat-stages",
       "kind": "event",
-      "label": "Change several stats at once by {stages} stages",
+      "label": "Change several stats at once ({stats}) by {stages} stages",
       "requires": [],
       "params": [
         {
@@ -9126,9 +9517,9 @@
         },
         {
           "id": "stats",
-          "label": "Stats (comma separated list)",
+          "label": "Stats (names, separated by commas)",
           "control": "text",
-          "default": "ATK,SPATK"
+          "default": "Attack, Sp. Atk"
         },
         {
           "id": "stages",
@@ -9188,7 +9579,28 @@
             "DARK",
             "FAIRY",
             "STELLAR"
-          ]
+          ],
+          "optionLabels": {
+            "NORMAL": "Normal",
+            "FIGHTING": "Fighting",
+            "FLYING": "Flying",
+            "POISON": "Poison",
+            "GROUND": "Ground",
+            "ROCK": "Rock",
+            "BUG": "Bug",
+            "GHOST": "Ghost",
+            "STEEL": "Steel",
+            "FIRE": "Fire",
+            "WATER": "Water",
+            "GRASS": "Grass",
+            "ELECTRIC": "Electric",
+            "PSYCHIC": "Psychic",
+            "ICE": "Ice",
+            "DRAGON": "Dragon",
+            "DARK": "Dark",
+            "FAIRY": "Fairy",
+            "STELLAR": "Stellar"
+          }
         }
       ],
       "implemented": false,
@@ -9257,7 +9669,28 @@
             "DARK",
             "FAIRY",
             "STELLAR"
-          ]
+          ],
+          "optionLabels": {
+            "NORMAL": "Normal",
+            "FIGHTING": "Fighting",
+            "FLYING": "Flying",
+            "POISON": "Poison",
+            "GROUND": "Ground",
+            "ROCK": "Rock",
+            "BUG": "Bug",
+            "GHOST": "Ghost",
+            "STEEL": "Steel",
+            "FIRE": "Fire",
+            "WATER": "Water",
+            "GRASS": "Grass",
+            "ELECTRIC": "Electric",
+            "PSYCHIC": "Psychic",
+            "ICE": "Ice",
+            "DRAGON": "Dragon",
+            "DARK": "Dark",
+            "FAIRY": "Fairy",
+            "STELLAR": "Stellar"
+          }
         }
       ],
       "feasibility": [
@@ -9280,7 +9713,7 @@
     {
       "id": "effect.hurt-percent-of-max-hp",
       "kind": "event",
-      "label": "Hurt {target} for {percent}% of its max HP",
+      "label": "Hurt {target} for {percent}% of {target}'s max HP",
       "requires": [],
       "params": [
         {
@@ -9550,7 +9983,9 @@
       "synonyms": [
         "self damage",
         "hp cost move",
-        "belly drum"
+        "belly drum",
+        "self inflicted",
+        "own move cost"
       ],
       "summary": "Locked safety rule: does nothing when the HP was spent by my own move. Example: Belly Drum does not trigger Wimp Out.",
       "category": "Damage"
@@ -9589,7 +10024,9 @@
       "synonyms": [
         "sheer force",
         "secondary effect removed",
-        "no extra effects"
+        "no extra effects",
+        "no secondary effects",
+        "sheer force boosted"
       ],
       "summary": "Locked safety rule: does nothing when the attacker's move is boosted by Sheer Force. Example: a Sheer Force Flamethrower leaves the effect off.",
       "category": "Moves"
@@ -9894,5 +10331,5 @@
       "category": "Damage"
     }
   ],
-  "hash": "07239b9907e2bd"
+  "hash": "1005f9e03d00ba"
 }

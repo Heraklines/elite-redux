@@ -299,7 +299,7 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
   {
     id: "effect.stat-stages",
     kind: "event",
-    label: "Change several stats at once by {stages} stages",
+    label: "Change several stats at once ({stats}) by {stages} stages",
     requires: [],
     params: [
       selectParam(
@@ -308,7 +308,7 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
         ["me", "the other Pokemon", "every adjacent foe", "every other adjacent Pokemon"],
         "me",
       ),
-      textParam("stats", "Stats (comma separated list)", "ATK,SPATK"),
+      textParam("stats", "Stats (names, separated by commas)", "Attack, Sp. Atk"),
       numberParam("stages", "Number of stages (-6 to 6)", 1, -6, 6, 1, true),
     ],
     implemented: false,
@@ -349,7 +349,7 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
   {
     id: "effect.hurt-percent-of-max-hp",
     kind: "event",
-    label: "Hurt {target} for {percent}% of its max HP",
+    label: "Hurt {target} for {percent}% of {target}'s max HP",
     requires: [],
     params: [TARGET(), numberParam("percent", "Percent of max HP (12.5 = one eighth)", 12.5, 0.5, 100, 0.5)],
     implemented: false,

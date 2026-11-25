@@ -86,8 +86,9 @@ function paramProblems(owner: string, params: readonly ParamDef[]): string[] {
     if (param.control === "select") {
       for (const option of param.options ?? []) {
         const shown = param.optionLabels?.[option];
-        // A choice is fine when it has player words, is an enum constant (the picker renames it) or is a plain word.
-        if (shown === undefined && !CONSTANT.test(option) && CODE_LIKE.test(option)) {
+        // A choice is fine when it has player words or is a plain word; enum constants need player words too, because
+        // the editor shows a choice without optionLabels as written.
+        if (shown === undefined && (CONSTANT.test(option) || CODE_LIKE.test(option))) {
           problems.push(`${where} shows the code word "${option}"; give it player words in optionLabels`);
         }
         if (shown !== undefined) {

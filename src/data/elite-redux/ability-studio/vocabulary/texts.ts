@@ -35,7 +35,7 @@ export interface VocabularyText {
   /** One or two short sentences, at most 200 characters: what happens in battle, with a concrete example. */
   readonly summary: string;
   readonly category: BrowseCategory;
-  /** Search words the definition did not have yet (merged until it has at least three). */
+  /** Extra search words, added to the definition's own (old label wording, staff words the definition lacks). */
   readonly synonyms?: readonly string[];
 }
 
@@ -68,7 +68,7 @@ export function getVocabularyText(id: string): VocabularyText | undefined {
   return BY_ID.get(id);
 }
 
-/** A definition with its summary and browse category filled in, and enough synonyms merged in. */
+/** A definition with its summary and browse category filled in, and the text's extra synonyms merged in. */
 export function withVocabularyText<T extends { readonly id: string; readonly synonyms?: readonly string[] }>(
   def: T,
 ): T & { readonly summary: string; readonly category: BrowseCategory } {
@@ -77,6 +77,6 @@ export function withVocabularyText<T extends { readonly id: string; readonly syn
     throw new Error(`"${def.id}" has no hand-written summary and category (vocabulary/texts-*.ts)`);
   }
   const own = def.synonyms ?? [];
-  const synonyms = own.length >= 3 ? own : [...own, ...(text.synonyms ?? []).filter(word => !own.includes(word))];
+  const synonyms = [...own, ...(text.synonyms ?? []).filter(word => !own.includes(word))];
   return { ...def, synonyms, summary: text.summary, category: text.category };
 }

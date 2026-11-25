@@ -44,6 +44,7 @@ import type { CompareOp, HpRounding } from "../enums";
 import { getGuard } from "../guards";
 import { compareNumbers as compare, hpAtLeast, hpAtMost, hpCrossedBelowRounded } from "../hp-math";
 import { type ParamValues, withParamDefaults } from "../params";
+import { constantName } from "../player-names";
 import { type Condition, type Frame, frameFromAttrParams, holderLikeOf } from "./frame";
 import { evaluateGuard } from "./guards";
 
@@ -62,23 +63,32 @@ export function crossedBelow(pokemon: Pokemon, damage: number, ratio: number, ro
   return hpCrossedBelowRounded(pokemon.hp, pokemon.getMaxHp(), damage, ratio, rounding, 0);
 }
 
+/** Looks `name` up as written, then as the constant a player name stands for ("Heavy rain" -> HEAVY_RAIN). */
 function enumValue<T extends Record<string, string | number>>(table: T, name: string, what: string): T[keyof T] {
-  if (!(name in table)) {
+  if (name in table) {
+    return table[name] as T[keyof T];
+  }
+  const constant = constantName(name);
+  if (!(constant in table)) {
     throw new Error(`"${name}" is not a known ${what}`);
   }
-  return table[name] as T[keyof T];
+  return table[constant] as T[keyof T];
 }
 
 /**
  * A move name from a setting: a vanilla move (MoveId) or an Elite Redux custom move (ErMoveId, ids from 5000 up).
- * The two enums never share a name, so the vanilla table is asked first.
+ * The vanilla table is asked first; a few names (SWIRLY_ROOM, IVORY_IMPACT) are in both with the same value.
+ * A player name ("Steam eruption") is tried as its constant after the name as written. Both enums are numeric, so a
+ * digit string such as "33" hits the reverse mapping (a name, not an id) and is rejected like any unknown text.
  */
 export function moveIdOf(name: string): number {
-  if (Object.hasOwn(MoveId, name)) {
-    return (MoveId as unknown as Record<string, number>)[name];
-  }
-  if (Object.hasOwn(ErMoveId, name)) {
-    return (ErMoveId as Record<string, number>)[name];
+  for (const candidate of [name, constantName(name)]) {
+    for (const table of [MoveId, ErMoveId] as unknown as Record<string, unknown>[]) {
+      const value = Object.hasOwn(table, candidate) ? table[candidate] : undefined;
+      if (typeof value === "number") {
+        return value;
+      }
+    }
   }
   throw new Error(`"${name}" is not a known move`);
 }
@@ -572,10 +582,17 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
   "move.targets-whole-side": () => frame =>
     frame.move !== undefined
     && [MoveTarget.BOTH_SIDES, MoveTarget.ENEMY_SIDE, MoveTarget.USER_SIDE].includes(frame.move.moveTarget),
-  "move.effective-priority": p => frame =>
-    frame.move !== undefined
-    && frame.moveUser !== undefined
-    && compare(frame.move.getPriority(frame.moveUser), p.cmp as CompareOp, Number(p.n)),
+  // The attacker is the move user where the moment names one, else the other Pokemon (calc.move-immunity, where
+  // FieldPriorityMoveImmunityAbAttr.gate asks `move.getPriority(attacker)`). The atom requires `other`, so it can never sit
+  // on calc.priority, where getPriority would dispatch the same rule again.
+  "move.effective-priority": p => frame => {
+    const attacker = frame.moveUser ?? frame.other;
+    return (
+      frame.move !== undefined
+      && attacker !== undefined
+      && compare(frame.move.getPriority(attacker), p.cmp as CompareOp, Number(p.n))
+    );
+  },
   "move.has-flinch-effect": () => frame => frame.move?.hasAttr("FlinchAttr") ?? false,
   "move.hits-substitute": () => frame => {
     if (frame.move === undefined || frame.moveUser === undefined) {

@@ -41,6 +41,7 @@ export const CONDITION_TEXTS: Readonly<Record<string, VocabularyText>> = {
     summary:
       "Yes when the hit about to land is as big as the Pokemon's remaining HP. Example: 300 damage against 200 HP would knock it out.",
     category: "Damage",
+    synonyms: ["knockout", "would knock out", "finishing blow"],
   },
   "hit.dealt-damage": {
     summary:
@@ -77,6 +78,7 @@ export const CONDITION_TEXTS: Readonly<Record<string, VocabularyText>> = {
     summary:
       "Yes when the move has a property, such as making contact, biting or sound, counting any property an ability adds. Example: Tough Claws boosts contact moves.",
     category: "Moves",
+    synonyms: ["slicing", "kick", "bite", "iron fist", "pulse", "sharpness", "strong jaw", "dance", "wind", "bullet"],
   },
   "move.inherent-flag": {
     summary:
@@ -90,12 +92,12 @@ export const CONDITION_TEXTS: Readonly<Record<string, VocabularyText>> = {
   },
   "move.damaging": {
     summary:
-      "Yes when the move deals damage, which means it is physical or special. Example: a status move like Growl is a no.",
+      "Yes when the move deals damage, which means it is physical or special. Example: a status move like Growl is a no. Use this one in most rules.",
     category: "Moves",
   },
   "move.is-attack-move": {
     summary:
-      "Yes when the move belongs to the attacking kind of moves in the game's own list. Example: Wonder Guard only blocks attacking moves.",
+      "Advanced: yes when the move is on the game's own list of attacking moves, which Wonder Guard reads. Most rules want 'The move deals damage'.",
     category: "Moves",
   },
   "move.target-kind": {
@@ -138,17 +140,17 @@ export const CONDITION_TEXTS: Readonly<Record<string, VocabularyText>> = {
   },
   "move.effectiveness": {
     summary:
-      "Yes when the move's type matchup against the target passes the comparison. Example: at least 2 means super effective, like Filter checks.",
+      "Yes when the move's type matchup against the target passes the comparison, abilities included. Example: at least 2 means super effective, like Filter. Use this one in most rules.",
     category: "Types & immunities",
   },
   "move.type-chart-effectiveness": {
     summary:
-      "Yes when the type chart alone, without caches or status-move rules, rates the move above or below the number. Example: more than 1 is super effective.",
+      "Advanced: reads the type chart directly, skipping the status-move and saved-result rules of the normal check. Most rules want 'The move's effectiveness'.",
     category: "Types & immunities",
   },
   "move.type-multiplier": {
     summary:
-      "Yes when the type matchup worked out so far passes the comparison. Example: below 2 lets Wonder Guard block every move that is not super effective.",
+      "Advanced: the matchup number the game has worked out so far for this hit. Example: below 2 lets Wonder Guard block moves that are not super effective.",
     category: "Types & immunities",
   },
   "move.drains": {
@@ -176,7 +178,7 @@ export const CONDITION_TEXTS: Readonly<Record<string, VocabularyText>> = {
   },
   "move.ability-can-change-type": {
     summary:
-      "Yes when abilities are allowed to change the move's type. Example: Weather Ball and Judgment keep their type, a normal move does not.",
+      "Advanced: yes unless the move keeps its own type whatever abilities do. Example: Weather Ball and Judgment keep their type, a normal move does not.",
     category: "Types & immunities",
   },
   "move.is-move": {
@@ -188,12 +190,12 @@ export const CONDITION_TEXTS: Readonly<Record<string, VocabularyText>> = {
   // ---- Field --------------------------------------------------------------------------------
   "field.weather": {
     summary:
-      "Yes when the chosen weather is on the field. Example: rain is on. It ignores weather that Cloud Nine switches off.",
+      "Yes when the chosen weather is on the field, even while Cloud Nine or Air Lock switches its effects off. To respect them, use 'The weather is one of'.",
     category: "Weather & terrain",
   },
   "field.weather-in-effect": {
     summary:
-      "Yes when one of the chosen weathers is on and its effect is not switched off by Cloud Nine or Air Lock. Example: rain or heavy rain for Rain Dish.",
+      "Yes when one of the chosen weathers is on and Cloud Nine or Air Lock is not switching it off. Type names, e.g. Rain, Heavy rain. Example: Rain Dish.",
     category: "Weather & terrain",
   },
   "field.weather-lasting": {
@@ -212,7 +214,7 @@ export const CONDITION_TEXTS: Readonly<Record<string, VocabularyText>> = {
   },
   "field.terrain-unhidden": {
     summary:
-      "Yes when one of the chosen terrains is really there, even if Clueless hides it from the rest of the game. Example: Grassy Terrain under Clueless.",
+      "Advanced: yes when one of the chosen terrains is really there, even while Clueless hides it. Most rules want 'The terrain is'. Example: Grassy.",
     category: "Weather & terrain",
   },
   "field.terrain-just-set": {
@@ -318,7 +320,7 @@ export const CONDITION_TEXTS: Readonly<Record<string, VocabularyText>> = {
   },
   "time.last-move-was-follow-up": {
     summary:
-      "Yes when the last move was an extra move that an ability triggered and not one the player chose. Example: an echo move.",
+      "Advanced: yes when the last move was an extra move an ability triggered, not one the player chose. Example: do not echo an echo move.",
     category: "Moves",
   },
   "time.acted": {
@@ -343,7 +345,7 @@ export const CONDITION_TEXTS: Readonly<Record<string, VocabularyText>> = {
   },
   "time.once-per-unused": {
     summary:
-      "Yes while the once-per effect has not been used up yet, without using it up. Example: show a hint only while the one-time effect is still available.",
+      "Advanced: yes while a once-per effect is still unused, without using it up. Most rules want 'Only once per'. Example: show a hint while it is unused.",
     category: "Other",
   },
   "time.nth-use": {
@@ -352,7 +354,7 @@ export const CONDITION_TEXTS: Readonly<Record<string, VocabularyText>> = {
   },
   "time.marker-set": {
     summary:
-      "Yes when a named marker is set on the Pokemon for the battle, the switch-in or the turn. Example: only if my entry marker is not set yet.",
+      "Advanced: yes when a named marker that another block set is on the Pokemon. Example: only if my entry marker is not set yet.",
     category: "Other",
   },
 
@@ -382,7 +384,7 @@ export const CONDITION_TEXTS: Readonly<Record<string, VocabularyText>> = {
   },
   "mon.is-first-ally": {
     summary:
-      "Yes when the other Pokemon is my partner on the field. Example: Telepathy ignores attacks from my partner.",
+      "Advanced: yes when the other Pokemon sits in my partner slot. Most rules want 'The other Pokemon is my ally'. Example: Telepathy ignores my partner.",
     category: "Other",
   },
   "party.ally-exists": {
@@ -494,12 +496,12 @@ export const CONDITION_TEXTS: Readonly<Record<string, VocabularyText>> = {
   // ---- Chance and advanced ----------------------------------------------------------------
   "rng.chance": {
     summary:
-      "Yes by chance, with the percent you set, rolled where the original ability rolled it. Example: 30% chance to paralyze on contact.",
+      "Yes by chance, with the percent you set, rolled where the original ability rolled it. Example: 30% or 50% chance to paralyze on contact. Use this one.",
     category: "Other",
   },
   "rng.chance-float": {
     summary:
-      "Yes by chance, rolled as one decimal number. Same percent as a normal chance, but the game's random numbers shift differently. Example: Harvest's 50%.",
+      "Advanced: the same percent, rolled as one decimal number like Harvest, so the game's random numbers shift differently. Most rules want the plain chance.",
     category: "Other",
   },
   "escape.legacy-closure": {

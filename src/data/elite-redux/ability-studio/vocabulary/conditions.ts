@@ -79,10 +79,11 @@ export type ConditionBase = Omit<ConditionDef, "summary" | "category">;
 const WHO = (def = "holder"): ParamDef => selectParam("who", "Which Pokemon", WHO_OPTIONS, def);
 const CMP = (): ParamDef => selectParam("cmp", "How to compare", COMPARE_OPTIONS, "gte");
 const HP_WHO = (def = "holder"): ParamDef => selectParam("who", "Whose HP", HP_WHO_OPTIONS, def);
+const HP_EXACT = { exact: "Exact HP (whole numbers)" } as const;
 const ROUNDING = (): ParamDef =>
-  selectParam("rounding", "How the HP line is rounded", HP_LEVEL_ROUNDING_OPTIONS, "exact");
+  selectParam("rounding", "How the HP line is rounded", HP_LEVEL_ROUNDING_OPTIONS, "exact", HP_EXACT);
 const CROSSING_ROUNDING = (): ParamDef =>
-  selectParam("rounding", "How the HP line is rounded", HP_CROSSING_ROUNDING_OPTIONS, "exact");
+  selectParam("rounding", "How the HP line is rounded", HP_CROSSING_ROUNDING_OPTIONS, "exact", HP_EXACT);
 
 const ENGINE = "src/field/pokemon.ts";
 const MOVE_TS = "src/data/moves/move.ts";
@@ -415,7 +416,7 @@ const BASE_CONDITIONS: readonly ConditionBase[] = [
     group: "Move",
     label: "The move is {moveId}",
     requires: ["move"],
-    params: [textParam("moveId", "Move id (enum name)", "SPLASH")],
+    params: [textParam("moveId", "Which move (type its name)", "SPLASH")],
     pure: true,
     formula: { expr: "move.id === MoveId[moveId]", source: "src/enums/move-id.ts" },
     synonyms: ["specific move", "this move", "named move"],
@@ -630,7 +631,7 @@ const BASE_CONDITIONS: readonly ConditionBase[] = [
     label: "{who}'s last move was {moveId}",
     requires: [],
     whoParam: "who",
-    params: [WHO(), textParam("moveId", "Move id (enum name)", "SPLASH")],
+    params: [WHO(), textParam("moveId", "Which move (type its name)", "SPLASH")],
     pure: true,
     formula: { expr: "pokemon.getLastXMoves()[0]?.move === MoveId[moveId]", source: `${ENGINE}:7249 (getLastXMoves)` },
     synonyms: ["previous move", "last used", "just used"],
@@ -687,7 +688,7 @@ const BASE_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "time.once-per-unused",
     group: "Time",
-    label: "The one-time effect {key} is still unused this {scope}",
+    label: "The one-time effect {key} is unused this {scope} (advanced)",
     requires: [],
     params: [
       selectParam("scope", "How long the memory lasts", ONCE_PER_SCOPES, "wave"),
@@ -804,7 +805,7 @@ const BASE_CONDITIONS: readonly ConditionBase[] = [
     group: "Party",
     label: "My ally has the ability {ability}",
     requires: [],
-    params: [textParam("ability", "Ability id (enum name)", "PLUS")],
+    params: [textParam("ability", "Which ability (type its name)", "PLUS")],
     pure: true,
     formula: { expr: "holder.getAlly()?.hasAbility(AbilityId[ability])", source: `${ENGINE}:3848 (hasAbility)` },
     synonyms: ["partner ability", "plus minus", "ally has ability"],
@@ -909,7 +910,7 @@ const BASE_CONDITIONS: readonly ConditionBase[] = [
     label: "{who} has the ability {ability}",
     requires: [],
     whoParam: "who",
-    params: [WHO(), textParam("ability", "Ability id (enum name)", "LEVITATE")],
+    params: [WHO(), textParam("ability", "Which ability (type its name)", "LEVITATE")],
     pure: true,
     formula: { expr: "pokemon.hasAbility(AbilityId[ability])", source: `${ENGINE}:3848 (hasAbility)` },
     synonyms: ["has ability", "ability check", "owns ability"],
@@ -1011,7 +1012,7 @@ const BASE_CONDITIONS: readonly ConditionBase[] = [
       expr: "simulated || (!alwaysRoll && pct >= 100) || holder.randBattleSeedInt(100) < pct  (evaluated at the position of the original draw)",
       source: "compile-ability-blueprint chance handling; runtime-components.ts carrier.canApply",
     },
-    synonyms: ["random", "percent chance", "luck", "sometimes"],
+    synonyms: ["random", "percent chance", "luck", "sometimes", "50% chance", "25% chance", "10% chance", "coin flip"],
     examples: ["30% chance to paralyze on contact"],
   },
 

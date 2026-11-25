@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { playerName } from "#data/elite-redux/ability-studio/decl-naming";
 import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
+import { playerName } from "#data/elite-redux/ability-studio/vocabulary/player-names";
 import { MoveId } from "#enums/move-id";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";

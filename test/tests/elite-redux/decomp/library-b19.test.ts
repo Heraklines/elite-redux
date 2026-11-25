@@ -17,6 +17,7 @@ import {
   hpCrossedBelowRounded,
   hpRatioRounded,
 } from "#data/elite-redux/ability-studio/vocabulary/hp-math";
+import { validateComposition } from "#data/elite-redux/ability-studio/vocabulary/validate-composition";
 import { TerrainType } from "#data/terrain";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
@@ -228,13 +229,29 @@ describe("move atoms", () => {
     }
   });
 
-  it("move.effective-priority asks getPriority of the move user, so ability priority counts", () => {
+  it("move.effective-priority asks getPriority of the attacker (move user, else the other Pokemon)", () => {
     const check = atom("move.effective-priority", { cmp: "gt", n: 0 });
     const user = mon();
     const prankster = moveWith({ getPriority: (who: unknown) => (who === user ? 1 : 0) });
     expect(check(frame(mon(), { move: prankster, moveUser: user as never }))).toBe(true);
     expect(check(frame(mon(), { move: prankster, moveUser: mon() as never }))).toBe(false);
+    // calc.move-immunity (Queenly Majesty, Dazzling) names no move user: the attacker is the other Pokemon.
+    expect(check(frame(mon(), { move: prankster, other: user as never }))).toBe(true);
     expect(check(frame(mon(), { move: prankster }))).toBe(false);
+  });
+
+  it("move.effective-priority cannot be put on calc.priority (getPriority would run the rule again)", () => {
+    const rule = (when: string) => ({
+      key: "priority-probe",
+      when: { block: when },
+      if: [{ block: "move.effective-priority", params: { cmp: "gt", n: 0 } }],
+      do: [{ block: when === "calc.priority" ? "effect.change-priority" : "effect.immune-to-type", params: {} }],
+      chance: 100,
+    });
+    expect(validateComposition([rule("calc.priority")])).toEqual([
+      'composition[0].if[0]: "move.effective-priority" needs the other pokemon, but the trigger "While the game calculates my move\'s priority" does not provide it',
+    ]);
+    expect(validateComposition([rule("calc.move-immunity")])).toEqual([]);
   });
 
   it("move.has-flinch-effect and move.hits-substitute call the move's own methods", () => {
@@ -314,6 +331,8 @@ describe("move atoms", () => {
     expect(moveIdOf("FIVE_STAR_FURY")).toBe(5156);
     expect(() => moveIdOf("NOT_A_MOVE")).toThrow("not a known move");
     expect(() => moveIdOf("toString")).toThrow("not a known move");
+    expect(() => moveIdOf("33")).toThrow("not a known move");
+    expect(moveIdOf("Five star fury")).toBe(5156);
     const fury = atom("move.is-move", { moveId: "FIVE_STAR_FURY" });
     expect(fury(frame(mon(), { move: moveWith({ id: 5156 }) }))).toBe(true);
     expect(fury(frame(mon(), { move: moveWith({ id: MoveId.TACKLE }) }))).toBe(false);

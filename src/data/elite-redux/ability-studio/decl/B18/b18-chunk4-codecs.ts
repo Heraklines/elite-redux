@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
 // Hand-written codecs for the B18 chunk 4 declarations. Staff see and type player words ("Attack, Sp. Atk", "Ball and bomb moves",
 // "Feint attack"); the classes want enum numbers. Every parser throws a plain-language error for text it does not understand, and
 // every reader returns undefined for a value that no player word stands for (the harness then shows nothing instead of a wrong word).
-import { playerName } from "#data/elite-redux/ability-studio/decl-naming";
-import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
+import { playerName } from "#data/elite-redux/ability-studio/vocabulary/player-names";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";

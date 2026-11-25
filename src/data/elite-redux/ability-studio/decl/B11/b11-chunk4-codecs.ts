@@ -5,8 +5,8 @@
  */
 
 import { allAbilities } from "#data/data-lists";
-import { playerName } from "#data/elite-redux/ability-studio/decl-naming";
 import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
+import { playerName } from "#data/elite-redux/ability-studio/vocabulary/player-names";
 import { Stat } from "#enums/stat";
 
 // Hand-written codecs for the B11 chunk 4 declarations. Staff see and pick player words ("Speed", "Replace the stat", the name

@@ -66,7 +66,7 @@ export default defineDecl(ConsumeFirstFlaggedMovePriorityAbAttr, {
       ctorIndex: 1,
       path: "regainOnKo",
       control: "boolean",
-      label: "A knock-out gives the bonus back",
+      label: "A knockout gives the bonus back",
       // Decides the SHAPE of the gate (an extra "target fainted" branch).
       editable: false,
       default: false,

@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { playerName } from "#data/elite-redux/ability-studio/decl-naming";
 // B12 chunk 3. Codecs of the type, trap, recoil and decay classes (a helper, not a declaration: the registry only collects
 // `*.decl.ts` and `bindings.ts`). Staff read and write plain words and percents; the classes take enum numbers and fractions.
 //
@@ -16,6 +15,7 @@ import { playerName } from "#data/elite-redux/ability-studio/decl-naming";
 //   optionPick              the fields of the trap class's options object
 //   conversionSourceCodec   "Normal" / "Sound moves that are Normal" <-> the source filter
 import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
+import { playerName } from "#data/elite-redux/ability-studio/vocabulary/player-names";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";

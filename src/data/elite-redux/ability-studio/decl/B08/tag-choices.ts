@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
+import { MOVE_FLAG_OPTIONS, TYPE_OPTIONS } from "#data/elite-redux/ability-studio/vocabulary/enums";
 // Shared by the B08 chunk 2 declarations (the chance-on-hit and chance-on-attack classes): the player-facing words
 // for the lasting effects and move filters, and the codecs that turn them into what the constructors want.
 // This is not a declaration (the registry only collects `*.decl.ts` and `bindings.ts`).
-import { playerName } from "#data/elite-redux/ability-studio/decl-naming";
-import type { ParamCodec } from "#data/elite-redux/ability-studio/define-decl";
-import { MOVE_FLAG_OPTIONS, TYPE_OPTIONS } from "#data/elite-redux/ability-studio/vocabulary/enums";
+import { playerName } from "#data/elite-redux/ability-studio/vocabulary/player-names";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
