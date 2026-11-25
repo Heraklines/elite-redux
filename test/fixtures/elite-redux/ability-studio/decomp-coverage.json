@@ -1,18 +1,18 @@
 {
  "attrs": {
   "full": 294,
-  "partly": 2237,
+  "partly": 2243,
   "packageOnly": 119,
-  "engineQuery": 158,
-  "notStarted": 67,
+  "engineQuery": 170,
+  "notStarted": 49,
   "total": 2875
  },
  "abilities": {
   "full": 53,
-  "partly": 1142,
-  "packageOnly": 78,
+  "partly": 1144,
+  "packageOnly": 85,
   "engineQuery": 0,
-  "notStarted": 9,
+  "notStarted": 0,
   "noAttrs": 3,
   "total": 1285
  },
@@ -272,15 +272,15 @@
   {
    "className": "AmaterasuMarkerAbAttr",
    "uses": 2,
-   "status": "undeclared",
-   "tier": "-",
-   "kind": "-",
+   "status": "decomposed",
+   "tier": "C",
+   "kind": "engine-query",
    "buckets": {
     "full": 0,
     "partly": 0,
     "packageOnly": 0,
-    "engineQuery": 0,
-    "notStarted": 2
+    "engineQuery": 2,
+    "notStarted": 0
    }
   },
   {
@@ -1056,15 +1056,15 @@
   {
    "className": "ClosedCircuitAbAttr",
    "uses": 1,
-   "status": "undeclared",
-   "tier": "-",
-   "kind": "-",
+   "status": "decomposed",
+   "tier": "C",
+   "kind": "engine-query",
    "buckets": {
     "full": 0,
     "partly": 0,
     "packageOnly": 0,
-    "engineQuery": 0,
-    "notStarted": 1
+    "engineQuery": 1,
+    "notStarted": 0
    }
   },
   {
@@ -1378,15 +1378,15 @@
   {
    "className": "CranisphereSkullBashAbAttr",
    "uses": 1,
-   "status": "undeclared",
-   "tier": "-",
-   "kind": "-",
+   "status": "decomposed",
+   "tier": "C",
+   "kind": "engine-query",
    "buckets": {
     "full": 0,
     "partly": 0,
     "packageOnly": 0,
-    "engineQuery": 0,
-    "notStarted": 1
+    "engineQuery": 1,
+    "notStarted": 0
    }
   },
   {
@@ -2694,15 +2694,15 @@
   {
    "className": "FreeAimAbAttr",
    "uses": 1,
-   "status": "undeclared",
-   "tier": "-",
-   "kind": "-",
+   "status": "decomposed",
+   "tier": "C",
+   "kind": "engine-query",
    "buckets": {
     "full": 0,
     "partly": 0,
     "packageOnly": 0,
-    "engineQuery": 0,
-    "notStarted": 1
+    "engineQuery": 1,
+    "notStarted": 0
    }
   },
   {
@@ -2806,15 +2806,15 @@
   {
    "className": "GritAttackStatAbAttr",
    "uses": 1,
-   "status": "undeclared",
-   "tier": "-",
-   "kind": "-",
+   "status": "decomposed",
+   "tier": "B",
+   "kind": "calc-modifier",
    "buckets": {
     "full": 0,
-    "partly": 0,
+    "partly": 1,
     "packageOnly": 0,
     "engineQuery": 0,
-    "notStarted": 1
+    "notStarted": 0
    }
   },
   {
@@ -3520,29 +3520,29 @@
   {
    "className": "LowerOffenseMoveCategoryAbAttr",
    "uses": 1,
-   "status": "undeclared",
-   "tier": "-",
-   "kind": "-",
+   "status": "decomposed",
+   "tier": "B",
+   "kind": "calc-modifier",
    "buckets": {
     "full": 0,
-    "partly": 0,
+    "partly": 1,
     "packageOnly": 0,
     "engineQuery": 0,
-    "notStarted": 1
+    "notStarted": 0
    }
   },
   {
    "className": "ManifestContactAbAttr",
    "uses": 1,
-   "status": "undeclared",
-   "tier": "-",
-   "kind": "-",
+   "status": "decomposed",
+   "tier": "C",
+   "kind": "engine-query",
    "buckets": {
     "full": 0,
     "partly": 0,
     "packageOnly": 0,
-    "engineQuery": 0,
-    "notStarted": 1
+    "engineQuery": 1,
+    "notStarted": 0
    }
   },
   {
@@ -3576,15 +3576,15 @@
   {
    "className": "MiracleBladeTypeChartAbAttr",
    "uses": 1,
-   "status": "undeclared",
-   "tier": "-",
-   "kind": "-",
+   "status": "decomposed",
+   "tier": "B",
+   "kind": "calc-modifier",
    "buckets": {
     "full": 0,
-    "partly": 0,
+    "partly": 1,
     "packageOnly": 0,
     "engineQuery": 0,
-    "notStarted": 1
+    "notStarted": 0
    }
   },
   {
@@ -3618,15 +3618,15 @@
   {
    "className": "MonkFocusPunchAbAttr",
    "uses": 1,
-   "status": "undeclared",
-   "tier": "-",
-   "kind": "-",
+   "status": "decomposed",
+   "tier": "C",
+   "kind": "engine-query",
    "buckets": {
     "full": 0,
     "partly": 0,
     "packageOnly": 0,
-    "engineQuery": 0,
-    "notStarted": 1
+    "engineQuery": 1,
+    "notStarted": 0
    }
   },
   {
@@ -3842,15 +3842,15 @@
   {
    "className": "MudballReactiveAbAttr",
    "uses": 1,
-   "status": "undeclared",
-   "tier": "-",
-   "kind": "-",
+   "status": "decomposed",
+   "tier": "B",
+   "kind": "event-effect",
    "buckets": {
     "full": 0,
-    "partly": 0,
+    "partly": 1,
     "packageOnly": 0,
     "engineQuery": 0,
-    "notStarted": 1
+    "notStarted": 0
    }
   },
   {
@@ -6376,15 +6376,15 @@
   {
    "className": "RagingFistAbAttr",
    "uses": 1,
-   "status": "undeclared",
-   "tier": "-",
-   "kind": "-",
+   "status": "decomposed",
+   "tier": "C",
+   "kind": "engine-query",
    "buckets": {
     "full": 0,
     "partly": 0,
     "packageOnly": 0,
-    "engineQuery": 0,
-    "notStarted": 1
+    "engineQuery": 1,
+    "notStarted": 0
    }
   },
   {
@@ -6600,15 +6600,15 @@
   {
    "className": "ReductionRuneAbAttr",
    "uses": 1,
-   "status": "undeclared",
-   "tier": "-",
-   "kind": "-",
+   "status": "decomposed",
+   "tier": "C",
+   "kind": "engine-query",
    "buckets": {
     "full": 0,
     "partly": 0,
     "packageOnly": 0,
-    "engineQuery": 0,
-    "notStarted": 1
+    "engineQuery": 1,
+    "notStarted": 0
    }
   },
   {
@@ -6880,15 +6880,15 @@
   {
    "className": "SeaSpecterAbAttr",
    "uses": 1,
-   "status": "undeclared",
-   "tier": "-",
-   "kind": "-",
+   "status": "decomposed",
+   "tier": "C",
+   "kind": "engine-query",
    "buckets": {
     "full": 0,
     "partly": 0,
     "packageOnly": 0,
-    "engineQuery": 0,
-    "notStarted": 1
+    "engineQuery": 1,
+    "notStarted": 0
    }
   },
   {
@@ -7300,15 +7300,15 @@
   {
    "className": "SpiritualSaberNoContactAbAttr",
    "uses": 1,
-   "status": "undeclared",
-   "tier": "-",
-   "kind": "-",
+   "status": "decomposed",
+   "tier": "C",
+   "kind": "engine-query",
    "buckets": {
     "full": 0,
     "partly": 0,
     "packageOnly": 0,
-    "engineQuery": 0,
-    "notStarted": 1
+    "engineQuery": 1,
+    "notStarted": 0
    }
   },
   {
@@ -7636,15 +7636,15 @@
   {
    "className": "StatusMoveTypeImmunityBypassAbAttr",
    "uses": 1,
-   "status": "undeclared",
-   "tier": "-",
-   "kind": "-",
+   "status": "decomposed",
+   "tier": "C",
+   "kind": "while-active",
    "buckets": {
     "full": 0,
-    "partly": 0,
+    "partly": 1,
     "packageOnly": 0,
     "engineQuery": 0,
-    "notStarted": 1
+    "notStarted": 0
    }
   },
   {
@@ -7846,15 +7846,15 @@
   {
    "className": "SynchronizedCurrentAbAttr",
    "uses": 1,
-   "status": "undeclared",
-   "tier": "-",
-   "kind": "-",
+   "status": "decomposed",
+   "tier": "C",
+   "kind": "engine-query",
    "buckets": {
     "full": 0,
     "partly": 0,
     "packageOnly": 0,
-    "engineQuery": 0,
-    "notStarted": 1
+    "engineQuery": 1,
+    "notStarted": 0
    }
   },
   {
@@ -8434,15 +8434,15 @@
   {
    "className": "WeatherGroundAirborneAbAttr",
    "uses": 1,
-   "status": "undeclared",
-   "tier": "-",
-   "kind": "-",
+   "status": "decomposed",
+   "tier": "B",
+   "kind": "calc-modifier",
    "buckets": {
     "full": 0,
-    "partly": 0,
+    "partly": 1,
     "packageOnly": 0,
     "engineQuery": 0,
-    "notStarted": 1
+    "notStarted": 0
    }
   },
   {
@@ -9615,7 +9615,7 @@
   "5921": "partly",
   "5922": "partly",
   "5923": "partly",
-  "5924": "notStarted",
+  "5924": "packageOnly",
   "5925": "partly",
   "5926": "packageOnly",
   "5927": "partly",
@@ -9753,15 +9753,15 @@
   "6061": "partly",
   "6062": "partly",
   "6063": "partly",
-  "6064": "notStarted",
+  "6064": "partly",
   "6065": "partly",
   "6066": "partly",
   "6067": "partly",
-  "6068": "notStarted",
+  "6068": "packageOnly",
   "6069": "full",
   "6070": "partly",
   "6071": "partly",
-  "6072": "notStarted",
+  "6072": "packageOnly",
   "6073": "partly",
   "6074": "partly",
   "6075": "partly",
@@ -9771,7 +9771,7 @@
   "6079": "partly",
   "6080": "partly",
   "6081": "partly",
-  "6082": "notStarted",
+  "6082": "packageOnly",
   "6083": "partly",
   "6084": "partly",
   "6085": "partly",
@@ -9779,7 +9779,7 @@
   "6087": "partly",
   "6088": "partly",
   "6089": "partly",
-  "6090": "notStarted",
+  "6090": "packageOnly",
   "6091": "partly",
   "6092": "partly",
   "6093": "partly",
@@ -9795,17 +9795,17 @@
   "6103": "partly",
   "6104": "packageOnly",
   "6105": "partly",
-  "6106": "notStarted",
+  "6106": "packageOnly",
   "6107": "partly",
   "6108": "partly",
   "6109": "partly",
-  "6110": "notStarted",
+  "6110": "partly",
   "6111": "partly",
   "6112": "partly",
   "6113": "partly",
   "6114": "partly",
   "6115": "partly",
-  "6116": "notStarted",
+  "6116": "packageOnly",
   "20000": "partly",
   "20001": "partly",
   "20002": "partly",
