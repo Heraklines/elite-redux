@@ -129,6 +129,8 @@ describe("B08 chunk 4: gate classes", () => {
   });
 
   // -------------------------------------------------------------------------------------------
+  // A grid over 66 attrs and several weathers: 22 s before B19, 30 s after (more vocabulary to rebuild from) on a busy
+  // shared server, over the default 20 s; give it 120 s.
   it("DamageReductionAbAttr: all 66 attrs answer like the class's own filter, refactored and rebuilt (the 9 legacy gates too, on the class side), and multiply the same", async () => {
     const world = await startWorld(phaserGame);
     loadMoves();
@@ -229,7 +231,7 @@ describe("B08 chunk 4: gate classes", () => {
     ]) {
       expect(accepted.get(kind) ?? 0, kind).toBeGreaterThan(0);
     }
-  });
+  }, 120_000);
 
   // -------------------------------------------------------------------------------------------
   it("DefenseStatSwapOnFlagAbAttr: the five users give the original power, refactored and rebuilt, over every move and several defense pairs", async () => {
