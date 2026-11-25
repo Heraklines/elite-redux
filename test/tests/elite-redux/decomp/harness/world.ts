@@ -473,11 +473,21 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
   // Pokemon.getAttackDamage (pokemon.ts:6071): a critical hit starts at 1.5 (a plain hit at 1, which MultCrit skips).
   "calc.crit-multiplier": ctx => ({ pokemon: ctx.holder, critMult: new NumberHolder(1.5), simulated: false }),
   // Pokemon.getCriticalHitResult (pokemon.ts:6438): the holder attacks `target`, the number is "will crit".
+  // B13 chunk 3 (Ring General): the engine asks the TRAPPER (`pokemon`) about the foe it may hold (`opponent`).
+  "calc.trap-check": ctx => ({
+    pokemon: ctx.holder,
+    opponent: ctx.foe,
+    trapped: new BooleanHolder(false),
+    simulated: false,
+  }),
+  // B13 chunk 4 (Deadeye Draw): the engine asks the ATTACKER (`pokemon`) whether a hit on `target` is a sure crit
+  // (`applyAbAttrs("ConditionalCritAbAttr", { pokemon: source, isCritical, target, move })`, field/pokemon.ts).
   "calc.crit-roll": ctx => ({
     pokemon: ctx.holder,
     target: ctx.foe,
     move: ctx.move,
     isCritical: new BooleanHolder(false),
+    simulated: false,
   }),
   // Cancel checks with no opponent (turn-end-phase.ts:89, move.ts:4713).
   "cancel.indirect-damage": ctx => ({ pokemon: ctx.holder, cancelled: new BooleanHolder(false) }),
