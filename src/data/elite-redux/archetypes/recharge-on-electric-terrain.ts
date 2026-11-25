@@ -17,14 +17,29 @@
 
 import { PostTerrainChangeAbAttr, type PostTerrainChangeAbAttrParams, PostVictoryAbAttr } from "#abilities/ab-attrs";
 import { allMoves } from "#data/data-lists";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { TerrainType } from "#data/terrain";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { PokemonType } from "#enums/pokemon-type";
 import type { AbAttrBaseParams } from "#types/ability-types";
 
 export class RechargeChargedOnElectricTerrainAbAttr extends PostTerrainChangeAbAttr {
-  override canApply({ pokemon, terrain }: PostTerrainChangeAbAttrParams): boolean {
-    return terrain === TerrainType.ELECTRIC && pokemon.canAddTag(BattlerTagType.CHARGED);
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostTerrainChangeAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the replaceable gate, then the effect's own feasibility. */
+  override canApply(params: PostTerrainChangeAbAttrParams): boolean {
+    return gatedCanApply<PostTerrainChangeAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition (clause 1 of the original): the terrain that just began is Electric Terrain. */
+  public gate({ terrain }: PostTerrainChangeAbAttrParams): boolean {
+    return terrain === TerrainType.ELECTRIC;
+  }
+
+  /** Clause 2 of the original: the holder can take the Charged state (feasibility of the effect). */
+  public residual({ pokemon }: PostTerrainChangeAbAttrParams): boolean {
+    return pokemon.canAddTag(BattlerTagType.CHARGED);
   }
 
   override apply({ simulated, pokemon }: PostTerrainChangeAbAttrParams): void {
@@ -41,13 +56,23 @@ export class RechargeChargedOnElectricTerrainAbAttr extends PostTerrainChangeAbA
  * Electric-type — that move is the one that just secured the knockout.
  */
 export class RechargeChargedOnElectricKoAbAttr extends PostVictoryAbAttr {
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the replaceable gate, then the effect's own feasibility. */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The replaceable condition (clauses 1 and 2 of the original): the holder's last move is a printed Electric-type move. */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     const last = pokemon.getLastXMoves(1)[0];
-    return (
-      last !== undefined
-      && allMoves[last.move]?.type === PokemonType.ELECTRIC
-      && pokemon.canAddTag(BattlerTagType.CHARGED)
-    );
+    return last !== undefined && allMoves[last.move]?.type === PokemonType.ELECTRIC;
+  }
+
+  /** Clause 3 of the original: the holder can take the Charged state (feasibility of the effect). */
+  public residual({ pokemon }: AbAttrBaseParams): boolean {
+    return pokemon.canAddTag(BattlerTagType.CHARGED);
   }
 
   override apply({ simulated, pokemon }: AbAttrBaseParams): void {

@@ -30,6 +30,7 @@ import { globalScene } from "#app/global-scene";
 import type { AbilityId } from "#enums/ability-id";
 import { HitResult } from "#enums/hit-result";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import type { PokemonAttackCondition } from "#types/ability-types";
 import { toDmgValue } from "#utils/common";
 
 export type SelfDamageBasis = "damageDealt" | "maxHp";
@@ -59,18 +60,40 @@ export class SelfDamageOnAttackAbAttr extends PostAttackAbAttr {
   private readonly basis: SelfDamageBasis;
   private readonly fraction: number;
   private readonly soulLink: boolean;
-  private readonly cancelIfTargetHasAbility: AbilityId | undefined;
+  /** Whether the self-damage may happen against this target; read by the ability studio. */
+  public readonly condition: PokemonAttackCondition;
 
-  constructor(options: SelfDamageOnAttackOptions) {
+  /**
+   * @param options - the basis, the fraction and the soul-link settings of the default condition
+   * @param condition - When the self-damage may happen, called with the holder, the target and the move. The default is
+   *   "not soul-link, or the target has not fainted and does not have `options.cancelIfTargetHasAbility`", so
+   *   `new SelfDamageOnAttackAbAttr({ ... })` behaves exactly as before; the ability studio hands in a replacement.
+   */
+  constructor(options: SelfDamageOnAttackOptions, condition?: PokemonAttackCondition) {
     super();
     this.basis = options.basis;
     this.fraction = options.fraction;
     this.soulLink = options.soulLink ?? false;
-    this.cancelIfTargetHasAbility = options.cancelIfTargetHasAbility;
+    const soulLink = this.soulLink;
+    const cancelIfTargetHasAbility = options.cancelIfTargetHasAbility;
+    this.condition =
+      condition
+      ?? ((_user, target) => {
+        if (!soulLink) {
+          return true;
+        }
+        // Dex: Soul Linker does not activate when either Pokemon is KO'd. Skip the offensive recoil when this hit
+        // KO'd the target.
+        if (target?.isFainted()) {
+          return false;
+        }
+        // Dex: does not activate against ANOTHER Soul Linker.
+        return !(cancelIfTargetHasAbility != null && target?.hasAbility(cancelIfTargetHasAbility));
+      });
   }
 
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { simulated, damage, pokemon, opponent: target } = params;
+    const { simulated, damage, pokemon, opponent: target, move } = params;
     // Soul Linker is suppressed inside the Fun and Games (Wobbuffet) minigame.
     if (
       this.soulLink
@@ -78,16 +101,9 @@ export class SelfDamageOnAttackAbAttr extends PostAttackAbAttr {
     ) {
       return false;
     }
-    if (this.soulLink) {
-      // Dex: Soul Linker does not activate when either Pokemon is KO'd. Skip the
-      // offensive recoil when this hit KO'd the target.
-      if (target?.isFainted()) {
-        return false;
-      }
-      // Dex: does not activate against ANOTHER Soul Linker.
-      if (this.cancelIfTargetHasAbility != null && target?.hasAbility(this.cancelIfTargetHasAbility)) {
-        return false;
-      }
+    // The replaceable condition (soul-link: the target has not fainted and is not another Soul Linker).
+    if (!this.condition(pokemon, target ?? null, move)) {
+      return false;
     }
     // Damaging move (super) + actually connected for damage this hit.
     if (!super.canApply(params) || simulated || damage <= 0) {

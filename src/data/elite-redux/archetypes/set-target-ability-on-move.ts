@@ -22,6 +22,7 @@
 
 import { PostAttackAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
 import { allAbilities } from "#data/data-lists";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { AbilityId } from "#enums/ability-id";
 import { HitResult } from "#enums/hit-result";
 import type { MoveId } from "#enums/move-id";
@@ -36,12 +37,33 @@ export class SetTargetAbilityOnMoveAbAttr extends PostAttackAbAttr {
     this.abilityId = abilityId;
   }
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order:
+   * `guards` (not a preview), then `gate` (the move is the configured move), then `residual` (the hit connected, there is a
+   * living target, and it does not have the ability yet).
+   */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { move, opponent: target, hitResult, simulated } = params;
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Stays in front of the gate: nothing happens in a preview. */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    return !params.simulated;
+  }
+
+  /** The replaceable condition: the move that was used is the configured move. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    return params.move.id === this.moveId;
+  }
+
+  /** Stays in the class (feasibility): the hit connected, a living target exists, and it does not already have the ability. */
+  public residual(params: PostMoveInteractionAbAttrParams): boolean {
+    const { opponent: target, hitResult } = params;
     return (
-      !simulated
-      && move.id === this.moveId
-      && hitResult < HitResult.NO_EFFECT
+      hitResult < HitResult.NO_EFFECT
       && !!target
       && !target.isFainted() // Don't re-apply if the target already has the ability.
       && target.getAbility().id !== this.abilityId

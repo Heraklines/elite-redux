@@ -25,6 +25,7 @@
 
 import { type AbAttrBaseParams, PostSummonAbAttr, PreSwitchOutAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { Pokemon } from "#field/pokemon";
 import type { PokemonHeldItemModifier } from "#modifiers/modifier";
 
@@ -70,10 +71,21 @@ export class PreSwitchOutItemRestoreAbAttr extends PreSwitchOutAbAttr {
     super(true);
   }
 
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
-    if (pokemon.isFainted()) {
-      return false;
-    }
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): guard, then the replaceable gate; nothing stays behind as a residual. */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The safety rule that came first in the original `canApply`: a fainted holder never gets anything back. */
+  public guards({ pokemon }: AbAttrBaseParams): boolean {
+    return !pokemon.isFainted();
+  }
+
+  /** The replaceable condition: a berry was eaten, or the holder is empty-handed and remembers items it came in with. */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     const ateBerry = (pokemon.summonData?.berriesEatenLast ?? []).length > 0;
     const canRestoreItem =
       pokemon.getHeldItems().length === 0 && (retrieverOriginalHeldItems.get(pokemon)?.length ?? 0) > 0;

@@ -68,6 +68,8 @@
     "calc.double-battle-chance": "quiet-turns: the engine never evaluated a DoubleBattleChanceAbAttr attr of the holder (wild encounter generation runs before a battle exists)",
     "calc.ignore-type-immunity": "holder-hits-foe: the engine never evaluated a IgnoreTypeImmunityAbAttr attr of the holder",
     "calc.ally-stat-aura": "holder-hits-foe: not dispatched through applyAbAttrs; Pokemon.getStat scans the field for the class by name and calls applyAuras(), so the engine never evaluates a PersistentFieldAuraAbAttr attr of the holder",
+    "calc.recoil-taken": "holder-hits-foe: not dispatched through applyAbAttrs; RecoilAttr.apply and the crash-damage helper in move.ts scan the user abilities for the class by name and call fire(), so the engine never evaluates a RecoilDamageMultiplierAbAttr attr of the holder",
+    "event.turn-start": "quiet-turn: not dispatched through applyAbAttrs; TurnStartPhase.queuePreemptiveCounters scans the field for the class by name, so the engine never evaluates a PreemptivePriorityCounterAbAttr attr of the holder",
     "calc.incoming-effect-chance": "foe-hits-holder: the engine never evaluated a IgnoreMoveEffectsAbAttr attr of the holder",
     "calc.incoming-move": "foe-hits-holder: the engine never evaluated a PreDefendAbAttr attr of the holder",
     "calc.move-power": "holder-hits-foe: the engine never evaluated a MovePowerBoostAbAttr attr of the holder",

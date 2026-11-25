@@ -63,6 +63,7 @@
 // =============================================================================
 
 import { PreDefendFullHpEndureAbAttr, type PreDefendModifyDamageAbAttrParams } from "#abilities/ab-attrs";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import type { Pokemon } from "#field/pokemon";
 
@@ -161,10 +162,25 @@ export class PreFaintReviveAbAttr extends PreDefendFullHpEndureAbAttr {
    *     already received N hits, so no more procs are allowed).
    */
   public override canApply(params: PreDefendModifyDamageAbAttrParams): boolean {
-    const { pokemon, damage } = params;
-    if (!this.matchesGate(pokemon.getHpRatio(true), pokemon.isFullHp())) {
-      return false;
-    }
+    return gatedCanApply<PreDefendModifyDamageAbAttrParams>(this, params);
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreDefendModifyDamageAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1), clause 1 of the original `canApply`: the replaceable HP rule. Both engine
+   * reads (the precise ratio and `isFullHp()`) are still made on every call, as before.
+   */
+  public gate({ pokemon }: PreDefendModifyDamageAbAttrParams): boolean {
+    return this.matchesGate(pokemon.getHpRatio(true), pokemon.isFullHp());
+  }
+
+  /**
+   * Clauses 2 to 4 of the original `canApply`, in the original order: more than 1 max HP, the hit would knock the
+   * holder out, and the usage policy still allows a proc. They are feasibility of the effect, not the HP rule.
+   */
+  public residual({ pokemon, damage }: PreDefendModifyDamageAbAttrParams): boolean {
     if (pokemon.getMaxHp() <= 1) {
       return false;
     }

@@ -315,6 +315,8 @@ export interface ParamContext {
   readonly move: Move;
   /** Damage dealt, for moments that carry it. */
   readonly damage: number;
+  /** The stat being calculated, for the stat-value moment (the differential tries every battle stat there). */
+  readonly stat?: number;
 }
 
 export type ParamBuilder = (ctx: ParamContext) => Record<string, unknown>;
@@ -326,6 +328,8 @@ const holderDamage = (ctx: ParamContext): NumberHolder => new NumberHolder(ctx.d
 export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
   "event.on-entry": ({ holder }) => ({ pokemon: holder, simulated: false }),
   "event.end-of-turn": ({ holder }) => ({ pokemon: holder, simulated: false }),
+  // FaintPhase: `applyAbAttrs("PostVictoryAbAttr", { pokemon: defeatSource })` (the holder landed the knock out).
+  "event.on-win": ({ holder }) => ({ pokemon: holder, simulated: false }),
   "event.after-taking-damage": ({ holder, foe, damage }) => ({
     pokemon: holder,
     source: foe,
@@ -361,6 +365,29 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     source: foe,
     move: new PokemonMove(move.id),
     targets: [foe.getBattlerIndex()],
+    simulated: false,
+  }),
+  // StatStageChangePhase passes pokemon, stats, stages and selfTarget to PostStatStageChangeAbAttr; here a drop of one stage.
+  "event.stat-changed": ({ holder }) => ({
+    pokemon: holder,
+    stats: [Stat.ATK],
+    stages: -1,
+    selfTarget: false,
+    simulated: false,
+  }),
+  // Pokemon.getEffectiveStat passes pokemon, stat, statVal, simulated and move to StatMultiplierAbAttr.
+  "calc.stat-value": ({ holder, move, stat }) => ({
+    pokemon: holder,
+    stat: stat ?? Stat.ATK,
+    statVal: new NumberHolder(100),
+    simulated: false,
+    move,
+  }),
+  // Never dispatched by the engine (PreAttackAbAttr is a base class); the same shape as the other attack-side moments.
+  "calc.outgoing-move": ({ holder, foe, move }) => ({
+    pokemon: holder,
+    opponent: foe,
+    move,
     simulated: false,
   }),
   "calc.damage-taken": ctx => ({
@@ -412,6 +439,13 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     cancelled: new BooleanHolder(false),
     simulated: false,
   }),
+  // Move.getPriority: `applyAbAttrs("ChangeMovePriorityAbAttr", { pokemon: user, simulated, move: this, priority })`.
+  "calc.priority": ctx => ({
+    pokemon: ctx.holder,
+    move: ctx.move,
+    priority: new NumberHolder(ctx.move.priority),
+    simulated: false,
+  }),
   "calc.move-power": ctx => ({
     pokemon: ctx.holder,
     opponent: ctx.foe,
@@ -425,14 +459,6 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     pokemon: ctx.holder,
     move: ctx.move,
     accuracy: new NumberHolder(ctx.move.accuracy),
-    simulated: false,
-  }),
-  // Added by B05 chunk 2. Move.getPriority / getPriorityModifier (move.ts:1445, :1455): the user is the holder, the
-  // number is the move priority (a bracket value for ChangeMovePriorityInBracketAbAttr; the shape is the same).
-  "calc.priority": ctx => ({
-    pokemon: ctx.holder,
-    move: ctx.move,
-    priority: new NumberHolder(ctx.move.priority),
     simulated: false,
   }),
   // Pokemon.getCritStage (pokemon.ts:2063): only the holder and the stage number.
@@ -480,15 +506,6 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
   }),
   // Added by B09 chunk 2 (request R-B09-08). MoveEffectPhase (move-effect-phase.ts:455) passes only the user.
   "event.my-move-starts": ({ holder }) => ({ pokemon: holder }),
-  // Added by B09 chunk 1 (request R-B09-27). StatStageChangePhase (stat-stage-change-phase.ts:357): the holder is the Pokemon whose
-  // stat changed, `stats` is the filtered list, `stages` the requested amount, `selfTarget` false (a foe caused it).
-  "event.stat-changed": ({ holder }) => ({
-    pokemon: holder,
-    stats: [Stat.ATK],
-    stages: 1,
-    selfTarget: false,
-    simulated: false,
-  }),
   // Added by B09 chunk 3 (request R-B09-15). MoveEffectPhase (move-effect-phase.ts:257-259) hands the user, the move, the running
   // hit count (starts at 1) and the first target to the AddSecondStrikeAbAttr dispatch.
   "calc.hit-count": ctx => ({

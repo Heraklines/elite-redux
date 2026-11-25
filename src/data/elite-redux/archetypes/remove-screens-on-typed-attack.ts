@@ -20,6 +20,7 @@
 
 import { PostAttackAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import type { PokemonType } from "#enums/pokemon-type";
@@ -45,14 +46,24 @@ export class RemoveScreensOnTypedAttackAbAttr extends PostAttackAbAttr {
     this.moveType = options.type;
   }
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the original clause order: `guards`, then `gate`. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The move must be a damaging move (the parent's attack condition) and there must be a target. */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
     if (!super.canApply(params)) {
       return false;
     }
-    const { move, pokemon, opponent } = params;
-    if (!opponent) {
-      return false;
-    }
+    return !!params.opponent;
+  }
+
+  /** The replaceable condition: the move resolves to the configured type. */
+  public gate({ move, pokemon }: PostMoveInteractionAbAttrParams): boolean {
     return pokemon.getMoveType(move) === this.moveType;
   }
 

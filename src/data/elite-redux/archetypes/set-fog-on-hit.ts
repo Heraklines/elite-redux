@@ -18,6 +18,7 @@
 
 import { PostDefendAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { WeatherType } from "#enums/weather-type";
 import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 
@@ -27,13 +28,35 @@ import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 // defect class as the counter-attack archetype). A prior explicit `super(false)`
 // suppressed that banner.
 export class SetFogOnHitAbAttr extends PostDefendAbAttr {
+  private readonly weather: WeatherType;
+  private readonly turns: number;
+
+  /**
+   * @param weather - the weather set when the holder is hit; the default is Eerie Fog, the only shipped value
+   * @param turns - how many turns it lasts; the default is 8 (the standard ER weather-summon length)
+   */
+  constructor(weather: WeatherType = WeatherType.EERIE_FOG, turns = 8) {
+    super();
+    this.weather = weather;
+    this.turns = turns;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole rule is the gate, there is no guard and no residual. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The replaceable conditions, in the ORIGINAL order: the move is an attack, and that weather is not already up. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
     const { move } = params;
     if (!move?.is("AttackMove")) {
       return false;
     }
     const currentWeather = globalScene.arena.weather?.weatherType;
-    return currentWeather !== WeatherType.EERIE_FOG;
+    return currentWeather !== this.weather;
   }
 
   override apply(params: PostMoveInteractionAbAttrParams): void {
@@ -42,6 +65,6 @@ export class SetFogOnHitAbAttr extends PostDefendAbAttr {
       return;
     }
     // ER 905 summons Eerie Fog for 8 turns (the standard ER weather-summon length).
-    globalScene.arena.trySetWeather(WeatherType.EERIE_FOG, pokemon, 8);
+    globalScene.arena.trySetWeather(this.weather, pokemon, this.turns);
   }
 }

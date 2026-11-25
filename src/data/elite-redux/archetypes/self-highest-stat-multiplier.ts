@@ -20,10 +20,10 @@
 // =============================================================================
 
 import { StatMultiplierAbAttr } from "#abilities/ab-attrs";
-import type { StatMultiplierAbAttrParams } from "#types/ability-types";
-import type { EffectiveStat } from "#enums/stat";
 import { globalScene } from "#app/global-scene";
+import type { EffectiveStat } from "#enums/stat";
 import type { WeatherType } from "#enums/weather-type";
+import type { AbAttrCondition, StatMultiplierAbAttrParams } from "#types/ability-types";
 
 export interface SelfHighestStatMultiplierOptions {
   /** Candidate stats — whichever has the highest base value gets the multiplier. */
@@ -46,9 +46,19 @@ export interface SelfHighestStatMultiplierOptions {
 export class SelfHighestStatMultiplierAbAttr extends StatMultiplierAbAttr {
   private readonly candidates: readonly EffectiveStat[];
   private readonly mult: number;
-  private readonly weathers?: readonly WeatherType[];
+  /**
+   * Whether the multiplier may apply at all, called with the holder; read by the ability studio. Always set: it is the
+   * constructor argument, or the weather test of `opts.weathers` (see the constructor).
+   */
+  public readonly activeCondition: AbAttrCondition;
 
-  constructor(opts: SelfHighestStatMultiplierOptions) {
+  /**
+   * @param opts - the candidate stats, the multiplier and the weather list of the default condition
+   * @param condition - When the multiplier may apply, called with the holder. The default is "the active weather is one of
+   *   `opts.weathers`" (no list = always), so `new SelfHighestStatMultiplierAbAttr({ ... })` behaves exactly as before; the
+   *   ability studio hands in a replacement.
+   */
+  constructor(opts: SelfHighestStatMultiplierOptions, condition?: AbAttrCondition) {
     if (opts.candidates.length === 0) {
       throw new Error("[SelfHighestStatMultiplierAbAttr] candidates must be non-empty");
     }
@@ -60,7 +70,18 @@ export class SelfHighestStatMultiplierAbAttr extends StatMultiplierAbAttr {
     super(opts.candidates[0], opts.multiplier);
     this.candidates = opts.candidates;
     this.mult = opts.multiplier;
-    this.weathers = opts.weathers;
+    const { weathers } = opts;
+    this.activeCondition =
+      condition
+      ?? (() => {
+        if (weathers !== undefined) {
+          const active = globalScene.arena.weather?.weatherType;
+          if (active === undefined || !weathers.includes(active)) {
+            return false;
+          }
+        }
+        return true;
+      });
   }
 
   override canApply(params: StatMultiplierAbAttrParams): boolean {
@@ -68,11 +89,9 @@ export class SelfHighestStatMultiplierAbAttr extends StatMultiplierAbAttr {
       // Parent gates on stat === this.stat (the placeholder first candidate),
       // which we WANT to bypass. So we replicate the parent's other checks here.
     }
-    if (this.weathers !== undefined) {
-      const active = globalScene.arena.weather?.weatherType;
-      if (active === undefined || !this.weathers.includes(active)) {
-        return false;
-      }
+    // The weather test (a condition the ability studio can replace), in its ORIGINAL position.
+    if (!this.activeCondition(params.pokemon)) {
+      return false;
     }
     const queriedStat = params.stat as EffectiveStat;
     if (!this.candidates.includes(queriedStat)) {

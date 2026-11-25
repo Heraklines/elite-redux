@@ -115,8 +115,13 @@ describe("L2 battle twin (live registry)", () => {
             // A presence flag (while-active, engine-query) is never dispatched, so no trace can show it evaluated.
             // A declaration with a written l2StaticReason says no template can steer into its trigger; its hand-written
             // twin test carries the proof, so the shared twin only compares whole-battle traces for it.
+            // An ability with an ability-level condition (vanilla Solar Power and Sand Force only work in their weather) is dormant
+            // in a scenario whose weather axis does not satisfy it, so the original cannot be shown evaluating the attr there; the
+            // two battles are still compared as a whole (request R-B11-C4-09).
+            const dormantInWeather = scenario.axes.weather !== undefined && original.conditions.length > 0;
             if (
               scenario.staticReason === undefined
+              && !dormantInWeather
               && getWhen(declRegistry.get(attr.constructor.name)!.decl.when)?.dispatchKey != null
             ) {
               entry.attrs.push({ attrIndex: index, className: attr.constructor.name });

@@ -22,6 +22,7 @@
 
 import { PostTurnAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
 import type { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
@@ -62,11 +63,21 @@ export class PostTurnScriptedMoveAbAttr extends PostTurnAbAttr {
     }
   }
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the original clause order: the faint guard, then the cadence gate. */
   override canApply(params: AbAttrBaseParams): boolean {
-    const { pokemon } = params;
-    if (pokemon.isFainted()) {
-      return false;
-    }
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** Safety rule (first clause of the original): a fainted holder never casts. */
+  public guards({ pokemon }: AbAttrBaseParams): boolean {
+    return !pokemon.isFainted();
+  }
+
+  /** The replaceable condition: it is a turn the cadence allows (turn 0 never counts). */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     const turn = pokemon.tempSummonData?.turnCount ?? 0;
     return turn > 0 && turn % this.everyNTurns === 0;
   }

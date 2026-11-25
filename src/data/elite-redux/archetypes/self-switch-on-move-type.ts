@@ -16,6 +16,7 @@
 // =============================================================================
 
 import { ForceSwitchOutHelper, PostAttackAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { HitResult } from "#enums/hit-result";
 import type { PokemonType } from "#enums/pokemon-type";
 import { SwitchType } from "#enums/switch-type";
@@ -29,17 +30,36 @@ export class SelfSwitchOnMoveTypeAbAttr extends PostAttackAbAttr {
     this.moveType = moveType;
   }
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the ORIGINAL clause order:
+   * `guards` (not a preview), then `gate` (a damaging move of the configured type), then `residual` (the hit connected and
+   * this was the final hit).
+   */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { pokemon, move, simulated, hitResult } = params;
-    // Only after a damaging move of the configured type actually connected,
-    // and only on the final hit of a multi-hit move.
-    return (
-      !simulated
-      && super.canApply(params)
-      && pokemon.getMoveType(move) === this.moveType
-      && hitResult < HitResult.NO_EFFECT
-      && pokemon.turnData.hitsLeft <= 1
-    );
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Stays in front of the gate: nothing happens in a preview. */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
+    return !params.simulated;
+  }
+
+  /** The replaceable conditions: the move is a damaging move (the parent test) and it is of the configured type. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    const { pokemon, move } = params;
+    return super.canApply(params) && pokemon.getMoveType(move) === this.moveType;
+  }
+
+  /**
+   * Stays in the class (feasibility): only after a hit that actually connected, and only on the final hit of a multi-hit
+   * move.
+   */
+  public residual(params: PostMoveInteractionAbAttrParams): boolean {
+    const { pokemon, hitResult } = params;
+    return hitResult < HitResult.NO_EFFECT && pokemon.turnData.hitsLeft <= 1;
   }
 
   override apply(params: PostMoveInteractionAbAttrParams): void {

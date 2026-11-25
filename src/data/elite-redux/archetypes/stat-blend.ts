@@ -19,6 +19,7 @@
 // =============================================================================
 
 import { StatMultiplierAbAttr, type StatMultiplierAbAttrParams } from "#abilities/ab-attrs";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { BattleStat } from "#enums/stat";
 import { type Stat, Stat as StatEnum } from "#enums/stat";
 
@@ -47,7 +48,16 @@ export class StatBlendAbAttr extends StatMultiplierAbAttr {
     }
   }
 
-  override canApply({ stat }: StatMultiplierAbAttrParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: StatMultiplierAbAttrParams) => boolean) | undefined;
+
+  /** Tier B (ability studio spec 3.1): `canApply` is the gate alone; there are no guards and no residual. */
+  override canApply(params: StatMultiplierAbAttrParams): boolean {
+    return gatedCanApply<StatMultiplierAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the stat being worked out is one of the stats this blend applies to. */
+  public gate({ stat }: StatMultiplierAbAttrParams): boolean {
     return this.appliesTo.includes(stat);
   }
 

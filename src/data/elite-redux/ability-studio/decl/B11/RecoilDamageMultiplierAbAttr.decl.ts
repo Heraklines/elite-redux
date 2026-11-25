@@ -1,0 +1,76 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// B11 chunk 2 / calc-modifier (Tier C: one number, read by a by-name scan).
+//
+// Read by hand from archetypes/recoil-damage-multiplier.ts and its two readers in data/moves/move.ts. The class extends only AbAttr
+// (`super(false)`) and is never dispatched with applyAbAttrs: RecoilAttr.apply (move.ts, the recoil of Double-Edge and the like)
+// and the crash-damage helper (move.ts, Jump Kick and the like when they miss) loop over `user.getAllActiveAbilityAttrs()`, pick every
+// attr whose constructor NAME is RecoilDamageMultiplierAbAttr and call `fire(multiplierHolder)`.
+//   constructor: ONE options object `{ factor }`, stored in the private field `opts`; a factor that is not above 0 and below 1 throws.
+//   fire(holder): `holder.value *= factor`.  Nothing else: no canApply, no condition test (the readers never look at one), no `simulated`,
+//   no message, no random draw.
+//   readers: recoil move: `damageValue = (useHp ? maxHp : totalDamageDealt) * damageRatio * recoilMult`, then `toDmgValue(damageValue, 1 if
+//   damage was dealt else 0)`; crash: `toDmgValue(maxHp / 2 * recoilMult)`. Several such attrs multiply together.
+//
+// The only rule is the factor, so there is one setting and no IF. The engine never reads the attr's own condition, so an IF added to this
+// block would be ignored (see notes). The trigger is the library WHEN calc.recoil-taken ("while the game calculates the recoil I take",
+// added with this declaration, a by-name scan); the library also has no effect that multiplies recoil (request R-B11-C2-14:
+// effect.recoil is "take a share of the damage as recoil", a different effect), so the effect is one piece with a typed factor.
+import { defineDecl } from "#data/elite-redux/ability-studio/define-decl";
+import { RecoilDamageMultiplierAbAttr } from "#data/elite-redux/archetypes/recoil-damage-multiplier";
+import { recoilFactorCodec } from "./b11-chunk2-codecs";
+
+export default defineDecl(RecoilDamageMultiplierAbAttr, {
+  tier: "C",
+  kind: "calc-modifier",
+  when: "calc.recoil-taken",
+  label: "Take less recoil damage",
+  summary: params =>
+    `The recoil I take from my own moves (and the crash damage when a move like Jump Kick misses) is multiplied by ${params.factor}. Example: 0.5 = half recoil.`,
+  synonyms: [
+    "half recoil",
+    "reduce recoil",
+    "recoil reduction",
+    "less crash damage",
+    "limber",
+    "daredevil",
+    "steadfast",
+  ],
+  examples: ["Take half the recoil damage from my moves, like Daredevil"],
+  params: [
+    {
+      id: "factor",
+      ctorIndex: 0,
+      ctorOption: "factor",
+      path: "opts",
+      control: "number",
+      min: 0.05,
+      max: 0.95,
+      step: 0.05,
+      label: "Recoil multiplier (0.5 = half recoil, 0.25 = a quarter)",
+      editable: true,
+      default: 0.5,
+      codec: recoilFactorCodec,
+    },
+  ],
+  conditions: [],
+  guards: [],
+  feasibility: [
+    "Counts for recoil moves and for the crash damage of moves like Jump Kick when they miss",
+    "Recoil that is a share of my max HP (instead of the damage I dealt) is multiplied too",
+    "Several effects like this on one Pokemon multiply together",
+  ],
+  effect: { id: "effect.package", params: ["factor"] },
+  reusableAlone: { when: true, if: false, do: true },
+  flags: { rng: "none", state: "none", simulated: "ignores" },
+  probes: [{ name: "a recoil move and a missed crash move", axes: {} }],
+  l2StaticReason:
+    "The class is found by two by-name scans in move.ts, never dispatched with applyAbAttrs, and its trigger is the by-name WHEN calc.recoil-taken, so no trace event shows it evaluated. test/tests/elite-redux/decomp/B11/chunk2.test.ts rebuilds every live user and checks `fire` on a holder value for the original and the rebuild.",
+  status: "decomposed",
+  notes:
+    "Tier C package, justified in the header. Users (all with factor 0.5): Limber (7, attr 3), Steadfast (80, attr 4), Daredevil (5709, attr 0) and Superheavy (5549, attr 4). The readers in move.ts do not look at the attr's own condition, so an IF added with addCondition would be silently ignored (`reusableAlone.if` is false); a rule that needs 'only while at full HP' cannot use this block until the readers pass the attr through the condition check.",
+});

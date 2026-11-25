@@ -49,7 +49,8 @@
 //       condition: { kind: "full-hp" } })`
 // =============================================================================
 
-import { ChangeMovePriorityAbAttr } from "#abilities/ab-attrs";
+import { ChangeMovePriorityAbAttr, type ChangeMovePriorityAbAttrParams } from "#abilities/ab-attrs";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { MoveFlags } from "#enums/move-flags";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { Pokemon } from "#field/pokemon";
@@ -162,6 +163,26 @@ export class PriorityModifierAbAttr extends ChangeMovePriorityAbAttr {
     this.priorityDelta = opts.priority;
     this.filter = filter;
     this.condition = condition;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: ChangeMovePriorityAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1): the whole rule (move filter, then HP or turn condition) is the gate and
+   * nothing stays behind as a residual. The parent's `moveFunc` (the same predicate, built in the constructor) is no
+   * longer what decides, `gate` is, so a compiled rule can swap it.
+   */
+  override canApply(params: ChangeMovePriorityAbAttrParams): boolean {
+    return gatedCanApply<ChangeMovePriorityAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the move matches the filter AND the holder meets the condition, in that order. */
+  public gate({ pokemon, move }: ChangeMovePriorityAbAttrParams): boolean {
+    return (
+      PriorityModifierAbAttr.matchesFilter(this.filter, pokemon, move)
+      && PriorityModifierAbAttr.matchesCondition(this.condition, pokemon)
+    );
   }
 
   /** The configured priority delta (read-only accessor). */

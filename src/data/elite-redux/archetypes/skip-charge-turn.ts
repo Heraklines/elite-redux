@@ -26,8 +26,9 @@
 // =============================================================================
 
 import { PreAttackAbAttr } from "#abilities/ab-attrs";
-import type { AugmentMoveInteractionAbAttrParams } from "#types/ability-types";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import type { AugmentMoveInteractionAbAttrParams } from "#types/ability-types";
 
 /**
  * On any move attempt, removes the CHARGING/RECHARGING tags from the holder
@@ -38,11 +39,22 @@ export class SkipChargeTurnAbAttr extends PreAttackAbAttr {
     super(false);
   }
 
-  override canApply({ pokemon }: AugmentMoveInteractionAbAttrParams): boolean {
-    return pokemon.getTag(BattlerTagType.CHARGING) !== undefined
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AugmentMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole rule is the gate, there is no guard and no residual. */
+  override canApply(params: AugmentMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<AugmentMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: the holder is in the charge-up half of a move (any of the four charging tags). */
+  public gate({ pokemon }: AugmentMoveInteractionAbAttrParams): boolean {
+    return (
+      pokemon.getTag(BattlerTagType.CHARGING) !== undefined
       || pokemon.getTag(BattlerTagType.UNDERGROUND) !== undefined
       || pokemon.getTag(BattlerTagType.UNDERWATER) !== undefined
-      || pokemon.getTag(BattlerTagType.FLYING) !== undefined;
+      || pokemon.getTag(BattlerTagType.FLYING) !== undefined
+    );
   }
 
   override apply({ pokemon, simulated }: AugmentMoveInteractionAbAttrParams): void {
