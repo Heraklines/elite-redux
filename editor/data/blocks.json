@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "1e254dabb157d4",
-  "hash": "1165b8c7da1564",
+  "hash": "1942c6a368482e",
   "blocks": [
     {
       "id": "block.absorbant",
@@ -699,6 +699,41 @@
         "do": true
       },
       "uses": 5
+    },
+    {
+      "id": "block.astral-project-star-marker",
+      "className": "AstralProjectStarMarkerAbAttr",
+      "label": "Count all my moves as Starcrossed moves",
+      "summary": "While I have this, every move I use counts as a Starcrossed move, so the Starcrossed ability makes it hit twice at reduced power. Example: all my moves hit twice.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "star move",
+        "lunar move",
+        "moon move",
+        "every move counts as",
+        "all moves are",
+        "astral",
+        "starcrossed"
+      ],
+      "examples": [
+        "All my moves count as Starcrossed moves, so my Starcrossed double hit always works"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "It changes nothing on its own: an ability that reacts to Starcrossed moves (the Starcrossed double hit) must also be present"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.ate-conditional-status",
@@ -2170,6 +2205,155 @@
       "uses": 3
     },
     {
+      "id": "block.bitter-drill",
+      "className": "BitterDrillAbAttr",
+      "label": "Lay a field effect on a side",
+      "summary": "I lay Drill Bits on the foes' side, until it is removed. Example: Drill Bits on the foes' side.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "bitter drill",
+        "drill bits",
+        "entry hazard",
+        "set a hazard",
+        "drill hazard",
+        "spikes",
+        "field effect after hit"
+      ],
+      "examples": [
+        "After a drill move hits, leave Drill Bits (a hazard) on the opposing side"
+      ],
+      "params": [
+        {
+          "id": "tag",
+          "label": "Field effect to lay",
+          "control": "select",
+          "default": "Drill Bits",
+          "editable": true,
+          "options": [
+            "Drill Bits",
+            "Spikes",
+            "Toxic Spikes",
+            "Stealth Rock",
+            "Sticky Web"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "side",
+          "label": "Which side gets it",
+          "control": "select",
+          "default": "The foes' side",
+          "editable": true,
+          "options": [
+            "The foes' side",
+            "My side",
+            "Both sides"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "duration",
+          "label": "Turns it lasts (0 = until removed)",
+          "control": "number",
+          "default": 0,
+          "editable": true,
+          "min": 0,
+          "max": 20,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must really have hurt the target (it dealt damage and was not blocked), and the game must not be only previewing",
+        "A field effect that is already on that side may not stack"
+      ],
+      "effect": {
+        "id": "effect.arena-tag",
+        "params": [
+          "tag",
+          "side"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.bitter-drill-damage",
+      "className": "BitterDrillDamageAbAttr",
+      "label": "Multiply a move's power by a set amount",
+      "summary": "The power of my move is multiplied by 2. Example: 2 = double power, 1.5 = 50% more. Bitter Drill uses it for drill moves against a foe with Drill Bits stuck in it.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "bitter drill",
+        "drill damage",
+        "double power",
+        "power boost",
+        "stronger moves",
+        "bonus power",
+        "boost power against a target"
+      ],
+      "examples": [
+        "Double the power of my drill moves against a foe that has Drill Bits stuck in it"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (2 = double, 0.5 = half)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 0,
+          "max": 8,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.block-crit",
       "className": "BlockCritAbAttr",
       "label": "Be immune to critical hits",
@@ -2670,6 +2854,130 @@
       "uses": 1
     },
     {
+      "id": "block.booby-trap",
+      "className": "BoobyTrapAbAttr",
+      "label": "Curse one foe per entry and feed on its pain",
+      "summary": "The foe gets Curse. While it lasts, I heal half of any damage that foe takes. Only one foe per entry.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "booby trap",
+        "curse attacker",
+        "trap the attacker",
+        "revenge curse",
+        "lifesteal curse",
+        "heal from curse",
+        "mine"
+      ],
+      "examples": [
+        "The first foe that hits me after I switch in is cursed, and I heal half of the damage it takes"
+      ],
+      "params": [
+        {
+          "id": "tag",
+          "label": "Lingering effect laid on the foe",
+          "control": "select",
+          "default": "Curse",
+          "editable": true,
+          "options": [
+            "Curse"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really have hurt me (it dealt damage and was not blocked), and the game must not be only previewing",
+        "The foe must be able to receive the effect (it is not already affected and nothing blocks it)",
+        "Only one foe is trapped each time I enter the battle",
+        "While I have this ability, I heal half of any damage the trapped foe takes (built in, not a setting)"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": [
+          "tag"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.booby-trap-item-lost",
+      "className": "BoobyTrapItemLostAbAttr",
+      "label": "Curse a foe and feed on its pain",
+      "summary": "The foe gets Curse. While it lasts, I heal half of any damage that foe takes.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.item-lost",
+      "whenLabel": "When I lose my held item",
+      "synonyms": [
+        "booby trap",
+        "curse item thief",
+        "knock off punishment",
+        "thief revenge",
+        "curse the thief",
+        "trap the thief"
+      ],
+      "examples": [
+        "A foe that uses Thief or Knock Off on me is cursed"
+      ],
+      "params": [
+        {
+          "id": "tag",
+          "label": "Lingering effect laid on the foe",
+          "control": "select",
+          "default": "Curse",
+          "editable": true,
+          "options": [
+            "Curse"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "side.is",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Somebody else must have caused the loss (an item I used up or ate myself does nothing), and the game must not be only previewing",
+        "While I have this ability, I heal half of any damage the cursed foe takes (built in, not a setting)"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": [
+          "tag"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.boot-hill",
       "className": "BootHillAbAttr",
       "label": "Plant a marker on the foe's side when I knock a target out",
@@ -2826,6 +3134,238 @@
         "do": true
       },
       "uses": 8
+    },
+    {
+      "id": "block.capacitor-bank-absorb",
+      "className": "CapacitorBankAbsorbAbAttr",
+      "label": "Absorb a type of move and gain a charge stack",
+      "summary": "Moves of the Electric type do nothing to me, and each one I absorb gives me 1 charge stack (at most 4 in total). Example: absorb Electric moves, +1 stack.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-immunity",
+      "whenLabel": "While the game checks whether a move can hit me",
+      "synonyms": [
+        "absorb and charge",
+        "lightning rod charge",
+        "volt absorb charge",
+        "capacitor bank",
+        "immune and gain a stack",
+        "soak up electricity",
+        "store a type of move"
+      ],
+      "examples": [
+        "Immune to Electric moves, and every one I absorb adds a charge stack, like Capacitor Bank"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Immune to this type",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "stacks",
+          "label": "Charge stacks gained per absorbed move (1-4)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 4,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Moves that hit every Pokemon or a whole side (Spikes, Rain Dance) are never blocked",
+        "A Pokemon never blocks its own move",
+        "The stack is only added while I hold fewer than the maximum number of stacks (4) and the move is really used (not when the game only previews it)"
+      ],
+      "branches": [
+        {
+          "label": "Block the move",
+          "conditions": [],
+          "effect": {
+            "id": "effect.immune-to-type",
+            "params": [
+              "type"
+            ]
+          }
+        },
+        {
+          "label": "Gain charge stacks",
+          "conditions": [
+            "I hold fewer than the maximum number of stacks"
+          ],
+          "effect": {
+            "id": "effect.package",
+            "params": [
+              "stacks"
+            ]
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.capacitor-bank-gain",
+      "className": "CapacitorBankGainAbAttr",
+      "label": "Gain charge stacks when a damaging move hits me",
+      "summary": "Each time a damaging move hurts me, I gain 1 charge stack (at most 4 in total, once per incoming move). Example: 1 = one stack per move that hits me.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "capacitor bank",
+        "charge up when hit",
+        "build charge",
+        "stack a charge",
+        "store electricity",
+        "gain a stack",
+        "charge counter"
+      ],
+      "examples": [
+        "Every time I get hit by a damaging move my charge goes up by one, to a maximum of four, like Capacitor Bank"
+      ],
+      "params": [
+        {
+          "id": "stacks",
+          "label": "Charge stacks gained per hit (1-4)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 4,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only when the hit really dealt damage and was not blocked",
+        "Only while I hold fewer than the maximum number of stacks (4)",
+        "A multi-hit move gives one stack, not one per hit",
+        "Does nothing while the game is only previewing"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "stacks"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package for the effect only; the trigger and the condition are separate blocks. Reason it cannot be split: the charge counter is a bespoke store (`charge-stack.ts`: a WeakMap keyed by Pokemon, clamped at CHARGE_STACK_MAX = 4) that no library effect can write, and the class also keeps a per-move memory (a module WeakMap of `wave:turn:attacker:move` tokens) so a multi-hit move counts once. Requests R-B14-6.1 (an effect that changes the charge counter), R-B14-6.2 (an atom that reads it) and R-B14-6.3 (the 'already counted this move' memory) would let it be built from blocks. Users (1): Capacitor Bank (5925) attr 0 (attr 1 absorbs Electric moves, attr 2 is the redirect of another batch). The gate (clause 1) is fully bound to move.damaging; the residual stays in the class. Not covered by this attr and held by engine code that finds the class BY NAME (`carriesAttr(.., 'CapacitorBankGainAbAttr')`, so this class name must never change and the class doubles as the holder marker): the attack-side gain (+1 when I land a damaging hit, once per move: `erCapacitorBankOnAttack`, called from `erBatch3OnTargetHit`) and the spend (an Electric move I use consumes one stack: `erCapacitorBankConsumeOnElectricUse`, called from `MoveEffectPhase`); request R-B14-6.4. The maximum of 4 stacks is a module constant used by all charge-stack code, so it is not a setting here. Oddity, not fixed: clause 3 tests 11 and NO_EFFECT only, not the other results that are no real hit (STATUS, MISS, FAIL, ...); those carry no damage in practice, so clause 2 stops them first. The grid cannot reach clauses 2 to 5 through the shared L1, so B14/chunk6.test.ts compares canApply with a literal copy of the original over every combination.",
+      "uses": 1
+    },
+    {
+      "id": "block.celestial-jelly",
+      "className": "CelestialJellyAbAttr",
+      "label": "Survive a knockout once per battle and cure my status",
+      "summary": "A hit that would knock me out leaves me with 25% of my max HP instead, and cures my status. Works once per battle. Example: 25% left.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.damage-taken",
+      "whenLabel": "While the game calculates damage I take",
+      "synonyms": [
+        "survive a hit",
+        "endure",
+        "sturdy",
+        "second chance",
+        "revive once",
+        "cheat death",
+        "last stand",
+        "celestial jelly"
+      ],
+      "examples": [
+        "Once per battle, in Misty Terrain or Rain, survive a lethal hit with a quarter of my HP"
+      ],
+      "params": [
+        {
+          "id": "hpPercent",
+          "label": "HP left after the saved hit (% of max HP)",
+          "control": "number",
+          "default": 25,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Works only once per battle: it is spent the first time it saves me",
+        "Needs more than 1 max HP",
+        "Only when the hit would really knock me out (a smaller hit is left alone)",
+        "Cures any status condition, except a burn that nothing can cure (an Amaterasu burn)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "hpPercent"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B + package. Users (1): Celestial Jelly (6078) attr 0 (its only attr). The 0.25 was a literal in apply; it is now constructor argument 0 (a fraction, default 0.25) shown to staff as a percent through a codec. Package, reason: no library effect leaves a Pokemon at X% HP in place of a knockout, and the class pushes its once-per-battle memory (battleData.erAbilityProvenance, key celestial-jelly:spent) and cures status in the same apply, in a fixed order, so splitting it in the declaration would re-implement it; requested as effect.survive-lethal-hit plus the memory in time.once-per. The gate cannot be bound yet: field.weather reads arena.weatherType (not suppression aware) and field.terrain reads arena.terrainType (hidden by Clueless), while the class reads the raw terrain and asks weather.isEffectSuppressed(); requests R-B14-3.2 and R-B14-3.3. Oddities, not fixed: (1) the cure is resetStatus, which refuses to cure an Amaterasu burn; (2) Heavy Rain counts as Rain here; (3) the flyout is shown by the engine around apply, and the preview rewrites the damage without remembering anything; (4) SUSPECTED BUG: the gate reads `weather !== null` and then `weather.isEffectSuppressed()`, but a fresh arena holds `undefined` (a weather that was set and cleared holds `null`), so on a lethal hit with no weather ever set the gate throws a TypeError inside the damage calculation (seen in a battle, and pinned in B14/chunk3.test.ts); `weather != null` would be the fix.",
+      "uses": 1
     },
     {
       "id": "block.center-of-attention",
@@ -9917,6 +10457,237 @@
       "uses": 1
     },
     {
+      "id": "block.electrodynamics-galvanize",
+      "className": "ElectrodynamicsGalvanizeAbAttr",
+      "label": "Change my move's type (Electrodynamics Galvanize style)",
+      "summary": "A Normal move I use becomes Electric type, unless an -ate ability or a Tera rule takes it first. Example: Normal moves become Electric, like Galvanize.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-type",
+      "whenLabel": "While the game decides a move's type",
+      "synonyms": [
+        "galvanize",
+        "electrodynamics",
+        "normal to electric",
+        "ate ability",
+        "convert move type",
+        "retype normal moves",
+        "type conversion"
+      ],
+      "examples": [
+        "Normal moves become Electric, with Aerilate, Pixilate and Refrigerate going first, like Electrodynamics"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Type the move becomes",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:1",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.change-move-type",
+        "params": [
+          "type"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.electrodynamics-galvanize-power",
+      "className": "ElectrodynamicsGalvanizePowerAbAttr",
+      "label": "Boost power of the converted move (Electrodynamics style)",
+      "summary": "The power of a Normal move that my type conversion turns into another type is multiplied by 1.2. Example: 1.2 = 20% more, like Galvanize.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "galvanize power",
+        "electrodynamics",
+        "ate ability boost",
+        "converted move boost",
+        "retyped move power",
+        "type conversion power",
+        "20 percent boost"
+      ],
+      "examples": [
+        "Normal moves that become Electric hit 20% harder, like Galvanize and Electrodynamics"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.2 = 20% more, 0.5 = half)",
+          "control": "number",
+          "default": 1.2,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.electrodynamics-position",
+      "className": "ElectrodynamicsPositionAbAttr",
+      "label": "Mark my battle slot as charged for the rest of the battle",
+      "summary": "When I enter, my slot is marked for the rest of the battle. Whoever stands there is off the ground (Ground moves cannot hit it) and gets Electric Terrain benefits there.",
+      "tier": "C",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "electrodynamics",
+        "charged slot",
+        "permanent electric terrain on my side",
+        "float my slot",
+        "ground immunity for the slot",
+        "slot effect",
+        "magnetic field",
+        "electric terrain position"
+      ],
+      "examples": [
+        "When I enter, my battle slot becomes charged: Ground moves cannot hit whoever stands there"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing while the game is only previewing the entry",
+        "A slot that is already marked is not marked twice",
+        "The mark stays after I leave: whoever takes the slot keeps its benefits until the battle ends"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.electrodynamics-terrain-power",
+      "className": "ElectrodynamicsTerrainPowerAbAttr",
+      "label": "Boost move power from a charged slot (Electrodynamics style)",
+      "summary": "The power of my Electric moves is multiplied by 1.3 while my battle slot is charged, as if Electric Terrain were on. Example: 1.3 = 30% more.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "electrodynamics",
+        "electric terrain boost",
+        "charged slot power",
+        "virtual electric terrain",
+        "electric move boost",
+        "terrain power boost",
+        "slot power up"
+      ],
+      "examples": [
+        "Electric moves get the 30% Electric Terrain boost from my charged slot, like Electrodynamics"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.3 = 30% more, 0.5 = half)",
+          "control": "number",
+          "default": 1.3,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.encore-set",
       "className": "EncoreSetAbAttr",
       "label": "Replay my previous move as a weaker echo",
@@ -12065,6 +12836,84 @@
         "do": true
       },
       "packageReason": "PACKAGE for the EFFECT only; the trigger (move power) and the special-move condition are separate and bound to a library atom. Why the effect cannot be split with today's blocks: the multiplier is 1 + 5% * (number of waiting teammates), read live from the party, not a constant that effect.multiply-power can hold; requested as R-B13-26 (`effect.multiply-power-per-count`). The 'a teammate waits' clause stays in the class as the residual (second position, as in the original) and is listed under 'also requires'; R-B13-29 adds `party.bench-count` so it can move into the gate. The 5% and the cap of 5 were literals, now constructor arguments 0 and 1 with the old values as defaults (the cap of 5 is also the most that can wait: a party has 6 and one is on the field). Users: Fan Favorite (5990, attr 0; attr 1 is FanFavoriteAccuracyAbAttr). ODDITIES (not fixed): (1) in a double battle both field slots are 'on the field', so only the 4 back Pokemon can count. (2) the cap of 5 is also the most that can wait, so a bigger value of the second param changes nothing in a normal party.",
+      "uses": 1
+    },
+    {
+      "id": "block.fault-current",
+      "className": "FaultCurrentAbAttr",
+      "label": "Release all charge stacks as a spread attack every few turns",
+      "summary": "Every 2 turns on the field I spend all my charge stacks to hit every foe like Discharge at 15 base power per stack. Example: 3 stacks x 15 = 45 base power.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "fault current",
+        "discharge the charge",
+        "release stored power",
+        "spread attack every other turn",
+        "spend all stacks",
+        "charge blast",
+        "delayed discharge"
+      ],
+      "examples": [
+        "Every second turn on the field I spend my charge stacks on a spread Electric attack, like Fault Current"
+      ],
+      "params": [
+        {
+          "id": "period",
+          "label": "Release every this many turns on the field (2 = every second turn)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "powerPerStack",
+          "label": "Base power added per spent stack (15 = 60 with a full charge)",
+          "control": "number",
+          "default": 15,
+          "editable": true,
+          "min": 1,
+          "max": 60,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "move",
+          "label": "Attack to copy for type and damage (its name, for example Discharge)",
+          "control": "text",
+          "default": "Discharge",
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Counts only the end-of-turn checks where I am on the field; the count starts again when I leave the field",
+        "Only releases when I hold at least one charge stack",
+        "Needs at least one foe still standing; every foe still standing is hit, with its type matchup",
+        "Does nothing while the game is only previewing",
+        "Hits straight through the damage formula: no accuracy roll, no extra effects of the copied move"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "period",
+          "powerPerStack",
+          "move"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "packageReason": "Package, Tier C. Reason: the effect is a small state machine (a turns-on-the-field counter that advances on every active end of turn, the charge store, and a direct damage loop over the foes) whose clauses are interleaved with two state writes, so they cannot be moved into a gate without changing the cycle (see the header). Params are typed: the period, the power per stack and the copied move are constructor arguments now (defaults 2, 15, Discharge; behaviour identical). Users (1): Fault Current (5926), its only attr. Requests: R-B14-6.1 (an effect that spends the charge counter), R-B14-6.2 (a charge-stack atom), R-B14-6.7 (an every-Nth-active-turn atom with its own reset), R-B14-6.8 (a foe is standing) and R-B14-6.9 (an effect that hits every foe through the damage formula with a base power taken from a count). The count is reset by `erFaultCurrentOnLeaveField`, called from `Pokemon` when the holder leaves the field; that engine hook finds the store, not the class, so it is not affected by a rebuilt attr but it is part of the behaviour. Oddities, not fixed: (1) the discharge ignores accuracy, Protect and ability flyouts because it calls the damage formula directly (the code comment says a MovePhase at the end of the turn does not run reliably); (2) with a period of 1 every turn is a discharge turn.",
       "uses": 1
     },
     {
@@ -15741,6 +16590,78 @@
       "uses": 1
     },
     {
+      "id": "block.low-tide-water-surf",
+      "className": "LowTideWaterSurfAbAttr",
+      "label": "Answer a hit by using a free move of my own",
+      "summary": "After I am hit, I use Surf at 50 power on the targets that move would normally have, for free. Example: a damaging Water move hits me and a 50 power Surf comes back.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "low tide",
+        "counter attack",
+        "retaliate",
+        "free move",
+        "answer with a move",
+        "surf back",
+        "follow up attack",
+        "water absorb counter"
+      ],
+      "examples": [
+        "When a damaging Water move hits me, I answer with a 50 power Surf"
+      ],
+      "params": [
+        {
+          "id": "moveId",
+          "label": "Move to use (its name, for example Surf)",
+          "control": "text",
+          "default": "Surf",
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "power",
+          "label": "Power of the free move",
+          "control": "number",
+          "default": 50,
+          "editable": true,
+          "min": 1,
+          "max": 250,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Does nothing while the game is only previewing a hit",
+        "The chosen move needs at least one target; with none, nothing is used"
+      ],
+      "effect": {
+        "id": "effect.scripted-move",
+        "params": [
+          "moveId",
+          "power"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.max-multi-hit",
       "className": "MaxMultiHitAbAttr",
       "label": "Always roll the most hits on a 2 to 5 hit move",
@@ -16400,6 +17321,198 @@
       "uses": 4
     },
     {
+      "id": "block.negative-feedback",
+      "className": "NegativeFeedbackAbAttr",
+      "label": "Consume paralysis: gain Speed, lock an item, two-type move",
+      "summary": "After I hit a paralyzed foe: its paralysis is cured, I gain 1 Speed stage, one of its items stops working for a while, and my next physical move is Electric and Fairy.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "negative feedback",
+        "eat paralysis for speed",
+        "item lock after paralysis",
+        "disable a held item",
+        "dual type next move",
+        "speed boost from paralysis",
+        "convert paralysis"
+      ],
+      "examples": [
+        "After I hit a paralyzed foe, I get faster, one of its items is switched off and my next physical move is Electric and Fairy, like Negative Feedback"
+      ],
+      "params": [
+        {
+          "id": "speedStages",
+          "label": "Speed stages I gain (1-6)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "primaryType",
+          "label": "My next physical move becomes this type first",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "secondType",
+          "label": "...and this type second",
+          "control": "select",
+          "default": "FAIRY",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "suppressTurns",
+          "label": "Turns the item stays switched off (1 = until the end of the following turn)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "physicalOnly",
+          "label": "Only physical moves get the two types",
+          "control": "boolean",
+          "default": true,
+          "editable": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only after an ordinary hit: a one-hit KO or a blocked hit does not count",
+        "Does nothing while the game is only previewing",
+        "The item lock needs the foe to hold at least one item that is not a form-change item; it lifts at the end of the following turn",
+        "The dual-type mark only affects my next physical move and is then used up"
+      ],
+      "branches": [
+        {
+          "label": "Cure the foe's paralysis",
+          "conditions": [
+            "foe is paralyzed"
+          ],
+          "effect": {
+            "id": "effect.cure-status",
+            "params": []
+          }
+        },
+        {
+          "label": "Raise my Speed",
+          "conditions": [
+            "foe is paralyzed"
+          ],
+          "effect": {
+            "id": "effect.stat-stage",
+            "params": [
+              "speedStages"
+            ]
+          }
+        },
+        {
+          "label": "Switch off one of the foe's held items for a while",
+          "conditions": [
+            "foe is paralyzed"
+          ],
+          "effect": {
+            "id": "effect.package",
+            "params": [
+              "suppressTurns"
+            ]
+          }
+        },
+        {
+          "label": "Make my next physical move two types",
+          "conditions": [
+            "foe is paralyzed"
+          ],
+          "effect": {
+            "id": "effect.package",
+            "params": [
+              "primaryType",
+              "secondType",
+              "physicalOnly"
+            ]
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.no-fusion-ability",
       "className": "NoFusionAbilityAbAttr",
       "label": "This ability stops working on a fused Pokemon",
@@ -16867,6 +17980,86 @@
         "do": true
       },
       "uses": 6
+    },
+    {
+      "id": "block.ofuda",
+      "className": "OfudaAbAttr",
+      "label": "Curse a foe",
+      "summary": "The foe gets Curse. Whether it happens, and how often, is set by the chance and trigger blocks around it.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "ofuda",
+        "curse the attacker",
+        "curse on hit",
+        "hex attacker",
+        "talisman",
+        "random curse",
+        "sometimes curse"
+      ],
+      "examples": [
+        "30% chance to curse any Pokemon that hits me, even with a ranged move"
+      ],
+      "params": [
+        {
+          "id": "chance",
+          "label": "Chance (%)",
+          "control": "slider",
+          "default": 30,
+          "editable": true,
+          "min": 1,
+          "max": 99,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "tag",
+          "label": "Lingering effect laid on the attacker",
+          "control": "select",
+          "default": "Curse",
+          "editable": true,
+          "options": [
+            "Curse"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "rng.chance",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must be a real hit (not blocked) and the game must not be only previewing, and the attacker must not be me",
+        "The attacker must be able to receive the effect (it is not already affected and nothing blocks it); this is asked after the chance roll"
+      ],
+      "gateParams": [
+        {
+          "param": "chance",
+          "block": "rng.chance",
+          "field": "pct"
+        }
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": [
+          "tag"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.on-crit-stat-boost-lowest",
@@ -17796,6 +18989,188 @@
         "id": "effect.package",
         "params": [
           "factor"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.overloaded-chip",
+      "className": "OverloadedChipAbAttr",
+      "label": "Lose a share of max HP each turn at full charge",
+      "summary": "At the end of every turn, if I hold the maximum of 4 charge stacks, I lose 0.125 of my max HP (at least 1 HP). Example: 0.125 = one eighth.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "overloaded",
+        "overcharge damage",
+        "end of turn self damage",
+        "burn off charge",
+        "hurt myself when charged",
+        "residual damage at max stacks",
+        "life orb style chip"
+      ],
+      "examples": [
+        "At the end of each turn, while I am fully charged, I lose 1/8 of my max HP, like Overloaded"
+      ],
+      "params": [
+        {
+          "id": "fraction",
+          "label": "Share of max HP lost each turn (0.125 = one eighth, 0.25 = a quarter)",
+          "control": "number",
+          "default": 0.125,
+          "editable": true,
+          "min": 0.01,
+          "max": 1,
+          "step": 0.005,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [
+        "not-fainted"
+      ],
+      "feasibility": [
+        "Does nothing while the game is only previewing",
+        "Always loses at least 1 HP, the share is rounded down",
+        "Counts as indirect damage: no attacker, no ability trigger from a hit",
+        "The ability flyout shows at every end of turn, also when no HP is lost"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "fraction"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.overloaded-power",
+      "className": "OverloadedPowerAbAttr",
+      "label": "Boost Electric move power at full charge",
+      "summary": "While I hold the maximum of 4 charge stacks, my Electric moves have their power multiplied by 1.25. Example: 1.25 = 25% more power.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "overloaded",
+        "full charge bonus",
+        "electric power at max stacks",
+        "overcharge boost",
+        "charged up damage",
+        "stronger electric moves",
+        "max stacks power"
+      ],
+      "examples": [
+        "While I am fully charged my Electric moves hit 25% harder, like Overloaded"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.25 = 25% more, 0.5 = half)",
+          "control": "number",
+          "default": 1.25,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.overloaded-priority",
+      "className": "OverloadedPriorityAbAttr",
+      "label": "Move first with Electric moves at full charge",
+      "summary": "While I hold the maximum of 4 charge stacks, my Electric moves get 1 extra priority. Example: 1 = Electric moves go before normal moves.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.priority",
+      "whenLabel": "While the game calculates my move's priority",
+      "synonyms": [
+        "overloaded",
+        "full charge priority",
+        "electric priority at max stacks",
+        "go first when charged",
+        "gale wings",
+        "quick electric moves",
+        "max stacks speed"
+      ],
+      "examples": [
+        "While I am fully charged my Electric moves get +1 priority, like Overloaded"
+      ],
+      "params": [
+        {
+          "id": "amount",
+          "label": "Priority change (1 = goes before normal moves, -1 = goes after)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": -7,
+          "max": 7,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.change-priority",
+        "params": [
+          "amount"
         ]
       },
       "reusableAlone": {
@@ -18948,6 +20323,42 @@
       "uses": 17
     },
     {
+      "id": "block.penta-punch-marker",
+      "className": "PentaPunchMarkerAbAttr",
+      "label": "Allow a fifth move slot",
+      "summary": "While I have this, I have room for five moves instead of four. Example: a Pokemon that is full at four moves can learn a fifth.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "fifth move",
+        "extra move slot",
+        "5th move",
+        "five moves",
+        "learn five moves",
+        "more moves",
+        "move slot",
+        "penta punch"
+      ],
+      "examples": [
+        "Give this Pokemon a fifth move slot"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The extra slot is not stacked with the fifth-slot reward: the game gives the larger of the two, so having both still means five moves"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.per-faint-stat-multiplier",
       "className": "PerFaintStatMultiplierAbAttr",
       "label": "Grow a stat with every faint (like Soul Harvest)",
@@ -19016,6 +20427,114 @@
       },
       "packageReason": "Package, justified: the multiplier is 1 + perFaint x the faint count, and the count is the private counter that FaintCountTriggerAbAttr keeps in the holder's battle data. The library has no counter to read and its multiply-stat effect is a fixed number, so the formula cannot be split further until R-B12-02 and R-B12-03 exist. Tier A: nothing to bind (the parent gets no closure). 3 attrs, all in Soul Harvest (5589): attr 1 Attack, attr 2 Sp. Atk, attr 3 Sp. Def, each 0.05 (5%). The percent shown to staff is perFaint x 100; the class keeps the fraction. Oddities, not fixed: (a) the parent `multiplier` stays 1, so code that reads it (the studio's reflection) sees 1, not the formula; (b) the multiplier is applied on every stat query, including previews and the AI; (c) the count is not capped, so a long battle can grow a stat without limit.",
       "uses": 3
+    },
+    {
+      "id": "block.perpetual-motion-power",
+      "className": "PerpetualMotionPowerAbAttr",
+      "label": "Raise power for each free follow-up hit in a row",
+      "summary": "Multiply the free follow-up move's power by 1 plus 0.1 for each hit in a row. Example: after 3 hits in a row, power x1.3.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "combo power",
+        "power per hit",
+        "streak bonus",
+        "escalating power",
+        "rollout",
+        "perpetual motion"
+      ],
+      "examples": [
+        "Each free Rollout that lands in a row hits 10% harder"
+      ],
+      "params": [
+        {
+          "id": "step",
+          "label": "Extra power per hit in a row (0.1 = 10%)",
+          "control": "number",
+          "default": 0.1,
+          "editable": true,
+          "min": 0,
+          "max": 1,
+          "step": 0.01,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": false,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only while my free follow-up is waiting to resolve (the streak is armed)",
+        "The bonus grows by the extra-power-per-hit setting for each hit in a row that landed so far"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "step"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "The 10% step is a constructor argument (default 0.1) and an editable param. The marker name perpetual-motion is deliberately NOT a param: it is the shared key that ties this attr to the follow-up move and to four other attrs of the same ability (three of them in B17); changing it on this attr alone would silently switch the bonus off, and the gate is the editable slot for the condition. Package, reason: the multiplier is `1 + streak x 0.1` where the streak is a per-Pokemon counter written by PerpetualMotionProgressAbAttr; effect.multiply-power only takes a fixed number (a counter-based power effect is requested). Users (1): Perpetual Motion (6022) attr 4 of 5. Gate is legacy-closure pending move.scripted-marker. The armed-state check stays a non-editable guard clause in the class (it is state of the ability's own machine, listed under feasibility, not a registered guard). Oddities, not fixed: canApply does not call super.canApply, so skipDuringMovesetGen is ignored (it is false for this class, so no effect); the class applies on simulated power previews too, which is correct for damage previews.",
+      "uses": 1
+    },
+    {
+      "id": "block.perpetual-motion-progress",
+      "className": "PerpetualMotionProgressAbAttr",
+      "label": "Count free follow-up hits that land in a row",
+      "summary": "I count one more hit in a row if the follow-up hurt the target, or reset the count to zero if it did not.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "hit streak",
+        "combo counter",
+        "in a row",
+        "consecutive hits",
+        "streak",
+        "perpetual motion"
+      ],
+      "examples": [
+        "Count each free Rollout that lands in a row so the next one hits harder"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": false,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only counts a follow-up that is still waiting for its result (the streak is armed); a hit that did not hurt the target resets the streak",
+        "Does nothing while the game is only previewing a hit"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package, reason: the effect is one step of a counter state machine (pending flag and streak) shared with PerpetualMotionTriggerAbAttr, PerpetualMotionPostTurnAbAttr, PerpetualMotionResolutionAbAttr (B17) and PerpetualMotionPowerAbAttr; the library has no counter effect (requested). Users (1): Perpetual Motion (6022) attr 3 of 5. Gate is legacy-closure pending the request move.scripted-marker. Oddities, not fixed: the inherited attackCondition (`move.category !== STATUS`, constructor argument 0) is not exposed as its own slot; for this user it is always the default, and the gate re-states it as move.damaging. The streak is stored on summonData, so it resets when the Pokemon leaves the field.",
+      "uses": 1
     },
     {
       "id": "block.persistent-field-aura",
@@ -19096,6 +20615,79 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.photovoltaic-type",
+      "className": "PhotovoltaicTypeAbAttr",
+      "label": "Gain an extra type",
+      "summary": "I gain the Electric type in addition to my own types. Example: a Water type that gains Electric becomes Water and Electric.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "add a type",
+        "extra type",
+        "dual type",
+        "gain electric type",
+        "second type",
+        "electric typing",
+        "photovoltaic"
+      ],
+      "examples": [
+        "Gain the Electric type when I enter the battle"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Type to gain",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Does nothing if I already have that type",
+        "The new type lasts until I leave the field"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "type"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "The gained type is a constructor argument (default Electric, so the shipped ability is unchanged) and an editable param. Package, reason: no effect.add-type in the effect library (requested), not because the effect cannot be split. Users (1): Photovoltaic (6030) attr 1; attr 0 is a SelfHighestStatMultiplierAbAttr (Solar Power half) from another batch. apply writes pokemon.summonData.types, which is reset when the Pokemon leaves the field. It ignores `simulated` (never read), harmless because PostSummon is never dispatched simulated. A Pokemon that already has summonData.types set (a type change before entry) keeps that list and gets Electric appended; with no summon types it starts from getTypes().",
+      "uses": 1
     },
     {
       "id": "block.poisoned-foe-purge",
@@ -19348,6 +20940,151 @@
       "feasibility": [],
       "effect": {
         "id": "effect.multiply-damage-taken",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.positive-feedback",
+      "className": "PositiveFeedbackAbAttr",
+      "label": "Consume the foe's paralysis and lower its better defense",
+      "summary": "After my attack hits a paralyzed foe, its paralysis is cured and its higher defense (Defense or Sp. Def) drops by 1 stage. Example: 1 = one stage lower.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "positive feedback",
+        "cure paralysis and lower defense",
+        "eat the paralysis",
+        "convert paralysis into a stat drop",
+        "shock to defense drop",
+        "defense break after paralysis",
+        "spend paralysis"
+      ],
+      "examples": [
+        "After I hit a paralyzed foe, its paralysis is gone and its better defense drops one stage, like Positive Feedback"
+      ],
+      "params": [
+        {
+          "id": "stageDrop",
+          "label": "Stages the foe's higher defense drops (1-6)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only after an ordinary hit: a one-hit KO or a blocked hit does not count",
+        "Does nothing while the game is only previewing",
+        "The foe's paralysis is cured at once, before the stat drop is queued"
+      ],
+      "branches": [
+        {
+          "label": "Cure the foe's paralysis",
+          "conditions": [
+            "foe is paralyzed"
+          ],
+          "effect": {
+            "id": "effect.cure-status",
+            "params": []
+          }
+        },
+        {
+          "label": "Lower the foe's higher defense",
+          "conditions": [
+            "foe is paralyzed"
+          ],
+          "effect": {
+            "id": "effect.stat-stage",
+            "params": [
+              "stageDrop"
+            ]
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.positive-feedback-power",
+      "className": "PositiveFeedbackPowerAbAttr",
+      "label": "Boost move power against a paralyzed foe",
+      "summary": "My moves have their power multiplied by 1.25 while the foe I aim at is paralyzed. Example: 1.25 = 25% more power.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "positive feedback",
+        "bonus against paralysis",
+        "hit paralyzed foes harder",
+        "power up on a status",
+        "paralysis bonus",
+        "static boost",
+        "stronger against paralyzed"
+      ],
+      "examples": [
+        "My attacks get 25% more power against a paralyzed foe, like Positive Feedback"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.25 = 25% more, 0.5 = half)",
+          "control": "number",
+          "default": 1.25,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-power",
         "params": [
           "multiplier"
         ]
@@ -27294,6 +29031,78 @@
       "uses": 18
     },
     {
+      "id": "block.prophetic",
+      "className": "PropheticAbAttr",
+      "label": "Set up a delayed attack on a foe",
+      "summary": "I set a delayed attack on the first foe still standing. It hits 3 turns later using the stronger of: Future Sight and Doom Desire.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "future sight",
+        "doom desire",
+        "delayed attack",
+        "delayed damage",
+        "time bomb",
+        "attack later",
+        "prophecy"
+      ],
+      "examples": [
+        "When I enter, a Future Sight style attack lands on the foe three turns later"
+      ],
+      "params": [
+        {
+          "id": "moves",
+          "label": "Which delayed attacks to choose from (the first one named is the main one)",
+          "control": "select",
+          "default": "Future Sight and Doom Desire",
+          "editable": true,
+          "options": [
+            "Future Sight and Doom Desire",
+            "Future Sight only",
+            "Doom Desire only",
+            "Doom Desire and Future Sight"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "turns",
+          "label": "Turns until it hits",
+          "control": "number",
+          "default": 3,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "There must be a foe still standing",
+        "No delayed attack may already be waiting on that foe's position",
+        "Nothing is set up while the game is only previewing"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "moves",
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "The attack list and the delay are constructor arguments (defaults Future Sight and Doom Desire, 3 turns, so the shipped ability is unchanged) and editable params. Package, reason: no delayed-attack effect in the library (requested); the class itself is one call to positionalTagManager.addTag with fixed arguments (sourceMoves [Future Sight, Doom Desire], turnCount 3), so it should be re-declared as an event-effect with params {moves, turns} when the effect exists. Users (1): Prophetic (6014) attr 0 (its only attr). Oddities, not fixed: canApply is the inherited true, so the ability flyout can show when no delayed attack is set (no foe, or a delayed attack already waiting on that slot); the tag is aimed at the first living foe only, never at both foes in a double battle.",
+      "uses": 1
+    },
+    {
       "id": "block.protect-stat",
       "className": "ProtectStatAbAttr",
       "label": "Stop other Pokemon from lowering my stats",
@@ -27353,6 +29162,358 @@
         "do": true
       },
       "uses": 10
+    },
+    {
+      "id": "block.psionic-terrain-power",
+      "className": "PsionicTerrainPowerAbAttr",
+      "label": "Boost move power from a virtual terrain (Psionic style)",
+      "summary": "The power of my Electric and Psychic moves is multiplied by 1.3 when their terrain is not really on the field but counts for me. Example: 1.3 = 30% more.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "psionic",
+        "terrain power boost",
+        "psychic terrain boost",
+        "electric terrain boost",
+        "virtual terrain",
+        "terrain move boost",
+        "as if terrain were on"
+      ],
+      "examples": [
+        "Electric and Psychic moves get the 30% terrain boost even without the terrain, like Psionic"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.3 = 30% more, 0.5 = half)",
+          "control": "number",
+          "default": 1.3,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.raichu-all-terrain-surge-surfer",
+      "className": "RaichuAllTerrainSurgeSurferAbAttr",
+      "label": "Multiply one of my stats (Surges Up style)",
+      "summary": "While any terrain is on the field, my Speed is multiplied by 2. Example: Speed x2 in any terrain, so I outrun foes.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "surges up",
+        "surge surfer",
+        "speed in any terrain",
+        "terrain speed boost",
+        "double speed in terrain",
+        "swift swim style",
+        "stat boost under terrain"
+      ],
+      "examples": [
+        "Double my Speed while any terrain is on the field, like Surges Up"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat (Attack, Defense, Sp. Atk, Sp. Def, Speed, Accuracy or Evasion)",
+          "control": "select",
+          "default": "SPD",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Stat multiplier (2 = double, 0.5 = half)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:2",
+          "lib": "field.terrain",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only the chosen stat is multiplied; every other stat is left alone"
+      ],
+      "effect": {
+        "id": "effect.multiply-stat",
+        "params": [
+          "stat",
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.raichu-ally-stat-multiplier",
+      "className": "RaichuAllyStatMultiplierAbAttr",
+      "label": "Boost my partner's stat in a terrain (more if magnetized)",
+      "summary": "In a double battle during Electric Terrain, my partner's Attack is x1.5, or x2 if it is magnetized (Magnet Rise, Magnetic Flux, Plus or Minus).",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "demodulator partner boost",
+        "modulator partner boost",
+        "help my partner in a terrain",
+        "ally stat boost in terrain",
+        "partner attack up",
+        "team terrain boost",
+        "doubles ally boost",
+        "magnet rise ally"
+      ],
+      "examples": [
+        "In Electric Terrain my partner's Attack is 50% higher, or doubled if it is floating from Magnet Rise",
+        "Raise my ally's Sp. Def in Electric Terrain, like Modulator"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat of my partner (Attack, Defense, Sp. Atk, Sp. Def, Speed, Accuracy or Evasion)",
+          "control": "select",
+          "default": "ATK",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "terrain",
+          "label": "Which terrain has to be active",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "MISTY",
+            "ELECTRIC",
+            "GRASSY",
+            "PSYCHIC",
+            "TOXIC"
+          ]
+        },
+        {
+          "id": "normalMultiplier",
+          "label": "Multiplier for my partner (1.5 = 50% higher)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        },
+        {
+          "id": "boostedMultiplier",
+          "label": "Multiplier when my partner is magnetized (2 = double)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "field.terrain",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only the chosen stat of my partner is multiplied",
+        "Only in a battle with more than one Pokemon per side (a single battle does nothing)",
+        "A partner counts as magnetized when it floats from Magnet Rise, was hit by Magnetic Flux this battle, or has the Plus or Minus pairing"
+      ],
+      "gateParams": [
+        {
+          "param": "terrain",
+          "block": "field.terrain",
+          "field": "terrain"
+        }
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "stat",
+          "normalMultiplier",
+          "boostedMultiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 4
+    },
+    {
+      "id": "block.raichu-terrain-stat-multiplier",
+      "className": "RaichuTerrainStatMultiplierAbAttr",
+      "label": "Multiply one of my stats while a terrain is active",
+      "summary": "While Electric Terrain is active, my Attack is multiplied by 1.5. Example: 1.5 = 50% higher, 0.5 = half.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "demodulator",
+        "modulator",
+        "terrain stat boost",
+        "electric terrain attack boost",
+        "grassy terrain defense",
+        "stat boost in terrain",
+        "terrain attack up",
+        "surge surfer"
+      ],
+      "examples": [
+        "Raise my Attack by 50% in Electric Terrain, like Demodulator",
+        "Raise my Sp. Def by 50% in Electric Terrain, like Modulator"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat (Attack, Defense, Sp. Atk, Sp. Def, Speed, Accuracy or Evasion)",
+          "control": "select",
+          "default": "ATK",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "multiplier",
+          "label": "Stat multiplier (1.5 = 50% higher, 0.5 = half)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        },
+        {
+          "id": "terrain",
+          "label": "Which terrain has to be active",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "MISTY",
+            "ELECTRIC",
+            "GRASSY",
+            "PSYCHIC",
+            "TOXIC"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "field.terrain",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only the chosen stat is multiplied; every other stat is left alone"
+      ],
+      "gateParams": [
+        {
+          "param": "terrain",
+          "block": "field.terrain",
+          "field": "terrain"
+        }
+      ],
+      "effect": {
+        "id": "effect.multiply-stat",
+        "params": [
+          "stat",
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 4
     },
     {
       "id": "block.rearm-first-flagged-move-on-move",
@@ -30571,6 +32732,71 @@
       "uses": 1
     },
     {
+      "id": "block.sharing-is-scaring",
+      "className": "SharingIsScaringAbAttr",
+      "label": "Pass my own stat drops on to the foes",
+      "summary": "When my own move lowers my stats, I take no drop and every foe still standing gets it instead. This pass-on always happens and cannot be conditioned.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.stat-protect",
+      "whenLabel": "While the game checks if my stat is protected",
+      "synonyms": [
+        "sharing is scaring",
+        "give my stat drops to the foes",
+        "reverse stat drop",
+        "no self drops, foes get them",
+        "share stat drops",
+        "hot potato",
+        "spread my stat drops",
+        "partner gimmighoul"
+      ],
+      "examples": [
+        "My own Close Combat, Overheat and Draco Meteor drops land on the foes instead of me"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat of mine is protected (fixed: the foes always get every drop)",
+          "control": "select",
+          "default": "Every stat",
+          "editable": false,
+          "options": [
+            "Every stat",
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Sp. Def",
+            "Speed",
+            "Accuracy",
+            "Evasion"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The pass-on to the foes always happens together with the block and cannot be limited by an extra condition (the game does not ask conditions before passing it on), so no IF can be added to this block",
+        "Only drops I cause myself are handled here (a drop from another Pokemon is the job of the other stat-protection block)",
+        "Only stat drops are blocked and passed on (a boost I give myself always lands)",
+        "A drop that another ability or effect already blocked is left alone and is not passed on",
+        "The drop is passed on only when the game really applies it, not while it only previews (a preview still shows my own drop as blocked)",
+        "Foes that already fainted are skipped"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": [
+          "stat"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.skip-charge-turn",
       "className": "SkipChargeTurnAbAttr",
       "label": "End my charge-up turn right away",
@@ -30699,6 +32925,131 @@
         "do": true
       },
       "packageReason": "PACKAGE for the EFFECT only. The trigger (after my hit) is a normal WHEN; the attack condition (ctor:0, move.damaging) is a library atom; the 'not yet this turn' memory is the editable gate (a legacy-closure binding until R-B13-17 `time.not-yet-this-turn` exists, the library's own once-per-turn atom keeps ITS OWN memory so it would drop the class's write). Why the effect cannot be split: it is 'switch out' (effect.force-switch-out) PLUS a per-side stored flag that a different engine call site (applyPendingSkyhookEntryBoost, switch-summon-phase.ts:464) turns into +1 Speed on the next Pokemon to enter; no library block holds a flag for 'the next Pokemon that enters my side' (requested as R-B13-45 `effect.boost-next-entrant`). The 20 in `randBattleSeedInt(100) < 20` was a literal, now constructor argument 2 (default 20, the very same draw and comparison). The +1 Speed was a literal in applyPendingSkyhookEntryBoost; the per-side value stored by apply is now the stage count (0 = no boost) taken from constructor argument 3 (default 1), so the entry code reads it from the stored value and behaviour is identical. The boosted stat (Speed) stays fixed. Users: Skyhook (5978, attr 0). ODDITIES (not fixed): (1) apply writes the once-per-turn memory BEFORE its simulated check, so a simulated call spends it; (2) the boost flag is stored per SIDE and per battle, so a second Skyhook activation on the same side before anyone enters overwrites the first roll, and a flag left over when the switch did not happen (the switch can still fail after canApply) boosts the next entrant of that side; (3) when the switch cannot complete the memory and the flag are already written.",
+      "uses": 1
+    },
+    {
+      "id": "block.slabs-curse",
+      "className": "SlabsCurseAbAttr",
+      "label": "Drain PP from a foe's moves every turn",
+      "summary": "Every move of the chosen foe loses 2 PP each turn, and each move of its neighbouring allies loses 1 PP. It ends when one of those moves has no PP left.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.faint",
+      "whenLabel": "When I faint",
+      "synonyms": [
+        "slab's curse",
+        "pp drain",
+        "pp curse",
+        "revenge curse",
+        "spite",
+        "last words",
+        "drain pp"
+      ],
+      "examples": [
+        "When a foe knocks me out, its moves lose 2 PP every turn"
+      ],
+      "params": [
+        {
+          "id": "ppLoss",
+          "label": "PP lost by each of the foe's moves every turn",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "allyPpLoss",
+          "label": "PP lost every turn by each move of the foe's neighbouring allies",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A different Pokemon must have knocked me out (no culprit, or myself, means nothing happens)",
+        "A foe that is already cursed this way is not cursed again",
+        "Only the foe's neighbouring allies that are still standing are cursed too"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": [
+          "ppLoss",
+          "allyPpLoss"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.southern-cross-punch",
+      "className": "SouthernCrossPunchAbAttr",
+      "label": "Re-aim queued attacks at the next foe",
+      "summary": "Every move still queued this turn that aims at a foe is re-aimed at the next foe over. Example: with two foes, the targets swap.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "southern cross punch",
+        "retarget",
+        "redirect attacks",
+        "swap targets",
+        "rotate targets",
+        "punch",
+        "double battle"
+      ],
+      "examples": [
+        "After a punch hits, the foes' targets are shifted one slot to the right"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must really have hurt the target (it dealt damage and was not blocked), and the game must not be only previewing",
+        "I must still have this ability active",
+        "There must be at least two foes on the field to rotate between"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package, reason: the effect rewrites `battle.turnCommands[*].targets` and `command.move.targets` for every queued command; no library effect touches the turn queue (requested as effect.rotate-queued-targets). Users (1): Southern Cross Punch (6016) attr 0 (its only attr). Gate legacy-closure pending move.has-own-flag; the guards need not-simulated and hit-dealt-damage (requested). The inherited attackCondition (constructor argument 0, default `move.category !== STATUS`) is never read: this canApply does not call super. Oddities, not fixed: (1) the class rewrites commands that already executed this turn as well as later ones, harmless but wider than the description 'later intended targets'; (2) the rotation also re-aims the holder's own queued command and its ally's; (3) clause 5 is redundant for the shipped ability.",
       "uses": 1
     },
     {
@@ -32680,6 +35031,128 @@
       "effect": {
         "id": "effect.inflict-status",
         "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.synchronized-current-both-attack-power",
+      "className": "SynchronizedCurrentBothAttackPowerAbAttr",
+      "label": "Boost move power (Synchronized Current style)",
+      "summary": "My damaging moves have their power multiplied by 1.25 while my ally has also chosen to attack this turn. Example: 1.25 = 25% more for both of us.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "synchronized current",
+        "team attack boost",
+        "ally attack bonus",
+        "both attack boost",
+        "partner attack bonus",
+        "double attack bonus",
+        "pair power up"
+      ],
+      "examples": [
+        "If both my ally and I attack this turn, each attack gets 25% more power, like Synchronized Current"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.25 = 25% more, 0.5 = half)",
+          "control": "number",
+          "default": 1.25,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.synchronized-current-heal",
+      "className": "SynchronizedCurrentHealAbAttr",
+      "label": "Heal me and my ally by a share of max HP (once a turn each)",
+      "summary": "At the end of the turn, my ally and I each recover 25% of our max HP, at most once per turn. Example: 25 = a quarter of max HP.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "synchronized current",
+        "heal both",
+        "heal the pair",
+        "heal my partner",
+        "team recovery",
+        "rest together",
+        "ally regeneration"
+      ],
+      "examples": [
+        "If neither my ally nor I attacked this turn, we both recover a quarter of our max HP, like Synchronized Current"
+      ],
+      "params": [
+        {
+          "id": "healPercent",
+          "label": "Share of max HP each one recovers (% of max HP)",
+          "control": "number",
+          "default": 25,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Does nothing while the game is only previewing",
+        "Each of the two recovers at most once per turn, even when both of them have this",
+        "A partner that is at full HP or no longer on the field is skipped",
+        "Every recovery is a whole number of at least 1 HP"
+      ],
+      "effect": {
+        "id": "effect.heal-percent",
+        "params": [
+          "healPercent"
+        ]
       },
       "reusableAlone": {
         "when": true,
