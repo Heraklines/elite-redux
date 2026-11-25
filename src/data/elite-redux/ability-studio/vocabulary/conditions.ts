@@ -688,7 +688,7 @@ const BASE_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "time.once-per-unused",
     group: "Time",
-    label: "The one-time effect {key} is still unused {scope} (advanced)",
+    label: "One-time effect {key} is still unused {scope} (advanced)",
     requires: [],
     params: [
       selectParam("scope", "How long the memory lasts", ONCE_PER_SCOPES, "wave"),
@@ -939,7 +939,7 @@ const BASE_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "mon.protected-from-effects",
     group: "Pokemon",
-    label: "{who} ignores the extra effects of moves (Shield Dust)",
+    label: "{who} ignores move side effects (Shield Dust)",
     requires: [],
     whoParam: "who",
     params: [WHO("other")],

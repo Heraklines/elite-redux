@@ -224,7 +224,7 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "field.weather-in-effect",
     group: "Field",
-    label: "The weather is one of {weathers} (and not switched off)",
+    label: "The weather is one of {weathers}, not switched off",
     requires: ["holder"],
     params: [
       textParam("weathers", "Weathers (names, separated by commas)", "Rain, Heavy rain"),
@@ -333,7 +333,7 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "status.just-set",
     group: "Status",
-    label: "The status I just got is one of {statuses}",
+    label: "My new status is one of {statuses}",
     requires: ["status"],
     params: [textParam("statuses", "Status problems (names, separated by commas)", "Burn, Paralysis, Poison, Toxic")],
     pure: true,
@@ -512,7 +512,7 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "time.last-move-was-follow-up",
     group: "Time",
-    label: "{who}'s last move was a free follow-up (advanced)",
+    label: "{who}'s last move was a follow-up (advanced)",
     requires: [],
     whoParam: "who",
     params: [WHO()],
@@ -694,7 +694,7 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "time.hits-taken",
     group: "Time",
-    label: "The number of times {who} was hit this battle is {cmp} {n}",
+    label: "Times {who} was hit this battle: {cmp} {n}",
     requires: [],
     whoParam: "who",
     params: [WHO(), CMP(), numberParam("n", "Number of hits taken", 1, 0, 99, 1, true)],
@@ -800,7 +800,7 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "field.aura-on-field",
     group: "Field",
-    label: "A Pokemon on the field has {aura}",
+    label: "{aura} is on the field",
     requires: [],
     params: [
       selectParam("aura", "Which aura", ["dark", "fairy", "either"], "either", {

@@ -4623,7 +4623,7 @@
     {
       "id": "time.once-per-unused",
       "group": "Time",
-      "label": "The one-time effect {key} is still unused {scope} (advanced)",
+      "label": "One-time effect {key} is still unused {scope} (advanced)",
       "requires": [],
       "params": [
         {
@@ -5350,7 +5350,7 @@
     {
       "id": "mon.protected-from-effects",
       "group": "Pokemon",
-      "label": "{who} ignores the extra effects of moves (Shield Dust)",
+      "label": "{who} ignores move side effects (Shield Dust)",
       "requires": [],
       "whoParam": "who",
       "params": [
@@ -6203,7 +6203,7 @@
     {
       "id": "field.weather-in-effect",
       "group": "Field",
-      "label": "The weather is one of {weathers} (and not switched off)",
+      "label": "The weather is one of {weathers}, not switched off",
       "requires": [
         "holder"
       ],
@@ -6453,7 +6453,7 @@
     {
       "id": "status.just-set",
       "group": "Status",
-      "label": "The status I just got is one of {statuses}",
+      "label": "My new status is one of {statuses}",
       "requires": [
         "status"
       ],
@@ -7003,7 +7003,7 @@
     {
       "id": "time.last-move-was-follow-up",
       "group": "Time",
-      "label": "{who}'s last move was a free follow-up (advanced)",
+      "label": "{who}'s last move was a follow-up (advanced)",
       "requires": [],
       "whoParam": "who",
       "params": [
@@ -7572,7 +7572,7 @@
     {
       "id": "time.hits-taken",
       "group": "Time",
-      "label": "The number of times {who} was hit this battle is {cmp} {n}",
+      "label": "Times {who} was hit this battle: {cmp} {n}",
       "requires": [],
       "whoParam": "who",
       "params": [
@@ -7880,7 +7880,7 @@
     {
       "id": "field.aura-on-field",
       "group": "Field",
-      "label": "A Pokemon on the field has {aura}",
+      "label": "{aura} is on the field",
       "requires": [],
       "params": [
         {
@@ -12740,5 +12740,5 @@
       "category": "Switching"
     }
   ],
-  "hash": "193a35981e4c39"
+  "hash": "0d668ec28ed8e7"
 }
