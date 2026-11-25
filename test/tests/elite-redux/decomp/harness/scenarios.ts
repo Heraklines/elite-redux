@@ -650,7 +650,17 @@ export async function runScenario(
         } else if (action.until === "TurnEndPhase") {
           await game.toEndOfTurn();
         } else {
-          await game.toNextTurn();
+          try {
+            await game.toNextTurn();
+          } catch (error) {
+            // A counter-attack ability (Deflect, Parry ...) can knock the enemy out; the battle is then over and the
+            // reward screen replaces the next turn. Both builds of an evaluation end the same way (merge captain).
+            if (!foe.isFainted()) {
+              throw error;
+            }
+            trace.snapshot(`turn ${turn}`);
+            return trace.data();
+          }
         }
       } else if ("switchTo" in action) {
         game.doSwitchPokemon(action.switchTo);
