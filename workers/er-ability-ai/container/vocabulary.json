@@ -1954,6 +1954,8 @@
         "CenterOfAttentionAbAttr",
         "CrackedVesselMarkerAbAttr",
         "DeadeyeMarkerAbAttr",
+        "ChivalryAbAttr",
+        "CommonRootAbAttr",
         "DoubleSelfInflictedDamageAbAttr",
         "DrenchImmunityAbAttr",
         "EntryHazardImmunityAbAttr",
@@ -1962,6 +1964,7 @@
         "FloatAbAttr",
         "GroundEntryHazardImmunityAbAttr",
         "GroundedEntryHazardImmunityAbAttr",
+        "HydrapexAbAttr",
         "IgnoreContactAbAttr",
         "IgnoreGenderInfatuationAbAttr",
         "IgnoreProtectByFlagAbAttr",
@@ -1974,13 +1977,23 @@
         "PostDefendSuppressOpponentDamageBoostAbAttr",
         "LivingChromeMarkerAbAttr",
         "SedimentBloomMarkerAbAttr",
+        "LastHostAbAttr",
+        "LibraryAbAttr",
+        "LifePreserverAbAttr",
+        "MycelialNetworkAbAttr",
+        "OmniformAbAttr",
+        "QuickeningGraceAbAttr",
+        "RapierFlagInjectionAbAttr",
+        "RelativityAbAttr",
+        "ShatteredPsycheAbAttr",
         "SpreadTargetByFlagAbAttr",
         "StealthRockImmunityAbAttr",
         "SuperegoMarkerAbAttr",
         "SuppressFieldAbilitiesWhenEnragedAbAttr",
         "SuppressFieldEffectsAbAttr",
         "SwitchWhileRampagingAbAttr",
-        "VaporBodyAccuracyAbAttr"
+        "VaporBodyAccuracyAbAttr",
+        "TangledSeedAbAttr"
       ],
       "provides": [
         "holder"
@@ -5984,5 +5997,5 @@
       ]
     }
   ],
-  "hash": "1e254dabb157d4"
+  "hash": "09871358dbb340"
 }
