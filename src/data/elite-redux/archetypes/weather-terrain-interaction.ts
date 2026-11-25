@@ -79,9 +79,11 @@ import {
   MovePowerBoostAbAttr,
   PostSummonTerrainChangeAbAttr,
   PostSummonWeatherChangeAbAttr,
+  type PreDefendModifyDamageAbAttrParams,
   ReceivedMoveDamageMultiplierAbAttr,
 } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { TerrainType } from "#data/terrain";
 import type { PokemonType } from "#enums/pokemon-type";
 import { WeatherType } from "#enums/weather-type";
@@ -151,6 +153,33 @@ export class SetTerrainOnEntryAbAttr extends PostSummonTerrainChangeAbAttr {
   }
 }
 
+/**
+ * The weather test the weather classes share: one of `weathers` is the active weather and its effects are not suppressed
+ * (Cloud Nine / Air Lock). Read at call time, because the weather changes during the battle.
+ */
+function weatherListIsActive(weathers: readonly WeatherType[]): boolean {
+  if (globalScene.arena.weather?.isEffectSuppressed()) {
+    return false;
+  }
+  return weathers.includes(globalScene.arena.weatherType);
+}
+
+/** The weather-type-boost test: there is a user, its move resolves to `type`, then the weather test. */
+function weatherTypeBoostApplies(
+  pokemon: Pokemon | undefined | null,
+  move: Move,
+  type: PokemonType,
+  weathers: readonly WeatherType[],
+): boolean {
+  if (pokemon === undefined || pokemon === null) {
+    return false;
+  }
+  if (pokemon.getMoveType(move) !== type) {
+    return false;
+  }
+  return weatherListIsActive(weathers);
+}
+
 /** Construction options for {@linkcode WeatherTypeBoostAbAttr}. */
 export interface WeatherTypeBoostOptions {
   /**
@@ -185,7 +214,12 @@ export interface WeatherTypeBoostOptions {
  * sun" pattern when composed appropriately, though Catastrophe itself wires
  * two separate instances (one per weather → type pairing).
  */
-export class WeatherTypeBoostAbAttr extends MovePowerBoostAbAttr {
+export class WeatherTypeBoostAbAttr
+  extends MovePowerBoostAbAttr
+  implements GatedAttr<PreAttackModifyPowerAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreAttackModifyPowerAbAttrParams) => boolean) | undefined;
   private readonly weathers: readonly WeatherType[];
   private readonly boostType: PokemonType;
   private readonly boostMultiplier: number;
@@ -200,24 +234,26 @@ export class WeatherTypeBoostAbAttr extends MovePowerBoostAbAttr {
     // We deliberately read globalScene inside the closure — pokerogue's
     // weather state is module-global and updated as the battle progresses.
     super(
-      (pokemon: Pokemon, _defender: Pokemon | null, move: Move) => {
-        if (pokemon === undefined || pokemon === null) {
-          return false;
-        }
-        if (pokemon.getMoveType(move) !== opts.type) {
-          return false;
-        }
-        if (globalScene.arena.weather?.isEffectSuppressed()) {
-          return false;
-        }
-        return opts.weathers.includes(globalScene.arena.weatherType);
-      },
+      (pokemon: Pokemon, _defender: Pokemon | null, move: Move) =>
+        weatherTypeBoostApplies(pokemon, move, opts.type, opts.weathers),
       opts.multiplier,
       false,
     );
     this.weathers = opts.weathers;
     this.boostType = opts.type;
     this.boostMultiplier = opts.multiplier;
+  }
+
+  override canApply(params: PreAttackModifyPowerAbAttrParams): boolean {
+    return gatedCanApply<PreAttackModifyPowerAbAttrParams>(this, params);
+  }
+
+  /**
+   * Tier B (ability studio spec 3.1): the replaceable condition is the whole old `canApply`, which asked the closure the
+   * constructor hands to the parent: the move resolves to the configured type and the configured weather is active.
+   */
+  public gate({ pokemon, move }: PreAttackModifyPowerAbAttrParams): boolean {
+    return weatherTypeBoostApplies(pokemon, move, this.boostType, this.weathers);
   }
 
   /** The configured weather set (read-only accessor). */
@@ -348,7 +384,12 @@ export interface WeatherDamageReductionOptions {
  * pokerogue damage-reduction families (which we'll re-archetype later in
  * the `damage-reduction-generic` task).
  */
-export class WeatherDamageReductionAbAttr extends ReceivedMoveDamageMultiplierAbAttr {
+export class WeatherDamageReductionAbAttr
+  extends ReceivedMoveDamageMultiplierAbAttr
+  implements GatedAttr<PreDefendModifyDamageAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreDefendModifyDamageAbAttrParams) => boolean) | undefined;
   private readonly weathers: readonly WeatherType[];
   private readonly reductionMultiplier: number;
 
@@ -359,14 +400,21 @@ export class WeatherDamageReductionAbAttr extends ReceivedMoveDamageMultiplierAb
     if (opts.weathers.length === 0) {
       throw new Error("[WeatherDamageReductionAbAttr] weathers must include at least one WeatherType");
     }
-    super((_target: Pokemon, _user: Pokemon, _move: Move) => {
-      if (globalScene.arena.weather?.isEffectSuppressed()) {
-        return false;
-      }
-      return opts.weathers.includes(globalScene.arena.weatherType);
-    }, opts.multiplier);
+    super((_target: Pokemon, _user: Pokemon, _move: Move) => weatherListIsActive(opts.weathers), opts.multiplier);
     this.weathers = opts.weathers;
     this.reductionMultiplier = opts.multiplier;
+  }
+
+  override canApply(params: PreDefendModifyDamageAbAttrParams): boolean {
+    return gatedCanApply<PreDefendModifyDamageAbAttrParams>(this, params);
+  }
+
+  /**
+   * Tier B (ability studio spec 3.1): the replaceable condition is the whole old `canApply`, which asked the closure the
+   * constructor hands to the parent: the configured weather is active and not suppressed. It never looks at the move.
+   */
+  public gate(_params: PreDefendModifyDamageAbAttrParams): boolean {
+    return weatherListIsActive(this.weathers);
   }
 
   /** The configured weather set. */

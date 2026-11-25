@@ -19,10 +19,16 @@
 // =============================================================================
 
 import { type ModifyMoveEffectChanceAbAttrParams, MoveEffectChanceMultiplierAbAttr } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { StatusEffect } from "#enums/status-effect";
 
-export class StatusChanceMultiplierAbAttr extends MoveEffectChanceMultiplierAbAttr {
+export class StatusChanceMultiplierAbAttr
+  extends MoveEffectChanceMultiplierAbAttr
+  implements GatedAttr<ModifyMoveEffectChanceAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: ModifyMoveEffectChanceAbAttrParams) => boolean) | undefined;
   private readonly status: StatusEffect;
 
   constructor(status: StatusEffect, multiplier: number) {
@@ -31,9 +37,19 @@ export class StatusChanceMultiplierAbAttr extends MoveEffectChanceMultiplierAbAt
   }
 
   override canApply(params: ModifyMoveEffectChanceAbAttrParams): boolean {
-    if (!super.canApply(params)) {
-      return false;
-    }
+    return gatedCanApply<ModifyMoveEffectChanceAbAttrParams>(this, params);
+  }
+
+  /** Tier B (ability studio spec 3.1), guard and first clause: the parent's test (a real chance, not Order Up or Electro Shot). */
+  public guards(params: ModifyMoveEffectChanceAbAttrParams): boolean {
+    return super.canApply(params);
+  }
+
+  /**
+   * The replaceable condition: the move inflicts the configured status. There is no residual.
+   * The second clause (frostbite through its battler tag) is part of the same condition.
+   */
+  public gate(params: ModifyMoveEffectChanceAbAttrParams): boolean {
     const move = params.move;
     // Scale moves that inflict the configured status directly...
     if (move.getAttrs("StatusEffectAttr").some(attr => attr.effect === this.status)) {

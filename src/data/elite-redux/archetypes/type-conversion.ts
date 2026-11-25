@@ -61,7 +61,13 @@
 //       type: PokemonType.ROCK }, newType: PokemonType.ICE })` + 1.1x boost.
 // =============================================================================
 
-import { MovePowerBoostAbAttr, MoveTypeChangeAbAttr } from "#abilities/ab-attrs";
+import {
+  MovePowerBoostAbAttr,
+  MoveTypeChangeAbAttr,
+  type MoveTypeChangeAbAttrParams,
+  type PreAttackModifyPowerAbAttrParams,
+} from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { MoveFlags } from "#enums/move-flags";
 import { PokemonType } from "#enums/pokemon-type";
 import type { Pokemon } from "#field/pokemon";
@@ -120,7 +126,9 @@ export interface TypeConversionOptions {
  * predicate fires correctly in both pre- and post-conversion states for
  * downstream-of-this-ability dispatches.
  */
-export class TypeConversionAbAttr extends MoveTypeChangeAbAttr {
+export class TypeConversionAbAttr extends MoveTypeChangeAbAttr implements GatedAttr<MoveTypeChangeAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: MoveTypeChangeAbAttrParams) => boolean) | undefined;
   private readonly source: TypeConversionSource;
   private readonly configuredNewType: PokemonType;
 
@@ -140,6 +148,18 @@ export class TypeConversionAbAttr extends MoveTypeChangeAbAttr {
     );
     this.source = source;
     this.configuredNewType = opts.newType;
+  }
+
+  override canApply(params: MoveTypeChangeAbAttrParams): boolean {
+    return gatedCanApply<MoveTypeChangeAbAttrParams>(this, params);
+  }
+
+  /**
+   * Tier B (ability studio spec 3.1): the replaceable condition is the whole old `canApply`, which asked the source filter
+   * (the closure the constructor still hands to the parent) about the move: the same {@linkcode matchesSource} call.
+   */
+  public gate({ pokemon, move }: MoveTypeChangeAbAttrParams): boolean {
+    return TypeConversionAbAttr.matchesSource(this.source, pokemon, move);
   }
 
   /** Read-only accessor for the configured source filter. */
@@ -212,7 +232,12 @@ export interface TypeConversionPowerBoostOptions {
  * filter directly from the original type / flag bypasses dispatch-ordering
  * ambiguity and matches what the type-conversion class already does.
  */
-export class TypeConversionPowerBoostAbAttr extends MovePowerBoostAbAttr {
+export class TypeConversionPowerBoostAbAttr
+  extends MovePowerBoostAbAttr
+  implements GatedAttr<PreAttackModifyPowerAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreAttackModifyPowerAbAttrParams) => boolean) | undefined;
   private readonly source: TypeConversionSource;
   private readonly multiplier: number;
 
@@ -227,6 +252,15 @@ export class TypeConversionPowerBoostAbAttr extends MovePowerBoostAbAttr {
     super((user, _defender, move) => TypeConversionAbAttr.matchesSource(source, user, move), opts.multiplier, false);
     this.source = source;
     this.multiplier = opts.multiplier;
+  }
+
+  override canApply(params: PreAttackModifyPowerAbAttrParams): boolean {
+    return gatedCanApply<PreAttackModifyPowerAbAttrParams>(this, params);
+  }
+
+  /** Tier B (ability studio spec 3.1): the replaceable condition is the whole old `canApply`, the same source-filter call. */
+  public gate({ pokemon, move }: PreAttackModifyPowerAbAttrParams): boolean {
+    return TypeConversionAbAttr.matchesSource(this.source, pokemon, move);
   }
 
   /** Read-only accessor for the configured source filter. */

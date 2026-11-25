@@ -30,14 +30,23 @@ import {
   StatMultiplierAbAttr,
   type StatMultiplierAbAttrParams,
 } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { BattleStat } from "#enums/stat";
 import type { Pokemon } from "#field/pokemon";
 
 const faintCount = (pokemon: Pokemon): number => pokemon.battleData.erSoulHarvestFaintCount ?? 0;
 
-export class FaintCountTriggerAbAttr extends PostKnockOutAbAttr {
-  override canApply({ pokemon, victim }: PostKnockOutAbAttrParams): boolean {
-    // Count every faint except the holder's own.
+export class FaintCountTriggerAbAttr extends PostKnockOutAbAttr implements GatedAttr<PostKnockOutAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostKnockOutAbAttrParams) => boolean) | undefined;
+
+  /** Tier B (ability studio spec 3.1): the only clause is the gate, there is no guard and no residual. */
+  override canApply(params: PostKnockOutAbAttrParams): boolean {
+    return gatedCanApply<PostKnockOutAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition: count every faint except the holder's own. */
+  public gate({ pokemon, victim }: PostKnockOutAbAttrParams): boolean {
     return victim.id !== pokemon.id;
   }
 

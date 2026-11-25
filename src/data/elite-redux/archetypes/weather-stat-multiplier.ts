@@ -53,6 +53,7 @@
 
 import { StatMultiplierAbAttr, type StatMultiplierAbAttrParams } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { BattleStat } from "#enums/stat";
 import { WeatherType } from "#enums/weather-type";
 
@@ -99,7 +100,9 @@ export interface WeatherStatMultiplierOptions {
  * orthogonal to our weather gate. We extend `canApply` rather than passing a
  * `condition` to keep the two concerns separable.
  */
-export class WeatherStatMultiplierAbAttr extends StatMultiplierAbAttr {
+export class WeatherStatMultiplierAbAttr extends StatMultiplierAbAttr implements GatedAttr<StatMultiplierAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: StatMultiplierAbAttrParams) => boolean) | undefined;
   private readonly weathers: readonly WeatherType[];
 
   constructor(opts: WeatherStatMultiplierOptions) {
@@ -124,11 +127,21 @@ export class WeatherStatMultiplierAbAttr extends StatMultiplierAbAttr {
   /**
    * canApply: stat must match (parent's check) AND active weather must be one
    * of the configured weathers and not suppressed.
+   *
+   * Tier B (ability studio spec 3.1): `guards` then `gate`, the two clauses in their old order and with the old
+   * short-circuit.
    */
   public override canApply(params: StatMultiplierAbAttrParams): boolean {
-    if (!super.canApply(params)) {
-      return false;
-    }
+    return gatedCanApply<StatMultiplierAbAttrParams>(this, params);
+  }
+
+  /** Clause 1, the parent's `canApply`: the stat the game asks about is the configured one. It is part of the effect. */
+  public guards(params: StatMultiplierAbAttrParams): boolean {
+    return super.canApply(params);
+  }
+
+  /** Clause 2, the replaceable condition: the active weather is one of the configured weathers and not suppressed. */
+  public gate(_params: StatMultiplierAbAttrParams): boolean {
     return this.isWeatherActive();
   }
 

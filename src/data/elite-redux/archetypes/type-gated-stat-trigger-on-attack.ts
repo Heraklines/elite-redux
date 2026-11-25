@@ -17,12 +17,13 @@
 // =============================================================================
 
 import { PostAttackAbAttr } from "#abilities/ab-attrs";
-import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
-import type { BattleStat } from "#enums/stat";
 import type { PokemonType } from "#enums/pokemon-type";
+import type { BattleStat } from "#enums/stat";
+import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 
 export interface TypeGatedStatTriggerOnAttackOptions {
   readonly type: PokemonType;
@@ -37,12 +38,26 @@ const HAZARD_TAGS: readonly ArenaTagType[] = [
   ArenaTagType.STICKY_WEB,
 ];
 
-export class TypeGatedStatTriggerOnAttackAbAttr extends PostAttackAbAttr {
+export class TypeGatedStatTriggerOnAttackAbAttr
+  extends PostAttackAbAttr
+  implements GatedAttr<PostMoveInteractionAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
   constructor(private readonly opts: TypeGatedStatTriggerOnAttackOptions) {
     super(undefined, false);
   }
 
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /**
+   * Tier B (ability studio spec 3.1): the replaceable condition is the whole old `canApply`: the move's type after other abilities
+   * changed it is the configured type. (The parent's default "damaging move" test is not consulted: this override never called it.)
+   */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
     const { move, pokemon } = params;
     return pokemon.getMoveType(move) === this.opts.type;
   }

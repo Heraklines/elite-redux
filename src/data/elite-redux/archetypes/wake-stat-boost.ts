@@ -23,6 +23,7 @@
 
 import { PostWakeUpAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { type EffectiveStat, Stat } from "#enums/stat";
 import type { AbAttrBaseParams } from "#types/ability-types";
 
@@ -41,7 +42,9 @@ export interface WakeStatBoostOptions {
  * and flip the `rudeAwakeningTriggered` flag (which also switches on the gated
  * sleep immunity). Fires at most once per battle.
  */
-export class WakeStatBoostAbAttr extends PostWakeUpAbAttr {
+export class WakeStatBoostAbAttr extends PostWakeUpAbAttr implements GatedAttr<AbAttrBaseParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
   private readonly stats: readonly EffectiveStat[];
   private readonly stages: number;
 
@@ -51,7 +54,15 @@ export class WakeStatBoostAbAttr extends PostWakeUpAbAttr {
     this.stages = opts.stages;
   }
 
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /**
+   * Tier B (ability studio spec 3.1): the replaceable condition is the whole old `canApply`, the once-per-battle charge that this
+   * class's own `apply` spends (the `rudeAwakeningTriggered` flag on the battle data, which the matching sleep immunity also reads).
+   */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     return !pokemon.battleData.rudeAwakeningTriggered;
   }
 

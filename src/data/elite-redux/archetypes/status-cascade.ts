@@ -17,6 +17,7 @@
 // =============================================================================
 
 import { PostAttackAbAttr } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 import { globalScene } from "#app/global-scene";
 import type { StatusEffect } from "#enums/status-effect";
@@ -34,7 +35,9 @@ export interface StatusCascadeOptions {
   readonly stats: readonly StatusCascadeChange[];
 }
 
-export class StatusCascadeAbAttr extends PostAttackAbAttr {
+export class StatusCascadeAbAttr extends PostAttackAbAttr implements GatedAttr<PostMoveInteractionAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
   private readonly trigger: StatusEffect;
   private readonly stats: readonly StatusCascadeChange[];
 
@@ -48,10 +51,16 @@ export class StatusCascadeAbAttr extends PostAttackAbAttr {
   }
 
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { opponent } = params;
-    if (!opponent || opponent.isFainted()) {
-      return false;
-    }
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Tier B (ability studio spec 3.1), guard and first clause: there is a target and it is still standing. */
+  public guards({ opponent }: PostMoveInteractionAbAttrParams): boolean {
+    return !(!opponent || opponent.isFainted());
+  }
+
+  /** The replaceable condition: the target now has the trigger status. There is no residual. */
+  public gate({ opponent }: PostMoveInteractionAbAttrParams): boolean {
     return opponent.status?.effect === this.trigger;
   }
 

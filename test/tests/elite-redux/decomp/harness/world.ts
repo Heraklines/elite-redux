@@ -390,6 +390,13 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     move,
     simulated: false,
   }),
+  "event.ally-stat-changed": ({ holder }) => ({
+    pokemon: holder,
+    stats: [Stat.ATK],
+    stages: -1,
+    selfTarget: false,
+    simulated: false,
+  }),
   "calc.damage-taken": ctx => ({
     pokemon: ctx.holder,
     opponent: ctx.foe,
@@ -539,4 +546,14 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     ];
     return { pokemon: ctx.holder, victim: ctx.foe, simulated: false };
   },
+  // Added by B12 chunk 3 (request R-B12-26). The move-type moment (Pokemon.getMoveType): the type holder starts at the move's own type.
+  "calc.move-type": ctx => ({
+    pokemon: ctx.holder,
+    opponent: ctx.foe,
+    move: ctx.move,
+    moveType: new NumberHolder(ctx.move.type),
+    simulated: false,
+  }),
+  // The wake-up moment (MovePhase.checkSleep): only the woken Pokemon.
+  "event.wake-up": ({ holder }) => ({ pokemon: holder, simulated: false }),
 };

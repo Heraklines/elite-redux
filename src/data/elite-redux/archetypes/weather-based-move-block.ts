@@ -16,8 +16,11 @@
 //   - 354 Weather Control — "Negates all weather based moves from enemies."
 // =============================================================================
 
-import { MoveImmunityAbAttr } from "#abilities/ab-attrs";
+import { MoveImmunityAbAttr, type MoveImmunityAbAttrParams } from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { MoveId } from "#enums/move-id";
+import type { Pokemon } from "#field/pokemon";
+import type { Move } from "#moves/move";
 
 // The dex enumerates the OFFENSIVE weather-based moves Weather Control negates
 // from enemies: Weather Ball, Solar Beam/Blade, Hurricane, Thunder, Blizzard,
@@ -43,8 +46,33 @@ const WEATHER_BASED_MOVES = new Set<MoveId>([
   MoveId.GRASS_PLEDGE,
 ]);
 
-export class WeatherBasedMoveBlockAbAttr extends MoveImmunityAbAttr {
+/** The block test: the move is not the holder's own and is one of the weather-based moves. */
+function blocksWeatherMove(pokemon: Pokemon, opponent: Pokemon, move: Move): boolean {
+  return pokemon !== opponent && WEATHER_BASED_MOVES.has(move.id);
+}
+
+export class WeatherBasedMoveBlockAbAttr extends MoveImmunityAbAttr implements GatedAttr<MoveImmunityAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: MoveImmunityAbAttrParams) => boolean) | undefined;
+
   constructor() {
-    super((pokemon, opponent, move) => pokemon !== opponent && WEATHER_BASED_MOVES.has(move.id));
+    super(blocksWeatherMove);
+  }
+
+  override canApply(params: MoveImmunityAbAttrParams): boolean {
+    return gatedCanApply<MoveImmunityAbAttrParams>(this, params);
+  }
+
+  /**
+   * Tier B (ability studio spec 3.1), the old `canApply` in its old order. Clause 1 is the parent's: another ability already blocked
+   * this move. Clause 2a (inside the old closure): a Pokemon never blocks its own move.
+   */
+  public guards({ cancelled, pokemon, opponent }: MoveImmunityAbAttrParams): boolean {
+    return !cancelled.value && pokemon !== opponent;
+  }
+
+  /** Clause 2b, the replaceable condition: the move is one of the weather-based moves. */
+  public gate({ move }: MoveImmunityAbAttrParams): boolean {
+    return WEATHER_BASED_MOVES.has(move.id);
   }
 }

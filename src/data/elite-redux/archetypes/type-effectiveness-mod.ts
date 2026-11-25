@@ -58,8 +58,15 @@
 //       defensiveMultiplier: 1 })` — defensive side omitted via 1x.
 // =============================================================================
 
-import { type AbAttr, MovePowerBoostAbAttr, ReceivedTypeDamageMultiplierAbAttr } from "#abilities/ab-attrs";
+import {
+  type AbAttr,
+  MovePowerBoostAbAttr,
+  type PreAttackModifyPowerAbAttrParams,
+  ReceivedTypeDamageMultiplierAbAttr,
+} from "#abilities/ab-attrs";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { PokemonType } from "#enums/pokemon-type";
+import type { Pokemon } from "#field/pokemon";
 
 /** Construction options for {@linkcode buildTypeEffectivenessModAttrs}. */
 export interface TypeEffectivenessModOptions {
@@ -85,6 +92,11 @@ export interface TypeEffectivenessModOptions {
   readonly defensiveMultiplier?: number;
 }
 
+/** The offensive test: the defender is of the configured type (vanilla `isOfType` defaults, so a Tera type counts). */
+function defenderIsOfType(opponent: Pokemon | undefined, type: PokemonType): boolean {
+  return opponent?.isOfType?.(type) === true;
+}
+
 /**
  * Parameterized `AbAttr` implementing the offensive half of the
  * `type-effectiveness-mod` archetype: a power boost when the *defender* has
@@ -102,7 +114,12 @@ export interface TypeEffectivenessModOptions {
  * "boost when I attack a Fire-type". The two are complementary axes and
  * compose multiplicatively without overlap.
  */
-export class OffensiveTypeMultiplierAbAttr extends MovePowerBoostAbAttr {
+export class OffensiveTypeMultiplierAbAttr
+  extends MovePowerBoostAbAttr
+  implements GatedAttr<PreAttackModifyPowerAbAttrParams>
+{
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreAttackModifyPowerAbAttrParams) => boolean) | undefined;
   private readonly targetDefenderType: PokemonType;
   private readonly multiplier: number;
 
@@ -110,9 +127,21 @@ export class OffensiveTypeMultiplierAbAttr extends MovePowerBoostAbAttr {
     if (!(multiplier > 0)) {
       throw new Error(`[OffensiveTypeMultiplierAbAttr] multiplier must be > 0; got ${multiplier}`);
     }
-    super((_pokemon, opponent, _move) => opponent?.isOfType?.(targetDefenderType) === true, multiplier, false);
+    super((_pokemon, opponent, _move) => defenderIsOfType(opponent, targetDefenderType), multiplier, false);
     this.targetDefenderType = targetDefenderType;
     this.multiplier = multiplier;
+  }
+
+  override canApply(params: PreAttackModifyPowerAbAttrParams): boolean {
+    return gatedCanApply<PreAttackModifyPowerAbAttrParams>(this, params);
+  }
+
+  /**
+   * Tier B (ability studio spec 3.1): the replaceable condition is the whole old `canApply`, which asked the closure the
+   * constructor hands to the parent: the defender is of the configured type.
+   */
+  public gate({ opponent }: PreAttackModifyPowerAbAttrParams): boolean {
+    return defenderIsOfType(opponent, this.targetDefenderType);
   }
 
   /** Read-only accessor for the defender type that this boost gates on. */

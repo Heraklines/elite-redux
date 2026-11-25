@@ -17,29 +17,42 @@
 
 import { PreDefendAbAttr, type TypeMultiplierAbAttrParams } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { type GatedAttr, gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { MoveFlags } from "#enums/move-flags";
 
 export interface UserFieldFlagImmunityOptions {
   readonly flag: MoveFlags;
 }
 
-export class UserFieldFlagImmunityAbAttr extends PreDefendAbAttr {
+export class UserFieldFlagImmunityAbAttr extends PreDefendAbAttr implements GatedAttr<TypeMultiplierAbAttrParams> {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: TypeMultiplierAbAttrParams) => boolean) | undefined;
+
   constructor(private readonly opts: UserFieldFlagImmunityOptions) {
     super(true);
   }
 
   override canApply(params: TypeMultiplierAbAttrParams): boolean {
-    const { move, opponent, pokemon } = params;
-    // NB: no AttackMove gate — Noise Cancel blocks ALL sound moves, including
-    // status ones (Growl, Metal Sound), matching Soundproof. The dispatcher in
-    // getMoveEffectiveness only invokes this on the target's own side, so the
-    // opponent (attacker) is always the other side.
-    if (opponent === pokemon) {
-      return false;
-    }
-    if (!move.doesFlagEffectApply({ flag: this.opts.flag, user: opponent, target: pokemon })) {
-      return false;
-    }
+    return gatedCanApply<TypeMultiplierAbAttrParams>(this, params);
+  }
+
+  /** Tier B (ability studio spec 3.1), clause 1 of the old `canApply`: a Pokemon never blocks its own move. */
+  public guards({ opponent, pokemon }: TypeMultiplierAbAttrParams): boolean {
+    return opponent !== pokemon;
+  }
+
+  /**
+   * Clause 2: the replaceable condition. NB: no AttackMove gate — Noise Cancel blocks ALL sound moves, including
+   * status ones (Growl, Metal Sound), matching Soundproof. The dispatcher in
+   * getMoveEffectiveness only invokes this on the target's own side, so the
+   * opponent (attacker) is always the other side.
+   */
+  public gate({ move, opponent, pokemon }: TypeMultiplierAbAttrParams): boolean {
+    return move.doesFlagEffectApply({ flag: this.opts.flag, user: opponent, target: pokemon });
+  }
+
+  /** Clause 3, effect-side feasibility that stays in the class. */
+  public residual({ pokemon }: TypeMultiplierAbAttrParams): boolean {
     // Holder OR any party-side ally on the field must have the ability.
     // Pokerogue invokes PreDefend on the actual target — for ally
     // protection we trust that the dispatcher fires our AbAttr for ALL
