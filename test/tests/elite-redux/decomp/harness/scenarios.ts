@@ -545,7 +545,7 @@ export function mappedWhenIds(): string[] {
 // Axes
 
 /** The axis names a declaration's probes may use. */
-export const KNOWN_AXES = ["hp", "foeHp", "foeLevel", "foeMove", "foeType", "weather", "status", "stage"] as const;
+export const KNOWN_AXES = ["hp", "foeHp", "foeLevel", "foeMove", "foeType", "weather", "status", "stage", "foeAbility"] as const;
 
 export function describeAxes(axes: Axes): string {
   const entries = Object.entries(axes);
@@ -591,6 +591,9 @@ export function applyAxes(ctx: ScenarioContext, axes: Axes): void {
         break;
       case "weather":
         setWeatherOf(game, enumValue(WeatherType as never, value, "weather") as WeatherType);
+        break;
+      case "foeAbility":
+        // B18 chunk 5 (request R-B18-0f): applied BEFORE the battle starts (runScenario), nothing to do afterwards.
         break;
       case "status":
         setStatusOf(holder, enumValue(StatusEffect as never, value, "status") as StatusEffect);
@@ -653,6 +656,15 @@ export async function runScenario(
     .enemyHasPassiveAbility(false);
   if (spec.weather !== undefined) {
     game.override.weather(spec.weather);
+  } else if (axes.weather !== undefined && (spec.id === "entry" || spec.id === "holder-switches-out")) {
+    // B18 chunk 4 (request R-B18-0d): for the entry and switch-out templates the weather axis is the weather the battle STARTS with. Entry
+    // effects read it at the entry, and an ability whose own condition is a weather (Snow Cloak) is never evaluated before that.
+    game.override.weather(enumValue(WeatherType as never, axes.weather, "weather") as WeatherType);
+  }
+  if (axes.foeAbility !== undefined) {
+    // B18 chunk 5 (request R-B18-0f): the foe's ability is chosen by the probe. An identity marker such as Wonder Guard (1 max HP) would
+    // otherwise faint to Rough Skin recoil in the while-active template and end the run in a game over.
+    game.override.enemyAbility(enumValue(AbilityId as never, axes.foeAbility, "foeAbility") as AbilityId);
   }
   if (spec.berry === true) {
     game.override.startingHeldItems([{ name: "BERRY", type: BerryType.SITRUS, count: 1 }]);

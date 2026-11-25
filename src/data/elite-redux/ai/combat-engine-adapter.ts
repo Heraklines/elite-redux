@@ -364,7 +364,7 @@ function snapshotMechanics(
         "erImposterCopiedAttackBoost",
       ],
     ],
-    ["entry", mon.tempSummonData, ["turnCount", "waveTurnCount", "erPoisonWeakness", "erTelekineticStruggle"]],
+    ["entry", mon.tempSummonData, ["turnCount", "waveTurnCount", "erWeakToType", "erTelekineticStruggle"]],
     [
       "battle",
       mon.battleData,

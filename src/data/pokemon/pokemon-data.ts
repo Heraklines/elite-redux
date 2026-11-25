@@ -515,8 +515,11 @@ export class PokemonTempSummonData {
    * the corresponding spent keys remain in waveData for the whole battle.
    */
   public abilityEntryWindows: Set<string> = new Set<string>();
-  /** Toxic Spill entry snapshot; clears with this temporary summon state on switch. */
-  public erPoisonWeakness = false;
+  /**
+   * Toxic Spill entry snapshot: the type this battler is weak to (at least x2) while it stays in, or null for none.
+   * Clears with this temporary summon state on switch.
+   */
+  public erWeakToType: PokemonType | null = null;
   /** Telekinetic forces this battler's next turn to resolve through Struggle. */
   public erTelekineticStruggle = false;
 }

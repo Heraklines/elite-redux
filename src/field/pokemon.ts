@@ -4473,7 +4473,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
     // Toxic Spill snapshots every battler present on entry. Existing
     // immunities stay immune; every other Poison matchup becomes weak.
-    if (moveType === PokemonType.POISON && this.tempSummonData.erPoisonWeakness && multi.value > 0) {
+    if (this.tempSummonData.erWeakToType !== null && moveType === this.tempSummonData.erWeakToType && multi.value > 0) {
       multi.value = Math.max(2, multi.value);
     }
     // ER Dojo (#439 §3): martial mastery - moves of the biome's `unresistedType`

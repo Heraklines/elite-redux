@@ -6,6 +6,7 @@
 
 import { PostSummonAbAttr, PostTurnAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { Pokemon } from "#field/pokemon";
 import type { AbAttrBaseParams } from "#types/ability-types";
 import { toDmgValue } from "#utils/common";
@@ -55,12 +56,23 @@ export class FirstEntryPartyHealAbAttr extends PostSummonAbAttr {
     this.healFraction = options.healFraction;
   }
 
-  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole original `canApply` is the replaceable gate; no guards, no residual. */
+  override canApply(params: AbAttrBaseParams): boolean {
+    return gatedCanApply<AbAttrBaseParams>(this, params);
+  }
+
+  /** The replaceable condition: this ability has not fired its first-entry heal yet this wave. Moved verbatim from the old `canApply`. */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
     return !pokemon.waveData.entryEffectsFired.has(this.key);
   }
 
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
-    if (simulated || pokemon.waveData.entryEffectsFired.has(this.key)) {
+    // With a compiled gate (`gateOverride`) the memory belongs to the gate: its commit has already written the key by the
+    // time this runs, so testing the key a second time here would swallow the heal. Without one, behaviour is unchanged.
+    if (simulated || (this.gateOverride === undefined && pokemon.waveData.entryEffectsFired.has(this.key))) {
       return;
     }
 
