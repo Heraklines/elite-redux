@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "09871358dbb340",
-  "hash": "1a055c0b6d3e69",
+  "hash": "1891cad3ab26fc",
   "blocks": [
     {
       "id": "block.absorbant",
@@ -5997,6 +5997,48 @@
         "do": true
       },
       "packageReason": "PACKAGE, justified. 1 attr in 1 ability: Cleansing Light (5912 attr 0). The trigger (WHEN event.on-win, which fires once per KO the holder scores) is a separate swappable block and the class has no condition of its own beyond the living-ally feasibility, which is the effect's target and stays in the class. The effect cannot be split with the current library because (1) the target is 'the ally with the lowest HP' and effect.heal-percent / effect.cure-status can only target the holder, the other Pokemon or a side, and (2) the rider depends on how many KOs the holder scored THIS TURN, a per-turn counter (module WeakMap keyed by holder with a wave:turn key) that the library has no atom for (time.nth-use counts per battle). Requests R-B15-9 (target 'my weakest ally') and R-B15-10 (atom 'KOs I scored this turn') would let it become WHEN + heal-percent + (IF kos >= 2) cure-status. Both numbers (heal share, KO number that starts the cure) are typed params. State: erCleansingLightKoState is read by the AI snapshot (ai/combat-private-state.ts), so the WeakMap stays as it is. Suspected oddities, NOT fixed: (1) the KO counter only runs when canApply found a living ally, so a KO scored while no ally stands does not count toward 'second KO this turn' (and the `if (!ally)` branch after the bump can never be reached); (2) the status cure message is a hard-coded English string, not an i18n key; (3) the heal message reuses the 'postTurnHeal' text.",
+      "uses": 1
+    },
+    {
+      "id": "block.clear-opponent-stat-buffs-on-summon",
+      "className": "ClearOpponentStatBuffsOnSummonAbAttr",
+      "label": "Wipe the foes' stat boosts when I enter",
+      "summary": "When I enter the battle, every raised stat of each adjacent foe goes back to normal. Lowered stats stay lowered. Example: a foe at +2 Attack and -1 Defense ends at 0 and -1.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "pressure",
+        "clear boosts",
+        "remove stat boosts",
+        "reset foe stats",
+        "haze on entry",
+        "cancel buffs"
+      ],
+      "examples": [
+        "Remove the foes' stat boosts when I switch in",
+        "Reset every raised foe stat to normal on entry"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one foe must be on the field",
+        "Only foes next to me are affected in a double or triple battle, and fainted foes are skipped",
+        "It never changes anything for a preview (a simulated entry)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier C, PACKAGE with a written reason: effect.stat-stage only RAISES or LOWERS a chosen stat by a number of stages, so it cannot reproduce 'set every stage above zero back to zero, leave stages below zero alone, for seven stats on every adjacent foe' (the amount differs per stat and per foe). Request R21 asks for a 'reset raised stat stages' effect with who (adjacent foes, holder, all) and which stats. No typed param exists (the seven stats are fixed). The trigger is a separate block, extra IFs can be ANDed on top. Users: Pressure (46, attr 2) only. Oddity, not a bug: canApply counts all foes while apply only reaches adjacent ones, so with no adjacent foe the ability flyout shows and nothing happens; the class shows no message of its own (the Pressure entry message comes from PostSummonMessageAbAttr). No game bug found.",
       "uses": 1
     },
     {
@@ -14222,6 +14264,57 @@
       "uses": 2
     },
     {
+      "id": "block.er-magician-steal",
+      "className": "ErMagicianStealAbAttr",
+      "label": "Steal a random item from the Pokemon I hit",
+      "summary": "After my attack lands, I take one random item the target holds, if I can carry it. As built, it only happens when my move does not make contact.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "magician",
+        "thief",
+        "pickpocket",
+        "steal item",
+        "take the foe's item",
+        "item theft",
+        "swipe held item"
+      ],
+      "examples": [
+        "Steal the target's item with a move that does not make contact",
+        "Steal an item after every hit"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.flag",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "My move must deal damage (a status move never steals)",
+        "The hit must have connected (not 'no effect')",
+        "It must be a real hit, not a damage preview",
+        "The target must hold at least one item that can be taken, and I must be able to carry it"
+      ],
+      "effect": {
+        "id": "effect.steal-item",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.er-multi-headed",
       "className": "ErMultiHeadedAbAttr",
       "label": "Make my attacks hit once for each of my heads",
@@ -14337,6 +14430,47 @@
         "do": true
       },
       "uses": 5
+    },
+    {
+      "id": "block.er-transmute-opposing-berries",
+      "className": "ErTransmuteOpposingBerriesAbAttr",
+      "label": "Destroy every berry the foes hold when I enter",
+      "summary": "When I enter the battle, each adjacent foe loses every berry it holds, all copies of each. A message names each foe that lost berries.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "power of alchemy",
+        "remove foe berries",
+        "berry removal",
+        "destroy berries",
+        "transmute berries",
+        "no berries for the enemy"
+      ],
+      "examples": [
+        "Remove all the berries the opposing Pokemon hold as I enter"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one foe must be on the field",
+        "Only foes next to me are affected in a double or triple battle, and fainted foes are skipped",
+        "It never removes anything for a preview (a simulated entry)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier C, PACKAGE with a written reason: the library's effect.remove-item takes only a 'who' and removes an unspecified item; this rule removes ONLY berries, ALL stacked copies, from EVERY adjacent foe, refreshes the modifier bar and shows a message per foe. There is no item-kind filter, no 'every stack' mode and no 'all adjacent foes' scope in the library, so the effect would have to be re-implemented; request R20 asks for effect.remove-item to grow those three options (kind: berries, all copies, who: adjacent foes). No typed param exists: nothing numeric or typed is used (the 99 in the code is a safety cap on the drain loop, not a setting). The trigger (on entry) is a separate block and extra IFs can be ANDed on top. Users: Power of Alchemy (223, attr 0) only. Oddity, not a bug: the Elite Redux text says berries are replaced by Black Sludge and later Big Nugget; this game has neither item, so the berries are only destroyed (documented in the class comment). Another oddity: canApply counts all foes while apply only reaches adjacent ones, so with no adjacent foe the ability flyout shows and nothing happens. No game bug found.",
+      "uses": 1
     },
     {
       "id": "block.er-weather-summon",
@@ -19125,6 +19259,94 @@
       "uses": 18
     },
     {
+      "id": "block.lingering-musk-endure",
+      "className": "LingeringMuskEndureAbAttr",
+      "label": "Survive a knockout hit but be marked to faint later",
+      "summary": "When a hit would knock me out, I stay at 1 HP instead, once per turn. I am then marked, and a matching end-of-turn effect makes me faint.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.damage-taken",
+      "whenLabel": "While the game calculates damage I take",
+      "synonyms": [
+        "lingering musk",
+        "endure",
+        "sturdy",
+        "survive a lethal hit",
+        "delayed knockout",
+        "borrowed time",
+        "cannot be one shot"
+      ],
+      "examples": [
+        "Survive a knockout hit, then faint when the turn ends"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The hit must be a knockout: its damage is at least my current HP",
+        "My maximum HP must be above 1",
+        "I must not already have survived a hit this turn (the survival marker lapses at the end of the turn)",
+        "The survival really happens only for a real hit, not for a damage preview"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, written reason: the survive rule (clauses 1 to 4) is inherited from PreFaintReviveAbAttr (B11), whose canApply is not mine to split, and the effect (a STURDY tag that the damage pipeline reads, plus a per-switch-in marker that the matching end-of-turn attr reads) has no library effect: there is no 'survive a lethal hit' block and no 'set a marker' block. Requests R1 (split the inherited canApply into a swappable 'the hit would knock me out' condition) and R2 (effect: survive a knockout at 1 HP) in requests/B17.md. Typed params: none exist; the only number in the chain is the inherited HP rule threshold 0, which is always true. Users: Lingering Musk (6084, attr 2) only; its attr 3 is LingeringMuskPostTurnAbAttr. SUSPECTED GAME BUG, NOT FIXED: this class's apply sets tempSummonData.lingeringMuskFaint = true without checking `simulated`. PreDefendFullHpEndureAbAttr is dispatched from Pokemon.getAttackDamage with the caller's `simulated` flag, and getAttackDamage(simulated: true) is called for damage previews (move-phase.ts:682 and move-effect-phase.ts:1071 target ordering, the enemy move scoring in pokemon.ts around lines 10040 to 10360). A previewed knockout of a Lingering Musk holder (damage >= hp) therefore sets the marker although no hit landed, and the holder faints at the end of the turn. Needs a check by the owner; the declaration records simulated: ignores.",
+      "uses": 1
+    },
+    {
+      "id": "block.lingering-musk-post-turn",
+      "className": "LingeringMuskPostTurnAbAttr",
+      "label": "Make myself faint",
+      "summary": "I lose all of my remaining HP and faint. As built, it only happens when I survived a knockout hit earlier.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "lingering musk",
+        "faint",
+        "knock myself out",
+        "self knockout",
+        "delayed knockout",
+        "die at end of turn"
+      ],
+      "examples": [
+        "Faint at the end of the turn after surviving a knockout hit"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "request R3: the marker left by a survived knockout",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B (gate/residual split, canApply = gate only, base canApply was never called) with a PACKAGE effect. Written reason for the package: the effect is a single damageAndUpdate(pokemon.hp, INDIRECT) call, but no library effect 'lose all my remaining HP / faint' exists (request R4 in requests/B17.md); it cannot be expressed with inflict, heal or recoil blocks, whose amounts are shares of damage or max HP, not 'all current HP', and a recoil block needs the damage slot, which an end-of-turn trigger does not have. The gate (the marker) is legacy-closure pending request R3: bindLegacyClosure for Lingering Musk (6084, attr 3, slot gate). Marker written by LingeringMuskEndureAbAttr (tempSummonData.lingeringMuskFaint). Users: Lingering Musk (6084, attr 3) only. No game bug found in this half (the Endure half has a suspected simulated-preview bug, see its notes).",
+      "uses": 1
+    },
+    {
       "id": "block.living-chrome-marker",
       "className": "LivingChromeMarkerAbAttr",
       "label": "Remember the types I leave behind when I change shape",
@@ -19358,6 +19580,73 @@
         "do": true
       },
       "uses": 2
+    },
+    {
+      "id": "block.metallosis-poison",
+      "className": "MetallosisPoisonAbAttr",
+      "label": "Give the target a status",
+      "summary": "After my attack hits, the target gets this status if it can take it: Poison. As built, only after a critical hit.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "metallosis",
+        "poison on crit",
+        "crit status",
+        "critical hit poison",
+        "status on critical hit",
+        "inflict status"
+      ],
+      "examples": [
+        "Poison the target after landing a critical hit",
+        "Burn the target after a critical hit"
+      ],
+      "params": [
+        {
+          "id": "status",
+          "label": "Status to give the target",
+          "control": "select",
+          "default": "POISON",
+          "editable": true,
+          "options": [
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.damaging plus request R5: the hit was a critical hit",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must have dealt at least 1 damage",
+        "The target must be able to receive the status (it is not immune and nothing blocks it)"
+      ],
+      "effect": {
+        "id": "effect.inflict-status",
+        "params": [
+          "status"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.money",
@@ -19928,6 +20217,69 @@
       "uses": 1
     },
     {
+      "id": "block.moxibustion",
+      "className": "MoxibustionAbAttr",
+      "label": "Heal by a share of the damage I dealt",
+      "summary": "After my attack hurts a burned target, I heal 75% of the damage dealt (at least 1 HP). Example: 75 means three quarters.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "moxibustion",
+        "drain",
+        "lifesteal",
+        "leech",
+        "heal from damage",
+        "absorb hp",
+        "vampiric"
+      ],
+      "examples": [
+        "Heal 75% of the damage dealt to burned targets",
+        "Drain half the damage dealt to a burned foe"
+      ],
+      "params": [
+        {
+          "id": "healPercent",
+          "label": "Share of the damage dealt that I heal (%, 75 = three quarters)",
+          "control": "number",
+          "default": 75,
+          "editable": true,
+          "min": 1,
+          "max": 200,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.damaging and status.has",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must have dealt at least 1 damage"
+      ],
+      "effect": {
+        "id": "effect.drain",
+        "params": [
+          "healPercent"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.mult-crit",
       "className": "MultCritAbAttr",
       "label": "Make my critical hits hit harder",
@@ -19978,6 +20330,56 @@
         "do": true
       },
       "uses": 4
+    },
+    {
+      "id": "block.mutual-destruction-post-faint",
+      "className": "MutualDestructionPostFaintAbAttr",
+      "label": "Make the Pokemon that knocked me out faint too",
+      "summary": "When I faint from an attack, the Pokemon that knocked me out loses all of its remaining HP, as long as it is still standing and not on my side.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.faint",
+      "whenLabel": "When I faint",
+      "synonyms": [
+        "mutual destruction",
+        "take it down with me",
+        "destiny bond",
+        "revenge knockout",
+        "innards out",
+        "aftermath",
+        "faint together"
+      ],
+      "examples": [
+        "When I faint from an attack, the attacker faints too",
+        "Knock out my killer when I go down"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "side.is",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "An attack must have knocked me out (not poison, weather or another indirect cause)",
+        "The Pokemon that knocked me out must be known and still standing"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B with a PACKAGE effect. Written reason: the effect is one damageAndUpdate(attacker.hp, INDIRECT) call, but no library effect 'knock out another Pokemon / take all of its remaining HP' exists (request R7 in requests/B17.md); recoil and drain scale with a damage or max-HP share and apply to the holder or the damage dealt, not 'all current HP of the other Pokemon'. The trigger (when I faint) and the one real condition (the knocker is not an ally) are separate blocks. The three guards (a move, a known attacker, still standing) have no registry ids (request R8), so they are written as feasibility; they run first, in the original order, before the gate. The condition used to be `!attacker.getAllies().includes(pokemon)`: getAllies() lists the OTHER ACTIVE battlers on the attacker's side, the atom side.is(ally) compares isPlayer() and identity. They differ only if the knocker is on my side but I am no longer in the field array (not reachable: the faint dispatch runs while I am still on the field). The L1 grid never sets a same-side attacker, so test/tests/elite-redux/decomp/B17/gates.test.ts checks both directions with stand-ins (the old canApply, the refactor, the rebuild and a deliberately wrong gate), and mutual-destruction.test.ts runs the foe direction in a real battle. A real double battle for the ally direction is not possible here: the existing innards-out.test.ts double case also times out in this checkout. Users: Mutual Destruction (6104, attr 0) only. The ability also carries the ability-level flag bypassFaint (set in wireBernerdRosterAbility, not an attr), which belongs to the ability blueprint, not to this block. The ability text mentions Pain Split first; the code deals the attacker's whole current HP directly (the comment in apply says that equals the Pain Split plus Innards Out result), so no Pain Split step exists in this attr. No game bug found.",
+      "uses": 1
     },
     {
       "id": "block.mycelial-network",
@@ -21721,6 +22123,115 @@
       "uses": 1
     },
     {
+      "id": "block.oracle-entry",
+      "className": "OracleEntryAbAttr",
+      "label": "Start a timed guard for a few turns",
+      "summary": "The first time I enter this battle, I start a timed guard that lasts 3 turns. Other effects can look for the guard while it lasts, for example one that halves damage taken.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "oracle",
+        "first entry shield",
+        "opening guard",
+        "temporary shield",
+        "enter with a barrier",
+        "start guard"
+      ],
+      "examples": [
+        "Take half damage for 3 turns after first entering the battle"
+      ],
+      "params": [
+        {
+          "id": "guardTurns",
+          "label": "How many turns the guard lasts (1-10)",
+          "control": "number",
+          "default": 3,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "request R3: this is my first entry in the battle (a marker in the battle memory)",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "It never does anything for a preview (a simulated entry)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "guardTurns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B (the gate runs through gatedCanApply inside apply, see the header) with a PACKAGE effect. Written reason: the effect writes two string markers in the ER provenance memory (battleData 'oracle:first-entry', summonData 'oracle:guard:N'), and a closure of ANOTHER attr (ReceivedMoveDamageMultiplierAbAttr in Oracle, bound legacy in the precedents) reads them back by string prefix; there is no library effect to set a typed marker (request R9) and no atom to read it (request R3). The number of turns is the typed `guardTurns` setting (1 to 10; the class itself accepts any number, 0 or less would start an already-expired guard). The gate binding is legacy-closure-pending-request R3, so the rebuild is skipped by L2. Users: Oracle (6047, attr 1) only. Oddity, not changed: the ability text says incoming attacks are 'treated as not very effective', but the damage attr halves the damage (x0.5), which is what the guard does in code. Replacing an existing guard marker means a second entry in the same battle never restarts the guard (the first-entry memory blocks it).",
+      "uses": 1
+    },
+    {
+      "id": "block.oracle-guard-tick",
+      "className": "OracleGuardTickAbAttr",
+      "label": "Count a running timed guard down by one turn",
+      "summary": "At the end of each turn, a running guard loses one turn. When no turns are left, the guard ends and effects that look for it stop.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "oracle",
+        "tick down",
+        "shield timer",
+        "guard countdown",
+        "temporary effect wears off",
+        "turn counter"
+      ],
+      "examples": [
+        "Make a 3 turn guard run out after 3 turns"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "request R3: a guard marker is running on me",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "It never does anything for a preview (a simulated end of turn)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B (gate run through gatedCanApply inside apply) with a PACKAGE effect. Written reason: the countdown parses a number out of a string marker ('oracle:guard:3'), removes it and writes the marker back with one less; there is no library effect for 'count a timed marker down' (request R9, the same marker family as the entry half) and no atom to read it (R3). The gate binding is legacy-closure-pending-request R3. Users: Oracle (6047, attr 2) only. Oddity, not changed: the marker is written by the entry half, so the tick only does anything after that half ran; marker state lives in summonData, i.e. it is dropped on a switch.",
+      "uses": 1
+    },
+    {
       "id": "block.outgoing-stat-drop-multiplier",
       "className": "OutgoingStatDropMultiplierAbAttr",
       "label": "Make the stat drops of my moves stronger",
@@ -23099,6 +23610,67 @@
       "uses": 17
     },
     {
+      "id": "block.penta-punch-fury-power",
+      "className": "PentaPunchFuryPowerAbAttr",
+      "label": "Set one move's power to a fixed number",
+      "summary": "While the game calculates a move's power, one named move (as built: Five-Star Fury) is given exactly 80 power, whatever its normal power is. Example: 80 means power 80.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "penta-punch",
+        "fixed power",
+        "set base power",
+        "power override",
+        "make a move hit with this power",
+        "signature move power"
+      ],
+      "examples": [
+        "Make Five-Star Fury always have 80 power",
+        "Give one special move a fixed power of 100"
+      ],
+      "params": [
+        {
+          "id": "power",
+          "label": "Power the move is set to (80 = a move of power 80)",
+          "control": "number",
+          "default": 80,
+          "editable": true,
+          "min": 1,
+          "max": 250,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "request R10: the move is a named Elite Redux move",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "power"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B, effect kept as a PACKAGE only because the library has no 'set the move's power to N' effect: effect.multiply-power multiplies, and a multiplier cannot reproduce a SET for a move whose base power staff may change (request R11, effect.set-power; the formula is `power.value = N`). The package still has a typed number (power 1-250) and the trigger and condition are separate, swappable blocks. The gate is legacy-closure-pending-request R10 (move.is-move cannot name Five-Star Fury because it only exists in ErMoveId); until R10 exists the attr cannot be rebuilt from the library. Users: Penta-Punch (6015, attr 1) only; attrs 0 (marker), 2 (priority +1 for Five-Star Fury, a closure) and 3 (+1 crit stage for Five-Star Fury) belong to other classes and use the same move test, so R10 serves them too. Oddity, not a bug: apply overwrites the power instead of multiplying, so any power multiplier applied earlier in the chain is thrown away and later ones still apply; this is what the ability text asks for. No game bug found.",
+      "uses": 1
+    },
+    {
       "id": "block.penta-punch-marker",
       "className": "PentaPunchMarkerAbAttr",
       "label": "Allow a fifth move slot",
@@ -23203,6 +23775,72 @@
       },
       "packageReason": "Package, justified: the multiplier is 1 + perFaint x the faint count, and the count is the private counter that FaintCountTriggerAbAttr keeps in the holder's battle data. The library has no counter to read and its multiply-stat effect is a fixed number, so the formula cannot be split further until R-B12-02 and R-B12-03 exist. Tier A: nothing to bind (the parent gets no closure). 3 attrs, all in Soul Harvest (5589): attr 1 Attack, attr 2 Sp. Atk, attr 3 Sp. Def, each 0.05 (5%). The percent shown to staff is perFaint x 100; the class keeps the fraction. Oddities, not fixed: (a) the parent `multiplier` stays 1, so code that reads it (the studio's reflection) sees 1, not the formula; (b) the multiplier is applied on every stat query, including previews and the AI; (c) the count is not capped, so a long battle can grow a stat without limit.",
       "uses": 3
+    },
+    {
+      "id": "block.perpetual-motion-post-turn",
+      "className": "PerpetualMotionPostTurnAbAttr",
+      "label": "Hit the foe with a follow-up Rollout at the end of the turn",
+      "summary": "At the end of the turn, if my attack landed earlier this turn, I use a follow-up Rollout of power 20 on the first foe still standing. Example: 20 means power 20.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "perpetual motion",
+        "rollout",
+        "free rollout",
+        "end of turn attack",
+        "extra move at turn end",
+        "keep rolling"
+      ],
+      "examples": [
+        "Roll into the foe with a free Rollout at the end of every turn in which I landed a hit"
+      ],
+      "params": [
+        {
+          "id": "power",
+          "label": "Power of the follow-up Rollout (20 = a move of power 20)",
+          "control": "number",
+          "default": 20,
+          "editable": true,
+          "min": 1,
+          "max": 250,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "time.turn-count",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [
+        "not-fainted"
+      ],
+      "feasibility": [
+        "My attack must have landed earlier this turn: the matching 'mark that my attack landed' block leaves a marker that this block uses up",
+        "A foe must still be standing, otherwise nothing is queued (the marker is used up anyway)",
+        "It never queues anything for a preview (a simulated end of turn)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "power"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B with a PACKAGE effect. Written reason it cannot be split further: the effect is one ordered, stateful sequence (use up the marker, find the first living foe, reset the streak if a chain was already pending, mark the chain pending, queue a Rollout that carries the marker 'perpetual-motion' and has its consecutive-use power stripped). The library's effect.scripted-move cannot reproduce it: it has no marker option, no 'strip consecutive-use power' option, it needs the foe that was hit (here there is none: the first living foe is picked) and it writes none of the chain state that the Progress, Power and Resolution attrs read (request R14). Typed param: power (the Rollout's power, 1-250). The Rollout itself and the marker names are fixed. The marker check (clause 3) stays as `residual` because it is the coupling between the two halves, not a design choice, and `apply` tests it again; requests R3/R15 name the library atom and effect for the marker memory. Users: Perpetual Motion (6022, attr 1) only. The turn-count gate has the exact atom `time.turn-count` (>= 1 turn, same field tempSummonData.turnCount). Oddity, not a bug: apply removes the marker BEFORE it looks for a foe, so when no foe is standing the marker is lost with no Rollout. No game bug found.",
+      "uses": 1
     },
     {
       "id": "block.perpetual-motion-power",
@@ -23313,6 +23951,103 @@
       "uses": 1
     },
     {
+      "id": "block.perpetual-motion-resolution",
+      "className": "PerpetualMotionResolutionAbAttr",
+      "label": "End the Rollout chain when its follow-up fails",
+      "summary": "When a Rollout I queued as a follow-up has just failed, the Rollout chain is cancelled and its power bonus starts again from nothing.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.my-move-starts",
+      "whenLabel": "When my move starts to execute",
+      "synonyms": [
+        "perpetual motion",
+        "rollout",
+        "reset the chain",
+        "chain breaks",
+        "streak reset",
+        "stop the combo"
+      ],
+      "examples": [
+        "Reset the Rollout streak when the free Rollout misses or fails"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "time.last-move",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A Rollout chain must be running (the matching end-of-turn block started one)",
+        "That Rollout must be the follow-up the chain queued itself, not one I chose",
+        "That Rollout must have failed or missed (it was not a success)",
+        "It never changes anything for a preview (a simulated move)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B with a PACKAGE effect. Written reason: the effect writes two fields of per-switch-in chain state (erPerpetualMotionPending and erPerpetualMotionStreak) that the Progress and Power attrs of the same ability (B14) also read and write; there is no library effect or atom for a named chain flag and counter (request R16), and splitting it would invent behaviour. No typed param exists: nothing numeric is used. The gate (my last move was Rollout) is the exact library atom time.last-move, but its binding is legacy-closure-pending-request R22: the shared L1 proves gates through canApply, this class runs its gate inside apply, and the my-move-starts trigger has no engine-parameter builder in the harness (the equivalence is proved by hand in penta-perpetual.test.ts); the residual (pending, indirect, not a success) stays in the class as feasibility, with request R17 for the atoms that would let it be promoted into the gate. Users: Perpetual Motion (6022, attr 2) only. The gate runs inside `apply`, not `canApply` (the inherited canApply is `true`), so the ability flyout is queued at every one of my moves even when nothing happens; this is existing behaviour, kept. No game bug found.",
+      "uses": 1
+    },
+    {
+      "id": "block.perpetual-motion-trigger",
+      "className": "PerpetualMotionTriggerAbAttr",
+      "label": "Mark that my attack landed this turn",
+      "summary": "After my attack really lands, I mark this turn once, so a matching end-of-turn effect can follow up. The follow-up move it queued itself never counts.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "perpetual motion",
+        "remember a hit",
+        "arm a follow-up",
+        "rollout chain",
+        "hit this turn flag",
+        "prepare an end of turn move"
+      ],
+      "examples": [
+        "Remember that I landed a hit this turn so a Rollout can follow at the end of the turn"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.damaging plus requests R12 (the hit landed) and R13 (the move is the follow-up this ability queued)",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "It never marks anything for a preview (a simulated hit)",
+        "It marks the turn only once, however many hits land"
+      ],
+      "effect": {
+        "id": "effect.arm-effect",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.persistent-field-aura",
       "className": "PersistentFieldAuraAbAttr",
       "label": "Boost the stats of my side the whole time I am on the field",
@@ -23391,6 +24126,105 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.phoenix-foliage-hit-form-change",
+      "className": "PhoenixFoliageHitFormChangeAbAttr",
+      "label": "Change to the Live Current form after I am hit",
+      "summary": "After I am hit, I change into my Live Current form. As built, only when I am not in it yet and the move that hit me counts as Fire or Electric type.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "phoenix foliage",
+        "transform when hit",
+        "form change on being hit",
+        "absorb an element to transform",
+        "elemental form",
+        "shift form"
+      ],
+      "examples": [
+        "Change into my charged form after being hit by a Fire or Electric move"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "mon.in-form and move.type",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [
+        "not-fainted"
+      ],
+      "feasibility": [
+        "My species must have the Live Current form wired for the manual form change, otherwise nothing happens",
+        "It never changes form for a preview (a simulated hit)"
+      ],
+      "effect": {
+        "id": "effect.change-form",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.phoenix-foliage-use-form-change",
+      "className": "PhoenixFoliageUseFormChangeAbAttr",
+      "label": "Change to the Live Current form after I attack",
+      "summary": "After the last hit of my attack, I change into my Live Current form. As built, only when I am not in it yet and my move counts as Fire or Electric type.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "phoenix foliage",
+        "transform after attacking",
+        "form change on attack",
+        "charge up form",
+        "elemental form",
+        "shift form"
+      ],
+      "examples": [
+        "Change into my charged form after using a Fire or Electric move"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "mon.in-form and move.type",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [
+        "not-fainted"
+      ],
+      "feasibility": [
+        "Only after the final hit of a multi-hit move of mine (request R18 asks for this as a named safety rule)",
+        "My species must have the Live Current form wired for the manual form change, otherwise nothing happens",
+        "It never changes form for a preview (a simulated hit)"
+      ],
+      "effect": {
+        "id": "effect.change-form",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.photovoltaic-type",
@@ -28695,6 +29529,60 @@
       "uses": 1
     },
     {
+      "id": "block.post-summon-screens",
+      "className": "PostSummonScreensAbAttr",
+      "label": "Raise Reflect and Light Screen on my side when I enter",
+      "summary": "When I enter the battle, my side gets both Reflect and Light Screen for 3 turns. A screen that is already up is not renewed. Example: 3 turns.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "split mind",
+        "set up screens",
+        "reflect and light screen",
+        "defensive screens on entry",
+        "barrier on switch in",
+        "team barrier"
+      ],
+      "examples": [
+        "Set up Reflect and Light Screen for 3 turns when I come in",
+        "Both screens on entry for 5 turns"
+      ],
+      "params": [
+        {
+          "id": "turns",
+          "label": "How many turns both screens last",
+          "control": "number",
+          "default": 3,
+          "editable": true,
+          "min": 1,
+          "max": 8,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A screen that is already active on my side is left as it is (it is not refreshed)",
+        "It never sets anything for a preview (a simulated entry)"
+      ],
+      "effect": {
+        "id": "effect.arena-tag",
+        "params": [
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.post-summon-scripted-move",
       "className": "PostSummonScriptedMoveAbAttr",
       "label": "Use a free move as soon as I enter the battle",
@@ -32382,6 +33270,128 @@
       "effect": {
         "id": "effect.apply-tag",
         "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.push-kick",
+      "className": "PushKickAbAttr",
+      "label": "Change a stat of the foe once per turn after my move hits",
+      "summary": "After one of my damaging moves with the \"Kicking move\" property lands, the foe's Defense changes by -1 stage(s), once per turn out. Example: -1 Defense after a kick.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "push kick",
+        "lower defense",
+        "defense drop",
+        "kick debuff",
+        "armor break",
+        "denting blows",
+        "chainsaw",
+        "once per turn"
+      ],
+      "examples": [
+        "Lower the foe's Defense by 1 stage after my first kicking move each turn",
+        "Drop the target's Defense after a hit with a kick"
+      ],
+      "params": [
+        {
+          "id": "flag",
+          "label": "Kind of move that triggers it",
+          "control": "select",
+          "default": "KICKING_MOVE",
+          "editable": true,
+          "options": [
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        },
+        {
+          "id": "stat",
+          "label": "Which stat of the foe changes",
+          "control": "select",
+          "default": "DEF",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "stages",
+          "label": "Number of stages (-1 lowers by one, +1 raises by one; 0 is not allowed)",
+          "control": "number",
+          "default": -1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.damaging and move.flag, plus requests R25 (once per turn out), R12 (the hit landed) and R24 (first strike of my move)",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The stat change is never queued for a preview (a simulated hit), but the turn marker is still written",
+        "The stat cannot go beyond -6 or +6; the stat change itself stops there"
+      ],
+      "gateParams": [
+        {
+          "param": "flag",
+          "block": "move.flag",
+          "field": "flag"
+        }
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stat",
+          "stages"
+        ]
       },
       "reusableAlone": {
         "when": true,
@@ -36904,6 +37914,150 @@
       "uses": 1
     },
     {
+      "id": "block.sleeping-in-accuracy",
+      "className": "SleepingInAccuracyAbAttr",
+      "label": "Give my sleep-inducing moves a fixed accuracy",
+      "summary": "While the game calculates accuracy, my moves that put the foe to sleep or make it drowsy get 100% base accuracy (a move that never misses is left alone). Evasion still applies on top.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.accuracy",
+      "whenLabel": "While the game calculates my move's accuracy",
+      "synonyms": [
+        "sleeping in",
+        "yawn accuracy",
+        "sleep move accuracy",
+        "hypnosis never misses",
+        "sleep powder accuracy",
+        "accurate sleep moves"
+      ],
+      "examples": [
+        "Make Hypnosis and Sleep Powder hit with 100% accuracy",
+        "Sleep moves get 90% accuracy like Hypnotist"
+      ],
+      "params": [
+        {
+          "id": "accuracy",
+          "label": "Accuracy the move gets (%)",
+          "control": "number",
+          "default": 100,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "request R27 (the move can put its target to sleep or make it drowsy)",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A move that already never misses (accuracy shown as a dash) keeps never missing"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "accuracy"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B, PACKAGE for the effect only, with a written reason: the library has no 'set the move's accuracy to N' effect. effect.always-hit (unimplemented) means 'never miss' (accuracy -1), which is a different rule from 'accuracy becomes exactly N'; request R33 asks for effect.set-accuracy with a number. The trigger (while the game calculates my move's accuracy) and the condition (sleep-inducing move) are separate blocks; the number is a typed setting, the old literal 100 is now the constructor argument `accuracy` (default 100, same behaviour). The `accuracy !== -1` rule moved from the first clause of canApply into a `guards` method (a pure move of code, same position). The gate is legacy-closure-pending-request (R27). Users: Sleeping In (6056, attr 0) only; its 'no repeat' and 'Yawn style' parts are runtime capability attrs of another batch. Oddity, not a bug: the ability text promises 'the accuracy of Yawn' while the class sets a plain 100; nothing is changed. The accuracy staff set is the BASE accuracy, before evasion and stages.",
+      "uses": 1
+    },
+    {
+      "id": "block.somniloquy-post-turn",
+      "className": "SomniloquyPostTurnAbAttr",
+      "label": "Use a move on the first foe every few turns",
+      "summary": "Every 2 turns I am out, at the end of the turn I use Sleep talk on the first foe still standing. Example: 2 means every other turn.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "somniloquy",
+        "sleep talk",
+        "free move every other turn",
+        "automatic move",
+        "periodic move",
+        "end of turn move"
+      ],
+      "examples": [
+        "Use Sleep Talk at the end of every 2nd turn",
+        "Every third turn, use Rest for free on the first foe"
+      ],
+      "params": [
+        {
+          "id": "everyTurns",
+          "label": "Acts every this many turns out (2 = every 2nd turn)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "moveId",
+          "label": "Move it uses (type the move name, for example Sleep Talk)",
+          "control": "text",
+          "default": "SLEEP_TALK",
+          "editable": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "time.turn-count, plus requests R26 (every Nth turn) and R3 (a marker with the turn number is set)",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [
+        "not-fainted"
+      ],
+      "feasibility": [
+        "A foe must still be standing, otherwise nothing is used (the turn is still marked as done)",
+        "It never uses the move for a preview (a simulated turn end)",
+        "The used move is a real move: the move itself decides whether it can work (for Sleep Talk, its own conditions)"
+      ],
+      "gateParams": [
+        {
+          "param": "everyTurns",
+          "block": "time.turn-count-multiple",
+          "field": "n"
+        }
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "moveId"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B, PACKAGE for the effect only, with a written reason: effect.scripted-move cannot express it. It needs the 'other' slot (the end of the turn has none), uses a fixed move at default power with no power override, picks 'the first foe still standing' instead of the foe that was hit, and writes a turn marker in the same step; request R35 extends effect.scripted-move with those options. The trigger (end of turn) and every condition are separate blocks. The two literals of the old class (every 2nd turn and Sleep Talk) are now the constructor arguments `everyTurns` and `moveId` with those defaults, so Somniloquy is unchanged and both are typed settings. Source edit (pure move of code, spec 3.1): `isFainted` moved into a `guards` method and the other three clauses into `gate`, keeping the old order; all are pure reads. The gate is legacy-closure-pending-request (R26 every Nth turn, R3 marker with the turn number). Users: Somniloquy (6058, attr 0) only. Oddity, not a bug: the marker is written before the foe check, so a turn with no foe left still counts as done. The class does not test that the holder is asleep: the effect is a scripted Sleep Talk whose own move conditions decide; this was not changed or probed here.",
+      "uses": 1
+    },
+    {
       "id": "block.soulmate",
       "className": "SoulmateAbAttr",
       "label": "Link to my ally and share damage and healing with it",
@@ -37346,6 +38500,71 @@
       "uses": 1
     },
     {
+      "id": "block.splash-damage",
+      "className": "SplashDamageAbAttr",
+      "label": "Repeat my hit on the foe's neighbour at reduced power",
+      "summary": "After my single-target attack lands, the same move also hits the foe's standing neighbour at 50% of its power (at least 1), once per turn. Example: 50 = half power.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "splash damage",
+        "two chambered",
+        "spread damage",
+        "hit the neighbour too",
+        "echo attack",
+        "half damage to the ally of the target"
+      ],
+      "examples": [
+        "Also hit the foe next to my target for half damage",
+        "After a single-target hit, splash 50% of the move's power onto the other foe"
+      ],
+      "params": [
+        {
+          "id": "powerPercent",
+          "label": "Power of the repeated hit (% of the move's power, 50 = half)",
+          "control": "number",
+          "default": 50,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.damaging, plus requests R28 (the exact single-target list), R3 (marker in turn memory) and R29 (the foe has a standing neighbour)",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must have dealt at least 1 damage",
+        "It never queues the repeated hit for a preview (a simulated hit)",
+        "The repeated hit is a real, indirect use of the same move: it cannot trigger another splash in the same turn"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "powerPercent"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier B, PACKAGE for the effect only, with a written reason: effect.scripted-move takes a FIXED move id and a FIXED power, and always targets the foe that was hit. This rule repeats the move that was just used, at a share of THAT move's power (never below 1), against a different Pokemon (the standing neighbour of the foe), and leaves a marker so it happens once per turn; request R35 extends effect.scripted-move with 'repeat the move I just used', 'power as a share of the move's power' and 'target the neighbour of the foe I hit'. The power share is a typed setting (the old literal 0.5 in apply is now the constructor argument `powerShare`, default 0.5, shown to staff as a whole percent; floor(power * 50 / 100) equals floor(power * 0.5), proved in chunk3.test.ts). The trigger and every condition are separate blocks. Source edit (pure move of code, spec 3.1): `damage > 0` moved into a `guards` method (a pure read of the frame; the first clause of the old canApply is the inherited attack condition, which stays first inside `gate`, so only one pure read was moved in front of it); the rest is `gate` in the old order. The gate is legacy-closure-pending-request (R28, R3, R29). Users: Splash Damage (6025, attr 0) and Two-Chambered (6086, attr 2, next to the HitMultiplier archetype attrs of other batches); both use the default share. Suspected game bugs, NOT fixed: (1) for a move with variable or no listed power (power -1 or 0, for example a fixed-damage or weight move) the repeated hit gets power max(1, floor(-0.5)) = 1, an almost harmless 1-power copy that still counts as a splash; (2) the marker is turn memory per holder, so with a multi-hit move only the FIRST landed hit splashes, which may or may not be intended (Two-Chambered hits twice). No other oddity found.",
+      "uses": 2
+    },
+    {
       "id": "block.spread-target-by-flag",
       "className": "SpreadTargetByFlagAbAttr",
       "label": "Make single-target moves with a property hit both foes",
@@ -37632,6 +38851,128 @@
         "do": true
       },
       "uses": 2
+    },
+    {
+      "id": "block.star-hit-multiplier",
+      "className": "StarHitMultiplierAbAttr",
+      "label": "Make my Star moves hit extra times",
+      "summary": "While the game decides how many times my move hits, moves that count as Star moves get 1 extra strike(s). Example: 1 means they hit twice.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.hit-count",
+      "whenLabel": "While the game decides how many times a move hits",
+      "synonyms": [
+        "starcrossed",
+        "hit twice",
+        "extra strike",
+        "double hit",
+        "parental bond",
+        "lunar moves hit twice",
+        "star moves hit again"
+      ],
+      "examples": [
+        "Make my Star moves hit twice",
+        "Lunar moves strike one extra time"
+      ],
+      "params": [
+        {
+          "id": "extraStrikes",
+          "label": "Extra strikes added (1 = the move hits twice)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 3,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "requests R30 (the move can be hit more than once by an ability) and R31 (the move is Star-based)",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.hit-n-times",
+        "params": [
+          "extraStrikes"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.star-hit-power",
+      "className": "StarHitPowerAbAttr",
+      "label": "Deal less damage with each hit of my Star moves",
+      "summary": "While the game calculates damage I deal, each hit of a move that counts as a Star move does 0.7 times its damage. Example: 0.7 = 70% damage per hit.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.damage-dealt",
+      "whenLabel": "While the game calculates damage I deal",
+      "synonyms": [
+        "starcrossed",
+        "reduce damage per hit",
+        "weaker hits",
+        "damage penalty",
+        "lunar damage",
+        "balance for extra strikes"
+      ],
+      "examples": [
+        "Each hit of my Star moves does 70% damage",
+        "Weaken the strikes of lunar moves to 0.7x"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Damage multiplier per hit (0.7 = 70% damage)",
+          "control": "number",
+          "default": 0.7,
+          "editable": true,
+          "min": 0.05,
+          "max": 1,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "request R31 (the move is Star-based)",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The multiplier can only lower damage (up to 1): the base class refuses values above 1"
+      ],
+      "effect": {
+        "id": "effect.multiply-damage-dealt",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.stat-blend",
@@ -40023,6 +41364,47 @@
           "grassyType",
           "psychicType"
         ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.third-eye",
+      "className": "ThirdEyeAbAttr",
+      "label": "Expose the Dark-type foes when I enter",
+      "summary": "When I enter the battle, every Dark-type foe on the field is exposed, so Psychic moves can hit it as if it were not Dark (like Miracle Eye).",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "third eye",
+        "miracle eye on entry",
+        "psychic hits dark",
+        "remove dark immunity",
+        "expose dark types",
+        "identify foe"
+      ],
+      "examples": [
+        "Let Psychic moves hit Dark-type foes when I switch in",
+        "Cast Miracle Eye on every Dark foe on entry"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only Dark-type foes are changed; every other foe is left alone",
+        "It reaches the foes on the field at the moment I enter; a Dark foe that enters later is not exposed",
+        "It never changes anything for a preview (a simulated entry)"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": []
       },
       "reusableAlone": {
         "when": true,
@@ -42464,6 +43846,50 @@
         "move",
         "moveUser"
       ],
+      "uses": 1
+    },
+    {
+      "id": "block.void-post-turn-steal",
+      "className": "VoidPostTurnStealAbAttr",
+      "label": "Steal one random item from any foe",
+      "summary": "At the end of every turn I take one random item that any foe holds, if I can carry it. It can be any foe on the field, not only the one I hit.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "void",
+        "thief",
+        "item theft",
+        "steal item every turn",
+        "pickpocket",
+        "magician at end of turn",
+        "take the foe's item",
+        "end of turn item steal"
+      ],
+      "examples": [
+        "Steal a random foe item at the end of every turn",
+        "Take one item from the other side each turn like Void"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one foe must hold an item that can be taken, and I must be able to carry it (otherwise nothing happens and nothing random is drawn)",
+        "It never steals anything for a preview (a simulated turn end)",
+        "Every foe on the field counts, whether next to me or not"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Tier C, PACKAGE for the effect only, with a written reason: the library effect.steal-item steals from one named other Pokemon (it requires the `other` slot, which the end-of-turn trigger does not provide) and has no random-pick rule; this rule gathers every takeable item of every foe into one list, in foe order, and picks one with a seeded random draw. The rule needs a scope of its own (all foes) and a pick mode (random among all), which request R39 in requests/B17.md asks for. There is no typed setting: nothing numeric or typed is used in the rule. The trigger (end of turn) is a separate block and any IF can be ANDed on top (the class has no condition of its own, so nothing is hidden inside the package). Users: Void (6102, attr 0) only, constructed with no arguments. Source edit: `export` only. Oddities, not bugs: (1) canApply and apply each rebuild the candidate list, so the list is computed twice (pure reads, the same result within one step; no RNG between them); (2) fainted foes still count as sources while they remain in getOpponents(), and `isTransferable` is read from the modifier, so only items the game allows to be taken count; (3) tryTransferHeldItemModifier is called with transferStack=false, so one copy of a stacked item moves, matching Magician. No game bug found.",
       "uses": 1
     },
     {
