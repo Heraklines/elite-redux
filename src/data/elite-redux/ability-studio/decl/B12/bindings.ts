@@ -509,7 +509,7 @@ bindEach({ any: WEATHER_MOVES.map(moveId => ({ id: "move.is-move", moveId })) },
 //   WeatherStatMultiplierAbAttr   5 attrs  gate legacy (the stat test is the class's own `guards`)
 //   WeatherTypeBoostAbAttr        2 attrs  gate legacy (the move-type half maps to `move.type { effective }`, the weather half does not)
 //   WeatherDamageReductionAbAttr  2 attrs  gate legacy
-//   WeatherGroundAirborneAbAttr   1 attr   parked declaration (R-B12-40), so no binding yet: Desert Spirit 5311 attr 1
+//   WeatherGroundAirborneAbAttr   1 attr   gate legacy (Desert Spirit 5311 attr 1)
 // =============================================================================================
 const WEATHER_GATE_REASON =
   "needs an atom for 'one of these weathers is on and its effects are not switched off' (arena.weather?.isEffectSuppressed() is false and arena.weatherType is in the list); field.weather takes one weather and has no suppression test; request R-B12-39";
@@ -534,3 +534,6 @@ legacyEach(WEATHER_GATE_REASON, [
   [5021, 0, "Christmas Spirit (x0.5 damage taken in Hail, Snow)"],
   [5167, 0, "Dune Terror (x0.65 damage taken in a Sandstorm)"],
 ]);
+
+// WeatherGroundAirborneAbAttr (1 attr, declaration activated by the merge captain): the same weather gate as the four classes above.
+legacyEach(WEATHER_GATE_REASON, [[5311, 1, "Desert Spirit (my Ground moves hit airborne Pokemon in a Sandstorm)"]]);

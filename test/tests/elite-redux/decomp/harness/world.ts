@@ -381,6 +381,10 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     selfTarget: false,
     simulated: false,
   }),
+  // B14 chunk 4 (merge captain activated them): the by-name scans hand over the holder and the foe that entered (Mudball), or the
+  // move and its user (the category resolver of Pokemon.getAttackDamage).
+  "event.foe-enters": ({ holder, foe }) => ({ pokemon: holder, opponent: foe, simulated: false }),
+  "calc.move-category": ({ holder, move }) => ({ move, user: holder }),
   "calc.damage-taken": ctx => ({
     pokemon: ctx.holder,
     opponent: ctx.foe,

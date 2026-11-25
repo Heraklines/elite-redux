@@ -216,3 +216,28 @@ bindLegacyClosure(
   "I hold exactly the maximum charge stacks (getCharge(pokemon) === CHARGE_STACK_MAX) has no atom: mon.charge-stacks is requested in requests/B14.md (R-B14-6.2); the planned tree is mon.charge-stacks { holder, '=', 4 }.",
   "gate",
 );
+
+// Grit (6110), attr 0. Gate = [the holder has a non-volatile status: status exists, its effect is not NONE and not FAINT].
+bindLegacyClosure(
+  6110,
+  0,
+  "The gate is `!!status && status.effect !== NONE && status.effect !== FAINT`. The library atom status.has ANY reads only `status != null`, which also counts a status whose effect is NONE and the fainted marker, so it is not the same predicate; status.has-non-volatile is requested in requests/B14.md (R-B14-4.10).",
+  "gate",
+);
+
+// Miracle Blade (6064), attr 0 (MiracleBladeTypeChartAbAttr). Gate = [the move has the slicing property, the defending types include Dark].
+// The second atom (matchup.defender-has-type) is requested as R-B14-2.2; until it exists the gate is a legacy closure.
+bindLegacyClosure(
+  6064,
+  0,
+  "Clause 2 of the gate reads the list of defending types the engine passes to fire(); no library atom reads it (matchup.defender-has-type is requested in requests/B14.md as R-B14-2.2).",
+  "gate",
+);
+
+// Subversion (6081), attr 1 (LowerOffenseMoveCategoryAbAttr; attr 0 is AttackStatSubstituteAbAttr, attr 2 a MovePowerBoostAbAttr).
+// Gate = [the move deals damage] (move.category !== STATUS, the same expression as the library atom).
+bindCondition(6081, 1, { id: "move.damaging" }, "gate");
+
+// Mudball (6097), attr 1 (MudballReactiveAbAttr; attr 0 is PostSummonScriptedMoveAbAttr). Gate = [the foe that entered is a Flying type].
+// The two "still standing" clauses stay in erMudballOnOpponentSummon.
+bindCondition(6097, 1, { id: "mon.has-type", who: "other", type: "FLYING" }, "gate");

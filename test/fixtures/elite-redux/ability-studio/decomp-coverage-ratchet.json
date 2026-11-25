@@ -1,8 +1,8 @@
 {
-  "attrsFull": 78,
-  "attrsPartlyOrBetter": 365,
-  "abilitiesFull": 10,
-  "attrsNotStartedMax": 2510,
+  "attrsFull": 294,
+  "attrsPartlyOrBetter": 2808,
+  "abilitiesFull": 53,
+  "attrsNotStartedMax": 67,
   "verifiedClasses": [
     "AttackTypeImmunityAbAttr",
     "BerserkOnThresholdAbAttr",

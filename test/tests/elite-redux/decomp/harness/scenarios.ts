@@ -454,6 +454,8 @@ const WHEN_TEMPLATE: Readonly<Record<string, string>> = {
   "event.stat-changed": t.statDrop,
   "event.ally-stat-changed": t.doubles,
   "event.ally-entered": t.doubles,
+  "event.foe-enters": t.entry,
+  "calc.move-category": t.attack,
   "event.foe-raised-stat": t.statRaise,
   "event.foe-switches-out": t.switchOut,
   "calc.redirect-move": t.doubles,

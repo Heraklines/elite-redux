@@ -115,6 +115,24 @@
       ]
     },
     {
+      "id": "event.foe-enters",
+      "kind": "event",
+      "dispatchKey": "MudballReactiveAbAttr",
+      "provides": [
+        "holder",
+        "other",
+        "simulated"
+      ],
+      "label": "When a foe enters the field",
+      "group": "Entry and exit",
+      "synonyms": [
+        "foe switches in",
+        "enemy sent out",
+        "opponent arrives",
+        "when the foe appears"
+      ]
+    },
+    {
       "id": "event.before-entry",
       "kind": "event",
       "dispatchKey": "PreSummonAbAttr",
@@ -1259,6 +1277,9 @@
       "label": "While the game picks the stat my attack uses",
       "group": "Stats",
       "modifies": "statValue",
+      "alsoDispatchKeys": [
+        "GritAttackStatAbAttr"
+      ],
       "baseClassOnly": true,
       "synonyms": [
         "body press",
@@ -1267,6 +1288,26 @@
         "which stat hits"
       ],
       "moveUserIs": "holder"
+    },
+    {
+      "id": "calc.move-category",
+      "kind": "calc",
+      "dispatchKey": "LowerOffenseMoveCategoryAbAttr",
+      "provides": [
+        "holder",
+        "move",
+        "moveUser"
+      ],
+      "label": "While the game decides if my move is physical or special",
+      "group": "Damage and power",
+      "modifies": "moveCategory",
+      "synonyms": [
+        "physical or special",
+        "move category",
+        "change category",
+        "use the other category",
+        "subversion"
+      ]
     },
     {
       "id": "calc.my-attack-matchup",
@@ -1281,6 +1322,10 @@
       "label": "While the game calculates how well my attack matches the target's types",
       "group": "Type",
       "modifies": "typeMultiplier",
+      "alsoDispatchKeys": [
+        "MiracleBladeTypeChartAbAttr",
+        "WeatherGroundAirborneAbAttr"
+      ],
       "baseClassOnly": true,
       "synonyms": [
         "bone zone",
@@ -1943,6 +1988,18 @@
       "kind": "while-active",
       "dispatchKey": null,
       "flagKeys": [
+        "MonkFocusPunchAbAttr",
+        "FreeAimAbAttr",
+        "SynchronizedCurrentAbAttr",
+        "SpiritualSaberNoContactAbAttr",
+        "CranisphereSkullBashAbAttr",
+        "AmaterasuMarkerAbAttr",
+        "RagingFistAbAttr",
+        "ManifestContactAbAttr",
+        "SeaSpecterAbAttr",
+        "ClosedCircuitAbAttr",
+        "ReductionRuneAbAttr",
+        "StatusMoveTypeImmunityBypassAbAttr",
         "AddMoveFlagAbAttr",
         "IgnoreProtectFirstTurnAbAttr",
         "IncreasePpAbAttr",
@@ -6006,5 +6063,5 @@
       ]
     }
   ],
-  "hash": "19eb767c559761"
+  "hash": "0a85a90cd42cd5"
 }

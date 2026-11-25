@@ -35,7 +35,7 @@ export default defineDecl(ClosedCircuitAbAttr, {
   when: "while.active",
   label: "Launch an extra attack when my ally and I hit the same foe",
   summary: () =>
-    "While I have this, when my ally and I both aim at the same foe in one turn, each of us launches an extra 25 base power Electric and Fairy attack at it after both main moves. I also count as a Plus or Minus partner.",
+    "When my ally and I both aim at the same foe in one turn, each of us launches an extra 25 power Electric and Fairy attack at it after both main moves. I also count as a Plus or Minus partner.",
   synonyms: [
     "closed circuit",
     "team follow up attack",

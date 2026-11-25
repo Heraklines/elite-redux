@@ -29,8 +29,6 @@ export const UNEXPOSED_DISPATCH_KEYS: Readonly<Record<string, string>> = {
     "Abstract base of the field power boosters. Its leaf classes either dispatch through calc.move-power or are queried with getAbilityAttrs, so the base itself is never dispatched.",
   PreAttackFieldMoveTypePowerBoostAbAttr:
     "Abstract base of the field type power boosters; only its subclasses are used.",
-  FieldMoveTypePowerBoostAbAttr:
-    "Not dispatched with applyAbAttrs: move.ts reads it with getAbilityAttrs inside the move power calculation (same moment as calc.move-power). It will be wired to that WHEN when the class gets its declaration.",
 };
 
 /**

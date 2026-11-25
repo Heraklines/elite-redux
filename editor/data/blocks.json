@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "19eb767c559761",
-  "hash": "1f6a4331c1315e",
+  "vocabularyHash": "0a85a90cd42cd5",
+  "hash": "074e8ae55e83c3",
   "blocks": [
     {
       "id": "block.ability-studio-runtime-capability",
@@ -1259,6 +1259,42 @@
         "do": true
       },
       "uses": 5
+    },
+    {
+      "id": "block.amaterasu-marker",
+      "className": "AmaterasuMarkerAbAttr",
+      "label": "Make burns I cause impossible to cure this battle",
+      "summary": "While I have this, a burn I inflict cannot be healed for the rest of the battle, even if I faint or switch out. Example: cure moves and berries do nothing to it.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "unhealable burn",
+        "permanent burn",
+        "burn cannot be cured",
+        "lasting burn",
+        "amaterasu",
+        "black flames",
+        "no cure"
+      ],
+      "examples": [
+        "Foes I burn stay burned until the battle ends, whatever they use to cure it"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only burns are made permanent; every other status can still be cured",
+        "It lasts until the next battle starts, not forever"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.anneal",
@@ -7207,6 +7243,44 @@
       "uses": 1
     },
     {
+      "id": "block.closed-circuit",
+      "className": "ClosedCircuitAbAttr",
+      "label": "Launch an extra attack when my ally and I hit the same foe",
+      "summary": "When my ally and I both aim at the same foe in one turn, each of us launches an extra 25 power Electric and Fairy attack at it after both main moves. I also count as a Plus or Minus partner.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "closed circuit",
+        "team follow up attack",
+        "double battle combo",
+        "ally combo attack",
+        "extra hit with a partner",
+        "linked attack",
+        "shared target bonus attack"
+      ],
+      "examples": [
+        "If my ally and I both target the same foe, each of us fires an extra weak Electric and Fairy attack, like Closed Circuit"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Needs an ally on the field, and one of the two carries this; the ally must already have targeted the same foe this turn",
+        "Each pair launches only once per turn per foe",
+        "If the shared foe faints before an extra attack, that attack goes to another foe still standing (a random pick); with none left it is skipped",
+        "The extra attacks are special, cannot trigger further follow-ups and have no secondary effects"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.commander",
       "className": "CommanderAbAttr",
       "label": "Jump into an ally Dondozo's mouth and power it up",
@@ -10818,6 +10892,43 @@
         "do": true
       },
       "packageReason": "PACKAGE, justified: the effect copies a private per-Pokemon list of types back onto the summon data, and the one clause of canApply ('a list was remembered') is the effect's own precondition (apply dereferences the list with `!`, so dropping the clause would crash): it is feasibility, not a condition a rule could change, and the library has no memory-read block for a list of types (requested as R-B13-52 `effect.restore-remembered-types` plus the matching memory write). The trigger is a normal switch-in WHEN. Users: Cracked Vessel (5992, attr 1; attr 0 is the marker CrackedVesselMarkerAbAttr, chunk 6). ODDITIES (not fixed): (1) apply ignores `simulated`; no engine path simulates PostSummon today; (2) the memory is a WeakMap entry keyed by the Pokemon and never cleared, so the shorter list is restored on every later entry in the same battle (the ability text says 'permanently removes its last type'); (3) summonData.types is replaced by a copy, so a type change made in between (Soak, Forest's Curse) is overwritten on entry.",
+      "uses": 1
+    },
+    {
+      "id": "block.cranisphere-skull-bash",
+      "className": "CranisphereSkullBashAbAttr",
+      "label": "Skip the charge turn of my first Skull Bash after entering",
+      "summary": "While I have this, the first time I use Skull Bash after entering the battle it hits at once, with no charging turn. After I switch out and back in, it works again.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "cranisphere",
+        "skull bash",
+        "no charge turn",
+        "instant skull bash",
+        "skip charging",
+        "two-turn move",
+        "charge move"
+      ],
+      "examples": [
+        "My first Skull Bash after switching in has no charging turn"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only for Skull Bash (the move is fixed in the engine step)",
+        "Only the first use after I enter: switching out and back in makes it work again",
+        "Does nothing when another effect already skipped the charging turn"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
       "uses": 1
     },
     {
@@ -18102,6 +18213,42 @@
       "uses": 1
     },
     {
+      "id": "block.free-aim",
+      "className": "FreeAimAbAttr",
+      "label": "Aim my single-target moves at the foe I hurt most",
+      "summary": "While I have this, my single-target moves pick the foe they would knock out, or else hurt most, ignoring Follow Me. Leftover strikes of a multi-hit move go to the best foe still standing.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "auto aim",
+        "best target",
+        "pick the target",
+        "ignore redirection",
+        "ignore follow me",
+        "smart targeting",
+        "target the weakest"
+      ],
+      "examples": [
+        "In a double battle my attack always goes to the foe it hurts most"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only single-target moves are re-aimed (a move that hits several targets is left alone)",
+        "Only foes that are still standing and can be targeted are considered"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.frisk",
       "className": "FriskAbAttr",
       "label": "Reveal the foes' held items",
@@ -18574,6 +18721,87 @@
       "effect": {
         "id": "effect.apply-tag",
         "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.grit-attack-stat",
+      "className": "GritAttackStatAbAttr",
+      "label": "Attack with my defenses while I have a status condition",
+      "summary": "While I have a status condition (burn, poison, paralysis...), my physical moves attack with my Defense and my special moves with my Sp. Def, instead of Attack and Sp. Atk.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.attack-stat",
+      "whenLabel": "While the game picks the stat my attack uses",
+      "synonyms": [
+        "grit",
+        "use defense to attack",
+        "body press when statused",
+        "status attack swap",
+        "attack with defense",
+        "burned attacker boost",
+        "guts style"
+      ],
+      "examples": [
+        "While I am burned or poisoned, my moves hit with my Defense and Sp. Def"
+      ],
+      "params": [
+        {
+          "id": "physicalStat",
+          "label": "Stat my physical moves attack with (instead of Attack)",
+          "control": "select",
+          "default": "Defense",
+          "editable": true,
+          "options": [
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Sp. Def",
+            "Speed"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "specialStat",
+          "label": "Stat my special moves attack with (instead of Sp. Atk)",
+          "control": "select",
+          "default": "Sp. Def",
+          "editable": true,
+          "options": [
+            "Attack",
+            "Defense",
+            "Sp. Atk",
+            "Sp. Def",
+            "Speed"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Does nothing while the game ignores my ability (for example a move that ignores abilities)",
+        "Uses the chosen stat as it is worked out for me, stat stages included"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "physicalStat",
+          "specialStat"
+        ]
       },
       "reusableAlone": {
         "when": true,
@@ -21642,6 +21870,103 @@
       "uses": 1
     },
     {
+      "id": "block.lower-offense-move-category",
+      "className": "LowerOffenseMoveCategoryAbAttr",
+      "label": "Pick physical or special from my Attack and Sp. Atk",
+      "summary": "My damaging moves count as physical or special by the lower of my Attack and Sp. Atk (a tie counts as physical). Example: Attack 80, Sp. Atk 120 gives physical.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-category",
+      "whenLabel": "While the game decides if my move is physical or special",
+      "synonyms": [
+        "subversion",
+        "use my weaker stat",
+        "category by stat",
+        "physical or special",
+        "switch move category",
+        "lower attacking stat",
+        "higher attacking stat"
+      ],
+      "examples": [
+        "My moves are physical if my Attack is lower and special if my Sp. Atk is lower, like Subversion"
+      ],
+      "params": [
+        {
+          "id": "useHigherStat",
+          "label": "Which of my Attack and Sp. Atk decides the category",
+          "control": "select",
+          "default": "The lower one",
+          "editable": true,
+          "options": [
+            "The lower one",
+            "The higher one"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.damaging",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Uses my raw Attack and Sp. Atk, without stat stages",
+        "Does nothing while the game ignores my ability (for example a move that ignores abilities)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "useHigherStat"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.manifest-contact",
+      "className": "ManifestContactAbAttr",
+      "label": "My moves always count as making contact",
+      "summary": "While I have this, my moves that do not normally make contact make contact, so contact abilities like Rough Skin trigger on them. Long Reach style effects still win.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "manifest",
+        "force contact",
+        "always contact",
+        "touch moves",
+        "contact on every move",
+        "makes contact"
+      ],
+      "examples": [
+        "Even my ranged moves trigger the target's contact abilities"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Effects that stop contact (Long Reach, Punching Glove, Spiritual Saber, hitting a substitute) are checked first and keep their answer"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.max-multi-hit",
       "className": "MaxMultiHitAbAttr",
       "label": "Always roll the most hits on a 2 to 5 hit move",
@@ -21738,6 +22063,138 @@
         "id": "effect.inflict-status",
         "params": [
           "status"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.miracle-blade-type-chart",
+      "className": "MiracleBladeTypeChartAbAttr",
+      "label": "Make my slicing moves hit one type for set effectiveness",
+      "summary": "My moves with the Slicing move property treat a Dark target as if its matchup were x2, even when it is immune. Example: 2 = super effective.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.my-attack-matchup",
+      "whenLabel": "While the game calculates how well my attack matches the target's types",
+      "synonyms": [
+        "miracle blade",
+        "keen edge",
+        "slicing moves",
+        "super effective against dark",
+        "ignore immunity",
+        "force effectiveness",
+        "type chart override"
+      ],
+      "examples": [
+        "My slicing moves are always super effective against Dark types"
+      ],
+      "params": [
+        {
+          "id": "flag",
+          "label": "Only for moves with this property",
+          "control": "select",
+          "default": "SLICING_MOVE",
+          "editable": true,
+          "options": [
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        },
+        {
+          "id": "defenderType",
+          "label": "Defending type whose matchup is replaced",
+          "control": "select",
+          "default": "DARK",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "factor",
+          "label": "Effectiveness against that type (2 = super effective, 1 = neutral, 0 = no effect)",
+          "control": "number",
+          "default": 2,
+          "editable": true,
+          "min": 0,
+          "max": 8,
+          "step": 0.25,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "When the game asks without knowing the move type, the answer is just the set effectiveness"
+      ],
+      "gateParams": [
+        {
+          "param": "flag",
+          "block": "move.flag",
+          "field": "flag"
+        },
+        {
+          "param": "defenderType",
+          "block": "matchup.defender-has-type",
+          "field": "type"
+        }
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "factor"
         ]
       },
       "reusableAlone": {
@@ -21858,6 +22315,42 @@
       "reusableAlone": {
         "when": true,
         "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.monk-focus-punch",
+      "className": "MonkFocusPunchAbAttr",
+      "label": "Keep Focus Punch at full power after being hit",
+      "summary": "While I have this, Focus Punch keeps its normal power even if I took damage this turn (without it, its power drops to 40). Example: hit first, then Focus Punch still hits at full strength.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "focus punch",
+        "no focus penalty",
+        "keep focus",
+        "ignore interruption",
+        "monk",
+        "punch after being hit",
+        "calm mind"
+      ],
+      "examples": [
+        "My Focus Punch hits at full strength even when I am attacked first"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "It only changes Focus Punch; every other move ignores it",
+        "Focus Punch is never interrupted in this game, it only loses power"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
         "do": true
       },
       "uses": 1
@@ -22916,6 +23409,80 @@
         "id": "effect.drain",
         "params": [
           "healPercent"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.mudball-reactive",
+      "className": "MudballReactiveAbAttr",
+      "label": "Answer a foe entering the field with a free move",
+      "summary": "When a foe enters the field, I use Mud bomb on it at 20 power for free. Add a condition to limit it. Example: a Flying foe enters and a 20 power Mud Bomb hits it.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.foe-enters",
+      "whenLabel": "When a foe enters the field",
+      "synonyms": [
+        "mudball",
+        "welcome attack",
+        "hit the foe that switches in",
+        "switch in punishment",
+        "entry hazard attack",
+        "free move when a foe enters",
+        "anti flying",
+        "mud bomb"
+      ],
+      "examples": [
+        "When a Flying foe enters, I hit it with a 20 power Mud Bomb"
+      ],
+      "params": [
+        {
+          "id": "moveId",
+          "label": "Move to use (its name, for example Mud Bomb)",
+          "control": "text",
+          "default": "Mud bomb",
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "power",
+          "label": "Base power of the free move",
+          "control": "number",
+          "default": 20,
+          "editable": true,
+          "min": 1,
+          "max": 250,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "mon.has-type",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only while the foe that entered is still standing",
+        "Only while I am still standing",
+        "The free move is used on the foe that entered, as an indirect move (it is not a normal move choice)"
+      ],
+      "effect": {
+        "id": "effect.scripted-move",
+        "params": [
+          "moveId",
+          "power"
         ]
       },
       "reusableAlone": {
@@ -37779,6 +38346,42 @@
       "uses": 1
     },
     {
+      "id": "block.raging-fist",
+      "className": "RagingFistAbAttr",
+      "label": "Count every hit I took twice for Rage Fist",
+      "summary": "While I have this, Rage Fist grows twice as fast: each hit I took counts as two, up to 6 counts. Example: 3 hits taken give 50 x (1 + 6) = 350 power.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "rage fist",
+        "double hit count",
+        "hits taken count double",
+        "angry punch",
+        "anger power",
+        "grow stronger when hit",
+        "raging fist"
+      ],
+      "examples": [
+        "Rage Fist reaches full power after only three hits"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "It only changes the power of Rage Fist; every other move ignores it",
+        "Hits on a substitute and confusion damage do not count, as for any Rage Fist user"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.raichu-all-terrain-surge-surfer",
       "className": "RaichuAllTerrainSurgeSurferAbAttr",
       "label": "Multiply one of my stats (Surges Up style)",
@@ -39746,6 +40349,42 @@
       "uses": 1
     },
     {
+      "id": "block.reduction-rune",
+      "className": "ReductionRuneAbAttr",
+      "label": "Cap the weakness bonus of other Pokemon's attacks",
+      "summary": "While I am in battle, every other attacker's weakness bonus is capped: 2x counts as 1.5x, and 4x or more counts as 2x. My own attacks are not capped.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "reduce weakness",
+        "weakness cap",
+        "super effective cap",
+        "less super effective",
+        "resist weaknesses",
+        "damage reduction",
+        "type chart softener"
+      ],
+      "examples": [
+        "Super effective hits from other Pokemon only do 1.5 times damage while I am in battle"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only attacks that are super effective (a type multiplier above 1) are changed",
+        "Every attacker except me is capped, including my allies and my foes"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.reflect-damage-on-defend",
       "className": "ReflectDamageOnDefendAbAttr",
       "label": "Hit the attacker back with the damage I took",
@@ -40882,6 +41521,99 @@
         "moveUser",
         "other"
       ],
+      "uses": 1
+    },
+    {
+      "id": "block.sea-specter",
+      "className": "SeaSpecterAbAttr",
+      "label": "Let two move types count as each other",
+      "summary": "While I have this, a Ghost move also counts as Water, and the other way round, for my type-based abilities. Example: a Ghost move also triggers a Water absorb.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "sea specter",
+        "ghost and water",
+        "type counts as",
+        "also counts as",
+        "type equivalence",
+        "dual type moves",
+        "water ghost"
+      ],
+      "examples": [
+        "Ghost and Water moves both set off my Water immunity and my Water follow-up"
+      ],
+      "params": [
+        {
+          "id": "firstType",
+          "label": "First type of the pair",
+          "control": "select",
+          "default": "GHOST",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "secondType",
+          "label": "Second type of the pair",
+          "control": "select",
+          "default": "WATER",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only abilities that look at a move's type notice it (a type immunity, drawing in moves of a type, a follow-up move after a type of move)",
+        "It reads the move's printed type, so a move whose type another ability changed is judged by its new type plus this pair"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
       "uses": 1
     },
     {
@@ -43029,6 +43761,42 @@
       "uses": 1
     },
     {
+      "id": "block.spiritual-saber-no-contact",
+      "className": "SpiritualSaberNoContactAbAttr",
+      "label": "My slicing moves never count as making contact",
+      "summary": "While I have this, my slicing moves (the Keen Edge group, like Night Slash) make no contact, so contact punishers do not trigger on them. Other moves are unchanged.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "spiritual saber",
+        "keen edge",
+        "slicing moves no contact",
+        "no contact",
+        "blade moves",
+        "ranged blades",
+        "sword moves"
+      ],
+      "examples": [
+        "My blade moves never trigger Rough Skin or Static"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only moves with the slicing property are affected (decided where the game asks whether a move makes contact)",
+        "Long Reach and Punching Glove checks run first and keep their answer; the Manifest rewrite runs after and is not reached for a slicing move"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.splash-damage",
       "className": "SplashDamageAbAttr",
       "label": "Repeat my hit on the foe's neighbour at reduced power",
@@ -44942,6 +45710,42 @@
       "uses": 6
     },
     {
+      "id": "block.status-move-type-immunity-bypass",
+      "className": "StatusMoveTypeImmunityBypassAbAttr",
+      "label": "My status moves ignore type immunities",
+      "summary": "While I have this, my status moves treat a type immunity as a normal hit. Example: Thunder Wave can paralyse a Ground type. Ability immunities still work.",
+      "tier": "C",
+      "kind": "while-active",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "status moves bypass immunity",
+        "thunder wave on ground",
+        "ignore type immunity for status moves",
+        "hit ghost with status",
+        "mycelium might",
+        "no type immunity"
+      ],
+      "examples": [
+        "My status moves hit Pokemon that are normally immune to them by type, like Mycelium Might"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only status moves are affected; damaging moves keep their type immunities",
+        "Immunities that come from an ability, a substitute or a move effect still hold",
+        "Does not work when the move ignores the user's abilities"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.stealth-rock-immunity",
       "className": "StealthRockImmunityAbAttr",
       "label": "Absorb Stealth Rock instead of taking damage",
@@ -45592,6 +46396,43 @@
       "reusableAlone": {
         "when": true,
         "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.synchronized-current",
+      "className": "SynchronizedCurrentAbAttr",
+      "label": "Paralyze a foe that my ally and I both hit in one turn",
+      "summary": "While I have this, a foe that both my ally and I damage in the same turn is paralyzed after the second hit. I also count as a Plus or Minus partner. Example: two attackers paralyze one foe.",
+      "tier": "C",
+      "kind": "engine-query",
+      "status": "decomposed",
+      "when": "while.active",
+      "whenLabel": "While the ability is active",
+      "synonyms": [
+        "synchronized current",
+        "team paralysis",
+        "double hit paralysis",
+        "paralyze together",
+        "ally paralyze",
+        "plus minus pair",
+        "shared target paralysis"
+      ],
+      "examples": [
+        "If my ally and I both damage the same foe in one turn, that foe is paralyzed, like Synchronized Current"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Needs a partner on the field that is also Plus or Minus aligned, and that already damaged the same foe this turn",
+        "The foe must still be standing and the hit must deal direct damage",
+        "A foe that cannot be paralyzed (Electric types, an existing status, a safeguard) is unaffected"
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": false,
         "do": true
       },
       "uses": 1
@@ -48971,6 +49812,61 @@
         "do": true
       },
       "uses": 2
+    },
+    {
+      "id": "block.weather-ground-airborne",
+      "className": "WeatherGroundAirborneAbAttr",
+      "label": "My Ground moves hit airborne Pokemon in certain weather",
+      "summary": "While Sandstorm is on, my Ground moves that a target is immune to (such as against a Flying type) hit it for normal damage. Weather that Cloud Nine or Air Lock switches off does not count.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.my-attack-matchup",
+      "whenLabel": "While the game calculates how well my attack matches the target's types",
+      "synonyms": [
+        "desert spirit",
+        "ground hits flying",
+        "ground moves hit levitate",
+        "earthquake hits flying",
+        "ignore flying immunity in sand",
+        "ground type immunity bypass"
+      ],
+      "examples": [
+        "In a sandstorm my Ground moves hit Flying types, like Desert Spirit",
+        "While it hails my Ground moves hit airborne Pokemon"
+      ],
+      "params": [
+        {
+          "id": "weathers",
+          "label": "Weather that switches it on, like 'Sandstorm' (at least one)",
+          "control": "text",
+          "default": "Sandstorm",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only Ground moves are changed, and only a target that would take no damage at all",
+        "Immunities that come from an ability or a move effect still hold; only the type chart is changed"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.weather-stat-multiplier",
