@@ -28,6 +28,7 @@
 
 import { PostSummonAbAttr, PostWeatherChangeAbAttr, type PostWeatherChangeAbAttrParams } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import type { GatedAttr } from "#data/elite-redux/ability-studio/gate-residual";
 import { isFogWeather } from "#data/weather";
 import { StatusEffect } from "#enums/status-effect";
 import type { Pokemon } from "#field/pokemon";
@@ -52,10 +53,44 @@ const selfBurnInFog = (pokemon: Pokemon, simulated: boolean | undefined): void =
   pokemon.trySetStatus(StatusEffect.BURN, pokemon);
 };
 
-/** Self-burn on switch-in when a fog weather is already active. */
-export class FlareBoostSelfBurnOnSummonAbAttr extends PostSummonAbAttr {
-  override apply({ pokemon, simulated }: AbAttrBaseParams): void {
-    selfBurnInFog(pokemon, simulated);
+/**
+ * Self-burn on switch-in when a fog weather is already active.
+ *
+ * Ability studio: the fog test is a replaceable gate, but it is evaluated at the start of `apply`, between the
+ * simulated check and the fainted / status check (the original order), NOT in `canApply`: the parent's `canApply` is
+ * always true, so the ability popup still shows on every entry, as before. `gateOverride` replaces {@linkcode gate}
+ * on a rebuilt instance.
+ */
+export class FlareBoostSelfBurnOnSummonAbAttr extends PostSummonAbAttr implements GatedAttr<AbAttrBaseParams> {
+  /** The status handed to the holder (burn for Flare Boost). */
+  public readonly status: StatusEffect;
+
+  constructor(status: StatusEffect = StatusEffect.BURN) {
+    super();
+    this.status = status;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** The replaceable condition: a fog weather is active (Eerie Fog or normal fog). Moved verbatim from the helper. */
+  public gate(_params: AbAttrBaseParams): boolean {
+    return isFogWeather(globalScene.arena.weatherType);
+  }
+
+  override apply(params: AbAttrBaseParams): void {
+    const { pokemon, simulated } = params;
+    if (simulated) {
+      return;
+    }
+    const gate = this.gateOverride ?? this.gate.bind(this);
+    if (!gate(params)) {
+      return;
+    }
+    if (pokemon.isFainted() || (pokemon.status?.effect ?? StatusEffect.NONE) !== StatusEffect.NONE) {
+      return;
+    }
+    pokemon.trySetStatus(this.status, pokemon);
   }
 }
 

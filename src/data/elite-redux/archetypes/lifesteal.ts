@@ -60,6 +60,7 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { allMoves } from "#data/data-lists";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import type { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
 import { MoveCategory } from "#enums/move-category";
@@ -231,16 +232,34 @@ export class LifestealOnHitAbAttr extends PostAttackAbAttr {
     return this.hitFilter;
   }
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: Parameters<PostAttackAbAttr["canApply"]>[0]) => boolean) | undefined;
+
   /**
-   * canApply: inherits the parent's attackCondition predicate (which wraps our
-   * filter), then layers a "damage > 0" gate — there's no point healing from
-   * a 0-damage hit (immune target, sub-blocked, etc.).
+   * Tier B split (ability studio spec 3.1): `guards` (a damaging move with a target), then `gate` (the target-tag test and the
+   * move filter), then `residual` (the hit did damage), in the order of the clauses that the closure given to `super` and the
+   * old `canApply` evaluated. The closure given to `super` above is kept as it was and is no longer called. No random draw.
    */
   public override canApply(params: Parameters<PostAttackAbAttr["canApply"]>[0]): boolean {
-    if (!super.canApply(params)) {
+    return gatedCanApply<Parameters<PostAttackAbAttr["canApply"]>[0]>(this, params);
+  }
+
+  /** A status move deals no damage and the target may be null (pokerogue's signature). Moved verbatim from the closure. */
+  public guards({ opponent, move }: Parameters<PostAttackAbAttr["canApply"]>[0]): boolean {
+    return move.category !== MoveCategory.STATUS && opponent !== null;
+  }
+
+  /** The replaceable condition: the optional target-tag test, then the move filter. Moved verbatim from the closure. */
+  public gate({ pokemon, opponent, move }: Parameters<PostAttackAbAttr["canApply"]>[0]): boolean {
+    if (this.hitFilter.targetTag !== undefined && opponent.getTag(this.hitFilter.targetTag) === undefined) {
       return false;
     }
-    return params.damage > 0;
+    return LifestealOnHitAbAttr.matchesFilter(this.hitFilter, pokemon, move);
+  }
+
+  /** There is no point healing from a 0-damage hit (immune target, substitute ...). Moved verbatim from `canApply`. */
+  public residual({ damage }: Parameters<PostAttackAbAttr["canApply"]>[0]): boolean {
+    return damage > 0;
   }
 
   /**
@@ -439,18 +458,34 @@ export class ScavengerLootAbAttr extends PostKnockOutAbAttr {
     return this.lootChance;
   }
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostKnockOutAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1) in the original clause order: forget the last pick, then `guards` (not simulated, the
+   * holder is alive, it landed the knock-out), then `gate` (the loot roll, the FIRST random draw), then `residual` (the victim
+   * holds a transferable item, which one is the SECOND random draw, and the holder can carry it).
+   */
   public override canApply(params: PostKnockOutAbAttrParams): boolean {
     this.lootItem = undefined;
+    return gatedCanApply<PostKnockOutAbAttrParams>(this, params);
+  }
+
+  /** Not simulated, the holder is alive and it landed the knock-out with a direct hit. Moved verbatim from `canApply`. */
+  public guards(params: PostKnockOutAbAttrParams): boolean {
     if (!super.canApply(params) || params.simulated) {
       return false;
     }
-    const { pokemon, victim } = params;
-    if (pokemon.isFainted() || !koLandedByDirectHit(params)) {
-      return false;
-    }
-    if (pokemon.randBattleSeedInt(100) >= Math.round(this.lootChance * 100)) {
-      return false; // failed the loot roll
-    }
+    return !(params.pokemon.isFainted() || !koLandedByDirectHit(params));
+  }
+
+  /** The replaceable condition: the loot roll (failing it ends the attempt). Moved verbatim from `canApply`; the first draw. */
+  public gate({ pokemon }: PostKnockOutAbAttrParams): boolean {
+    return !(pokemon.randBattleSeedInt(100) >= Math.round(this.lootChance * 100));
+  }
+
+  /** The victim holds an item that can move to the holder (the pick is the second draw) and the holder can carry it. */
+  public residual({ pokemon, victim }: PostKnockOutAbAttrParams): boolean {
     const transferable = (
       globalScene.findModifiers(
         m => m instanceof PokemonHeldItemModifier && m.pokemonId === victim.id,

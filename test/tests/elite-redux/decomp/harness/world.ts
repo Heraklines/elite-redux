@@ -355,9 +355,6 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     hitResult: HitResult.EFFECTIVE,
     simulated: false,
   }),
-  // B03: PostKnockOutAbAttr is dispatched for every Pokemon on the field with `victim` = the Pokemon that fainted
-  // (faint-phase.ts). The single-battle grid can only offer the foe as the victim.
-  "event.on-ko": ({ holder, foe }) => ({ pokemon: holder, victim: foe, simulated: false }),
   // PostMoveUsedAbAttr: the engine passes the SOURCE's PokemonMove (canApply calls move.getMove()) and the targets (B06 chunk 2).
   "event.after-any-move": ({ holder, foe, move }) => ({
     pokemon: holder,
@@ -481,4 +478,48 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     statHolder: new NumberHolder(Stat.DEF),
     simulated: false,
   }),
+  // Added by B09 chunk 2 (request R-B09-08). MoveEffectPhase (move-effect-phase.ts:455) passes only the user.
+  "event.my-move-starts": ({ holder }) => ({ pokemon: holder }),
+  // Added by B09 chunk 1 (request R-B09-27). StatStageChangePhase (stat-stage-change-phase.ts:357): the holder is the Pokemon whose
+  // stat changed, `stats` is the filtered list, `stages` the requested amount, `selfTarget` false (a foe caused it).
+  "event.stat-changed": ({ holder }) => ({
+    pokemon: holder,
+    stats: [Stat.ATK],
+    stages: 1,
+    selfTarget: false,
+    simulated: false,
+  }),
+  // Added by B09 chunk 3 (request R-B09-15). MoveEffectPhase (move-effect-phase.ts:257-259) hands the user, the move, the running
+  // hit count (starts at 1) and the first target to the AddSecondStrikeAbAttr dispatch.
+  "calc.hit-count": ctx => ({
+    pokemon: ctx.holder,
+    move: ctx.move,
+    hitCount: new NumberHolder(1),
+    opponent: ctx.foe,
+  }),
+  // Added by B09 chunk 4 (request R-B09-30). Move.calculateBattleAccuracy (move.ts:1239): the TARGET is the holder, the user is the
+  // opponent, the number is the move accuracy.
+  "calc.incoming-accuracy": ctx => ({
+    pokemon: ctx.holder,
+    opponent: ctx.foe,
+    move: ctx.move,
+    simulated: false,
+    accuracy: new NumberHolder(ctx.move.accuracy),
+  }),
+  // Added by B09 chunk 4 (request R-B09-30). FaintPhase (faint-phase.ts:268) fans PostKnockOutAbAttr out to every Pokemon on the
+  // field with the fainted one as `victim`. The victim's latest received attack (index 0, move-effect-phase.ts:989) is set to a
+  // direct hit by the holder, so the holder is the one credited with the knock-out and the "direct hit" rule is reachable.
+  "event.on-ko": ctx => {
+    ctx.foe.turnData.attacksReceived = [
+      {
+        move: ctx.move.id,
+        result: HitResult.EFFECTIVE,
+        damage: ctx.damage,
+        critical: false,
+        sourceId: ctx.holder.id,
+        sourceBattlerIndex: ctx.holder.getBattlerIndex(),
+      },
+    ];
+    return { pokemon: ctx.holder, victim: ctx.foe, simulated: false };
+  },
 };
