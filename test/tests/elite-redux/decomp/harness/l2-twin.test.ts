@@ -72,6 +72,9 @@ function abilitiesToTwin(): number[] {
   return [...ids].sort((a, b) => a - b);
 }
 
+/** Abilities whose carried attrs compare the holder's ability id with their own id (merge captain, B09). */
+const ID_SENSITIVE_ABILITIES: ReadonlySet<number> = new Set([6062]);
+
 describe("L2 battle twin (live registry)", () => {
   let phaserGame: Phaser.Game;
   beforeAll(() => {
@@ -126,6 +129,10 @@ describe("L2 battle twin (live registry)", () => {
           continue;
         }
         registerShadow(shadowId, rebuilt.ability);
+        if (ID_SENSITIVE_ABILITIES.has(id)) {
+          // Carried attrs that ask `pokemon.hasAbility(<own id>)` (Electrodynamics) would see a stranger under the shadow id.
+          Object.defineProperty(rebuilt.ability, "id", { value: id, configurable: true });
+        }
         for (const { scenario, attrs } of scenarios.values()) {
           scenarioCount++;
           battles += 2;
