@@ -543,6 +543,8 @@ describe("the three-column builder", () => {
     // a NOT group takes exactly one condition
     click("[data-cb-action='add-group'][data-cb-group='not'][data-cb-path='0']");
     click("[data-cb-action='open-picker'][data-cb-part='if'][data-cb-path='0.2']");
+    // The picker lists one page of the whole library; search so the block is on it however many blocks exist.
+    typeInto("[data-cb-search]", "gravity");
     pickOption("field.gravity");
     expect(root.querySelector("[data-cb-action='open-picker'][data-cb-path='0.2']")?.hasAttribute("disabled")).toBe(
       true,

@@ -152,7 +152,7 @@ describe("B14 chunk 6: the six classes keep their names, places and defaults", (
     expect(overloaded.powerMultiplier).toBe(1.25);
     // The marker is untouched and keeps showing no ability flyout.
     expect(liveAbility(CLOSED_CIRCUIT).attrs[0]).toBeInstanceOf(ClosedCircuitAbAttr);
-    // Seven declarations are registered (the marker's is parked until R-B14-6.11).
+    // Eight declarations are registered (the marker's was parked until R-B14-6.11; the merge captain added its flag key).
     for (const name of [
       "PositiveFeedbackPowerAbAttr",
       "PositiveFeedbackAbAttr",
@@ -161,10 +161,10 @@ describe("B14 chunk 6: the six classes keep their names, places and defaults", (
       "CapacitorBankAbsorbAbAttr",
       "FaultCurrentAbAttr",
       "OverloadedPowerAbAttr",
+      "ClosedCircuitAbAttr",
     ]) {
       expect(declRegistry.get(name), name).toBeDefined();
     }
-    expect(declRegistry.get("ClosedCircuitAbAttr")).toBeUndefined();
     expect(phaserGame).toBeDefined();
   });
 });

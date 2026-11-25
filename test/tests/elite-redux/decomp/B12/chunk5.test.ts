@@ -97,11 +97,7 @@ describe("B12 chunk 5: the weather classes", () => {
       for (const site of sitesOf(className)) {
         counts[className] = (counts[className] ?? 0) + 1;
         const binding = getBinding(site.abilityId, site.attrIndex, "gate");
-        if (className === "WeatherGroundAirborneAbAttr") {
-          // Parked declaration (R-B12-40): no declaration, so no binding.
-          expect(declRegistry.get(className)).toBeUndefined();
-          expect(binding).toBeUndefined();
-        } else {
+        {
           expect(binding?.spec, `${site.abilityName} must not be bound to a lookalike`).toBeUndefined();
           expect(binding?.legacyClosure?.reason).toContain("R-B12-39");
           const module = declRegistry.get(className)!;
@@ -132,6 +128,7 @@ describe("B12 chunk 5: the weather classes", () => {
         "5296:1 WeatherTypeBoostAbAttr type=ICE multiplier=1.5 weathers=Sandstorm",
         "5021:0 WeatherDamageReductionAbAttr multiplier=0.5 weathers=Hail, Snow",
         "5167:0 WeatherDamageReductionAbAttr multiplier=0.65 weathers=Sandstorm",
+        "5311:1 WeatherGroundAirborneAbAttr weathers=Sandstorm",
       ].sort(),
     );
   });
