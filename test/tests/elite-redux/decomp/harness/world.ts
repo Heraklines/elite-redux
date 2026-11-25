@@ -336,8 +336,6 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     damage,
     simulated: false,
   }),
-  // PostFaintAbAttrParams: the fainted holder, the Pokemon that knocked it out and the move it used (faint-phase.ts:256).
-  "event.faint": ({ holder, foe, move }) => ({ pokemon: holder, attacker: foe, move, simulated: false }),
   "event.after-hit": ({ holder, foe, move, damage }) => ({
     pokemon: holder,
     opponent: foe,
@@ -552,27 +550,35 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
   }),
   // The wake-up moment (MovePhase.checkSleep): only the woken Pokemon.
   "event.wake-up": ({ holder }) => ({ pokemon: holder, simulated: false }),
-  // B14 chunk 4 (Demodulator and Modulator, the Raichu stat classes) and B02-39: the frame Pokemon.getEffectiveStat dispatches
-  // StatMultiplierAbAttr and AllyStatMultiplierAbAttr with. The stat is Attack for the attr differential; the other stats are
-  // proven in test/tests/elite-redux/decomp/B14/chunk4.test.ts, which builds the frame per stat. `target` and `ignoreAbility` are
-  // only read by the ally class.
-  "calc.stat-value": ctx => ({
-    pokemon: ctx.holder,
-    target: ctx.foe,
-    stat: ctx.stat ?? Stat.ATK,
-    statVal: new NumberHolder(100),
-    move: ctx.move,
-    ignoreAbility: false,
-    simulated: false,
-  }),
-  // B14 chunk 2 (Slab's Curse): the faint code hands over the culprit (`attacker`) and the move that caused it.
-  "event.faint": ({ holder, foe, move }) => ({
-    pokemon: holder,
-    attacker: foe,
-    move,
-    hitResult: HitResult.EFFECTIVE,
-    simulated: false,
-  }),
+  // B18 chunk 3. A stat calculation hands over the holder, the move, the stat and the value being built (StatMultiplierAbAttr and, for the
+  // ally dispatch, AllyStatMultiplierAbAttr: `target` is the Pokemon that receives the stat and `ignoreAbility` the Mold Breaker flag). The
+  // grid has no stat axis, so the stat is picked from the grid move's position: all seven stats, Accuracy and Evasion included, are asked.
+  "calc.stat-value": ({ holder, foe, move, stat: forcedStat }) => {
+    const index = Math.max(0, GRID_MOVES.indexOf(move.id));
+    const stats = [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD, Stat.ACC, Stat.EVA];
+    return {
+      pokemon: holder,
+      target: foe,
+      stat: forcedStat ?? stats[index % stats.length],
+      statVal: new NumberHolder(100),
+      move,
+      ignoreAbility: index % 4 === 3,
+      simulated: false,
+    };
+  },
+  // B18 chunk 4. The faint check hands over the holder, the foe that knocked it out and that foe's move (faint-phase.ts: the newest hit it took;
+  // after poison, weather or recoil there is neither). The grid has no such axes, so the grid move's position picks the case: no attacker,
+  // the holder as its own attacker, or no move; every other position is a normal knock-out by the foe with the grid move.
+  "event.faint": ({ holder, foe, move }) => {
+    const index = Math.max(0, GRID_MOVES.indexOf(move.id));
+    return {
+      pokemon: holder,
+      attacker: index % 5 === 3 ? undefined : index % 6 === 4 ? holder : foe,
+      move: index % 7 === 5 ? undefined : move,
+      hitResult: HitResult.EFFECTIVE,
+      simulated: false,
+    };
+  },
   // B14 chunk 2 (Booby Trap): the item-loss code hands over the Pokemon that took or knocked off the item.
   "event.item-lost": ({ holder, foe }) => ({ pokemon: holder, opponent: foe, simulated: false }),
   // B15 chunk 2. The holder's own move was just used (PostMoveUsed hands over a PokemonMove and the user as `source`).
