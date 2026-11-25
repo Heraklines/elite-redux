@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "07239b9907e2bd",
-  "hash": "0d66b04c40f452",
+  "hash": "0c58e6c9778af4",
   "blocks": [
     {
       "id": "block.ability-studio-runtime-capability",
@@ -37403,7 +37403,7 @@
     {
       "id": "block.pre-faint-revive",
       "className": "PreFaintReviveAbAttr",
-      "label": "Survive a knockout hit with 1 HP left, at an HP level you set",
+      "label": "Survive a knockout with 1 HP left, at an HP level you set",
       "summary": "A hit that would knock me out leaves me on 1 HP instead. It can work again every turn.",
       "tier": "B",
       "kind": "calc-modifier",

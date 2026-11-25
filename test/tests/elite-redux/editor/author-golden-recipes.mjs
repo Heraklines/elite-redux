@@ -142,7 +142,7 @@ async function main() {
 
     // 1. "switch out below 35% HP"
     await newAbility(page, "Switch At 35");
-    await startRule(page, "switch-below-35", "taking damage", "After I take any damage");
+    await startRule(page, "switch-below-35", "taking damage", "When I take any damage");
     await addEffect(page, "switch out", "Switch out");
     await addCondition(page, "dropped below", "just dropped below");
     await setRange(page.locator("[data-cb-param='ratio']"), 0.35);
@@ -168,7 +168,7 @@ async function main() {
 
     // 4. "50 BP Steam Eruption after a Fire or Water move"
     await newAbility(page, "Steam Follow Up");
-    await startRule(page, "steam-follow-up", "after my attack", "After my attack lands");
+    await startRule(page, "steam-follow-up", "after my attack", "When my attack lands");
     await addEffect(page, "steam eruption", "Use");
     await page.fill("[data-cb-param='moveId']", "STEAM_ERUPTION");
     await page.fill("[data-cb-param='power']", "50");

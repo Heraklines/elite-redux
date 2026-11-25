@@ -418,14 +418,14 @@ describe("plain-language sentence", () => {
   it("reads the four golden recipes back in words", () => {
     const m = model();
     expect(m.sentence(wimpRule)).toBe(
-      "After I take any damage, if the ability owner just dropped below 35% of max HP, switch out.",
+      "When I take any damage, if the ability owner just dropped below 35% of max HP, switch out.",
     );
     expect(m.sentence(halfRule)).toBe(
       "While the game calculates damage I take, if the ability owner is at full HP, multiply damage I take by 0.5.",
     );
     expect(m.sentence(groundRule)).toBe("While the game checks whether a move can hit me, be immune to Ground moves.");
     expect(m.sentence(steamRule)).toBe(
-      "After my attack lands, if (the move is Fire type or the move is Water type), use Steam Eruption with 50 power.",
+      "When my attack lands, if (the move is Fire type or the move is Water type), use Steam Eruption with 50 power.",
     );
   });
 
@@ -469,7 +469,7 @@ describe("the three-column builder", () => {
     typeInto("[data-cb-param='ratio']", "0.35");
     expect(q("[data-cb-output]").textContent).toBe("35%");
     expect(q("[data-cb-sentence]").textContent).toBe(
-      "After I take any damage, if the ability owner just dropped below 35% of max HP, switch out.",
+      "When I take any damage, if the ability owner just dropped below 35% of max HP, switch out.",
     );
     expect(studio.buildDelta().errors).toEqual([]);
     const saved = studio.buildDelta().delta["block-test"] as Json;

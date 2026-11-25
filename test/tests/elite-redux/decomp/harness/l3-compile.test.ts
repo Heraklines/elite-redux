@@ -58,6 +58,7 @@ describe("L3 compile matrix", () => {
     expect(ALL_EFFECTS.length).toBeGreaterThan(30);
   });
 
+  // ~1.7 million triples since the B19 library additions (about 1 min on the test machine), so the default 20 s is too short.
   it("WHEN x IF x DO: the oracle's verdict equals whether compile throws, and failures name the block (and the slot)", () => {
     const started = Date.now();
     let triples = 0;
@@ -101,7 +102,7 @@ describe("L3 compile matrix", () => {
     expect(wrong).toEqual([]);
     expect(unreadable).toEqual([]);
     expect(compiled).toBeGreaterThan(100);
-  });
+  }, 180_000);
 
   it("the staff validator and compile agree on every WHEN x DO pair with no IF", () => {
     const disagreements: string[] = [];
