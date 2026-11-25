@@ -38,6 +38,7 @@ import {
   VariableMovePowerAbAttr,
 } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
 import { HitResult } from "#enums/hit-result";
 import { MoveCategory } from "#enums/move-category";
@@ -99,12 +100,38 @@ function turnStamp(): string {
  * so a multi-hit move grants one). Also the marker used for holder detection.
  */
 export class CapacitorBankGainAbAttr extends PostDefendAbAttr {
+  /** Stacks gained per incoming damaging move (1 for the shipped ability). */
+  public readonly stacks: number;
+
+  constructor(stacks = 1) {
+    super();
+    this.stacks = stacks;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
   // Reuse PostDefend's shape but drive it from the ATTACK side via a dedicated
   // apply hook is awkward; instead this class is the DEFEND-side gain (holder is
   // hit) and the marker. The ATTACK-side gain is `erCapacitorBankOnAttack`,
   // called from the batch3 dispatcher path.
-  override canApply({ pokemon, opponent, move, damage, hitResult }: PostMoveInteractionAbAttrParams): boolean {
-    if (move.category === MoveCategory.STATUS || damage <= 0) {
+
+  /** Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `gate`, then `residual`; there is no guard. */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Clause 1, the replaceable condition: the move deals damage (it is not a status move). */
+  public gate({ move }: PostMoveInteractionAbAttrParams): boolean {
+    return move.category !== MoveCategory.STATUS;
+  }
+
+  /**
+   * Clauses 2 to 5, in order, kept in the class: some damage was dealt, the hit was not blocked (no effect or immune), the
+   * holder is below the maximum number of stacks, and this incoming move has not been counted yet (a multi-hit move grants one).
+   */
+  public residual({ pokemon, opponent, move, damage, hitResult }: PostMoveInteractionAbAttrParams): boolean {
+    if (damage <= 0) {
       return false;
     }
     if (hitResult === HitResult.NO_EFFECT || hitResult === HitResult.IMMUNE) {
@@ -122,7 +149,7 @@ export class CapacitorBankGainAbAttr extends PostDefendAbAttr {
       return;
     }
     LAST_DEFEND_TOKEN.set(pokemon, defendToken(opponent, move));
-    addCharge(pokemon);
+    addCharge(pokemon, this.stacks);
   }
 }
 
@@ -153,14 +180,18 @@ export function erCapacitorBankOnAttack(attacker: Pokemon, move: Move, damaging:
  * and the redirect (registered separately) interact exactly like Lightning Rod.
  */
 export class CapacitorBankAbsorbAbAttr extends TypeImmunityAbAttr {
-  constructor() {
-    super(PokemonType.ELECTRIC);
+  /** Stacks gained per absorbed move (1 for the shipped ability). */
+  public readonly stacks: number;
+
+  constructor(immuneType: PokemonType = PokemonType.ELECTRIC, stacks = 1) {
+    super(immuneType);
+    this.stacks = stacks;
   }
 
   override apply(params: TypeMultiplierAbAttrParams): void {
     super.apply(params); // sets typeMultiplier to 0 (immune)
     if (!params.simulated && getCharge(params.pokemon) < CHARGE_STACK_MAX) {
-      addCharge(params.pokemon);
+      addCharge(params.pokemon, this.stacks);
     }
   }
 }
@@ -176,12 +207,30 @@ export function erCapacitorBankConsumeOnElectricUse(user: Pokemon, move: Move): 
 
 /** Discharge all stacks as a spread Electric attack every 2nd active turn. */
 export class FaultCurrentAbAttr extends PostTurnAbAttr {
+  /** The discharge happens every this many turns on the field (2 for the shipped ability). */
+  public readonly period: number;
+  /** Base power per consumed stack (15 for the shipped ability). */
+  public readonly powerPerStack: number;
+  /** The move whose type, category and spread effect the discharge copies (Discharge). */
+  public readonly moveId: MoveId;
+
+  constructor(
+    period = FAULT_CURRENT_PERIOD,
+    powerPerStack = FAULT_CURRENT_BP_PER_STACK,
+    moveId: MoveId = MoveId.DISCHARGE,
+  ) {
+    super();
+    this.period = period;
+    this.powerPerStack = powerPerStack;
+    this.moveId = moveId;
+  }
+
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
     if (simulated || !pokemon.isActive(true)) {
       return;
     }
     const turns = incrementActiveTurns(pokemon);
-    if (turns % FAULT_CURRENT_PERIOD !== 0) {
+    if (turns % this.period !== 0) {
       return;
     }
     const stacks = getCharge(pokemon);
@@ -196,7 +245,7 @@ export class FaultCurrentAbAttr extends PostTurnAbAttr {
     // Spread Electric discharge (Discharge clone) at 15 BP per consumed stack.
     // Applied directly through the damage formula (type effectiveness included);
     // a MovePhase unshifted at end-of-turn does not execute reliably.
-    const move = scriptedPokemonMove(MoveId.DISCHARGE, FAULT_CURRENT_BP_PER_STACK * stacks).getMove();
+    const move = scriptedPokemonMove(this.moveId, this.powerPerStack * stacks).getMove();
     for (const opp of opponents) {
       const { damage, result } = opp.getAttackDamage({ source: pokemon, move });
       if (damage > 0) {
@@ -216,22 +265,54 @@ function overloadedActive(pokemon: Pokemon): boolean {
 
 /** +25% power on the holder's Electric moves while at 4 stacks. */
 export class OverloadedPowerAbAttr extends VariableMovePowerAbAttr {
-  override canApply({ pokemon, move }: PreAttackModifyPowerAbAttrParams): boolean {
+  /** Power multiplier of the holder's Electric moves (1.25 for the shipped ability). */
+  public readonly powerMultiplier: number;
+
+  constructor(powerMultiplier = OVERLOADED_POWER_MULTIPLIER) {
+    super();
+    this.powerMultiplier = powerMultiplier;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreAttackModifyPowerAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole original `canApply` is the gate; there is no guard and no residual. */
+  override canApply(params: PreAttackModifyPowerAbAttrParams): boolean {
+    return gatedCanApply<PreAttackModifyPowerAbAttrParams>(this, params);
+  }
+
+  /**
+   * The replaceable condition, in the original order: the holder is at the maximum number of stacks and carries the Overloaded
+   * marker (`overloadedActive`), and its move is Electric after ability changes.
+   */
+  public gate({ pokemon, move }: PreAttackModifyPowerAbAttrParams): boolean {
     return overloadedActive(pokemon) && pokemon.getMoveType(move) === PokemonType.ELECTRIC;
   }
 
   override apply({ power }: PreAttackModifyPowerAbAttrParams): void {
-    power.value *= OVERLOADED_POWER_MULTIPLIER;
+    power.value *= this.powerMultiplier;
   }
 }
 
-/** +1 priority on the holder's Electric moves while at 4 stacks. */
+/**
+ * The shipped priority condition, in the original order: the holder is at the maximum number of stacks and carries the Overloaded
+ * marker (`overloadedActive`), and its move is Electric after ability changes.
+ */
+export function overloadedPriorityCondition(pokemon: Pokemon, move: Move): boolean {
+  return overloadedActive(pokemon) && pokemon.getMoveType(move) === PokemonType.ELECTRIC;
+}
+
+/**
+ * +1 priority on the holder's Electric moves while at 4 stacks.
+ * The condition and the amount are constructor arguments (the old values are the defaults), so a rebuilt rule can swap the condition
+ * (Tier A, slot `ctor:0`) and change the amount.
+ */
 export class OverloadedPriorityAbAttr extends ChangeMovePriorityAbAttr {
-  constructor() {
-    super(
-      (pokemon, move) => overloadedActive(pokemon) && pokemon.getMoveType(move) === PokemonType.ELECTRIC,
-      OVERLOADED_PRIORITY_BONUS,
-    );
+  constructor(
+    moveFunc: (pokemon: Pokemon, move: Move) => boolean = overloadedPriorityCondition,
+    changeAmount = OVERLOADED_PRIORITY_BONUS,
+  ) {
+    super(moveFunc, changeAmount);
   }
 }
 
@@ -240,11 +321,38 @@ export class OverloadedPriorityAbAttr extends ChangeMovePriorityAbAttr {
  * `overloadedActive` / the switch-lock hook.
  */
 export class OverloadedChipAbAttr extends PostTurnAbAttr {
-  override apply({ pokemon, simulated }: AbAttrBaseParams): void {
-    if (simulated || pokemon.isFainted() || getCharge(pokemon) !== CHARGE_STACK_MAX) {
+  /** Share of the holder's maximum HP lost each turn at full charge (1/8 for the shipped ability). */
+  public readonly chipFraction: number;
+
+  constructor(chipFraction = OVERLOADED_CHIP_FRACTION) {
+    super();
+    this.chipFraction = chipFraction;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /**
+   * The clauses stay in `apply` (not in `canApply`) on purpose: the inherited `canApply` is always true, so the ability flyout is
+   * shown at every end of turn whether or not the chip happens. Moving a clause into `canApply` would remove that flyout.
+   * Order kept: a preview does nothing, then the guard, then the gate.
+   */
+  override apply(params: AbAttrBaseParams): void {
+    if (params.simulated || !gatedCanApply<AbAttrBaseParams>(this, params)) {
       return;
     }
-    const chip = Math.max(1, Math.floor(pokemon.getMaxHp() * OVERLOADED_CHIP_FRACTION));
+    const { pokemon } = params;
+    const chip = Math.max(1, Math.floor(pokemon.getMaxHp() * this.chipFraction));
     pokemon.damageAndUpdate(chip, { result: HitResult.INDIRECT });
+  }
+
+  /** Non-removable: a fainted holder takes no chip. */
+  public guards({ pokemon }: AbAttrBaseParams): boolean {
+    return !pokemon.isFainted();
+  }
+
+  /** The replaceable condition: the holder is at exactly the maximum number of stacks. */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
+    return getCharge(pokemon) === CHARGE_STACK_MAX;
   }
 }

@@ -15,10 +15,12 @@ import {
   PostSummonAbAttr,
   PostSummonTerrainChangeAbAttr,
   StatMultiplierAbAttr,
+  type StatMultiplierAbAttrParams,
 } from "#abilities/ab-attrs";
 import type { AbBuilder } from "#abilities/ability";
 import type { Battle } from "#app/battle";
 import { globalScene } from "#app/global-scene";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { GroundedEntryHazardImmunityAbAttr } from "#data/elite-redux/archetypes/entry-hazard-immunity";
 import { TerrainType } from "#data/terrain";
@@ -34,6 +36,7 @@ import type { Pokemon } from "#field/pokemon";
 import { noAbilityTypeOverrideMoves } from "#moves/invalid-moves";
 import type { Move } from "#moves/move";
 import { isFieldTargeted } from "#moves/move-utils";
+import type { PokemonAttackCondition } from "#types/ability-types";
 import {
   ER_DEMODULATOR_ABILITY_ID,
   ER_ELECTRODYNAMICS_ABILITY_ID,
@@ -220,30 +223,77 @@ export function getRaichuTerrainMoveMultiplier(pokemon: Pokemon, moveType: Pokem
 
 /** Holder-side Demodulator / Modulator base-stat multiplier during Electric Terrain. */
 export class RaichuTerrainStatMultiplierAbAttr extends StatMultiplierAbAttr {
+  /** The terrain that has to be active (Electric for the shipped abilities). */
+  public readonly terrain: TerrainType;
+
   constructor(stat: BattleStat, multiplier: number, terrain: TerrainType) {
     super(stat, multiplier, () => currentTerrain() === terrain);
+    this.terrain = terrain;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: StatMultiplierAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Tier B split (ability studio spec 3.1), in the ORIGINAL clause order. The original was the inherited
+   * `stat === this.stat && condition()`, and the condition was `currentTerrain() === terrain`.
+   */
+  override canApply(params: StatMultiplierAbAttrParams): boolean {
+    return gatedCanApply<StatMultiplierAbAttrParams>(this, params);
+  }
+
+  /** Clause 1: the stat being worked out is the one this attr multiplies. Not editable. */
+  public guards({ stat }: StatMultiplierAbAttrParams): boolean {
+    return stat === this.stat;
+  }
+
+  /** Clause 2, the replaceable condition: the terrain is the chosen one. */
+  public gate(_params: StatMultiplierAbAttrParams): boolean {
+    return currentTerrain() === this.terrain;
   }
 }
 
 /** Partner-side Demodulator / Modulator multiplier with the exact 1.5x/2x split. */
 export class RaichuAllyStatMultiplierAbAttr extends AllyStatMultiplierAbAttr {
-  private readonly terrain: TerrainType;
+  /** The terrain that has to be active (Electric for the shipped abilities). */
+  public readonly terrain: TerrainType;
+  /** The multiplier for an ordinary partner (1.5 for the shipped abilities). */
+  public readonly normalMultiplier: number;
+  /** The multiplier for a partner that is magnetised (2 for the shipped abilities). */
+  public readonly boostedMultiplier: number;
 
-  constructor(stat: BattleStat, terrain: TerrainType) {
-    super(stat, 1.5, false);
+  constructor(stat: BattleStat, terrain: TerrainType, normalMultiplier = 1.5, boostedMultiplier = 2) {
+    super(stat, normalMultiplier, false);
     this.terrain = terrain;
+    this.normalMultiplier = normalMultiplier;
+    this.boostedMultiplier = boostedMultiplier;
   }
 
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AllyStatMultiplierAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `guards`, `gate`, `residual`. */
   override canApply(params: AllyStatMultiplierAbAttrParams): boolean {
-    return (
-      super.canApply(params)
-      && currentTerrain() === this.terrain
-      && (globalScene?.currentBattle?.getBattlerCount() ?? 1) > 1
-    );
+    return gatedCanApply<AllyStatMultiplierAbAttrParams>(this, params);
+  }
+
+  /** Clause 1: the inherited check (the stat is the one this attr multiplies; the attr is never ignorable). Not editable. */
+  public guards(params: AllyStatMultiplierAbAttrParams): boolean {
+    return super.canApply(params);
+  }
+
+  /** Clause 2, the replaceable condition: the terrain is the chosen one. */
+  public gate(_params: AllyStatMultiplierAbAttrParams): boolean {
+    return currentTerrain() === this.terrain;
+  }
+
+  /** Clause 3, kept in the class (no library atom reads "more than one battler per side" yet): a multi battle. */
+  public residual(_params: AllyStatMultiplierAbAttrParams): boolean {
+    return (globalScene?.currentBattle?.getBattlerCount() ?? 1) > 1;
   }
 
   override apply({ target, statVal }: AllyStatMultiplierAbAttrParams): void {
-    statVal.value *= partnerHasRaichuBoostCondition(target) ? 2 : 1.5;
+    statVal.value *= partnerHasRaichuBoostCondition(target) ? this.boostedMultiplier : this.normalMultiplier;
   }
 }
 
@@ -256,42 +306,79 @@ export class ElectrodynamicsPositionAbAttr extends PostSummonAbAttr {
   }
 }
 
-/** Psionic terrain power rider when the matching virtual terrain is active. */
+/**
+ * Psionic's rule for its power rider (the closure the constructor used to build inline): the move is Electric or Psychic, the matching
+ * terrain is NOT the real one (the real one is already boosted by the game), and the virtual terrain applies to me. Kept as one named
+ * function so a rebuilt rule can swap it.
+ */
+const psionicTerrainPowerCondition: PokemonAttackCondition = (user, _target, move) =>
+  getRaichuTerrainMoveMultiplier(user, user.getMoveType(move)) > 1;
+
+/** Electrodynamics' rule for its power rider: the same as Psionic's, but never for a holder that also has Psionic. */
+const electrodynamicsTerrainPowerCondition: PokemonAttackCondition = (user, _target, move) =>
+  !user.hasAbility(RAICHU_PSIONIC_ABILITY) && getRaichuTerrainMoveMultiplier(user, user.getMoveType(move)) > 1;
+
+/** Electrodynamics' Galvanize rule (also the one of its power rider): a Normal move that no -ate ability or Tera rule takes first. */
+const electrodynamicsConvertCondition: PokemonAttackCondition = (user, _target, move) =>
+  canElectrodynamicsConvert(move, user);
+
+/** Surges Up's Speed rule: any terrain is active. */
+const anyTerrainActiveCondition: PokemonAttackCondition = () => isAnyTerrainActive();
+
+/**
+ * Psionic terrain power rider when the matching virtual terrain is active.
+ * The condition and the multiplier are constructor arguments so the studio can rebuild the rule; the defaults are the shipped values.
+ */
 export class PsionicTerrainPowerAbAttr extends MovePowerBoostAbAttr {
-  constructor() {
-    super((user, _target, move) => getRaichuTerrainMoveMultiplier(user, user.getMoveType(move)) > 1, 1.3);
+  constructor(condition: PokemonAttackCondition = psionicTerrainPowerCondition, powerMultiplier = 1.3) {
+    super(condition, powerMultiplier);
   }
 }
 
-/** Electrodynamics' virtual Electric Terrain move-power rider for its slot occupant. */
+/**
+ * Electrodynamics' virtual Electric Terrain move-power rider for its slot occupant.
+ * The condition and the multiplier are constructor arguments so the studio can rebuild the rule; the defaults are the shipped values.
+ */
 export class ElectrodynamicsTerrainPowerAbAttr extends MovePowerBoostAbAttr {
-  constructor() {
-    super(
-      (user, _target, move) =>
-        !user.hasAbility(RAICHU_PSIONIC_ABILITY) && getRaichuTerrainMoveMultiplier(user, user.getMoveType(move)) > 1,
-      1.3,
-    );
+  constructor(condition: PokemonAttackCondition = electrodynamicsTerrainPowerCondition, powerMultiplier = 1.3) {
+    super(condition, powerMultiplier);
   }
 }
 
-/** Galvanize conversion supplied by Electrodynamics, with -ate precedence. */
+/**
+ * Galvanize conversion supplied by Electrodynamics, with -ate precedence.
+ * The new type and the condition are constructor arguments so the studio can rebuild the rule; the defaults are the shipped values.
+ */
 export class ElectrodynamicsGalvanizeAbAttr extends MoveTypeChangeAbAttr {
-  constructor() {
-    super(PokemonType.ELECTRIC, (user, _target, move) => canElectrodynamicsConvert(move, user));
+  constructor(
+    newType: PokemonType = PokemonType.ELECTRIC,
+    condition: PokemonAttackCondition = electrodynamicsConvertCondition,
+  ) {
+    super(newType, condition);
   }
 }
 
-/** Galvanize's standard power rider, sharing the same -ate precedence gate. */
+/**
+ * Galvanize's standard power rider, sharing the same -ate precedence gate.
+ * The condition and the multiplier are constructor arguments so the studio can rebuild the rule; the defaults are the shipped values.
+ */
 export class ElectrodynamicsGalvanizePowerAbAttr extends MovePowerBoostAbAttr {
-  constructor() {
-    super((user, _target, move) => canElectrodynamicsConvert(move, user), 1.2);
+  constructor(condition: PokemonAttackCondition = electrodynamicsConvertCondition, powerMultiplier = 1.2) {
+    super(condition, powerMultiplier);
   }
 }
 
-/** All-terrain Surge Surfer: speed doubles under any active terrain. */
+/**
+ * All-terrain Surge Surfer: speed doubles under any active terrain.
+ * The stat, the multiplier and the condition are constructor arguments so the studio can rebuild the rule; the defaults are the shipped values.
+ */
 export class RaichuAllTerrainSurgeSurferAbAttr extends StatMultiplierAbAttr {
-  constructor() {
-    super(Stat.SPD, 2, () => isAnyTerrainActive());
+  constructor(
+    stat: BattleStat = Stat.SPD,
+    multiplier = 2,
+    condition: PokemonAttackCondition = anyTerrainActiveCondition,
+  ) {
+    super(stat, multiplier, condition);
   }
 }
 

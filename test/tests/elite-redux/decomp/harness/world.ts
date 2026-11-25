@@ -375,14 +375,6 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
     selfTarget: false,
     simulated: false,
   }),
-  // Pokemon.getEffectiveStat passes pokemon, stat, statVal, simulated and move to StatMultiplierAbAttr.
-  "calc.stat-value": ({ holder, move, stat }) => ({
-    pokemon: holder,
-    stat: stat ?? Stat.ATK,
-    statVal: new NumberHolder(100),
-    simulated: false,
-    move,
-  }),
   // Never dispatched by the engine (PreAttackAbAttr is a base class); the same shape as the other attack-side moments.
   "calc.outgoing-move": ({ holder, foe, move }) => ({
     pokemon: holder,
@@ -566,4 +558,27 @@ export const PARAM_BUILDERS: Readonly<Record<string, ParamBuilder>> = {
   }),
   // The wake-up moment (MovePhase.checkSleep): only the woken Pokemon.
   "event.wake-up": ({ holder }) => ({ pokemon: holder, simulated: false }),
+  // B14 chunk 4 (Demodulator and Modulator, the Raichu stat classes) and B02-39: the frame Pokemon.getEffectiveStat dispatches
+  // StatMultiplierAbAttr and AllyStatMultiplierAbAttr with. The stat is Attack for the attr differential; the other stats are
+  // proven in test/tests/elite-redux/decomp/B14/chunk4.test.ts, which builds the frame per stat. `target` and `ignoreAbility` are
+  // only read by the ally class.
+  "calc.stat-value": ctx => ({
+    pokemon: ctx.holder,
+    target: ctx.foe,
+    stat: ctx.stat ?? Stat.ATK,
+    statVal: new NumberHolder(100),
+    move: ctx.move,
+    ignoreAbility: false,
+    simulated: false,
+  }),
+  // B14 chunk 2 (Slab's Curse): the faint code hands over the culprit (`attacker`) and the move that caused it.
+  "event.faint": ({ holder, foe, move }) => ({
+    pokemon: holder,
+    attacker: foe,
+    move,
+    hitResult: HitResult.EFFECTIVE,
+    simulated: false,
+  }),
+  // B14 chunk 2 (Booby Trap): the item-loss code hands over the Pokemon that took or knocked off the item.
+  "event.item-lost": ({ holder, foe }) => ({ pokemon: holder, opponent: foe, simulated: false }),
 };

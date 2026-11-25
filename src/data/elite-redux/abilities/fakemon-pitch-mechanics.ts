@@ -43,6 +43,7 @@ import type { AbBuilder } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-debuff-on-flag-attack";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { ABILITY_STUDIO_RUNTIME_CAPABILITIES } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { AbilityStudioRuntimeCapabilityAbAttr } from "#data/elite-redux/ability-studio/runtime-components";
 import {
@@ -244,9 +245,17 @@ class BallasterAbAttr extends PostDefendAbAttr {
 }
 
 export class PhotovoltaicTypeAbAttr extends PostSummonAbAttr {
+  /** The type gained on entry (Electric for the shipped ability). */
+  public readonly type: PokemonType;
+
+  constructor(type: PokemonType = PokemonType.ELECTRIC) {
+    super();
+    this.type = type;
+  }
+
   override apply({ pokemon }: AbAttrBaseParams): void {
     const current = pokemon.summonData.types.length > 0 ? pokemon.summonData.types : [...pokemon.getTypes()];
-    pokemon.summonData.types = current.includes(PokemonType.ELECTRIC) ? current : [...current, PokemonType.ELECTRIC];
+    pokemon.summonData.types = current.includes(this.type) ? current : [...current, this.type];
   }
 }
 
@@ -695,7 +704,16 @@ class PerpetualMotionResolutionAbAttr extends ExecutedMoveAbAttr {
 }
 
 export class PerpetualMotionProgressAbAttr extends PostAttackAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole rule is the replaceable {@linkcode gate}; no guards, no residual. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition, in the original order: the move deals damage, and it is the own follow-up move. */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
     return (
       super.canApply(params)
       && params.move.attrs.some(attr => attr instanceof ScriptedMoveMarkerAttr && attr.key === PERPETUAL_MOTION_MARKER)
@@ -721,15 +739,34 @@ export class PerpetualMotionProgressAbAttr extends PostAttackAbAttr {
 }
 
 export class PerpetualMotionPowerAbAttr extends VariableMovePowerAbAttr {
-  override canApply({ pokemon, move }: PreAttackModifyPowerAbAttrParams): boolean {
-    return (
-      !!pokemon.summonData.erPerpetualMotionPending
-      && move.attrs.some(attr => attr instanceof ScriptedMoveMarkerAttr && attr.key === PERPETUAL_MOTION_MARKER)
-    );
+  /** Power bonus per hit in a row (0.1 = +10% each). */
+  public readonly step: number;
+
+  constructor(step = 0.1) {
+    super();
+    this.step = step;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreAttackModifyPowerAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `guards`, then `gate`. */
+  override canApply(params: PreAttackModifyPowerAbAttrParams): boolean {
+    return gatedCanApply<PreAttackModifyPowerAbAttrParams>(this, params);
+  }
+
+  /** Clause 1: the free follow-up is currently armed (state of the ability's own state machine, not editable). */
+  public guards({ pokemon }: PreAttackModifyPowerAbAttrParams): boolean {
+    return !!pokemon.summonData.erPerpetualMotionPending;
+  }
+
+  /** Clause 2, the replaceable condition: the move is the own scripted follow-up move. */
+  public gate({ move }: PreAttackModifyPowerAbAttrParams): boolean {
+    return move.attrs.some(attr => attr instanceof ScriptedMoveMarkerAttr && attr.key === PERPETUAL_MOTION_MARKER);
   }
 
   override apply({ pokemon, power }: PreAttackModifyPowerAbAttrParams): void {
-    power.value *= 1 + pokemon.summonData.erPerpetualMotionStreak * 0.1;
+    power.value *= 1 + pokemon.summonData.erPerpetualMotionStreak * this.step;
   }
 }
 
@@ -1242,6 +1279,17 @@ export function wireFakemonPitchAbility(builder: AbBuilder, id: number): void {
 
 /** Prophetic chooses the stronger effective Future Sight or Doom Desire attack. */
 export class PropheticAbAttr extends PostSummonAbAttr {
+  /** The attacks to choose from when the delayed attack lands; the first one is the named source move. */
+  public readonly moves: MoveId[];
+  /** Turns until the delayed attack lands. */
+  public readonly turns: number;
+
+  constructor(moves: MoveId[] = [MoveId.FUTURE_SIGHT, MoveId.DOOM_DESIRE], turns = 3) {
+    super();
+    this.moves = moves;
+    this.turns = turns;
+  }
+
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
     if (simulated) {
       return;
@@ -1257,23 +1305,36 @@ export class PropheticAbAttr extends PostSummonAbAttr {
       tagType: PositionalTagType.DELAYED_ATTACK,
       sourceId: pokemon.id,
       targetIndex: target.getBattlerIndex(),
-      sourceMove: MoveId.FUTURE_SIGHT,
-      sourceMoves: [MoveId.FUTURE_SIGHT, MoveId.DOOM_DESIRE],
-      turnCount: 3,
+      sourceMove: this.moves[0] ?? MoveId.FUTURE_SIGHT,
+      sourceMoves: [...this.moves],
+      turnCount: this.turns,
     });
   }
 }
 
 /** Southern Cross Punch rotates queued opposing targets one active slot right. */
 export class SouthernCrossPunchAbAttr extends PostAttackAbAttr {
-  override canApply({ pokemon, move, damage, hitResult, simulated }: PostMoveInteractionAbAttrParams): boolean {
-    return (
-      !simulated
-      && damage > 0
-      && hitResult < HitResult.NO_EFFECT
-      && move.hasFlag(MoveFlags.PUNCHING_MOVE)
-      && pokemon.getAllActiveAbilityAttrs().some(attr => attr instanceof SouthernCrossPunchAbAttr)
-    );
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `guards`, `gate`, `residual`. */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Clauses 1 to 3: a real, damaging hit (not a preview, damage dealt, not blocked). Not editable. */
+  public guards({ damage, hitResult, simulated }: PostMoveInteractionAbAttrParams): boolean {
+    return !simulated && damage > 0 && hitResult < HitResult.NO_EFFECT;
+  }
+
+  /** Clause 4, the replaceable condition: the move is a punching move (its own flag, not an injected one). */
+  public gate({ move }: PostMoveInteractionAbAttrParams): boolean {
+    return move.hasFlag(MoveFlags.PUNCHING_MOVE);
+  }
+
+  /** Clause 5: the holder still has this attr on an active ability. */
+  public residual({ pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    return pokemon.getAllActiveAbilityAttrs().some(attr => attr instanceof SouthernCrossPunchAbAttr);
   }
 
   override apply({ pokemon, simulated }: PostMoveInteractionAbAttrParams): void {
@@ -1313,30 +1374,83 @@ export function rotateSouthernCrossPunchTargets(pokemon: Pokemon): void {
 
 /** Bitter Drill lays persistent grounded entry bits after a successful drill hit. */
 export class BitterDrillAbAttr extends PostAttackAbAttr {
-  override canApply({ move, damage, hitResult, simulated }: PostMoveInteractionAbAttrParams): boolean {
-    return !simulated && damage > 0 && hitResult < HitResult.NO_EFFECT && move.hasFlag(MoveFlags.DRILL_BASED);
+  /** The field effect laid after the hit (Drill Bits for the shipped ability). */
+  public readonly tag: ArenaTagType;
+  /** Which side gets it, seen from the holder. */
+  public readonly side: "holder-side" | "opposing-side" | "both";
+  /** Turns it lasts; 0 means until removed. */
+  public readonly duration: number;
+
+  constructor(
+    tag: ArenaTagType = ArenaTagType.ER_DRILL_BITS,
+    side: "holder-side" | "opposing-side" | "both" = "opposing-side",
+    duration = 0,
+  ) {
+    super();
+    this.tag = tag;
+    this.side = side;
+    this.duration = duration;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `guards`, then `gate`. */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Clauses 1 to 3: a real, damaging hit (not a preview, damage dealt, not blocked). Not editable. */
+  public guards({ damage, hitResult, simulated }: PostMoveInteractionAbAttrParams): boolean {
+    return !simulated && damage > 0 && hitResult < HitResult.NO_EFFECT;
+  }
+
+  /** Clause 4, the replaceable condition: the move is a drill move (its own flag, not an injected one). */
+  public gate({ move }: PostMoveInteractionAbAttrParams): boolean {
+    return move.hasFlag(MoveFlags.DRILL_BASED);
   }
 
   override apply({ pokemon, move, simulated }: PostMoveInteractionAbAttrParams): void {
     if (!simulated) {
       globalScene.arena.addTag(
-        ArenaTagType.ER_DRILL_BITS,
-        0,
+        this.tag,
+        this.duration,
         move.id,
         pokemon.id,
-        pokemon.isPlayer() ? ArenaTagSide.ENEMY : ArenaTagSide.PLAYER,
+        this.side === "both"
+          ? ArenaTagSide.BOTH
+          : (this.side === "opposing-side") === pokemon.isPlayer()
+            ? ArenaTagSide.ENEMY
+            : ArenaTagSide.PLAYER,
       );
     }
   }
 }
 
 export class BitterDrillDamageAbAttr extends VariableMovePowerAbAttr {
-  override canApply({ opponent, move }: PreAttackModifyPowerAbAttrParams): boolean {
+  /** Power multiplier against an Embedded foe (2 = doubled). */
+  public readonly multiplier: number;
+
+  constructor(multiplier = 2) {
+    super();
+    this.multiplier = multiplier;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreAttackModifyPowerAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1): the whole rule is the replaceable {@linkcode gate}; no guards, no residual. */
+  override canApply(params: PreAttackModifyPowerAbAttrParams): boolean {
+    return gatedCanApply<PreAttackModifyPowerAbAttrParams>(this, params);
+  }
+
+  /** The replaceable condition, in the original order: a drill move (its own flag), against an Embedded target. */
+  public gate({ opponent, move }: PreAttackModifyPowerAbAttrParams): boolean {
     return move.hasFlag(MoveFlags.DRILL_BASED) && opponent.getTag(BattlerTagType.ER_EMBEDDED) !== undefined;
   }
 
   override apply({ power }: PreAttackModifyPowerAbAttrParams): void {
-    power.value *= 2;
+    power.value *= this.multiplier;
   }
 }
 
@@ -1359,10 +1473,39 @@ class PostSummonScreensAbAttr extends PostSummonAbAttr {
   }
 }
 
+/** What the type-chart rewrite gate of {@linkcode MiracleBladeTypeChartAbAttr} reads. */
+export interface MiracleBladeGateParams {
+  readonly move: Move;
+  readonly defenderTypes: readonly PokemonType[];
+  readonly user?: Pokemon | null | undefined;
+}
+
 /** Miracle Blade rewrites the Dark contribution for any Keen Edge move. */
 export class MiracleBladeTypeChartAbAttr extends AbAttr {
-  constructor() {
+  /** The move property that triggers the rewrite (Keen Edge, the slicing flag). */
+  public readonly flag: MoveFlags;
+  /** The defending type whose matchup is rewritten. */
+  public readonly defenderType: PokemonType;
+  /** The effectiveness that replaces the natural matchup against that type (2 = super effective). */
+  public readonly factor: number;
+
+  constructor(flag: MoveFlags = MoveFlags.SLICING_MOVE, defenderType: PokemonType = PokemonType.DARK, factor = 2) {
     super(false);
+    this.flag = flag;
+    this.defenderType = defenderType;
+    this.factor = factor;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: MiracleBladeGateParams) => boolean) | undefined;
+
+  /** The replaceable condition, in the original order: the move has the property, and the defender has the type. */
+  public gate({ move, defenderTypes, user }: MiracleBladeGateParams): boolean {
+    const slicing =
+      user === undefined || user === null
+        ? move.hasFlag(this.flag)
+        : move.doesFlagEffectApply({ flag: this.flag, user });
+    return slicing && defenderTypes.includes(this.defenderType);
   }
 
   fire(
@@ -1372,32 +1515,28 @@ export class MiracleBladeTypeChartAbAttr extends AbAttr {
     moveType?: PokemonType,
     user?: Pokemon | null,
   ): void {
-    const slicing =
-      user === undefined || user === null
-        ? move.hasFlag(MoveFlags.SLICING_MOVE)
-        : move.doesFlagEffectApply({ flag: MoveFlags.SLICING_MOVE, user });
-    if (!slicing || !defenderTypes.includes(PokemonType.DARK)) {
+    if (!gatedCanApply<MiracleBladeGateParams>(this, { move, defenderTypes, user })) {
       return;
     }
     if (moveType === undefined) {
-      multi.value = 2;
+      multi.value = this.factor;
       return;
     }
-    const natural = getTypeDamageMultiplier(moveType, PokemonType.DARK);
+    const natural = getTypeDamageMultiplier(moveType, this.defenderType);
     if (natural === 0) {
       let rest = 1;
       let consumed = false;
       for (const defenderType of defenderTypes) {
-        if (!consumed && defenderType === PokemonType.DARK) {
+        if (!consumed && defenderType === this.defenderType) {
           consumed = true;
           continue;
         }
         rest *= getTypeDamageMultiplier(moveType, defenderType);
       }
-      multi.value = rest * 2;
+      multi.value = rest * this.factor;
       return;
     }
-    multi.value = (multi.value / natural) * 2;
+    multi.value = (multi.value / natural) * this.factor;
   }
 }
 
@@ -1421,10 +1560,34 @@ export class ManifestContactAbAttr extends AbAttr {
 
 /** Slab's Curse applies a persistent PP-drain curse after a direct KO. */
 export class SlabsCurseAbAttr extends PostFaintAbAttr {
-  override canApply({ pokemon, attacker, move }: PostFaintAbAttrParams): boolean {
+  /** PP each of the foe's moves loses every turn (the curse's strength). */
+  public readonly ppLoss: number;
+  /** PP each of the foe's adjacent allies' moves loses every turn. */
+  public readonly allyPpLoss: number;
+
+  constructor(ppLoss = 2, allyPpLoss = 1) {
+    super();
+    this.ppLoss = ppLoss;
+    this.allyPpLoss = allyPpLoss;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostFaintAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `guards`, then `gate`. */
+  override canApply(params: PostFaintAbAttrParams): boolean {
+    return gatedCanApply<PostFaintAbAttrParams>(this, params);
+  }
+
+  /** Clauses 1 and 2: a different Pokemon made me faint. Not editable. */
+  public guards({ pokemon, attacker }: PostFaintAbAttrParams): boolean {
+    return attacker !== undefined && attacker !== pokemon;
+  }
+
+  /** Clauses 3 to 5, the replaceable condition: the culprit is a foe, and the faint came from a damaging move. */
+  public gate({ pokemon, attacker, move }: PostFaintAbAttrParams): boolean {
     return (
       attacker !== undefined
-      && attacker !== pokemon
       && attacker.isPlayer() !== pokemon.isPlayer()
       && move !== undefined
       && move.category !== MoveCategory.STATUS
@@ -1435,61 +1598,89 @@ export class SlabsCurseAbAttr extends PostFaintAbAttr {
     if (simulated || attacker === undefined) {
       return;
     }
-    attacker.addTag(BattlerTagType.ER_SLAB_CURSE, 2, MoveId.CURSE, pokemon.id);
+    attacker.addTag(BattlerTagType.ER_SLAB_CURSE, this.ppLoss, MoveId.CURSE, pokemon.id);
     for (const ally of attacker.getAdjacentAllies().filter(candidate => !candidate.isFainted())) {
-      ally.addTag(BattlerTagType.ER_SLAB_CURSE, 1, MoveId.CURSE, pokemon.id);
+      ally.addTag(BattlerTagType.ER_SLAB_CURSE, this.allyPpLoss, MoveId.CURSE, pokemon.id);
     }
   }
 }
 
 /** Booby Trap's once-per-entry first-direct-attacker curse. */
 export class BoobyTrapAbAttr extends PostDefendAbAttr {
-  override canApply({
-    pokemon,
-    opponent,
-    move,
-    hitResult,
-    damage,
-    simulated,
-  }: PostMoveInteractionAbAttrParams): boolean {
-    return (
-      !simulated
-      && damage > 0
-      && hitResult < HitResult.NO_EFFECT
-      && move.category !== MoveCategory.STATUS
-      && opponent !== pokemon
-      && opponent.isPlayer() !== pokemon.isPlayer()
-      && opponent.canAddTag(BattlerTagType.CURSED)
-      && !hasSummonAbilityProvenance(pokemon, "booby-trap:entry")
-    );
+  /** The lingering effect laid on the first direct attacker (Curse for the shipped ability). */
+  public readonly tag: BattlerTagType;
+
+  constructor(tag: BattlerTagType = BattlerTagType.CURSED) {
+    super();
+    this.tag = tag;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `guards`, `gate`, `residual`. */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Clauses 1 to 3: a real hit (not a preview, damage dealt, not blocked). Not editable. */
+  public guards({ hitResult, damage, simulated }: PostMoveInteractionAbAttrParams): boolean {
+    return !simulated && damage > 0 && hitResult < HitResult.NO_EFFECT;
+  }
+
+  /** Clauses 4 to 6, the replaceable condition: a damaging move from a foe (clause 5 is implied by clause 6). */
+  public gate({ pokemon, opponent, move }: PostMoveInteractionAbAttrParams): boolean {
+    return move.category !== MoveCategory.STATUS && opponent !== pokemon && opponent.isPlayer() !== pokemon.isPlayer();
+  }
+
+  /** Clauses 7 and 8: the attacker can take the effect, and this entry's one trap is not already spent. */
+  public residual({ pokemon, opponent }: PostMoveInteractionAbAttrParams): boolean {
+    return opponent.canAddTag(this.tag) && !hasSummonAbilityProvenance(pokemon, "booby-trap:entry");
   }
 
   override apply({ pokemon, opponent, move, simulated }: PostMoveInteractionAbAttrParams): void {
     if (simulated || !claimSummonAbilityProvenance(pokemon, "booby-trap:entry")) {
       return;
     }
-    opponent.addTag(BattlerTagType.CURSED, 0, move.id, pokemon.id);
+    opponent.addTag(this.tag, 0, move.id, pokemon.id);
     pokemon.summonData.erAbilityProvenance.push(`booby-trap:${opponent.id}`);
   }
 }
 export class BoobyTrapItemLostAbAttr extends PostItemLostAbAttr {
+  /** The lingering effect laid on whoever took or knocked off the item (Curse for the shipped ability). */
+  public readonly tag: BattlerTagType;
+
+  constructor(tag: BattlerTagType = BattlerTagType.CURSED) {
+    super();
+    this.tag = tag;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostItemLostAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `guards`, then `gate`. */
   override canApply(params: Exact<Parameters<this["apply"]>[0]>): boolean {
+    return gatedCanApply<PostItemLostAbAttrParams>(this, params);
+  }
+
+  /** Clauses 1 and 2: not a preview, and somebody else caused the loss. Not editable. */
+  public guards(params: PostItemLostAbAttrParams): boolean {
+    return !params.simulated && params.opponent !== undefined;
+  }
+
+  /** Clauses 3 and 4, the replaceable condition: the one who caused it is a foe. */
+  public gate(params: PostItemLostAbAttrParams): boolean {
     return (
-      !params.simulated
-      && params.opponent !== undefined
+      params.opponent !== undefined
       && params.opponent !== params.pokemon
       && params.opponent.isPlayer() !== params.pokemon.isPlayer()
     );
   }
 
   override apply(params: PostItemLostAbAttrParams): void {
-    if (
-      !params.simulated
-      && params.opponent !== undefined
-      && params.opponent !== params.pokemon
-      && params.opponent.isPlayer() !== params.pokemon.isPlayer()
-    ) {
-      params.opponent.addTag(BattlerTagType.CURSED, 0, MoveId.NONE, params.pokemon.id);
+    // The foe test that used to be repeated here is the gate; the engine always asks canApply first.
+    if (!params.simulated && params.opponent !== undefined) {
+      params.opponent.addTag(this.tag, 0, MoveId.NONE, params.pokemon.id);
       params.pokemon.summonData.erAbilityProvenance.push(`booby-trap:${params.opponent.id}`);
     }
   }
@@ -1497,40 +1688,89 @@ export class BoobyTrapItemLostAbAttr extends PostItemLostAbAttr {
 
 /** Ofuda curses any attacker with a 30% defensive proc, contact-independent. */
 export class OfudaAbAttr extends PostDefendAbAttr {
-  override canApply({ pokemon, opponent, hitResult, simulated }: PostMoveInteractionAbAttrParams): boolean {
-    return (
-      !simulated
-      && hitResult < HitResult.NO_EFFECT
-      && opponent !== pokemon
-      && pokemon.randBattleSeedInt(100) < 30
-      && opponent.canAddTag(BattlerTagType.CURSED)
-    );
+  /** Chance (percent) that a move against the holder lays the effect on its user. */
+  public readonly chance: number;
+  /** The lingering effect laid on the attacker (Curse for the shipped ability). */
+  public readonly tag: BattlerTagType;
+
+  constructor(chance = 30, tag: BattlerTagType = BattlerTagType.CURSED) {
+    super();
+    this.chance = chance;
+    this.tag = tag;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `guards`, `gate`, `residual`. */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Clauses 1 to 3: not a preview, a real hit, and not the holder hitting itself. Not editable. */
+  public guards({ pokemon, opponent, hitResult, simulated }: PostMoveInteractionAbAttrParams): boolean {
+    return !simulated && hitResult < HitResult.NO_EFFECT && opponent !== pokemon;
+  }
+
+  /** Clause 4, the replaceable condition and the ONLY random draw: the chance roll (it sits before clause 5). */
+  public gate({ pokemon }: PostMoveInteractionAbAttrParams): boolean {
+    return pokemon.randBattleSeedInt(100) < this.chance;
+  }
+
+  /** Clause 5: the attacker can take the effect (asked only after the roll passed). */
+  public residual({ opponent }: PostMoveInteractionAbAttrParams): boolean {
+    return opponent.canAddTag(this.tag);
   }
 
   override apply({ pokemon, opponent, move, simulated }: PostMoveInteractionAbAttrParams): void {
     if (!simulated) {
-      opponent.addTag(BattlerTagType.CURSED, 0, move.id, pokemon.id);
+      opponent.addTag(this.tag, 0, move.id, pokemon.id);
     }
   }
 }
 
 /** Low Tide draws in Water moves, absorbs them, and answers with 50 BP Surf. */
 export class LowTideWaterSurfAbAttr extends PostDefendAbAttr {
-  override canApply({ opponent, move, simulated }: PostMoveInteractionAbAttrParams): boolean {
-    return !simulated && move.category !== MoveCategory.STATUS && opponent.getMoveType(move) === PokemonType.WATER;
+  /** The move used as the answer (Surf for the shipped ability). */
+  public readonly moveId: MoveId;
+  /** The power that move is used with (50 for the shipped ability). */
+  public readonly power: number;
+
+  constructor(moveId: MoveId = MoveId.SURF, power = 50) {
+    super();
+    this.moveId = moveId;
+    this.power = power;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `guards`, then `gate`. */
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /** Clause 1: not a preview. Not editable. */
+  public guards({ simulated }: PostMoveInteractionAbAttrParams): boolean {
+    return !simulated;
+  }
+
+  /** Clauses 2 and 3, the replaceable condition: the move deals damage, and its type (after ability changes) is Water. */
+  public gate({ opponent, move }: PostMoveInteractionAbAttrParams): boolean {
+    return move.category !== MoveCategory.STATUS && opponent.getMoveType(move) === PokemonType.WATER;
   }
 
   override apply({ pokemon, simulated }: PostMoveInteractionAbAttrParams): void {
     if (simulated) {
       return;
     }
-    const targets = getMoveTargets(pokemon, MoveId.SURF).targets;
+    const targets = getMoveTargets(pokemon, this.moveId).targets;
     if (targets.length > 0) {
       globalScene.phaseManager.unshiftNew(
         "MovePhase",
         pokemon,
         targets,
-        scriptedPokemonMove(MoveId.SURF, 50),
+        scriptedPokemonMove(this.moveId, this.power),
         MoveUseMode.INDIRECT,
       );
     }
@@ -1539,16 +1779,23 @@ export class LowTideWaterSurfAbAttr extends PostDefendAbAttr {
 
 /** Sea Specter lets Ghost and Water move families trigger one another. */
 export class SeaSpecterAbAttr extends AbAttr {
-  constructor() {
+  /** The first of the two types that trigger one another (Ghost for the shipped ability). */
+  public readonly firstType: PokemonType;
+  /** The second of the two types that trigger one another (Water for the shipped ability). */
+  public readonly secondType: PokemonType;
+
+  constructor(firstType: PokemonType = PokemonType.GHOST, secondType: PokemonType = PokemonType.WATER) {
     super(false);
+    this.firstType = firstType;
+    this.secondType = secondType;
   }
 
   getTriggeredMoveTypes(move: Move): readonly PokemonType[] {
-    if (move.type === PokemonType.GHOST) {
-      return [PokemonType.GHOST, PokemonType.WATER];
+    if (move.type === this.firstType) {
+      return [this.firstType, this.secondType];
     }
-    if (move.type === PokemonType.WATER) {
-      return [PokemonType.WATER, PokemonType.GHOST];
+    if (move.type === this.secondType) {
+      return [this.secondType, this.firstType];
     }
     return [move.type];
   }
@@ -1557,14 +1804,33 @@ export class SeaSpecterAbAttr extends AbAttr {
 /** Celestial Jelly's once-per-battle Misty Terrain OR unsuppressed Rain revival. */
 const CELESTIAL_JELLY_USED = "celestial-jelly:spent";
 export class CelestialJellyAbAttr extends PreDefendFullHpEndureAbAttr {
-  override canApply({ pokemon, damage }: PreDefendModifyDamageAbAttrParams): boolean {
-    if (
+  /** Share of max HP left after the saved hit (a quarter for the shipped ability). */
+  public readonly hpFraction: number;
+
+  constructor(hpFraction = 0.25) {
+    super();
+    this.hpFraction = hpFraction;
+  }
+
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PreDefendModifyDamageAbAttrParams) => boolean) | undefined;
+
+  /** Tier B split (ability studio spec 3.1), in the ORIGINAL clause order: `guards`, then `gate`. */
+  override canApply(params: PreDefendModifyDamageAbAttrParams): boolean {
+    return gatedCanApply<PreDefendModifyDamageAbAttrParams>(this, params);
+  }
+
+  /** Clauses 1 to 3: not already used this battle, more than 1 max HP, and the hit would knock me out. Not editable. */
+  public guards({ pokemon, damage }: PreDefendModifyDamageAbAttrParams): boolean {
+    return !(
       pokemon.battleData.erAbilityProvenance.includes(CELESTIAL_JELLY_USED)
       || pokemon.getMaxHp() <= 1
       || damage.value < pokemon.hp
-    ) {
-      return false;
-    }
+    );
+  }
+
+  /** Clauses 4 to 6, the replaceable condition: Misty Terrain, or Rain (or Heavy Rain) that is not negated. */
+  public gate(_params: PreDefendModifyDamageAbAttrParams): boolean {
     const misty = globalScene.arena.terrain?.terrainType === TerrainType.MISTY;
     const weather = globalScene.arena.weather;
     const rain =
@@ -1575,7 +1841,7 @@ export class CelestialJellyAbAttr extends PreDefendFullHpEndureAbAttr {
   }
 
   override apply({ pokemon, damage, simulated }: PreDefendModifyDamageAbAttrParams): void {
-    const targetHp = Math.max(1, Math.floor(pokemon.getMaxHp() * 0.25));
+    const targetHp = Math.max(1, Math.floor(pokemon.getMaxHp() * this.hpFraction));
     damage.value = Math.max(0, pokemon.hp - targetHp);
     if (simulated) {
       return;
