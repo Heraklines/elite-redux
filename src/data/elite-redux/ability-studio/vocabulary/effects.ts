@@ -313,7 +313,7 @@ const BASE_EFFECTS: readonly EffectBase[] = [
   {
     id: "effect.cure-status",
     kind: "event",
-    label: "Cure {target}'s {status}",
+    label: "Cure {target} of {status}",
     requires: [],
     params: [TARGET(), selectParam("status", "Which status", ["ANY", ...STATUS_OPTIONS], "ANY")],
     v1Kind: "cure-status",
@@ -361,9 +361,9 @@ const BASE_EFFECTS: readonly EffectBase[] = [
     kind: "event",
     label: "Put {tag} on {target}",
     requires: [],
-    params: [TARGET(), textParam("tag", "Which battle effect (type its name)", "TAUNT")],
+    params: [TARGET(), textParam("tag", "Which battle effect (type its name)", "Taunt")],
     implemented: false,
-    synonyms: ["taunt", "confuse", "leech seed", "apply volatile"],
+    synonyms: ["taunt", "confuse", "leech seed", "battle effect"],
     examples: ["Confuse the attacker"],
   },
   {
@@ -371,7 +371,7 @@ const BASE_EFFECTS: readonly EffectBase[] = [
     kind: "event",
     label: "Remove {tag} from {target}",
     requires: [],
-    params: [TARGET(), textParam("tag", "Which battle effect (type its name)", "TAUNT")],
+    params: [TARGET(), textParam("tag", "Which battle effect (type its name)", "Taunt")],
     implemented: false,
     synonyms: ["cleanse tag", "remove volatile", "cure confusion"],
     examples: ["Remove Leech Seed"],
@@ -402,7 +402,7 @@ const BASE_EFFECTS: readonly EffectBase[] = [
     label: "Set {tag} on {side}",
     requires: [],
     params: [
-      textParam("tag", "Which field effect (type its name)", "REFLECT"),
+      textParam("tag", "Which field effect (type its name)", "Reflect"),
       selectParam("side", "Which side of the field", ["holder-side", "opposing-side", "both"], "holder-side"),
     ],
     implemented: false,
@@ -427,7 +427,7 @@ const BASE_EFFECTS: readonly EffectBase[] = [
     label: "Use {moveId} with {power} power",
     requires: ["other"],
     params: [
-      textParam("moveId", "Which move (type its name)", "STEAM_ERUPTION"),
+      textParam("moveId", "Which move (type its name)", "Steam Eruption"),
       numberParam("power", "Move power", 50, 1, 250, 1, true),
     ],
     feasibility: [

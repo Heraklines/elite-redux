@@ -50,10 +50,11 @@ const CONSTANT_BY_PLAYER_NAME: Readonly<Record<string, string>> = Object.fromEnt
 );
 
 /**
- * The reverse of playerName for typed settings: "Heavy rain" -> "HEAVY_RAIN", "Sp. Atk" -> "SPATK", "Sun" -> "SUNNY".
- * Trims, upper-cases and turns spaces and hyphens into underscores; "HEAVY_RAIN" comes back unchanged.
+ * The reverse of playerName for typed settings: "Heavy rain" -> "HEAVY_RAIN", "Sp. Atk" -> "SPATK", "Sun" -> "SUNNY",
+ * "King's Shield" -> "KINGS_SHIELD". Trims, upper-cases, drops apostrophes and full stops, and turns spaces and hyphens
+ * into underscores; "HEAVY_RAIN" comes back unchanged.
  */
 export function constantName(text: string): string {
   const upper = text.trim().toUpperCase();
-  return CONSTANT_BY_PLAYER_NAME[upper] ?? upper.replace(/[\s-]+/g, "_");
+  return CONSTANT_BY_PLAYER_NAME[upper] ?? upper.replace(/['’.]/g, "").replace(/[\s-]+/g, "_");
 }

@@ -63,8 +63,14 @@ export function crossedBelow(pokemon: Pokemon, damage: number, ratio: number, ro
   return hpCrossedBelowRounded(pokemon.hp, pokemon.getMaxHp(), damage, ratio, rounding, 0);
 }
 
-/** Looks `name` up as written, then as the constant a player name stands for ("Heavy rain" -> HEAVY_RAIN). */
+/**
+ * Looks `name` up as written, then as the constant a player name stands for ("Heavy rain" -> HEAVY_RAIN). A digit string
+ * is rejected: on a numeric enum it would hit the reverse mapping and return a name instead of a value.
+ */
 function enumValue<T extends Record<string, string | number>>(table: T, name: string, what: string): T[keyof T] {
+  if (/^\s*\d+\s*$/.test(name)) {
+    throw new Error(`"${name}" is not a known ${what}`);
+  }
   if (name in table) {
     return table[name] as T[keyof T];
   }
@@ -256,8 +262,8 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
 
   // Move
   "move.type": p => {
-    const type = String(p.type) as keyof typeof PokemonType;
-    enumValue(PokemonType, type, "type");
+    // The canonical constant, so a typed player name ("Fire") matches like FIRE does.
+    const type = PokemonType[enumValue(PokemonType, String(p.type), "type")] as keyof typeof PokemonType;
     return frame => {
       if (frame.move === undefined || frame.moveUser === undefined) {
         return false;
@@ -621,12 +627,11 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
   "move.type-multiplier": p => frame =>
     frame.typeMultiplier !== undefined && compare(frame.typeMultiplier, p.cmp as CompareOp, Number(p.n)),
   "move.inflicts-status": p => {
-    const name = String(p.status);
-    const effect = enumValue(StatusEffect, name, "status");
+    const effect = enumValue(StatusEffect, String(p.status), "status");
     return frame =>
       frame.move !== undefined
       && (frame.move.getAttrs("StatusEffectAttr").some(attr => attr.effect === effect)
-        || (name === "FREEZE"
+        || (effect === StatusEffect.FREEZE
           && frame.move.getAttrs("AddBattlerTagAttr").some(attr => attr.tagType === BattlerTagType.ER_FROSTBITE)));
   },
   "move.ability-can-change-type": () => frame =>

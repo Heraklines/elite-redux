@@ -96,6 +96,10 @@ function paramProblems(owner: string, params: readonly ParamDef[]): string[] {
         }
       }
     }
+    // A text box shows its default as written; typed player names resolve, so the default must be one too ("Splash").
+    if (param.control === "text" && typeof param.default === "string" && CONSTANT.test(param.default)) {
+      problems.push(`${where} default "${param.default}" is a code word; use the player name`);
+    }
   }
   return problems;
 }

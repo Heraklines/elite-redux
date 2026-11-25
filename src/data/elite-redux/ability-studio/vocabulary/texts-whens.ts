@@ -132,7 +132,7 @@ export const WHEN_TEXTS: Readonly<Record<string, VocabularyText>> = {
   "event.on-ko": {
     summary: "Runs after this Pokemon knocks out a Pokemon. Example: Moxie raises Attack by 1 stage after a knockout.",
     category: "Moves",
-    synonyms: ["knockout", "knocked out", "after a knockout"],
+    synonyms: ["knockout", "knocked out", "after a knockout", "moxie", "beast boost"],
   },
   "event.on-win": {
     summary:

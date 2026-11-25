@@ -515,7 +515,9 @@
         "defeat a foe",
         "knockout",
         "knocked out",
-        "after a knockout"
+        "after a knockout",
+        "moxie",
+        "beast boost"
       ],
       "composable": true,
       "summary": "Runs after this Pokemon knocks out a Pokemon. Example: Moxie raises Attack by 1 stage after a knockout.",
@@ -3722,7 +3724,7 @@
           "id": "moveId",
           "label": "Which move (type its name)",
           "control": "text",
-          "default": "SPLASH"
+          "default": "Splash"
         }
       ],
       "pure": true,
@@ -3859,7 +3861,7 @@
           "id": "tag",
           "label": "Which field effect (type its name)",
           "control": "text",
-          "default": "REFLECT"
+          "default": "Reflect"
         },
         {
           "id": "side",
@@ -4105,7 +4107,7 @@
           "id": "tag",
           "label": "Which battle effect (type its name)",
           "control": "text",
-          "default": "TAUNT"
+          "default": "Taunt"
         }
       ],
       "pure": true,
@@ -4410,7 +4412,7 @@
           "id": "moveId",
           "label": "Which move (type its name)",
           "control": "text",
-          "default": "SPLASH"
+          "default": "Splash"
         }
       ],
       "pure": true,
@@ -4570,7 +4572,7 @@
     {
       "id": "time.once-per",
       "group": "Time",
-      "label": "Only once per {scope}",
+      "label": "Only once {scope}",
       "requires": [],
       "params": [
         {
@@ -4621,7 +4623,7 @@
     {
       "id": "time.once-per-unused",
       "group": "Time",
-      "label": "The one-time effect {key} is unused this {scope} (advanced)",
+      "label": "The one-time effect {key} is still unused {scope} (advanced)",
       "requires": [],
       "params": [
         {
@@ -4958,7 +4960,7 @@
           "id": "ability",
           "label": "Which ability (type its name)",
           "control": "text",
-          "default": "PLUS"
+          "default": "Plus"
         }
       ],
       "pure": true,
@@ -5308,7 +5310,7 @@
           "id": "ability",
           "label": "Which ability (type its name)",
           "control": "text",
-          "default": "LEVITATE"
+          "default": "Levitate"
         }
       ],
       "pure": true,
@@ -7964,7 +7966,7 @@
     {
       "id": "effect.cure-status",
       "kind": "event",
-      "label": "Cure {target}'s {status}",
+      "label": "Cure {target} of {status}",
       "requires": [],
       "params": [
         {
@@ -8202,7 +8204,7 @@
           "id": "tag",
           "label": "Which battle effect (type its name)",
           "control": "text",
-          "default": "TAUNT"
+          "default": "Taunt"
         }
       ],
       "implemented": false,
@@ -8210,7 +8212,7 @@
         "taunt",
         "confuse",
         "leech seed",
-        "apply volatile",
+        "battle effect",
         "flinch",
         "make it flinch",
         "infatuate"
@@ -8249,7 +8251,7 @@
           "id": "tag",
           "label": "Which battle effect (type its name)",
           "control": "text",
-          "default": "TAUNT"
+          "default": "Taunt"
         }
       ],
       "implemented": false,
@@ -8337,7 +8339,7 @@
           "id": "tag",
           "label": "Which field effect (type its name)",
           "control": "text",
-          "default": "REFLECT"
+          "default": "Reflect"
         },
         {
           "id": "side",
@@ -8410,7 +8412,7 @@
           "id": "moveId",
           "label": "Which move (type its name)",
           "control": "text",
-          "default": "STEAM_ERUPTION"
+          "default": "Steam Eruption"
         },
         {
           "id": "power",
@@ -10331,5 +10333,5 @@
       "category": "Damage"
     }
   ],
-  "hash": "1005f9e03d00ba"
+  "hash": "0670f4e7070a77"
 }
