@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "09871358dbb340",
-  "hash": "09c92932d874b8",
+  "hash": "1a055c0b6d3e69",
   "blocks": [
     {
       "id": "block.absorbant",
@@ -2147,6 +2147,166 @@
       "uses": 1
     },
     {
+      "id": "block.ballaster",
+      "className": "BallasterAbAttr",
+      "label": "Hit back with a move after taking damaging hits",
+      "summary": "A damaging hit charges me up. After the next one (at once for a Fire, Water hit) I use Steam eruption with 80 power on the attacker.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "ballaster",
+        "counter attack",
+        "retaliate",
+        "revenge move",
+        "steam eruption",
+        "hit back after two hits",
+        "charge up then strike"
+      ],
+      "examples": [
+        "After two damaging hits I strike back with an 80 power Steam Eruption; Fire and Water hits trigger it at once"
+      ],
+      "params": [
+        {
+          "id": "moveId",
+          "label": "Move used in return (type its name, for example Steam Eruption)",
+          "control": "text",
+          "default": "STEAM_ERUPTION",
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "power",
+          "label": "Power of that move",
+          "control": "number",
+          "default": 80,
+          "editable": true,
+          "min": 1,
+          "max": 250,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "immediateTypes",
+          "label": "Hit types that make me use the move at once, with no charge needed (comma separated)",
+          "control": "text",
+          "default": "FIRE,WATER",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [
+        "not-fainted"
+      ],
+      "feasibility": [
+        "The hit must really have dealt damage (more than 0)",
+        "The attacker must still be standing",
+        "Nothing happens while the game only previews a hit",
+        "I keep only one stored charge at a time, and it is cleared every time I enter the battle"
+      ],
+      "branches": [
+        {
+          "label": "Store a charge",
+          "conditions": [
+            "the move is not one of the hit types that act at once (immediateTypes)",
+            "I have no stored charge yet"
+          ],
+          "effect": {
+            "id": "effect.arm-effect",
+            "params": []
+          }
+        },
+        {
+          "label": "Use the move on the attacker",
+          "conditions": [
+            "the move is one of the hit types that act at once (immediateTypes), or I already have a stored charge"
+          ],
+          "effect": {
+            "id": "effect.scripted-move",
+            "params": [
+              "moveId",
+              "power"
+            ]
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.ballaster-reset",
+      "className": "BallasterResetAbAttr",
+      "label": "Clear my stored hit charge when I enter",
+      "summary": "When I enter the battle, any hit charge I had stored is cleared, so I start with no hit counted.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "reset charge",
+        "forget stored hit",
+        "clear charge",
+        "fresh start on entry",
+        "ballaster",
+        "empty the counter"
+      ],
+      "examples": [
+        "Start every switch-in with no damaging hit counted yet"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified: the effect clears one marker string ('ballaster:1') from `summonData.erAbilityProvenance`, the per-Pokemon list of ability markers. The library has no memory block that can name and clear such a marker (requested as `effect.reset-memory`, R-B16-2 in requests/B16.md, the same request as R-B13-23). It is a single assignment, so there is nothing further to split; the trigger is a normal on-entry WHEN and there is no IF. The marker key is fixed on purpose: it is the private name that BallasterAbAttr (part 2) writes, so it is not a param. Users: Ballaster (6006, attr 0). ODDITY, not fixed: apply ignores `simulated`, so a simulated PostSummon call would clear the charge; no engine path simulates PostSummon today.",
+      "uses": 1
+    },
+    {
       "id": "block.battler-tag-immunity",
       "className": "BattlerTagImmunityAbAttr",
       "label": "Be immune to chosen effects such as confusion or flinching",
@@ -2407,6 +2567,47 @@
         "if": true,
         "do": true
       },
+      "uses": 1
+    },
+    {
+      "id": "block.blind-justice",
+      "className": "BlindJusticeAbAttr",
+      "label": "Lock one random move of a random other Pokemon each turn",
+      "summary": "At the end of every turn I pick a random other Pokemon on the field, and one of its moves that has PP left. It cannot use that move on the next turn.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "blind justice",
+        "disable a random move",
+        "random disable",
+        "move lock",
+        "block a move",
+        "jam a move",
+        "silence a move"
+      ],
+      "examples": [
+        "Every turn, stop a random Pokemon on the field from using one random move for a turn, like Blind Justice"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Another Pokemon on the field must be standing, must not already carry this lock and must have at least one move with PP left",
+        "Nothing happens while the game only previews the turn"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified: the effect chooses a random Pokemon among the others on the field and then a random usable move of it, and locks exactly that move. The library has no target choice 'a random other Pokemon on the field' and no 'a random usable move of the target' choice for the tag effect, so effect.apply-tag cannot express it (requested as effect.lock-random-move, R-B16-6 in requests/B16.md). The trigger (end of turn) is its own block and the class has no IF. There are no params for a stated reason (see noParamsReason). Users: Blind Justice (6009, attr 0). The two random draws keep their order (Pokemon first, move second), covered by test/tests/elite-redux/decomp/B16/chunk1.test.ts. ODDITIES, not fixed: (1) the candidate list includes the holder's own ally (the ability text says 'other active Pokemon'); (2) `isUsable(target, false, true)` ignores restriction tags, so a move that is already disabled by another effect can be picked.",
       "uses": 1
     },
     {
@@ -7279,6 +7480,144 @@
       "uses": 2
     },
     {
+      "id": "block.confectious-attack",
+      "className": "ConfectiousAttackAbAttr",
+      "label": "Make a foe Food-based when my contact attack hurts it",
+      "summary": "After my damaging move touches a foe and hurts it, that foe gets the Confected marker until it leaves the field, so it counts as Food-based.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "confectious",
+        "make the foe food",
+        "sugar coat the attacker",
+        "candy touch",
+        "contact marker",
+        "food based foe"
+      ],
+      "examples": [
+        "When my contact move hurts the foe, the foe is coated in sugar and counts as Food-based"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "lib": "move.damaging",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really have dealt damage (more than 0)",
+        "Nothing happens while the game only previews a hit"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.confectious-defend",
+      "className": "ConfectiousDefendAbAttr",
+      "label": "Make an attacker Food-based when its contact move hurts me",
+      "summary": "After a move that touches me hurts me, the attacker gets the Confected marker until it leaves the field, so it counts as Food-based.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "confectious",
+        "make the attacker food",
+        "sugar coat the attacker",
+        "candy touch",
+        "food based attacker",
+        "sticky sweet",
+        "contact marker"
+      ],
+      "examples": [
+        "When a contact move hurts me, the attacker is coated in sugar and counts as Food-based"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really have dealt damage (more than 0)",
+        "Nothing happens while the game only previews a hit"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.confectious-entry",
+      "className": "ConfectiousEntryAbAttr",
+      "label": "Count as Food-based from the moment I enter",
+      "summary": "When I enter the battle, I get the Confected marker until I leave the field. While it is on, I count as a Food-based Pokemon.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "confectious",
+        "food based",
+        "sugar coated",
+        "candy coat",
+        "count as food",
+        "sweet marker"
+      ],
+      "examples": [
+        "Every time I come in, I am coated in sugar and count as Food-based, like Confectious"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens while the game only previews the entry"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.confusion-on-status-effect",
       "className": "ConfusionOnStatusEffectAbAttr",
       "label": "Confuse the foe after I give it a chosen status",
@@ -7588,6 +7927,67 @@
         "do": true
       },
       "uses": 2
+    },
+    {
+      "id": "block.contaminated-hit-multiplier",
+      "className": "ContaminatedHitMultiplierAbAttr",
+      "label": "Hit extra times for each poisoned Pokemon on the field",
+      "summary": "While any Pokemon on the field is poisoned, my moves hit 1 extra time(s) for each poisoned Pokemon (both sides count). Charging, status and multi-hit moves are left alone.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.hit-count",
+      "whenLabel": "While the game decides how many times a move hits",
+      "synonyms": [
+        "contaminated",
+        "hit more when poisoned",
+        "extra hits per poisoned",
+        "poison multi hit",
+        "toxic strikes",
+        "parental bond",
+        "more hits with poison around"
+      ],
+      "examples": [
+        "While a Pokemon is poisoned, my attacks hit one extra time per poisoned Pokemon on the field"
+      ],
+      "params": [
+        {
+          "id": "extraHitsPerPoisoned",
+          "label": "Extra hits for each poisoned Pokemon on the field (1 = one extra hit each)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 4,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:1",
+          "removable": false,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must be one a multi-hit ability can add hits to: not a status move, a charging move (unless I skip the charge), a move aimed at several foes, a move that already hits many times, or Fling, Uproar, Rollout, Ice Ball and Endeavor",
+        "The number of extra hits counts every poisoned or badly poisoned Pokemon on both sides, me included"
+      ],
+      "effect": {
+        "id": "effect.hit-n-times",
+        "params": [
+          "extraHitsPerPoisoned"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.copy-fainted-ally-ability",
@@ -9782,6 +10182,60 @@
       "uses": 1
     },
     {
+      "id": "block.cyberkinetic",
+      "className": "CyberkineticAbAttr",
+      "label": "Turn a foe pure Electric when my contact attack hurts it",
+      "summary": "After my damaging move touches a foe and hurts it, that foe becomes a pure Electric type until it leaves the field.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "cyberkinetic",
+        "make the foe electric",
+        "change the foe's type",
+        "electrify the target",
+        "type swap on touch",
+        "breach",
+        "pure electric"
+      ],
+      "examples": [
+        "When my contact move hurts the foe, the foe turns into a pure Electric type"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "lib": "move.damaging",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really have dealt damage (more than 0)",
+        "Nothing happens while the game only previews a hit"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.damage-cap-on-resist",
       "className": "DamageCapOnResistAbAttr",
       "label": "Survive a resisted hit that would knock me out",
@@ -10211,6 +10665,109 @@
       "reusableAlone": {
         "when": true,
         "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.decay-entry",
+      "className": "DecayEntryAbAttr",
+      "label": "Poison myself and remember it when I enter",
+      "summary": "When I enter the battle, I become poisoned and get the Decay marker, so the poison can be put back every turn if it is ever cured.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "decay",
+        "start poisoned",
+        "poison myself on entry",
+        "self poison",
+        "zombie",
+        "poison heal setup",
+        "toxic start"
+      ],
+      "examples": [
+        "Every time I come in I am poisoned and remember it, so poison comes back at the end of each turn, like Decay"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "I only get poisoned if I do not already have a status and nothing stops it (the same checks as any poisoning)",
+        "Nothing happens while the game only previews the entry"
+      ],
+      "branches": [
+        {
+          "label": "Mark myself as carrying Decay",
+          "conditions": [],
+          "effect": {
+            "id": "effect.apply-tag",
+            "params": []
+          }
+        },
+        {
+          "label": "Poison myself unless I already am",
+          "conditions": [
+            "I am not already poisoned"
+          ],
+          "effect": {
+            "id": "effect.inflict-status",
+            "params": []
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.decay-restore",
+      "className": "DecayRestoreAbAttr",
+      "label": "Poison myself again each turn while I carry the marker",
+      "summary": "At the end of every turn, if I carry the Decay marker and am not poisoned, I become poisoned again (if no other status stops it).",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "decay",
+        "re poison myself",
+        "poison comes back",
+        "permanent poison",
+        "keep myself poisoned",
+        "restore poison each turn",
+        "poison upkeep"
+      ],
+      "examples": [
+        "At the end of every turn I get poisoned again if poison was cured, like Decay"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens while the game only previews the end of the turn",
+        "I only get poisoned if I do not already have another status and nothing stops it (the same checks as any poisoning)"
+      ],
+      "effect": {
+        "id": "effect.inflict-status",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
         "do": true
       },
       "uses": 1
@@ -11422,6 +11979,91 @@
       "feasibility": [],
       "effect": {
         "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.electromancy-effect-chance",
+      "className": "ElectromancyEffectChanceAbAttr",
+      "label": "Multiply the chance that my moves cause one chosen status",
+      "summary": "The extra-effect chance of my moves that can cause Paralysis is multiplied by 5, never above 100%. Example: 5 = a 10% chance becomes 50%.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.effect-chance",
+      "whenLabel": "While the game calculates my move's effect chance",
+      "synonyms": [
+        "electromancy",
+        "more paralysis",
+        "paralysis chance",
+        "serene grace for one status",
+        "status chance boost",
+        "stronger side effect"
+      ],
+      "examples": [
+        "Make my paralyzing moves paralyze five times as often, like Electromancy"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Chance multiplier (5 = five times as likely, 0 = never)",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 0,
+          "max": 10,
+          "step": 0.1,
+          "gateIndependent": true
+        },
+        {
+          "id": "status",
+          "label": "Which status the move must be able to cause",
+          "control": "select",
+          "default": "PARALYSIS",
+          "editable": true,
+          "options": [
+            "NONE",
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN",
+            "FAINT"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must have an extra effect with a chance above 0 (a guaranteed or missing effect is left alone)",
+        "Order Up and Electro Shot are never changed",
+        "The result never goes above 100%"
+      ],
+      "gateParams": [
+        {
+          "param": "status",
+          "block": "move.can-inflict-status",
+          "field": "status"
+        }
+      ],
+      "effect": {
+        "id": "effect.package",
         "params": [
           "multiplier"
         ]
@@ -13346,6 +13988,240 @@
       "uses": 1
     },
     {
+      "id": "block.er-bad-dreams",
+      "className": "ErBadDreamsAbAttr",
+      "label": "Hurt every sleeping foe a little at the end of each turn",
+      "summary": "At the end of every turn, each sleeping foe on the field loses 25% of its max HP (at least 1 HP). 25 means a quarter.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.end-of-turn",
+      "whenLabel": "At the end of every turn",
+      "synonyms": [
+        "bad dreams",
+        "nightmare",
+        "hurt sleeping foes",
+        "damage while asleep",
+        "sleep punisher",
+        "punish sleepers",
+        "sleep damage"
+      ],
+      "examples": [
+        "Foes that are asleep lose a quarter of their max HP every turn, like Bad Dreams"
+      ],
+      "params": [
+        {
+          "id": "percent",
+          "label": "Share of the foe's max HP lost each turn (%)",
+          "control": "slider",
+          "default": 25,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "At least one foe must be asleep (or comatose), still on the field, not about to switch out, not protected from indirect damage and not immune to Bad Dreams",
+        "Each foe that is awake, about to switch out or protected from indirect damage is skipped, and nothing changes while the game only previews the turn"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "percent"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "PACKAGE, justified: the effect hurts every foe that passes a per-foe filter (asleep or comatose, not switching out, not protected from indirect damage). The effect library has no damage effect and no 'for each foe that ...' target filter, so the effect cannot be built from existing blocks (requested as effect.hurt-percent-of-max-hp with a 'only foes that are asleep' filter, R-B16-1 in requests/B16.md). The trigger (end of turn) is a separate block, the class has no IF of its own (every clause of the inherited canApply is feasibility, see the header), and the one number is a typed param. Constructor change (behaviour-neutral): damagePercent, default 25, replaces the literal /4. Users: Bad Dreams (123, attr 0) only; nothing to bind. SUSPECTED BUG, NOT FIXED: the inherited canApply refuses foes with BadDreamsImmunityAbAttr (Honk Shoo has it), but the ER apply override never tests it, so with TWO foes where one is immune and one is asleep, the immune foe is hurt as well (the vanilla apply tests it). Also the vanilla apply checks BlockNonDirectDamageAbAttr on the HOLDER by mistake (applyAbAttrs with pokemon); the ER override tests it on the foe (correct). The L2 twin cannot put a foe to sleep (the harness axis `status` sets the holder), so the sleeping-foe path is proven in test/tests/elite-redux/decomp/B16/chunk1.test.ts.",
+      "uses": 1
+    },
+    {
+      "id": "block.er-biome-change-weather",
+      "className": "ErBiomeChangeWeatherAbAttr",
+      "label": "Set the weather again for set turns on a new area",
+      "summary": "When the game moves on to a new area, I set the weather to Rain again for 8 turns, but only while a lasting weather is still active. Example: 8 = 8 turns.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.biome-changed",
+      "whenLabel": "When the biome changes",
+      "synonyms": [
+        "keep weather after new area",
+        "weather on new biome",
+        "re summon weather",
+        "drizzle",
+        "drought",
+        "sand stream",
+        "snow warning"
+      ],
+      "examples": [
+        "Set rain again for 8 turns when the area changes, like Drizzle"
+      ],
+      "params": [
+        {
+          "id": "weather",
+          "label": "Which weather",
+          "control": "select",
+          "default": "RAIN",
+          "editable": true,
+          "options": [
+            "NONE",
+            "SUNNY",
+            "RAIN",
+            "SANDSTORM",
+            "HAIL",
+            "SNOW",
+            "FOG",
+            "HEAVY_RAIN",
+            "HARSH_SUN",
+            "STRONG_WINDS",
+            "TEMPEST_STORM",
+            "SNOWY_WRATH",
+            "EERIE_FOG"
+          ]
+        },
+        {
+          "id": "turns",
+          "label": "How many turns the weather lasts (a Mystical Rock adds 2 per item)",
+          "control": "number",
+          "default": 8,
+          "editable": true,
+          "min": 1,
+          "max": 20,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A lasting weather (Extremely harsh sunlight, Heavy rain or Strong winds) must be active when the area changes",
+        "The weather must differ from the current one, and no weather lock may be up",
+        "The new length is written to whatever weather is active afterwards, if it has turns left",
+        "Nothing happens while the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.set-weather",
+        "params": [
+          "weather",
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 10
+    },
+    {
+      "id": "block.er-defeatist-stat-multiplier",
+      "className": "ErDefeatistStatMultiplierAbAttr",
+      "label": "Multiply a stat while my HP is at or below a set share",
+      "summary": "While my HP is at most 33% of my maximum, my Attack is multiplied by 0.5. Example: 0.5 = half, so a Pokemon on low HP hits half as hard.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "defeatist",
+        "weaker when hurt",
+        "lose attack on low hp",
+        "halve a stat at low hp",
+        "stat drop when weak",
+        "low health penalty",
+        "slump"
+      ],
+      "examples": [
+        "Halve my Attack and Sp. Atk while I am at a third of my HP or less, like Defeatist"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat (Attack, Defense, Sp. Atk, Sp. Def, Speed, Accuracy or Evasion)",
+          "control": "select",
+          "default": "ATK",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "multiplier",
+          "label": "Stat multiplier (1.5 = 50% higher, 0.5 = half)",
+          "control": "number",
+          "default": 0.5,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        },
+        {
+          "id": "hpPercent",
+          "label": "Applies while my HP is at most this share of my maximum (% of max HP)",
+          "control": "number",
+          "default": 33,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:2",
+          "removable": true,
+          "editable": true,
+          "optional": true
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "gateParams": [
+        {
+          "param": "hpPercent",
+          "block": "hp.ratio-at-most",
+          "field": "pct"
+        }
+      ],
+      "effect": {
+        "id": "effect.multiply-stat",
+        "params": [
+          "stat",
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
       "id": "block.er-multi-headed",
       "className": "ErMultiHeadedAbAttr",
       "label": "Make my attacks hit once for each of my heads",
@@ -13388,6 +14264,223 @@
         "do": true
       },
       "uses": 6
+    },
+    {
+      "id": "block.er-terrain-summon",
+      "className": "ErTerrainSummonAbAttr",
+      "label": "Set the terrain for a set number of turns when I enter",
+      "summary": "When I enter the battle, I set the terrain to Psychic for 8 turns (a terrain-extending item adds more). Example: 8 = the terrain lasts 8 turns.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "psychic surge",
+        "grassy surge",
+        "misty surge",
+        "hadron engine",
+        "summon terrain",
+        "timed terrain",
+        "long terrain",
+        "terrain setter"
+      ],
+      "examples": [
+        "Set Grassy Terrain for 8 turns when I enter the battle, like Grassy Surge"
+      ],
+      "params": [
+        {
+          "id": "terrain",
+          "label": "Which terrain (None clears it)",
+          "control": "select",
+          "default": "PSYCHIC",
+          "editable": true,
+          "options": [
+            "NONE",
+            "MISTY",
+            "ELECTRIC",
+            "GRASSY",
+            "PSYCHIC",
+            "TOXIC"
+          ]
+        },
+        {
+          "id": "turns",
+          "label": "How many turns the terrain lasts (an extending item adds more)",
+          "control": "number",
+          "default": 8,
+          "editable": true,
+          "min": 1,
+          "max": 20,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The terrain must differ from the one that is already set",
+        "The field may still refuse the new terrain (a protected Toxic terrain is not overwritten by an ordinary one)",
+        "The new length is written to whatever terrain is active afterwards, if it has turns left",
+        "Nothing happens while the game only previews the entry"
+      ],
+      "effect": {
+        "id": "effect.set-terrain",
+        "params": [
+          "terrain",
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 5
+    },
+    {
+      "id": "block.er-weather-summon",
+      "className": "ErWeatherSummonAbAttr",
+      "label": "Set the weather for a set number of turns when I enter",
+      "summary": "When I enter the battle, I set the weather to Rain for 8 turns (a Mystical Rock adds more). Example: 8 = the weather lasts 8 turns.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "drizzle",
+        "drought",
+        "sand stream",
+        "snow warning",
+        "summon weather",
+        "timed weather",
+        "long weather",
+        "weather setter"
+      ],
+      "examples": [
+        "Summon rain for 8 turns when I enter the battle, like Drizzle"
+      ],
+      "params": [
+        {
+          "id": "weather",
+          "label": "Which weather",
+          "control": "select",
+          "default": "RAIN",
+          "editable": true,
+          "options": [
+            "NONE",
+            "SUNNY",
+            "RAIN",
+            "SANDSTORM",
+            "HAIL",
+            "SNOW",
+            "FOG",
+            "HEAVY_RAIN",
+            "HARSH_SUN",
+            "STRONG_WINDS",
+            "TEMPEST_STORM",
+            "SNOWY_WRATH",
+            "EERIE_FOG"
+          ]
+        },
+        {
+          "id": "turns",
+          "label": "How many turns the weather lasts (a Mystical Rock adds 2 per item)",
+          "control": "number",
+          "default": 8,
+          "editable": true,
+          "min": 1,
+          "max": 20,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "The weather must be replaceable: a lasting weather (Extremely harsh sunlight, Heavy rain, Strong winds) cannot be overwritten by an ordinary one",
+        "The weather must differ from the current one, and no weather lock may be up",
+        "The new length is only written if the weather that is active afterwards is the one I set",
+        "Nothing happens while the game only previews the entry"
+      ],
+      "effect": {
+        "id": "effect.set-weather",
+        "params": [
+          "weather",
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 10
+    },
+    {
+      "id": "block.eulogy",
+      "className": "EulogyAbAttr",
+      "label": "Bring back a fainted party member when I faint (once)",
+      "summary": "When I faint, one fainted party member (never a boss) comes back with 50% of its max HP and no status. Works once per battle. Example: 50 = half HP.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.faint",
+      "whenLabel": "When I faint",
+      "synonyms": [
+        "eulogy",
+        "revive a teammate",
+        "bring back an ally",
+        "last wish",
+        "resurrect",
+        "revive on faint",
+        "second chance for an ally"
+      ],
+      "examples": [
+        "When I faint, revive one fainted teammate at half HP, once per battle"
+      ],
+      "params": [
+        {
+          "id": "percent",
+          "label": "HP the party member comes back with (% of its max HP)",
+          "control": "slider",
+          "default": 50,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A fainted party member that is not a boss must exist (never myself); the first one in party order is brought back",
+        "Its status is cleared and it comes back with at least 1 HP",
+        "The revival is marked as used the moment it happens, before the party member is changed",
+        "Nothing happens while the game only previews the faint"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "percent"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.faint-count-trigger",
@@ -16015,6 +17108,62 @@
       "uses": 2
     },
     {
+      "id": "block.hijack",
+      "className": "HijackAbAttr",
+      "label": "Take command of a paralyzed foe's next action",
+      "summary": "After my Electric move hurts a paralyzed foe, I take command of the foe's next action. Works once per time the foe comes in.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "hijack",
+        "control the foe",
+        "mind control",
+        "puppet the foe",
+        "force the foe's move",
+        "steal the foe's turn",
+        "remote control"
+      ],
+      "examples": [
+        "When my Electric move hurts a paralyzed foe, I take control of its next move"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "lib": "move.damaging",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really have dealt damage (more than 0)",
+        "The foe must not have been commanded already since it came in (once per switch-in)",
+        "The foe must not be commanded right now",
+        "Nothing happens while the game only previews a hit"
+      ],
+      "effect": {
+        "id": "effect.apply-tag",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.hit-multiplier",
       "className": "HitMultiplierAbAttr",
       "label": "Make some of my moves hit extra times",
@@ -16449,6 +17598,68 @@
       "reusableAlone": {
         "when": true,
         "if": false,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.hydromancy-effect-chance",
+      "className": "HydromancyEffectChanceAbAttr",
+      "label": "Multiply the chance that my moves drench the target",
+      "summary": "The chance of my moves that can drench the target is multiplied by 5, never above 100%. Example: 5 = a 20% chance becomes 100%.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.effect-chance",
+      "whenLabel": "While the game calculates my move's effect chance",
+      "synonyms": [
+        "hydromancy",
+        "drench more",
+        "soak chance",
+        "more drenching",
+        "wet the target",
+        "water magic",
+        "serene grace for drench"
+      ],
+      "examples": [
+        "Make my drenching moves drench five times as often, like Hydromancy"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Chance multiplier (5 = five times as likely, 0 = never)",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 0,
+          "max": 10,
+          "step": 0.1,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must have an extra effect with a chance above 0 (a guaranteed or missing effect is left alone)",
+        "Order Up and Electro Shot are never changed",
+        "The result never goes above 100%"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
         "do": true
       },
       "uses": 1
@@ -17292,6 +18503,274 @@
         "do": true
       },
       "uses": 2
+    },
+    {
+      "id": "block.irradiated-fist",
+      "className": "IrradiatedFistAbAttr",
+      "label": "Sometimes badly poison and mark the foe when I punch",
+      "summary": "After my punching move hurts a foe, there is a 50% chance it becomes badly poisoned. Once that poison is gone, its stat boosts are wiped and it cannot raise stats until it switches.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "irradiated fist",
+        "poison punch",
+        "toxic punch",
+        "punch poison chance",
+        "badly poison on punch",
+        "radioactive",
+        "toxic touch"
+      ],
+      "examples": [
+        "Each punching move has a 50% chance to badly poison the foe, like Irradiated Fist"
+      ],
+      "params": [
+        {
+          "id": "chance",
+          "label": "Chance (%)",
+          "control": "slider",
+          "default": 50,
+          "editable": true,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "lib": "move.damaging",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really have dealt damage (more than 0)",
+        "The foe must be able to be badly poisoned (it has no status and nothing blocks it); this is asked after the chance roll",
+        "The mark (stat boosts wiped and locked once the poison is gone) is only put on the foe if the poisoning really landed",
+        "Nothing happens while the game only previews a hit"
+      ],
+      "gateParams": [
+        {
+          "param": "chance",
+          "block": "rng.chance",
+          "field": "pct"
+        }
+      ],
+      "branches": [
+        {
+          "label": "Badly poison the foe",
+          "conditions": [],
+          "effect": {
+            "id": "effect.inflict-status",
+            "params": []
+          }
+        },
+        {
+          "label": "Mark the foe if it was badly poisoned",
+          "conditions": [
+            "The poisoning really landed"
+          ],
+          "effect": {
+            "id": "effect.apply-tag",
+            "params": []
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.jackpot-battle-buff",
+      "className": "JackpotBattleBuffAbAttr",
+      "label": "Give my side a critical-hit and luck boost for the battle",
+      "summary": "When I enter the battle, my side's attacks get +1 critical-hit stage and I get +1 Luck, for the rest of the battle. Only one Pokemon per side gets it per battle.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "jackpot",
+        "lucky crits",
+        "crit boost for the team",
+        "luck boost",
+        "battle long crit",
+        "team critical chance",
+        "lucky streak"
+      ],
+      "examples": [
+        "When I come in, my whole side lands critical hits more often for the rest of the battle, like Jackpot"
+      ],
+      "params": [
+        {
+          "id": "critStages",
+          "label": "Critical-hit stages my side gains for the battle",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 0,
+          "max": 3,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "luck",
+          "label": "Luck I gain for this wave",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 0,
+          "max": 5,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens while the game only previews the entry"
+      ],
+      "branches": [
+        {
+          "label": "Raise my side's critical-hit stage for the battle",
+          "conditions": [],
+          "effect": {
+            "id": "effect.package",
+            "params": [
+              "critStages"
+            ]
+          }
+        },
+        {
+          "label": "Raise my Luck for this wave",
+          "conditions": [],
+          "effect": {
+            "id": "effect.package",
+            "params": [
+              "luck"
+            ]
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.knuckle-down",
+      "className": "KnuckleDownAbAttr",
+      "label": "Change a stat of mine after my punching move hits",
+      "summary": "After the first strike of my punching move hurts a foe, my Attack changes by 1 stage(s). Example: Attack +1 after a punch, like Knuckle Down.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "knuckle down",
+        "punch boost",
+        "raise attack after punching",
+        "stat boost after a punch",
+        "fist power up",
+        "punching move raises attack",
+        "boost on punch"
+      ],
+      "examples": [
+        "When my punching move hits, raise my Attack by 1 stage, like Knuckle Down"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat (Attack, Defense, Sp. Atk, Sp. Def, Speed, Accuracy or Evasion)",
+          "control": "select",
+          "default": "ATK",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "stages",
+          "label": "Number of stages (+1 raises by one stage, a negative number lowers)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "lib": "move.damaging",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The hit must really have connected and dealt damage (a blocked or immune hit does not count)",
+        "Only the first strike of a move counts: a multi-hit punch raises the stat once, not once per strike",
+        "Nothing happens while the game only previews a hit"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stat",
+          "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.last-host",
@@ -28051,6 +29530,60 @@
       "uses": 3
     },
     {
+      "id": "block.post-summon-wonder-room",
+      "className": "PostSummonWonderRoomAbAttr",
+      "label": "Swap Defense and Sp. Def for everyone when I enter",
+      "summary": "When I enter the battle, Defense and Sp. Def are swapped for every Pokemon on both sides for 5 turns. Example: 5 = the room lasts 5 turns.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "wonder room",
+        "swap defenses",
+        "swap defense and special defense",
+        "false equivalence",
+        "defense swap room",
+        "field defense swap",
+        "stat swap field"
+      ],
+      "examples": [
+        "Set Wonder Room for 5 turns when I enter the battle, like False Equivalence"
+      ],
+      "params": [
+        {
+          "id": "turns",
+          "label": "How many turns the room lasts",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 1,
+          "max": 20,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens while the game only previews the entry",
+        "If a Wonder Room is already up, the field refuses a second one"
+      ],
+      "effect": {
+        "id": "effect.arena-tag",
+        "params": [
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.post-terrain-change-add-battler-tag-attr",
       "className": "PostTerrainChangeAddBattlerTagAttr",
       "label": "Gain a battle effect when a chosen terrain starts",
@@ -37492,6 +39025,147 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.stellarize-power",
+      "className": "StellarizePowerAbAttr",
+      "label": "Boost my move power while I have the Stellar type",
+      "summary": "While the game calculates my move's power, a move that passes the condition gets x1.5 power, but only while I am Stellar type. Default: Normal moves against Terastallized, Mega or Gigantamax foes.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "stellarize",
+        "stellar power boost",
+        "power boost",
+        "boost normal moves",
+        "stronger against mega",
+        "stronger against terastallized",
+        "base power multiplier"
+      ],
+      "examples": [
+        "While I am Stellar type, my Normal moves hit Terastallized, Mega and Gigantamax foes 50% harder, like Stellarize"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.5 = 50% more power)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0,
+          "max": 10,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:0",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        },
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.stellarize-type",
+      "className": "StellarizeTypeAbAttr",
+      "label": "Turn my Normal moves into another type (Stellar by default)",
+      "summary": "While the game decides the type of my move, a Normal move becomes Stellar type. Example: Stellar makes Normal moves Stellar moves.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-type",
+      "whenLabel": "While the game decides a move's type",
+      "synonyms": [
+        "stellarize",
+        "normal becomes stellar",
+        "convert normal moves",
+        "change move type",
+        "type conversion",
+        "stellar moves",
+        "pixilate style"
+      ],
+      "examples": [
+        "My Normal moves become Stellar moves, like Stellarize",
+        "Turn Normal moves into Flying moves"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Moves become this type",
+          "control": "select",
+          "default": "STELLAR",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "ctor:1",
+          "lib": "move.type",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.change-move-type",
+        "params": [
+          "type"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.super-effective-move-ability-bypass",

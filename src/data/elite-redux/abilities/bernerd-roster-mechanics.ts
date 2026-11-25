@@ -47,7 +47,6 @@ import {
   ER_VOID_ABILITY_ID,
 } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
 import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-debuff-on-flag-attack";
-import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { AttackStatSubstituteAbAttr } from "#data/elite-redux/archetypes/attack-stat-substitute";
 import {
   ChanceBattlerTagOnAttackAbAttr,
