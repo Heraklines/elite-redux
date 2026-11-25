@@ -148,6 +148,18 @@ describe("tools - dump composition builder data", () => {
           doParams[id] = params[id];
         }
       }
+      // A declaration that hands the block class settings it does not have (e.g. `message`, `berryOnly`) would be refused
+      // by the editor's validator anyway; say why here instead of offering an Unpack that cannot work.
+      const blockSettings = new Set(effectDef.params.map(param => param.id));
+      const unknown = Object.keys(doParams).filter(id => !blockSettings.has(id));
+      if (unknown.length > 0) {
+        gates[key] = {
+          ...base,
+          unpackable: false,
+          reason: `the block has no setting for ${unknown.join(", ")} yet`,
+        };
+        continue;
+      }
       gates[key] = {
         ...base,
         unpackable: true,
