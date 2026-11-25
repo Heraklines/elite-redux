@@ -19,6 +19,7 @@ import {
 } from "#abilities/ab-attrs";
 import type { AbBuilder } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import {
   ER_AMATERASU_ABILITY_ID,
   ER_CRANISPHERE_ABILITY_ID,
@@ -69,11 +70,12 @@ import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
 import { PokemonType } from "#enums/pokemon-type";
-import { type EffectiveStat, Stat } from "#enums/stat";
+import { type BattleStat, type EffectiveStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import type { Pokemon } from "#field/pokemon";
 import { PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { Move } from "#moves/move";
+import type { PokemonAttackCondition } from "#types/ability-types";
 
 /** Marker read by the damage pipeline. */
 export class ReductionRuneAbAttr extends AbAttr {}
@@ -226,40 +228,99 @@ class PushKickAbAttr extends StatDebuffOnFlagAttackAbAttr {
   }
 }
 
-class KnuckleDownAbAttr extends PostAttackAbAttr {
+export class KnuckleDownAbAttr extends PostAttackAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: PostMoveInteractionAbAttrParams) => boolean) | undefined;
+
+  /** The stat I raise after a punch (Knuckle Down: Attack, the former literal). */
+  private readonly stat: BattleStat;
+  /** How many stages I raise it by (Knuckle Down: 1, the former literal). */
+  private readonly stages: number;
+
+  /**
+   * Ability studio (Tier B): argument 0 is the parent's attack condition (default: a damaging move), arguments 1 and 2 are the former
+   * literals `Stat.ATK` and `1`, whose defaults equal the old values. `super(attackCondition)` keeps `showAbility` at its default.
+   */
+  constructor(attackCondition?: PokemonAttackCondition, stat: BattleStat = Stat.ATK, stages = 1) {
+    super(attackCondition);
+    this.stat = stat;
+    this.stages = stages;
+  }
+
+  /** Tier B split (ability studio spec 3.1), original clause order: `guards`, then `gate`. */
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return gatedCanApply<PostMoveInteractionAbAttrParams>(this, params);
+  }
+
+  /**
+   * Clause 1: the inherited attack condition (constructor argument 0, a replaceable library condition; default: a damaging move)
+   * sits here only to keep the order. Clause 2: the hit connected (`hitResult < NO_EFFECT`, i.e. it dealt damage). Clause 3: this is
+   * the FIRST strike of the move (`hitCount === hitsLeft`: `hitsLeft` is only lowered after this phase's strike, so the two are
+   * equal on strike one only).
+   */
+  public guards(params: PostMoveInteractionAbAttrParams): boolean {
     return (
       super.canApply(params)
       && params.hitResult < HitResult.NO_EFFECT
       && params.pokemon.turnData.hitCount === params.pokemon.turnData.hitsLeft
-      && params.move.doesFlagEffectApply({
-        flag: MoveFlags.PUNCHING_MOVE,
-        user: params.pokemon,
-        target: params.opponent,
-      })
     );
+  }
+
+  /** Clause 4, the replaceable condition: the move is a punching move (the engine's own flag test, `doesFlagEffectApply`). */
+  public gate(params: PostMoveInteractionAbAttrParams): boolean {
+    return params.move.doesFlagEffectApply({
+      flag: MoveFlags.PUNCHING_MOVE,
+      user: params.pokemon,
+      target: params.opponent,
+    });
   }
 
   override apply({ pokemon, simulated }: PostMoveInteractionAbAttrParams): void {
     if (!simulated) {
-      globalScene.phaseManager.unshiftNew("StatStageChangePhase", pokemon.getBattlerIndex(), true, [Stat.ATK], 1);
+      globalScene.phaseManager.unshiftNew("StatStageChangePhase", pokemon.getBattlerIndex(), true, [this.stat], this.stages);
     }
   }
 }
 
 /** Gives Jackpot's +1 crit/+1 Luck to one holder per side for this battle. */
-class JackpotBattleBuffAbAttr extends PostSummonAbAttr {
-  override apply({ pokemon, simulated }: AbAttrBaseParams): void {
+export class JackpotBattleBuffAbAttr extends PostSummonAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: AbAttrBaseParams) => boolean) | undefined;
+
+  /** Critical-hit stages my side gets for the battle (Jackpot: 1). Stored per side, read in Pokemon.getCritStage. */
+  private readonly critStages: number;
+  /** Luck I get for this wave (Jackpot: 1). Read in Pokemon.getLuck. */
+  private readonly luck: number;
+
+  constructor(critStages = 1, luck = 1) {
+    super();
+    this.critStages = critStages;
+    this.luck = luck;
+  }
+
+  /**
+   * The condition of this class lives in `apply`, not in `canApply` (always true). The studio split stays inside `apply`, in the
+   * original clause order: `!simulated`, create the battle's set of buffed sides, then this replaceable gate: nobody on my side has
+   * received the buff yet in this battle. The test is pure; the set is created before it, exactly as before.
+   */
+  public gate({ pokemon }: AbAttrBaseParams): boolean {
+    const battle = globalScene.currentBattle as unknown as { erJackpotSides?: Map<boolean, number> };
+    return !battle.erJackpotSides?.has(pokemon.isPlayer());
+  }
+
+  override apply(params: AbAttrBaseParams): void {
+    const { pokemon, simulated } = params;
     if (simulated) {
       return;
     }
-    const battle = globalScene.currentBattle as unknown as { erJackpotSides?: Set<boolean> };
-    const sides = (battle.erJackpotSides ??= new Set<boolean>());
-    if (sides.has(pokemon.isPlayer())) {
+    const battle = globalScene.currentBattle as unknown as { erJackpotSides?: Map<boolean, number> };
+    const sides = (battle.erJackpotSides ??= new Map<boolean, number>());
+    const gate = this.gateOverride ?? this.gate.bind(this);
+    if (!gate(params)) {
       return;
     }
-    sides.add(pokemon.isPlayer());
-    (pokemon.waveData as unknown as { erJackpotLuck?: boolean }).erJackpotLuck = true;
+    sides.set(pokemon.isPlayer(), this.critStages);
+    (pokemon.waveData as unknown as { erJackpotLuck?: number }).erJackpotLuck = this.luck;
   }
 }
 

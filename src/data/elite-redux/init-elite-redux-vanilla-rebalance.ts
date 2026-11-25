@@ -104,6 +104,7 @@ import {
   SelfStatDropImmunityAbAttr,
   StabBoostAbAttr,
   StatMultiplierAbAttr,
+  type StatMultiplierAbAttrParams,
   StatusEffectImmunityAbAttr,
   TypeImmunityStatStageChangeAbAttr,
   UserFieldBattlerTagImmunityAbAttr,
@@ -113,6 +114,7 @@ import type { Ability } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { gatedCanApply } from "#data/elite-redux/ability-studio/gate-residual";
 import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import {
   AllyHigherStatMultiplierAbAttr,
@@ -195,6 +197,7 @@ import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import { BerryModifier, FieldEffectModifier } from "#modifiers/modifier";
 import type { Move } from "#moves/move";
+import type { PokemonAttackCondition } from "#types/ability-types";
 import { NumberHolder, randSeedInt } from "#utils/common";
 import i18next from "i18next";
 
@@ -2257,7 +2260,7 @@ function erFieldTurnsWithItems(pokemon: Pokemon, baseTurns: number): number {
   return dur.value;
 }
 
-class ErWeatherSummonAbAttr extends PostSummonWeatherChangeAbAttr {
+export class ErWeatherSummonAbAttr extends PostSummonWeatherChangeAbAttr {
   private readonly erTurns: number;
 
   constructor(weather: WeatherType, turns: number) {
@@ -2279,7 +2282,7 @@ class ErWeatherSummonAbAttr extends PostSummonWeatherChangeAbAttr {
 }
 
 /** Same as ErWeatherSummonAbAttr but for the post-biome-change weather setter. */
-class ErBiomeChangeWeatherAbAttr extends PostBiomeChangeWeatherChangeAbAttr {
+export class ErBiomeChangeWeatherAbAttr extends PostBiomeChangeWeatherChangeAbAttr {
   private readonly erTurns: number;
 
   constructor(weather: WeatherType, turns: number) {
@@ -2317,7 +2320,7 @@ function patchTerrainSummoner(ability: MutableAbility, turns: number): void {
   }
 }
 
-class ErTerrainSummonAbAttr extends PostSummonTerrainChangeAbAttr {
+export class ErTerrainSummonAbAttr extends PostSummonTerrainChangeAbAttr {
   private readonly erTurns: number;
 
   constructor(terrain: TerrainType, turns: number) {
@@ -2455,7 +2458,15 @@ function patchBadDreams(ability: MutableAbility): void {
 }
 
 /** ER Bad Dreams: 1/4 max HP per turn instead of vanilla's 1/8. */
-class ErBadDreamsAbAttr extends PostTurnHurtIfSleepingAbAttr {
+export class ErBadDreamsAbAttr extends PostTurnHurtIfSleepingAbAttr {
+  /** Share of each sleeping foe's max HP lost per turn, in percent (ability studio param; the default is ER's 25). */
+  public readonly damagePercent: number;
+
+  constructor(damagePercent = 25) {
+    super();
+    this.damagePercent = damagePercent;
+  }
+
   public override apply(params: Parameters<PostTurnHurtIfSleepingAbAttr["apply"]>[0]): void {
     if (params.simulated) {
       return;
@@ -2470,7 +2481,7 @@ class ErBadDreamsAbAttr extends PostTurnHurtIfSleepingAbAttr {
         continue;
       }
       // 1/4 max HP (ER) instead of vanilla's 1/8.
-      const damage = Math.max(1, Math.floor(opp.getMaxHp() / 4));
+      const damage = Math.max(1, Math.floor((opp.getMaxHp() * this.damagePercent) / 100));
       opp.damageAndUpdate(damage, { result: HitResult.INDIRECT });
     }
   }
@@ -2589,12 +2600,34 @@ function patchDefeatistThreshold(ability: MutableAbility): void {
   conditions.push(p => p.getHpRatio() <= 1 / 3);
 }
 
-class ErDefeatistStatMultiplierAbAttr extends StatMultiplierAbAttr {
-  public override canApply(params: Parameters<StatMultiplierAbAttr["canApply"]>[0]): boolean {
-    if (!super.canApply(params)) {
-      return false;
-    }
-    return params.pokemon.getHpRatio() <= 1 / 3;
+export class ErDefeatistStatMultiplierAbAttr extends StatMultiplierAbAttr {
+  /** Set by the ability studio compiler to replace {@linkcode gate} on a freshly built instance. */
+  public declare gateOverride: ((params: StatMultiplierAbAttrParams) => boolean) | undefined;
+
+  /**
+   * Ability studio: the former literal threshold `1 / 3` is now the percent argument `hpPercent` (default 33). The game's own
+   * `getHpRatio()` is rounded to two decimals, so `ratio <= 1 / 3` and `ratio <= 33 / 100` agree for every possible ratio.
+   */
+  private readonly hpPercent: number;
+
+  constructor(stat: BattleStat, multiplier: number, condition?: PokemonAttackCondition, hpPercent = 33) {
+    super(stat, multiplier, condition);
+    this.hpPercent = hpPercent;
+  }
+
+  /** Tier B split (ability studio spec 3.1), original clause order: `guards`, then `gate`. */
+  public override canApply(params: StatMultiplierAbAttrParams): boolean {
+    return gatedCanApply<StatMultiplierAbAttrParams>(this, params);
+  }
+
+  /** Clause 1: the parent's test (the stat is the one this attr multiplies, and the optional attack condition). */
+  public guards(params: StatMultiplierAbAttrParams): boolean {
+    return super.canApply(params);
+  }
+
+  /** Clause 2, the replaceable condition: my HP ratio is at most a third. */
+  public gate(params: StatMultiplierAbAttrParams): boolean {
+    return params.pokemon.getHpRatio() <= this.hpPercent / 100;
   }
 }
 

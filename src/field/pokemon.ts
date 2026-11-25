@@ -2078,11 +2078,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       }
     }
     critStage.value += fieldCritBonus;
-    const jackpotSides = (globalScene.currentBattle as unknown as { erJackpotSides?: Set<boolean> } | undefined)
+    const jackpotSides = (globalScene.currentBattle as unknown as { erJackpotSides?: Map<boolean, number> } | undefined)
       ?.erJackpotSides;
-    if (jackpotSides?.has(source.isPlayer())) {
-      critStage.value += 1;
-    }
+    critStage.value += jackpotSides?.get(source.isPlayer()) ?? 0;
 
     // ER Pretentious: the attacker's accumulated KO crit-stacks. Scanned by name.
     for (const attr of source.getAllActiveAbilityAttrs()) {
@@ -2561,7 +2559,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (globalScene.gameMode.isCoop && this.customPokemonData?.coopLuck != null) {
       return this.customPokemonData.coopLuck;
     }
-    const jackpotLuck = (this.waveData as unknown as { erJackpotLuck?: boolean }).erJackpotLuck ? 1 : 0;
+    const jackpotLuck = (this.waveData as unknown as { erJackpotLuck?: number }).erJackpotLuck ?? 0;
     const base = this.luck + (this.isFusion() ? this.fusionLuck : 0) + jackpotLuck;
     // ER (#432): a Black Shiny is the rarest shiny tier and grants a flat
     // Luck 5 (a regular shiny caps at 3). DERIVED here, never stored - the
