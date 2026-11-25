@@ -1240,5 +1240,6 @@ export const WHEN_MOVE_USER: Readonly<Record<string, "holder" | "other">> = {
   "calc.outgoing-move": "holder",
   "calc.attack-stat": "holder",
   "calc.my-attack-matchup": "holder",
+  "calc.move-category": "holder",
   "calc.always-hit-check": "holder",
 };

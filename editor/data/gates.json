@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "19eb767c559761",
+  "vocabularyHash": "053c68832624fd",
   "gates": {
     "1:0": {
       "abilityId": 1,
@@ -16625,6 +16625,15 @@
         "percent": "healFractionValue",
         "when": "conditionSpec"
       }
+    },
+    "5311:1": {
+      "abilityId": 5311,
+      "attrIndex": 1,
+      "className": "WeatherGroundAirborneAbAttr",
+      "when": "calc.my-attack-matchup",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
     },
     "5311:2": {
       "abilityId": 5311,
@@ -37017,6 +37026,15 @@
       "unpackable": false,
       "reason": "a condition has no block yet: Needs two atoms the library does not have: 'my battle slot is charged' (isElectrodynamicsPosition, R-B14-5.2) and 'has the ability' for an ER ability id such as Psionic and Electrodynamics, which are not in the AbilityId enum the atom accepts (R-B14-5.3). The rest maps to move.type (with ability changes), field.terrain and mon.grounded; the exact planned tree is in PsionicTerrainPowerAbAttr.decl.ts."
     },
+    "6064:0": {
+      "abilityId": 6064,
+      "attrIndex": 0,
+      "className": "MiracleBladeTypeChartAbAttr",
+      "when": "calc.my-attack-matchup",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
     "6065:0": {
       "abilityId": 6065,
       "attrIndex": 0,
@@ -37611,6 +37629,15 @@
       "unpackable": false,
       "reason": "its trigger or its effect is not wired into the block builder yet"
     },
+    "6081:1": {
+      "abilityId": 6081,
+      "attrIndex": 1,
+      "className": "LowerOffenseMoveCategoryAbAttr",
+      "when": "calc.move-category",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
     "6081:2": {
       "abilityId": 6081,
       "attrIndex": 2,
@@ -37995,6 +38022,15 @@
       "className": "PostSummonScriptedMoveAbAttr",
       "when": "event.on-entry",
       "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
+    },
+    "6097:1": {
+      "abilityId": 6097,
+      "attrIndex": 1,
+      "className": "MudballReactiveAbAttr",
+      "when": "event.foe-enters",
+      "effect": "effect.scripted-move",
       "unpackable": false,
       "reason": "its trigger or its effect is not wired into the block builder yet"
     },
@@ -38492,6 +38528,15 @@
         "critRequired": "critRequired",
         "filter": "filter"
       }
+    },
+    "6110:0": {
+      "abilityId": 6110,
+      "attrIndex": 0,
+      "className": "GritAttackStatAbAttr",
+      "when": "calc.attack-stat",
+      "effect": "effect.package",
+      "unpackable": false,
+      "reason": "its trigger or its effect is not wired into the block builder yet"
     },
     "6111:0": {
       "abilityId": 6111,

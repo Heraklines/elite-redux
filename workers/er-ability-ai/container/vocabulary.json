@@ -1307,7 +1307,8 @@
         "change category",
         "use the other category",
         "subversion"
-      ]
+      ],
+      "moveUserIs": "holder"
     },
     {
       "id": "calc.my-attack-matchup",
@@ -6063,5 +6064,5 @@
       ]
     }
   ],
-  "hash": "0a85a90cd42cd5"
+  "hash": "053c68832624fd"
 }
