@@ -73,7 +73,7 @@ export const MAX_LABEL_LENGTH = 60;
 export const MAX_SUMMARY_LENGTH = 200;
 
 /** ALL_CAPS words that are fine for players. */
-export const ALLOWED_CAPS: ReadonlySet<string> = new Set(["HP", "PP", "STAB"]);
+export const ALLOWED_CAPS: ReadonlySet<string> = new Set(["HP", "KO", "PP", "STAB"]);
 
 /** Words that only programmers use. Case matters for the camel-case ones. */
 const CODE_WORDS: readonly { readonly name: string; readonly pattern: RegExp }[] = [

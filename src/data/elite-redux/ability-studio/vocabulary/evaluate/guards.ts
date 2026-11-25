@@ -12,6 +12,7 @@
 import { allMoves } from "#data/data-lists";
 import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { AbilityId } from "#enums/ability-id";
+import { HitResult } from "#enums/hit-result";
 import { MoveId } from "#enums/move-id";
 import { MoveResult } from "#enums/move-result";
 import { SpeciesId } from "#enums/species-id";
@@ -70,6 +71,33 @@ export const GUARD_EVALUATORS: Readonly<Record<string, GuardPredicate>> = {
     }
     return !(source.turnData.hitsLeft > 1);
   },
+  // ---- Librarian pass (B19) ---------------------------------------------------------------
+  // Does not trigger when the target's ability ignores the extra effects of attacks.
+  "not-blocked-by-effect-shield": frame => !frame.other?.hasAbilityWithAttr("IgnoreMoveEffectsAbAttr"),
+  "not-self-target": frame => frame.holder !== frame.other,
+  // `Boolean(sourcePokemon)`: weather and hazards have no source Pokemon.
+  "status-set-by-a-pokemon": frame => Boolean(frame.other),
+  // Not a miss, not blocked, not immune: EFFECTIVE, SUPER_EFFECTIVE, NOT_VERY_EFFECTIVE or ONE_HIT_KO.
+  "hit-connected": frame => frame.hitResult !== undefined && frame.hitResult < HitResult.NO_EFFECT,
+  "hit-connected-on-another-pokemon": frame =>
+    frame.holder !== frame.other && frame.hitResult !== undefined && frame.hitResult < HitResult.NO_EFFECT,
+  "hit-dealt-damage": frame => frame.damage !== undefined && frame.damage > 0,
+  "hit-on-another-living-target": frame =>
+    frame.holder !== frame.other
+    && frame.other !== undefined
+    && !frame.other.isFainted()
+    && frame.damage !== undefined
+    && frame.damage > 0,
+  // The holder is the attacker of an after-my-attack trigger: its own multi-hit counter.
+  "after-my-final-hit": frame => !(frame.holder.turnData.hitsLeft > 1),
+  "knocked-out-by-a-move": frame => !!frame.other && !!frame.move,
+  "attacker-still-standing": frame => frame.other !== undefined && !frame.other.isFainted(),
+  // The faint is credited to the holder only when its attack was the last direct hit the victim took.
+  "credited-with-the-knock-out": frame => {
+    const lastAttack = frame.other?.turnData?.attacksReceived?.[0];
+    return !!lastAttack && lastAttack.sourceId === frame.holder.id;
+  },
+  "not-protected-from-indirect-damage": frame => !frame.holder.hasAbilityWithAttr("BlockNonDirectDamageAbAttr"),
 };
 
 export function evaluateGuard(name: string, frame: Frame): boolean {

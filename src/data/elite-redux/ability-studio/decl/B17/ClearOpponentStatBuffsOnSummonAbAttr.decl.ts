@@ -21,7 +21,7 @@ export default defineDecl(ClearOpponentStatBuffsOnSummonAbAttr, {
   tier: "C",
   kind: "package",
   when: "event.on-entry",
-  label: "Wipe the foes' stat boosts when I enter",
+  label: "Wipe the stat boosts of adjacent foes when I enter",
   summary: () =>
     "When I enter the battle, every raised stat of each adjacent foe goes back to normal. Lowered stats stay lowered. Example: a foe at +2 Attack and -1 Defense ends at 0 and -1.",
   synonyms: ["pressure", "clear boosts", "remove stat boosts", "reset foe stats", "haze on entry", "cancel buffs"],

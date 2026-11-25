@@ -8,11 +8,16 @@
 // Each atom is plain data; the game-side predicate lives in evaluate/conditions.ts and calls the
 // SAME engine predicate the original lambda used (isFullHp(), doesFlagEffectApply(), ...).
 
+import { LIBRARY_CONDITIONS } from "./conditions-library";
 import {
   ARENA_SIDE_OPTIONS,
   CATEGORY_OPTIONS,
   COMPARE_OPTIONS,
-  HP_ROUNDING_OPTIONS,
+  HIT_SIDE_OPTIONS,
+  HP_CROSSING_ROUNDING_OPTIONS,
+  HP_CROSSING_WHO_OPTIONS,
+  HP_LEVEL_ROUNDING_OPTIONS,
+  HP_WHO_OPTIONS,
   ITEM_KIND_OPTIONS,
   MOVE_AIM_OPTIONS,
   MOVE_FLAG_OPTIONS,
@@ -36,6 +41,7 @@ import {
   textParam,
 } from "./params";
 import type { SlotId } from "./slots";
+import { type BrowseCategory, withVocabularyText } from "./texts";
 
 export interface ConditionFormula {
   /** The exact expression, as plain text. */
@@ -59,19 +65,30 @@ export interface ConditionDef {
   readonly formula: ConditionFormula;
   readonly synonyms: readonly string[];
   readonly examples: readonly string[];
+  /** One or two short sentences with a concrete example (spec 8.2), written by hand in texts-conditions.ts. */
+  readonly summary: string;
+  /** The browse category of spec 8.4. */
+  readonly category: BrowseCategory;
   /** True for the two escape hatches that cannot be authored in the editor. */
   readonly escapeHatch?: boolean;
 }
 
-const WHO = (def = "holder"): ParamDef => selectParam("who", "Whose", WHO_OPTIONS, def);
-const CMP = (): ParamDef => selectParam("cmp", "Comparison", COMPARE_OPTIONS, "gte");
-const ROUNDING = (): ParamDef => selectParam("rounding", "HP rounding", HP_ROUNDING_OPTIONS, "exact");
+/** A condition as written in the registries; its summary and category come from texts-conditions.ts. */
+export type ConditionBase = Omit<ConditionDef, "summary" | "category">;
+
+const WHO = (def = "holder"): ParamDef => selectParam("who", "Which Pokemon", WHO_OPTIONS, def);
+const CMP = (): ParamDef => selectParam("cmp", "How to compare", COMPARE_OPTIONS, "gte");
+const HP_WHO = (def = "holder"): ParamDef => selectParam("who", "Whose HP", HP_WHO_OPTIONS, def);
+const ROUNDING = (): ParamDef =>
+  selectParam("rounding", "How the HP line is rounded", HP_LEVEL_ROUNDING_OPTIONS, "exact");
+const CROSSING_ROUNDING = (): ParamDef =>
+  selectParam("rounding", "How the HP line is rounded", HP_CROSSING_ROUNDING_OPTIONS, "exact");
 
 const ENGINE = "src/field/pokemon.ts";
 const MOVE_TS = "src/data/moves/move.ts";
 const ARENA = "src/field/arena.ts";
 
-export const CONDITION_REGISTRY: readonly ConditionDef[] = [
+const BASE_CONDITIONS: readonly ConditionBase[] = [
   // ---- HP -------------------------------------------------------------------------------
   {
     id: "hp.full",
@@ -91,11 +108,13 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     label: "{who} has at most {pct}% HP",
     requires: [],
     whoParam: "who",
-    params: [WHO(), sliderParam("pct", "HP percent", 50, 1, 100, 1, true), ROUNDING()],
+    params: [HP_WHO(), sliderParam("pct", "HP (% of max HP)", 50, 1, 100, 1, true), ROUNDING()],
     pure: true,
     formula: {
-      expr: "exact: hp * 100 <= maxHp * pct ; floor-half: hp <= floor(maxHp * pct / 100)",
-      source: `${ENGINE}:2408 (getMaxHp); integer math, no float ratio`,
+      expr:
+        "exact: hp * 100 <= maxHp * pct ; floor-half: hp <= floor(maxHp * pct / 100) ; "
+        + "rounded-ratio: getHpRatio() <= pct / 100, getHpRatio() = Math.round(hp / maxHp * 100) / 100",
+      source: `${ENGINE}:2408 (getMaxHp), :2430 (getHpRatio for rounded-ratio); integer math, no float ratio except rounded-ratio`,
     },
     synonyms: ["low hp", "below half", "hurt", "weakened"],
     examples: ["Boost power when at most 33% HP"],
@@ -106,11 +125,13 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     label: "{who} has at least {pct}% HP",
     requires: [],
     whoParam: "who",
-    params: [WHO(), sliderParam("pct", "HP percent", 50, 1, 100, 1, true), ROUNDING()],
+    params: [HP_WHO(), sliderParam("pct", "HP (% of max HP)", 50, 1, 100, 1, true), ROUNDING()],
     pure: true,
     formula: {
-      expr: "exact: hp * 100 >= maxHp * pct ; floor-half: hp >= floor(maxHp * pct / 100)",
-      source: `${ENGINE}:2408 (getMaxHp); integer math, no float ratio`,
+      expr:
+        "exact: hp * 100 >= maxHp * pct ; floor-half: hp >= floor(maxHp * pct / 100) ; "
+        + "rounded-ratio: getHpRatio() >= pct / 100, getHpRatio() = Math.round(hp / maxHp * 100) / 100",
+      source: `${ENGINE}:2408 (getMaxHp), :2430 (getHpRatio for rounded-ratio); integer math, no float ratio except rounded-ratio`,
     },
     synonyms: ["high hp", "healthy", "above half"],
     examples: ["Resist hits while above 75% HP"],
@@ -122,9 +143,9 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     requires: [],
     whoParam: "who",
     params: [
-      WHO(),
-      sliderParam("minPct", "Lowest HP percent", 25, 0, 100, 1, true),
-      sliderParam("maxPct", "Highest HP percent", 75, 0, 100, 1, true),
+      HP_WHO(),
+      sliderParam("minPct", "Lowest HP (% of max HP)", 25, 0, 100, 1, true),
+      sliderParam("maxPct", "Highest HP (% of max HP)", 75, 0, 100, 1, true),
       ROUNDING(),
     ],
     pure: true,
@@ -142,15 +163,16 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     requires: ["damage"],
     whoParam: "who",
     params: [
-      selectParam("who", "Whose", ["holder", "other"]),
-      sliderParam("ratio", "Max HP ratio", 0.5, 0.01, 0.99, 0.01),
-      ROUNDING(),
+      selectParam("who", "Whose HP", HP_CROSSING_WHO_OPTIONS, "holder"),
+      sliderParam("ratio", "HP line (0.5 = half of max HP)", 0.5, 0.01, 0.99, 0.01),
+      CROSSING_ROUNDING(),
     ],
     pure: true,
     formula: {
       expr:
         "exact: hp + damage >= maxHp * ratio && hp - calculateShellBellRecovery(pokemon) < maxHp * ratio ; "
-        + "floor-half: t = floor(maxHp * ratio); hp <= t && hp + damage > t",
+        + "floor-half: t = floor(maxHp * ratio); hp <= t && hp + damage > t ; "
+        + "damage-value: t = toDmgValue(maxHp * ratio) = max(floor(maxHp * ratio), 1); hp <= t && hp + damage > t",
       source:
         "src/data/abilities/ab-attrs.ts hpCrossedBelow (moved from PostDamageForceSwitchAbAttr.canApply); "
         + "floor-half form from archetypes/berserk-on-threshold.ts. The Shell Bell term belongs to the exact form.",
@@ -166,7 +188,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     label: "The move is {type} type",
     requires: ["move", "moveUser"],
     params: [
-      selectParam("type", "Type", TYPE_OPTIONS, "FIRE"),
+      selectParam("type", "Which type", TYPE_OPTIONS, "FIRE"),
       booleanParam("effective", "Use the type after ability changes", true),
     ],
     pure: true,
@@ -182,7 +204,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     group: "Move",
     label: "The move is {category}",
     requires: ["move"],
-    params: [selectParam("category", "Category", CATEGORY_OPTIONS, "PHYSICAL")],
+    params: [selectParam("category", "Damage type of the move", CATEGORY_OPTIONS, "PHYSICAL")],
     pure: true,
     formula: { expr: "move.category === MoveCategory[category]", source: `${MOVE_TS} (Move.category)` },
     synonyms: ["physical", "special", "status move", "attack category"],
@@ -193,7 +215,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     group: "Move",
     label: "The move has the {flag} property",
     requires: ["move", "moveUser"],
-    params: [selectParam("flag", "Move property", MOVE_FLAG_OPTIONS, "MAKES_CONTACT")],
+    params: [selectParam("flag", "Which move property", MOVE_FLAG_OPTIONS, "MAKES_CONTACT")],
     pure: true,
     formula: {
       expr: "move.doesFlagEffectApply({ flag: MoveFlags[flag], user: moveUser, target })",
@@ -207,7 +229,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     group: "Move",
     label: "The move's power is {cmp} {n}",
     requires: ["move"],
-    params: [CMP(), numberParam("n", "Power", 60, 0, 400, 1, true)],
+    params: [CMP(), numberParam("n", "Move power", 60, 0, 400, 1, true)],
     pure: true,
     formula: { expr: "compare(move.power, cmp, n)", source: `${MOVE_TS} (Move.power)` },
     synonyms: ["base power", "weak move", "strong move", "bp"],
@@ -229,7 +251,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     group: "Move",
     label: "The move targets {kind}",
     requires: ["move"],
-    params: [selectParam("kind", "Target", TARGET_KIND_OPTIONS, "single")],
+    params: [selectParam("kind", "Kind of target", TARGET_KIND_OPTIONS, "single")],
     pure: true,
     formula: {
       expr: "single: OTHER|NEAR_OTHER|RANDOM_NEAR_ENEMY ; all-foes: ALL_NEAR_ENEMIES|ENEMY_SIDE ; all-others: ALL_NEAR_OTHERS|ALL_OTHERS ; user-or-ally: USER|NEAR_ALLY|USER_AND_ALLIES ; field: BOTH_SIDES|USER_SIDE",
@@ -243,7 +265,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     group: "Move",
     label: "The move is aimed at {target}",
     requires: ["move"],
-    params: [selectParam("target", "Aim", MOVE_AIM_OPTIONS, "one adjacent Pokemon")],
+    params: [selectParam("target", "How the move is aimed", MOVE_AIM_OPTIONS, "one adjacent Pokemon")],
     pure: true,
     formula: {
       expr: "move.moveTarget === MoveTarget[target]  (one exact aim; use several of these in an ANY group for a set such as Ole's single-target test: one adjacent Pokemon, one other Pokemon, one adjacent foe, the foe's side)",
@@ -257,7 +279,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     group: "Move",
     label: "The move's priority is {cmp} {n}",
     requires: ["move"],
-    params: [CMP(), numberParam("n", "Priority", 0, -7, 7, 1, true)],
+    params: [CMP(), numberParam("n", "Priority (0 = normal)", 0, -7, 7, 1, true)],
     pure: true,
     formula: { expr: "compare(move.priority, cmp, n)", source: `${MOVE_TS}:231 (Move.priority)` },
     synonyms: ["priority move", "quick attack", "go first"],
@@ -279,7 +301,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     group: "Move",
     label: "This is hit number {cmp} {n}",
     requires: ["hits"],
-    params: [CMP(), numberParam("n", "Hit number", 1, 1, 10, 1, true)],
+    params: [CMP(), numberParam("n", "Hit number (1 = the first hit)", 1, 1, 10, 1, true)],
     pure: true,
     formula: {
       expr: "compare(hits.index, cmp, n)  (hits.index is 1-based)",
@@ -307,7 +329,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     group: "Move",
     label: "The move's effectiveness is {cmp} {n}x",
     requires: ["move", "moveUser", "other"],
-    params: [CMP(), numberParam("n", "Multiplier", 2, 0, 16, 0.25)],
+    params: [CMP(), numberParam("n", "Effectiveness (1 = normal, 2 = super effective)", 2, 0, 16, 0.25)],
     pure: true,
     formula: {
       expr: "compare(target.getMoveEffectiveness(moveUser, move), cmp, n)",
@@ -319,9 +341,9 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
   {
     id: "move.inherent-flag",
     group: "Move",
-    label: "The move itself has the {flag} property (whatever the attacker's abilities do)",
+    label: "The move has the {flag} property as printed",
     requires: ["move"],
-    params: [selectParam("flag", "Move property", MOVE_FLAG_OPTIONS, "MAKES_CONTACT")],
+    params: [selectParam("flag", "Which move property", MOVE_FLAG_OPTIONS, "MAKES_CONTACT")],
     pure: true,
     formula: {
       expr: "move.hasFlag(MoveFlags[flag])  (NOT doesFlagEffectApply: Long Reach style abilities and substitutes do not change it)",
@@ -361,14 +383,15 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
   {
     id: "hit.critical",
     group: "Move",
-    label: "The hit was a critical hit",
-    requires: ["other"],
-    params: [],
+    label: "{who} took a critical hit",
+    requires: [],
+    whoParam: "who",
+    params: [selectParam("who", "Who took the critical hit", HIT_SIDE_OPTIONS, "other")],
     pure: true,
     formula: {
-      expr: "!!other.turnData?.attacksReceived?.[0]?.critical  (the first hit the other Pokemon took this turn)",
+      expr: "!!pokemon.turnData?.attacksReceived?.[0]?.critical  (the first hit that Pokemon took this turn; the default reads the other Pokemon)",
       source:
-        "src/data/elite-redux/archetypes/chance-status-on-hit.ts ChanceStatusOnAttackAbAttr.canApply (critRequired)",
+        "src/data/elite-redux/archetypes/chance-status-on-hit.ts ChanceStatusOnAttackAbAttr.canApply (critRequired); damage-reduction-generic.ts crit kind (Bad Omen reads the defender)",
     },
     synonyms: ["crit", "critical hit", "lucky hit", "crits only", "when I crit"],
     examples: ["Burn the target only when my attack was a critical hit"],
@@ -405,7 +428,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     group: "Field",
     label: "The weather is {weather}",
     requires: [],
-    params: [selectParam("weather", "Weather", WEATHER_OPTIONS, "SUNNY")],
+    params: [selectParam("weather", "Which weather", WEATHER_OPTIONS, "SUNNY")],
     pure: true,
     formula: {
       expr: "arena.weatherType === WeatherType[weather]",
@@ -419,7 +442,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     group: "Field",
     label: "The terrain is {terrain}",
     requires: [],
-    params: [selectParam("terrain", "Terrain", TERRAIN_OPTIONS, "ELECTRIC")],
+    params: [selectParam("terrain", "Which terrain", TERRAIN_OPTIONS, "ELECTRIC")],
     pure: true,
     formula: { expr: "arena.terrainType === TerrainType[terrain]", source: `${ARENA}:245 (terrainType)` },
     synonyms: ["electric terrain", "grassy terrain", "misty terrain", "psychic terrain"],
@@ -431,8 +454,8 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     label: "{tag} is active on {side}",
     requires: [],
     params: [
-      textParam("tag", "Field effect (ArenaTagType name)", "REFLECT"),
-      selectParam("side", "Side", ARENA_SIDE_OPTIONS, "holder-side"),
+      textParam("tag", "Which field effect (type its name)", "REFLECT"),
+      selectParam("side", "Which side of the field", ARENA_SIDE_OPTIONS, "holder-side"),
     ],
     pure: true,
     formula: { expr: "arena.getTagOnSide(ArenaTagType[tag], side)", source: `${ARENA} getTagOnSide` },
@@ -442,7 +465,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
   {
     id: "field.anyone-asleep",
     group: "Field",
-    label: "A Pokemon on the field is asleep (my own Comatose counts for me)",
+    label: "Any Pokemon on the field is asleep",
     requires: [],
     params: [],
     pure: true,
@@ -486,7 +509,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     label: "{who} has {status}",
     requires: [],
     whoParam: "who",
-    params: [WHO(), selectParam("status", "Status", ["ANY", "NONE", ...STATUS_OPTIONS], "ANY")],
+    params: [WHO(), selectParam("status", "Which status", ["ANY", "NONE", ...STATUS_OPTIONS], "ANY")],
     pure: true,
     formula: {
       expr: "ANY: pokemon.status != null ; NONE: pokemon.status == null ; else pokemon.status?.effect === StatusEffect[status]",
@@ -513,7 +536,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     label: "{who} is affected by {tag}",
     requires: [],
     whoParam: "who",
-    params: [WHO(), textParam("tag", "Battle effect (BattlerTagType name)", "TAUNT")],
+    params: [WHO(), textParam("tag", "Which battle effect (type its name)", "TAUNT")],
     pure: true,
     formula: { expr: "pokemon.getTag(BattlerTagType[tag]) !== undefined", source: `${ENGINE}:6941 (getTag)` },
     synonyms: ["taunted", "flinching", "leech seed", "volatile status", "battle effect"],
@@ -545,9 +568,9 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     whoParam: "who",
     params: [
       WHO(),
-      selectParam("stat", "Stat", ["ANY", ...STAT_OPTIONS], "ATK"),
+      selectParam("stat", "Which stat", ["ANY", ...STAT_OPTIONS], "ATK"),
       CMP(),
-      numberParam("n", "Stage", 0, -6, 6, 1, true),
+      numberParam("n", "Stage (-6 to 6)", 0, -6, 6, 1, true),
     ],
     pure: true,
     formula: {
@@ -562,7 +585,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     group: "Stat stages",
     label: "The stat just changed",
     requires: ["stat", "stages"],
-    params: [selectParam("direction", "Direction", ["any", "raised", "lowered"], "any")],
+    params: [selectParam("direction", "Which direction the stat moved", ["any", "raised", "lowered"], "any")],
     pure: true,
     formula: {
       expr: "any: stages !== 0 ; raised: stages > 0 ; lowered: stages < 0",
@@ -592,7 +615,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     group: "Time",
     label: "I have been out for {cmp} {n} turns",
     requires: [],
-    params: [CMP(), numberParam("n", "Turns", 3, 1, 99, 1, true)],
+    params: [CMP(), numberParam("n", "Number of turns", 3, 1, 99, 1, true)],
     pure: true,
     formula: {
       expr: "compare(holder.tempSummonData.turnCount, cmp, n)",
@@ -634,7 +657,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     label: "{who}'s last move had the {flag} property",
     requires: [],
     whoParam: "who",
-    params: [WHO("other"), selectParam("flag", "Move property", MOVE_FLAG_OPTIONS, "SOUND_BASED")],
+    params: [WHO("other"), selectParam("flag", "Which move property", MOVE_FLAG_OPTIONS, "SOUND_BASED")],
     pure: true,
     formula: {
       expr: "const last = pokemon.getLastXMoves(1)[0]; last !== undefined && allMoves[last.move]?.hasFlag(MoveFlags[flag])",
@@ -648,7 +671,10 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     group: "Time",
     label: "Only once per {scope}",
     requires: [],
-    params: [selectParam("scope", "Scope", ONCE_PER_SCOPES, "battle"), textParam("key", "Memory key", "once")],
+    params: [
+      selectParam("scope", "How long the memory lasts", ONCE_PER_SCOPES, "battle"),
+      textParam("key", "Name of the memory slot (any short word)", "once"),
+    ],
     pure: true,
     formula: {
       expr: "wave: holder.waveData.entryEffectsFired.has(key) ? false : (add(key), true) ; other scopes: WeakMap<battleData>(key) === scope marker ? false : (mark, true) ; marks only when not simulated and only when the rule applies",
@@ -661,9 +687,12 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
   {
     id: "time.once-per-unused",
     group: "Time",
-    label: "The one-time effect {key} has not been used up yet this {scope}",
+    label: "The one-time effect {key} is still unused this {scope}",
     requires: [],
-    params: [selectParam("scope", "Scope", ONCE_PER_SCOPES, "wave"), textParam("key", "Memory key", "once")],
+    params: [
+      selectParam("scope", "How long the memory lasts", ONCE_PER_SCOPES, "wave"),
+      textParam("key", "Name of the memory slot (any short word)", "once"),
+    ],
     pure: true,
     formula: {
       expr: "wave: !holder.waveData.entryEffectsFired.has(key) ; other scopes: WeakMap<battleData>(key) !== scope marker. Only READS the memory, never writes it (time.once-per is the one that spends it)",
@@ -678,7 +707,10 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     group: "Time",
     label: "On the {n}th time this triggers",
     requires: [],
-    params: [numberParam("n", "Count", 2, 1, 99, 1, true), textParam("key", "Memory key", "uses")],
+    params: [
+      numberParam("n", "Which time (2 = the second time)", 2, 1, 99, 1, true),
+      textParam("key", "Name of the memory slot (any short word)", "uses"),
+    ],
     pure: true,
     formula: { expr: "++counter(battleData, key) === n", source: "state keyed by (pokemon.battleData, key)" },
     synonyms: ["every other", "third time", "counter", "nth"],
@@ -692,7 +724,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     label: "{who} holds {kind} item",
     requires: [],
     whoParam: "who",
-    params: [WHO(), selectParam("kind", "Item kind", ITEM_KIND_OPTIONS, "any")],
+    params: [WHO(), selectParam("kind", "Which kind of item", ITEM_KIND_OPTIONS, "any")],
     pure: true,
     formula: {
       expr: "any: pokemon.getHeldItems().length > 0 ; berry: some BerryModifier",
@@ -735,7 +767,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     group: "Party",
     label: "The other Pokemon is {kind}",
     requires: ["other"],
-    params: [selectParam("kind", "Relation", SIDE_KIND_OPTIONS, "foe")],
+    params: [selectParam("kind", "How the other Pokemon relates to me", SIDE_KIND_OPTIONS, "foe")],
     pure: true,
     formula: {
       expr: "ally: other.isPlayer() === holder.isPlayer() && other !== holder ; foe: other.isPlayer() !== holder.isPlayer() ; self: other === holder",
@@ -783,7 +815,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     group: "Party",
     label: "I have {cmp} {n} Pokemon left",
     requires: [],
-    params: [CMP(), numberParam("n", "Pokemon", 1, 0, 6, 1, true)],
+    params: [CMP(), numberParam("n", "Number of Pokemon (0-6)", 1, 0, 6, 1, true)],
     pure: true,
     formula: {
       expr: "compare(party.filter(not fainted).length, cmp, n)",
@@ -797,7 +829,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     group: "Party",
     label: "{cmp} {n} of my party have fainted",
     requires: [],
-    params: [CMP(), numberParam("n", "Pokemon", 1, 0, 6, 1, true)],
+    params: [CMP(), numberParam("n", "Number of Pokemon (0-6)", 1, 0, 6, 1, true)],
     pure: true,
     formula: {
       expr: "compare(party.filter(fainted).length, cmp, n)",
@@ -839,7 +871,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     label: "{who} is {type} type",
     requires: [],
     whoParam: "who",
-    params: [WHO(), selectParam("type", "Type", TYPE_OPTIONS, "WATER")],
+    params: [WHO(), selectParam("type", "Which type", TYPE_OPTIONS, "WATER")],
     pure: true,
     formula: { expr: "pokemon.isOfType(PokemonType[type])", source: `${ENGINE}:2875 (isOfType)` },
     synonyms: ["is fire type", "type check", "dual type"],
@@ -886,7 +918,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
   {
     id: "mon.protected-from-effects",
     group: "Pokemon",
-    label: "{who} is protected from the added effects of moves (like Shield Dust)",
+    label: "{who} ignores the extra effects of moves (Shield Dust)",
     requires: [],
     whoParam: "who",
     params: [WHO("other")],
@@ -930,7 +962,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     label: "{who} is in the {key} form",
     requires: [],
     whoParam: "who",
-    params: [WHO(), textParam("key", "Form key", "")],
+    params: [WHO(), textParam("key", "Which form (type its name)", "")],
     pure: true,
     formula: { expr: "pokemon.getFormKey() === key", source: `${ENGINE} getFormKey` },
     synonyms: ["form", "current form", "transformed", "ape form"],
@@ -954,7 +986,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     label: "{who} can change to the {key} form",
     requires: [],
     whoParam: "who",
-    params: [WHO(), textParam("key", "Form key", "")],
+    params: [WHO(), textParam("key", "Which form (type its name)", "")],
     pure: true,
     formula: {
       expr: "pokemon has a registered form change edge to key",
@@ -970,10 +1002,13 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     group: "Chance",
     label: "{pct}% chance",
     requires: [],
-    params: [sliderParam("pct", "Chance percent", 30, 1, 100, 1, true)],
+    params: [
+      sliderParam("pct", "Chance (%)", 30, 1, 100, 1, true),
+      booleanParam("alwaysRoll", "Always draw a random number, even at 100%", false),
+    ],
     pure: false,
     formula: {
-      expr: "simulated || pct >= 100 || holder.randBattleSeedInt(100) < pct  (evaluated at the position of the original draw)",
+      expr: "simulated || (!alwaysRoll && pct >= 100) || holder.randBattleSeedInt(100) < pct  (evaluated at the position of the original draw)",
       source: "compile-ability-blueprint chance handling; runtime-components.ts carrier.canApply",
     },
     synonyms: ["random", "percent chance", "luck", "sometimes"],
@@ -986,7 +1021,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     group: "Advanced",
     label: "A built-in rule (works as one piece)",
     requires: [],
-    params: [textParam("note", "Note", "")],
+    params: [textParam("note", "Note for staff (not shown in battle)", "")],
     pure: true,
     formula: {
       expr: "the original constructor closure, reused as a whole",
@@ -1001,7 +1036,7 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     group: "Advanced",
     label: "Safety rule {name}",
     requires: [],
-    params: [textParam("name", "Guard name", "")],
+    params: [textParam("name", "Which safety rule", "")],
     pure: true,
     formula: { expr: "guard registry entry (never removable)", source: "vocabulary/guards.ts" },
     synonyms: ["safety rule", "guard", "locked rule"],
@@ -1009,6 +1044,11 @@ export const CONDITION_REGISTRY: readonly ConditionDef[] = [
     escapeHatch: true,
   },
 ];
+
+/** The base atoms plus the atoms the librarian pass added (conditions-library.ts). */
+export const CONDITION_REGISTRY: readonly ConditionDef[] = [...BASE_CONDITIONS, ...LIBRARY_CONDITIONS].map(def =>
+  withVocabularyText(def),
+);
 
 /** The three group operators of an IF tree. They are not blocks; they have no registry entry. */
 export const CONDITION_GROUP_OPERATORS = ["all", "any", "not"] as const;

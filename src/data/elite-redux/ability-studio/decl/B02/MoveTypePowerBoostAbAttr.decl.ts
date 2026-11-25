@@ -76,7 +76,7 @@ export default defineDecl(MoveTypePowerBoostAbAttr, {
       ctorIndex: 2,
       path: "skipDuringMovesetGen",
       control: "boolean",
-      label: "Skip this boost while the game builds opponent move sets (not used by the battle today)",
+      label: "Skip this boost while the game builds foe move sets (not used by the battle today)",
       // Not editable: only the vanilla Sand Force (replaced in Elite Redux, so no live user) passes true, and the game never reads it for this class today. It is a setting so that a
       // rebuilt attr keeps its value and a future fix of the game cannot make original and rebuild differ.
       editable: false,

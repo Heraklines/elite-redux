@@ -27,7 +27,7 @@ export default defineDecl(PreDefendFullHpEndureAbAttr, {
   tier: "B",
   kind: "calc-modifier",
   when: "calc.damage-taken",
-  label: "Survive a knockout hit with 1 HP",
+  label: "Survive a knockout hit with 1 HP while at full HP",
   summary: () =>
     "When I am at full HP, a hit that would knock me out leaves me with 1 HP instead, once per turn. Example: a 300 damage hit on a 200 HP Pokemon leaves 1 HP.",
   synonyms: ["sturdy", "endure", "survive at 1 hp", "cannot be one hit knocked out", "focus sash", "immovable object"],

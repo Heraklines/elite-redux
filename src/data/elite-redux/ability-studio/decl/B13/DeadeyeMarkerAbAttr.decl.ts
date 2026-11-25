@@ -20,7 +20,7 @@ export default defineDecl(DeadeyeMarkerAbAttr, {
   tier: "C",
   kind: "engine-query",
   when: "while.active",
-  label: "Hit my marked foe's weaker defence with pulse moves",
+  label: "Hit my marked foe's weaker defense with pulse moves",
   summary: () =>
     "While I have this, my pulse moves against the foe I marked are calculated against whichever of its Defense and Sp. Def is lower.",
   synonyms: [
@@ -31,7 +31,7 @@ export default defineDecl(DeadeyeMarkerAbAttr, {
     "deadeye draw",
     "pierce",
   ],
-  examples: ["My pulse moves hit the marked foe's weaker defence, like Deadeye Draw"],
+  examples: ["My pulse moves hit the marked foe's weaker defense, like Deadeye Draw"],
   params: [],
   noParamsReason:
     "A presence flag read by name from the damage calculation (shouldDeadeyeUseLowerDefense); the weaker-defence choice has no number or setting.",

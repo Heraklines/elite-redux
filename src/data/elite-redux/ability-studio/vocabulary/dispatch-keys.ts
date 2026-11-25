@@ -20,11 +20,8 @@
 export const UNEXPOSED_DISPATCH_KEYS: Readonly<Record<string, string>> = {
   AiMovegenMoveStatsAbAttr:
     "Only consulted while the enemy AI generates movesets (move.ts getMovegen stats). It is not a battle moment staff can react to.",
-  IllusionBreakAbAttr:
-    "Internal Illusion bookkeeping, called by applySingleAbAttrs when a Pokemon leaves the field or is hit. Not a staff-facing moment.",
   PostSummonRemoveEffectAbAttr:
     "Re-run by MoveEndPhase to undo entry-time ignore-ability effects (Mold Breaker style). An engine clean-up call, not a moment staff reason about.",
-  SyncEncounterNatureAbAttr: "Wild encounter generation (Synchronize nature copy). Not a moment inside a battle.",
   FieldMovePowerBoostAbAttr:
     "Abstract base of the field power boosters. Its leaf classes either dispatch through calc.move-power or are queried with getAbilityAttrs, so the base itself is never dispatched.",
   PreAttackFieldMoveTypePowerBoostAbAttr:

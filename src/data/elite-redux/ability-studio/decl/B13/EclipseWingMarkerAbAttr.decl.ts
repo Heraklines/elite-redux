@@ -56,7 +56,7 @@ export default defineDecl(EclipseWingMarkerAbAttr, {
   tier: "C",
   kind: "engine-query",
   when: "while.active",
-  label: "Survive a knock-out from full HP once a wave and strike back",
+  label: "Survive a knockout from full HP once a wave and strike back",
   summary: params =>
     `While I have this, once per wave a hit that would knock me out from full HP leaves me at 1 HP and I answer with a ${params.counterPower} power ${params.counterType} special move against the attacker.`,
   synonyms: [
@@ -67,7 +67,7 @@ export default defineDecl(EclipseWingMarkerAbAttr, {
     "revenge strike",
     "eclipse wing",
   ],
-  examples: ["Once per wave I survive a knock-out from full HP and hit back with a Dark move, like Eclipse Wing"],
+  examples: ["Once per wave I survive a knockout from full HP and hit back with a Dark move, like Eclipse Wing"],
   params: [
     {
       id: "counterPower",

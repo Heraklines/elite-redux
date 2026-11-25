@@ -14,13 +14,28 @@
 
 import type { CompareOp, HpRounding } from "./enums";
 
+/**
+ * The game's own HP ratio: `Pokemon.getHpRatio()` without the `precise` flag (pokemon.ts:2430), a value rounded to
+ * TWO decimals. At max HP 1000, 334 HP is 0.33 and 335 HP is 0.34, so "at most 33%" read through this ratio
+ * passes at 334 while the exact test (`hp * 100 <= maxHp * 33`) does not.
+ */
+export function hpRatioRounded(hp: number, maxHp: number): number {
+  return Math.round((hp / maxHp) * 100) / 100;
+}
+
 /** hp is at most pct% of maxHp. */
 export function hpAtMost(hp: number, maxHp: number, pct: number, rounding: HpRounding): boolean {
+  if (rounding === "rounded-ratio") {
+    return hpRatioRounded(hp, maxHp) <= pct / 100;
+  }
   return rounding === "floor-half" ? hp <= Math.floor((maxHp * pct) / 100) : hp * 100 <= maxHp * pct;
 }
 
 /** hp is at least pct% of maxHp. */
 export function hpAtLeast(hp: number, maxHp: number, pct: number, rounding: HpRounding): boolean {
+  if (rounding === "rounded-ratio") {
+    return hpRatioRounded(hp, maxHp) >= pct / 100;
+  }
   return rounding === "floor-half" ? hp >= Math.floor((maxHp * pct) / 100) : hp * 100 >= maxHp * pct;
 }
 
@@ -36,6 +51,8 @@ export function hpBetween(hp: number, maxHp: number, minPct: number, maxPct: num
  *   The ratio multiplication stays a float on purpose: it is the original expression.
  * - `floor-half` is the BerserkOnThresholdAbAttr test: `t = floor(maxHp * ratio); hp <= t && hp + damage > t`.
  *   `shellBellHeal` is ignored there, as in the original.
+ * - `damage-value` is the Anger Shell test: `t = toDmgValue(maxHp * ratio)` (never below 1), then as `floor-half`.
+ *   It differs from `floor-half` only for a 1 HP Pokemon (Shedinja): line 1 versus line 0.
  */
 export function hpCrossedBelowRounded(
   hp: number,
@@ -47,6 +64,12 @@ export function hpCrossedBelowRounded(
 ): boolean {
   if (rounding === "floor-half") {
     const threshold = Math.floor(maxHp * ratio);
+    return hp <= threshold && hp + damage > threshold;
+  }
+  if (rounding === "damage-value") {
+    // toDmgValue(maxHp * ratio) = Math.max(Math.floor(maxHp * ratio), 1): floor-half with a line of at least 1 HP.
+    // Source: ab-attrs.ts PostDefendHpGatedStatStageChangeAbAttr.gate (Anger Shell, No Turning Back).
+    const threshold = Math.max(Math.floor(maxHp * ratio), 1);
     return hp <= threshold && hp + damage > threshold;
   }
   return hp + damage >= maxHp * ratio && hp - shellBellHeal < maxHp * ratio;

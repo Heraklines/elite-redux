@@ -89,7 +89,8 @@ var SLOT_IDS = [
   "tag",
   "ally",
   "simulated",
-  "hits"
+  "hits",
+  "typeMultiplier"
 ];
 var SLOTS = [
   { id: "holder", label: "The ability owner", meaning: "The Pokemon that owns the ability." },
@@ -118,7 +119,12 @@ var SLOTS = [
   { id: "tag", label: "The battle effect", meaning: "The battler tag (volatile effect) involved." },
   { id: "ally", label: "The ally", meaning: "The holder's ally." },
   { id: "simulated", label: "Simulation flag", meaning: "Whether the call is only a preview, with no side effects." },
-  { id: "hits", label: "The hit counters", meaning: "The hit count and hit index of a multi-hit move." }
+  { id: "hits", label: "The hit counters", meaning: "The hit count and hit index of a multi-hit move." },
+  {
+    id: "typeMultiplier",
+    label: "The type matchup so far",
+    meaning: "The type-chart multiplier the game has worked out so far for the move against the target (2 = super effective)."
+  }
 ];
 function missingSlots(requires, provides) {
   const have = new Set(provides);

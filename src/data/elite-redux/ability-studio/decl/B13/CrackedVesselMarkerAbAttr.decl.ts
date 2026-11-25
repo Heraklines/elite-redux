@@ -77,7 +77,7 @@ export default defineDecl(CrackedVesselMarkerAbAttr, {
   tier: "C",
   kind: "engine-query",
   when: "while.active",
-  label: "Survive a knock-out once a wave, then crack",
+  label: "Survive a knockout once a wave, then crack",
   summary: params =>
     `Once a wave, a hit that would knock me out leaves me at 1 HP. I lose my last ${params.typesLost} type(s), ${params.fogWeather} lasts ${params.fogTurns} turns and every Pokemon next to me becomes ${params.adjacentStatus}.`,
   synonyms: [

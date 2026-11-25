@@ -13,6 +13,7 @@
 // with the very same parameter shape.
 
 import type { SlotId } from "./slots";
+import { type BrowseCategory, withVocabularyText } from "./texts";
 
 export type WhenKind = "event" | "calc" | "while-active";
 
@@ -35,6 +36,10 @@ export interface WhenDef {
   /** True when the key is only an ancestor class that the engine never dispatches directly. */
   readonly baseClassOnly?: boolean;
   readonly synonyms?: readonly string[];
+  /** One or two short sentences with a concrete example (spec 8.2), written by hand in texts-whens.ts. */
+  readonly summary: string;
+  /** The browse category of spec 8.4. */
+  readonly category: BrowseCategory;
   /**
    * True when evaluate/compile-composition.ts can hang a `composition` rule on this WHEN. The other
    * WHENs are listed so staff and the AI can already name them; composition validation rejects them
@@ -42,6 +47,9 @@ export interface WhenDef {
    */
   readonly composable?: boolean;
 }
+
+/** A WHEN as written in the registry; its summary and category come from texts-whens.ts. */
+export type WhenBase = Omit<WhenDef, "summary" | "category">;
 
 type Slots = readonly SlotId[];
 
@@ -60,6 +68,7 @@ const TG: SlotId = "tag";
 const A: SlotId = "ally";
 const SIM: SlotId = "simulated";
 const HITS: SlotId = "hits";
+const TM: SlotId = "typeMultiplier";
 
 function event(
   id: string,
@@ -68,7 +77,7 @@ function event(
   label: string,
   group: string,
   extra: Partial<WhenDef> = {},
-): WhenDef {
+): WhenBase {
   return { id, kind: "event", dispatchKey, provides, label, group, ...extra };
 }
 
@@ -80,11 +89,11 @@ function calc(
   group: string,
   modifies: string,
   extra: Partial<WhenDef> = {},
-): WhenDef {
+): WhenBase {
   return { id, kind: "calc", dispatchKey, provides, label, group, modifies, ...extra };
 }
 
-export const WHEN_REGISTRY: readonly WhenDef[] = [
+const WHEN_BASE: readonly WhenBase[] = [
   // ---- Entry and exit -------------------------------------------------------------------
   event("event.on-entry", "PostSummonAbAttr", [H, SIM], "When I enter the battle", "Entry and exit", {
     legacyHookId: "PostSummonAbAttr",
@@ -100,22 +109,28 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     "Entry and exit",
     { synonyms: ["ally switch in", "partner arrives", "ally sent out", "ally revived"] },
   ),
+  event("event.foe-enters", "MudballReactiveAbAttr", [H, O, SIM], "When a foe enters the field", "Entry and exit", {
+    synonyms: ["foe switches in", "enemy sent out", "opponent arrives", "when the foe appears"],
+  }),
   event(
-    "event.foe-enters",
-    "MudballReactiveAbAttr",
-    [H, O, SIM],
-    "When a foe enters the field",
+    "event.wild-pokemon-created",
+    "SyncEncounterNatureAbAttr",
+    [H, O],
+    "When a wild Pokemon is created for an encounter",
     "Entry and exit",
-    { synonyms: ["foe switches in", "enemy sent out", "opponent arrives", "when the foe appears"] },
+    { synonyms: ["wild encounter", "wild pokemon appears", "encounter start", "synchronize", "new wild pokemon"] },
   ),
-  event("event.before-entry", "PreSummonAbAttr", [H], "Just before I enter the battle", "Entry and exit", {
+  event("event.ability-lost", "IllusionBreakAbAttr", [H], "When my ability is lost or switched off", "Entry and exit", {
+    synonyms: ["ability suppressed", "ability replaced", "gastro acid", "neutralizing gas", "skill swap"],
+  }),
+  event("event.before-entry", "PreSummonAbAttr", [H], "When I am about to enter the battle", "Entry and exit", {
     legacyHookId: "PreSummonAbAttr",
   }),
   event("event.battle-start", "PostBattleInitAbAttr", [H], "When a battle begins", "Entry and exit", {
     legacyHookId: "PostBattleInitAbAttr",
     synonyms: ["start of battle", "battle init"],
   }),
-  event("event.after-battle", "PostBattleAbAttr", [H], "After the battle ends", "Entry and exit", {
+  event("event.after-battle", "PostBattleAbAttr", [H], "When the battle ends", "Entry and exit", {
     legacyHookId: "PostBattleAbAttr",
     synonyms: ["end of battle", "post battle"],
   }),
@@ -135,22 +150,15 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
   }),
 
   // ---- Turn -----------------------------------------------------------------------------
-  event("event.end-of-turn", "PostTurnAbAttr", [H, SIM], "At the end of every turn", "Turn", {
+  event("event.end-of-turn", "PostTurnAbAttr", [H, SIM], "When every turn ends", "Turn", {
     legacyHookId: "PostTurnAbAttr",
     synonyms: ["each turn", "end turn", "residual"],
 
     composable: true,
   }),
-  event(
-    "event.turn-start",
-    "PreemptivePriorityCounterAbAttr",
-    [H],
-    "At the start of the turn, before anyone moves",
-    "Turn",
-    {
-      synonyms: ["start of turn", "turn begins", "before moves", "after commands are chosen", "surprise"],
-    },
-  ),
+  event("event.turn-start", "PreemptivePriorityCounterAbAttr", [H], "When a turn starts, before anyone moves", "Turn", {
+    synonyms: ["start of turn", "turn begins", "before moves", "after commands are chosen", "surprise"],
+  }),
   event("event.wake-up", "PostWakeUpAbAttr", [H], "When I wake up", "Turn", { legacyHookId: "PostWakeUpAbAttr" }),
   event("event.flinched", "FlinchEffectAbAttr", [H, SIM], "When I flinch", "Turn", {
     legacyHookId: "FlinchEffectAbAttr",
@@ -165,16 +173,23 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
       synonyms: ["after berry phase", "berry meal ends", "cud chew moment"],
     },
   ),
-  event("event.berry-eaten", "HealFromBerryUseAbAttr", [H], "After I eat a berry", "Turn", {
+  event("event.berry-eaten", "HealFromBerryUseAbAttr", [H], "When I eat a berry", "Turn", {
     synonyms: ["berry consumed", "nom"],
   }),
 
   // ---- Attacking ------------------------------------------------------------------------
-  event("event.before-i-use-move", "PokemonTypeChangeAbAttr", [H, O, M, MU], "Just before I use a move", "Attacking", {
-    synonyms: ["move starts", "before attacking"],
-  }),
-  event("event.my-move-starts", "ExecutedMoveAbAttr", [H], "When my move starts to execute", "Attacking"),
-  event("event.after-my-hit", "PostAttackAbAttr", [H, O, M, MU, D, HR, SIM], "After my attack lands", "Attacking", {
+  event(
+    "event.before-i-use-move",
+    "PokemonTypeChangeAbAttr",
+    [H, O, M, MU],
+    "When I am about to use a move",
+    "Attacking",
+    {
+      synonyms: ["move starts", "before attacking"],
+    },
+  ),
+  event("event.my-move-starts", "ExecutedMoveAbAttr", [H], "When my chosen move starts", "Attacking"),
+  event("event.after-my-hit", "PostAttackAbAttr", [H, O, M, MU, D, HR, SIM], "When my attack lands", "Attacking", {
     legacyHookId: "PostAttackAbAttr",
     synonyms: ["on hit", "after attacking", "after damaging", "when I hit"],
 
@@ -190,7 +205,7 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     legacyHookId: "PostVictoryAbAttr",
     synonyms: ["victory", "battle won"],
   }),
-  event("event.after-any-move", "PostMoveUsedAbAttr", [H, O, M, MU, SIM], "After anyone uses a move", "Attacking", {
+  event("event.after-any-move", "PostMoveUsedAbAttr", [H, O, M, MU, SIM], "When anyone uses a move", "Attacking", {
     legacyHookId: "PostMoveUsedAbAttr",
     synonyms: ["any move", "after a move"],
   }),
@@ -198,7 +213,7 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     "event.after-inflicting-status",
     "ConfusionOnStatusEffectAbAttr",
     [H, O, S],
-    "After I inflict a status",
+    "When I inflict a status condition",
     "Attacking",
     {
       synonyms: ["status landed", "after poisoning", "after burning"],
@@ -206,13 +221,13 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
   ),
 
   // ---- Being hit ------------------------------------------------------------------------
-  event("event.after-hit", "PostDefendAbAttr", [H, O, M, MU, D, HR, SIM], "After I am hit", "Being hit", {
+  event("event.after-hit", "PostDefendAbAttr", [H, O, M, MU, D, HR, SIM], "When I am hit", "Being hit", {
     legacyHookId: "PostDefendAbAttr",
     synonyms: ["when hit", "on being hit", "after defending", "contact"],
 
     composable: true,
   }),
-  event("event.after-taking-damage", "PostDamageAbAttr", [H, O, D, SIM], "After I take any damage", "Being hit", {
+  event("event.after-taking-damage", "PostDamageAbAttr", [H, O, D, SIM], "When I take any damage", "Being hit", {
     legacyHookId: "PostDamageAbAttr",
     synonyms: ["hp dropped", "lose hp", "damaged", "below half", "wimp out"],
 
@@ -230,7 +245,7 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     "event.before-hit-lands",
     "PreHitResistTypeChangeAbAttr",
     [H, O, M, MU],
-    "Just before a hit lands on me",
+    "When a hit is about to land on me",
     "Being hit",
   ),
   event("event.got-status", "PostSetStatusAbAttr", [H, O, S, SIM], "When I get a status condition", "Being hit", {
@@ -260,7 +275,7 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     "event.weather-each-turn",
     "PostWeatherLapseAbAttr",
     [H, W, SIM],
-    "Each turn while weather is active",
+    "While a weather is on, every turn",
     "Field",
     {
       legacyHookId: "PostWeatherLapseAbAttr",
@@ -378,7 +393,7 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     "cancel.burn-attack-cut",
     "BypassBurnDamageReductionAbAttr",
     [H, SIM],
-    "While the game checks if my burn or frostbite weakens my attacks",
+    "While the game checks if burn weakens my attacks",
     "Cancel checks",
     "cancelled",
     {
@@ -672,7 +687,7 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     "calc.my-attack-matchup",
     "BoneMoveTypeChartAbAttr",
     [H, O, M, MU],
-    "While the game calculates how well my attack matches the target's types",
+    "While the game rates my attack against the target's types",
     "Type",
     "typeMultiplier",
     {
@@ -739,7 +754,7 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
   calc(
     "calc.type-matchup",
     "FullHpResistTypeAbAttr",
-    [H, O, M],
+    [H, O, M, TM],
     "While the game calculates type matchup against me",
     "Type",
     "typeMultiplier",
@@ -750,7 +765,7 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
   calc(
     "calc.move-immunity",
     "TypeImmunityAbAttr",
-    [H, O, M],
+    [H, O, M, TM],
     "While the game checks whether a move can hit me",
     "Type",
     "cancelled",
@@ -776,7 +791,7 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     "calc.my-type-chart-override",
     "OffensiveTypeChartOverrideAbAttr",
     [H],
-    "While the game works out how well my attacks match the target's types",
+    "While the game applies my own type chart to my attacks",
     "Type",
     "typeMultiplier",
     {
@@ -1088,7 +1103,7 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     "calc.incoming-move",
     "PreDefendAbAttr",
     [H, O, M, MU, D, SIM],
-    "Before I take a hit",
+    "While the game prepares a hit against me",
     "Damage and power",
     "damage",
     {
@@ -1096,10 +1111,18 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
       baseClassOnly: true,
     },
   ),
-  calc("calc.outgoing-move", "PreAttackAbAttr", [H, O, M, MU, SIM], "Before I attack", "Damage and power", "power", {
-    legacyHookId: "PreAttackAbAttr",
-    baseClassOnly: true,
-  }),
+  calc(
+    "calc.outgoing-move",
+    "PreAttackAbAttr",
+    [H, O, M, MU, SIM],
+    "While the game prepares my attack",
+    "Damage and power",
+    "power",
+    {
+      legacyHookId: "PreAttackAbAttr",
+      baseClassOnly: true,
+    },
+  ),
 
   // ---- While active (pure flags, never dispatched) --------------------------------------
   {
@@ -1186,6 +1209,8 @@ export const WHEN_REGISTRY: readonly WhenDef[] = [
     synonyms: ["always", "passive", "permanent", "flag"],
   },
 ];
+
+export const WHEN_REGISTRY: readonly WhenDef[] = WHEN_BASE.map(when => withVocabularyText(when));
 
 const BY_ID: ReadonlyMap<string, WhenDef> = new Map(WHEN_REGISTRY.map(when => [when.id, when]));
 const BY_DISPATCH_KEY: ReadonlyMap<string, WhenDef> = (() => {

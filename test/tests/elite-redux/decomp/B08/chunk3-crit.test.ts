@@ -13,6 +13,7 @@ import { allMoves } from "#data/data-lists";
 import { normalizeBindingSpec } from "#data/elite-redux/ability-studio/bindings";
 import { buildAttr, recomposeAttr } from "#data/elite-redux/ability-studio/build-attr";
 import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
+import { compileCondition } from "#data/elite-redux/ability-studio/vocabulary/evaluate/conditions";
 import { type CritDamageMultiplierAbAttr, CritStageBonusAbAttr } from "#data/elite-redux/archetypes/crit-mod";
 import { CritStackOnKoAbAttr } from "#data/elite-redux/archetypes/crit-stack-on-ko";
 import { AbilityId } from "#enums/ability-id";
@@ -98,10 +99,14 @@ describe("B08 chunk 3: critical-hit classes", () => {
       }
       expect(accepted, `${user} accepts nothing`).toBeGreaterThan(0);
     }
-    // Five-Star Fury is an Elite Redux custom move: the atom looks names up in MoveId, which has no entry for it.
+    // Five-Star Fury is an Elite Redux custom move: the atom looks a name up in MoveId first and in ErMoveId second
+    // (librarian pass B19, request R-B08-33), so the library can now name it.
     const penta = allAttrSites().find(s => s.className === "CritStageBonusAbAttr" && s.abilityName === "Penta-Punch")!;
     expect(CritStageBonusAbAttr.matchesFilter(penta.attr.getFilter(), holder, { id: 5156 } as never)).toBe(true);
-    expect(() =>
+    const furyGate = compileCondition({ block: "move.is-move", params: { moveId: "FIVE_STAR_FURY" } });
+    expect(furyGate({ holder: holder as never, move: { id: 5156 } as never, simulated: true })).toBe(true);
+    expect(furyGate({ holder: holder as never, move: allMoves[MoveId.TACKLE], simulated: true })).toBe(false);
+    expect(
       buildAttr(
         module,
         { bonus: 1, filter: "Only these moves: Five star fury" },
@@ -111,7 +116,7 @@ describe("B08 chunk 3: critical-hit classes", () => {
         move: allMoves[MoveId.TACKLE],
         critStage: new NumberHolder(0),
       } as never),
-    ).toThrow(/not a known move/);
+    ).toBe(false);
   });
 
   it("the two unfiltered users rebuild with the always-true gate and add the same stages; the bonus setting reaches the compiled attr", async () => {

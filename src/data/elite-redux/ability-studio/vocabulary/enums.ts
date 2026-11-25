@@ -96,7 +96,33 @@ export type WhoOption = (typeof WHO_OPTIONS)[number];
  * floors the threshold: hp <= floor(maxHp * pct / 100), the form Berserk-style abilities use.
  */
 export const HP_ROUNDING_OPTIONS = ["exact", "floor-half"] as const;
-export type HpRounding = (typeof HP_ROUNDING_OPTIONS)[number];
+
+/**
+ * The roundings of the "has at most / at least / between % HP" atoms: `exact` and `floor-half` as above, plus
+ * `rounded-ratio`, which reads the game's own two-decimal ratio (`Pokemon.getHpRatio()`, pokemon.ts:2430,
+ * `Math.round(hp / maxHp * 100) / 100`) the way the Zen Mode, Schooling and Defeatist closures do.
+ */
+export const HP_LEVEL_ROUNDING_OPTIONS = ["exact", "floor-half", "rounded-ratio"] as const;
+
+/**
+ * The roundings of "just dropped below": `exact` (Wimp Out), `floor-half` (Berserk) and `damage-value`, the
+ * Anger Shell form `toDmgValue(maxHp * ratio)`, which never lets the line fall to 0 HP.
+ */
+export const HP_CROSSING_ROUNDING_OPTIONS = ["exact", "floor-half", "damage-value"] as const;
+
+export type HpRounding =
+  | (typeof HP_ROUNDING_OPTIONS)[number]
+  | (typeof HP_LEVEL_ROUNDING_OPTIONS)[number]
+  | (typeof HP_CROSSING_ROUNDING_OPTIONS)[number];
+
+/** Whose HP an HP atom reads: one Pokemon, or "any foe" (true when at least one opponent matches). */
+export const HP_WHO_OPTIONS = ["holder", "other", "ally", "any-foe"] as const;
+
+/** Whose HP the "just dropped below" atom reads (the damage slot belongs to one Pokemon). */
+export const HP_CROSSING_WHO_OPTIONS = ["holder", "other"] as const;
+
+/** The two Pokemon a hit can be read from. */
+export const HIT_SIDE_OPTIONS = ["holder", "other"] as const;
 
 export const ONCE_PER_SCOPES = ["entry", "wave", "battle", "turn", "switch"] as const;
 export type OncePerScope = (typeof ONCE_PER_SCOPES)[number];

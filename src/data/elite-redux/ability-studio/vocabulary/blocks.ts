@@ -10,6 +10,7 @@
 
 import type { ParamControl, ParamValue } from "./params";
 import type { SlotId } from "./slots";
+import type { BrowseCategory } from "./texts";
 
 export const CATALOG_SCHEMA_VERSION = 1;
 
@@ -82,6 +83,8 @@ export interface BlockJson {
   readonly tier: "A" | "B" | "C";
   readonly kind: "event-effect" | "calc-modifier" | "while-active" | "engine-query" | "package" | "trigger-source";
   readonly status: "todo" | "decomposed" | "verified" | "exempt";
+  /** The browse category of spec 8.4 (written by hand in block-categories.ts). */
+  readonly category: BrowseCategory;
   /** The WHEN_REGISTRY id the class hangs on, with its plain label. */
   readonly when: string;
   readonly whenLabel: string;

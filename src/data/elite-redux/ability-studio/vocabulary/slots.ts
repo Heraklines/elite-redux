@@ -9,8 +9,9 @@
 /**
  * The typed frame every WHEN provides and every IF / DO requires (spec section 1.1).
  *
- * `hits` is the one slot beyond the original table: the multi-hit counters that the
- * `multi-hit`, `hit-index` and `last-hit` atoms read.
+ * `hits` and `typeMultiplier` are the slots beyond the original table: the multi-hit counters that the
+ * `multi-hit`, `hit-index` and `last-hit` atoms read, and the running type-chart multiplier that
+ * `move.type-multiplier` reads (the number the engine has worked out so far, before the abilities run).
  */
 export const SLOT_IDS = [
   "holder",
@@ -28,6 +29,7 @@ export const SLOT_IDS = [
   "ally",
   "simulated",
   "hits",
+  "typeMultiplier",
 ] as const;
 
 export type SlotId = (typeof SLOT_IDS)[number];
@@ -66,6 +68,12 @@ export const SLOTS: readonly SlotDef[] = [
   { id: "ally", label: "The ally", meaning: "The holder's ally." },
   { id: "simulated", label: "Simulation flag", meaning: "Whether the call is only a preview, with no side effects." },
   { id: "hits", label: "The hit counters", meaning: "The hit count and hit index of a multi-hit move." },
+  {
+    id: "typeMultiplier",
+    label: "The type matchup so far",
+    meaning:
+      "The type-chart multiplier the game has worked out so far for the move against the target (2 = super effective).",
+  },
 ];
 
 /**

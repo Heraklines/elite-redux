@@ -22,6 +22,7 @@ import { applyAbilityStudioEffects } from "../../rule-ab-attrs";
 import type { BlockRef } from "../composition-types";
 import { getEffect } from "../effects";
 import { type ParamValues, withParamDefaults } from "../params";
+import { moveIdOf } from "./conditions";
 import type { Frame } from "./frame";
 
 /** What an effect needs when it runs: the frame plus the raw engine parameter object. */
@@ -113,6 +114,36 @@ const FACTORIES: Readonly<Record<string, EffectFactory>> = {
     holderField<NumberHolderLike>(context, "priority").value += Number(v.amount);
   },
 
+  // ---- Librarian pass (B19): calc effects with the exact arithmetic of the classes ---------------
+  // BonusCritAbAttr.apply: critStage.value += stages
+  "effect.raise-crit-stage": v => context => {
+    holderField<NumberHolderLike>(context, "critStage").value += Number(v.stages);
+  },
+  // MultCritAbAttr: canApply is `critMult.value > 1` (only critical hits change), apply is `critMult.value *= multiplier`.
+  "effect.multiply-crit-damage": v => ({
+    run: context => {
+      holderField<NumberHolderLike>(context, "critMult").value *= Number(v.multiplier);
+    },
+    feasible: context => holderField<NumberHolderLike>(context, "critMult").value > 1,
+  }),
+  // MoveEffectChanceMultiplierAbAttr: canApply is `!(chance <= 0 || move is Order Up or Electro Shot)`, apply multiplies
+  // and caps the chance at 100.
+  "effect.multiply-effect-chance": v => ({
+    run: context => {
+      const chance = holderField<NumberHolderLike>(context, "chance");
+      chance.value *= Number(v.multiplier);
+      chance.value = Math.min(chance.value, 100);
+    },
+    feasible: context => {
+      const chance = holderField<NumberHolderLike>(context, "chance");
+      const move = context.frame.move;
+      return !(
+        chance.value <= 0
+        || (move !== undefined && (move.id === MoveId.ORDER_UP || move.id === MoveId.ELECTRO_SHOT))
+      );
+    },
+  }),
+
   // Event effects: reuse the V1 effect runner.
   "effect.stat-stage": v =>
     v1Effect({
@@ -142,11 +173,8 @@ const FACTORIES: Readonly<Record<string, EffectFactory>> = {
   // "Use {moveId} with {power} power": queues the scripted follow-up the way every ER scripted-move attr does
   // (scripted-move-util.ts), as an indirect move aimed at the foe.
   "effect.scripted-move": v => {
-    const name = String(v.moveId);
-    const move = (MoveId as unknown as Record<string, number>)[name];
-    if (typeof move !== "number") {
-      throw new Error(`"${name}" is not a known move`);
-    }
+    // A vanilla move or an Elite Redux custom move (moveIdOf throws for an unknown name).
+    const move = moveIdOf(String(v.moveId));
     const power = Number(v.power);
     return {
       run: ({ frame }) => {

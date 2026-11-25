@@ -23,7 +23,7 @@ export default defineDecl(PostSummonClearOpponentPositiveStatStagesAbAttr, {
   tier: "A",
   kind: "event-effect",
   when: "event.on-entry",
-  label: "Remove the foes' stat boosts when I enter",
+  label: "Remove every active foe's stat boosts when I enter",
   summary: () =>
     "When I enter the battle, every active foe loses its stat boosts. Their stat drops and my own stages stay. Example: a foe at +2 Attack and -1 Speed ends at 0 Attack and -1 Speed.",
   synonyms: [

@@ -23,7 +23,50 @@ export interface ParamDef {
   readonly options?: readonly string[];
   /** Integer-only numbers (HP percentages, stages, counts). */
   readonly integer?: boolean;
+  /** Select controls: the player-facing words of the choices that are not plain words already (PLAYER_OPTION_LABELS). */
+  readonly optionLabels?: Readonly<Record<string, string>>;
 }
+
+/**
+ * Player-facing words for the plain (lowercase) choice values that settings use, so a picker never shows a code word
+ * such as "gte" or "holder-side" (spec 8.3). Enum constants (GROUND, HEAVY_RAIN) are renamed by playerName instead.
+ * Only values with one clear meaning are listed here; a context-specific choice names its words in `optionLabels`.
+ */
+export const PLAYER_OPTION_LABELS: Readonly<Record<string, string>> = {
+  holder: "The ability owner",
+  other: "The other Pokemon",
+  ally: "My ally",
+  "any-foe": "Any foe",
+  lt: "less than",
+  lte: "at most",
+  eq: "exactly",
+  gte: "at least",
+  gt: "more than",
+  "holder-side": "My side of the field",
+  "opposing-side": "The foes' side of the field",
+  both: "Both sides of the field",
+  self: "Myself",
+  foe: "A foe",
+  exact: "Exact HP (whole numbers)",
+  "floor-half": "Rounded down to a whole HP",
+  "rounded-ratio": "The game's two-decimal HP ratio",
+  "damage-value": "Rounded down, never below 1 HP",
+  entry: "Each time I enter",
+  wave: "Each wave",
+  battle: "Each battle",
+  turn: "Each turn",
+  switch: "Each switch-in",
+  "switch-in": "Until I switch out",
+  prefix: "Starts with this name",
+  raised: "Went up",
+  lowered: "Went down",
+  single: "One target",
+  "all-foes": "All foes",
+  "all-others": "Everyone else",
+  "user-or-ally": "The user or its ally",
+  field: "The whole field",
+  berry: "A berry",
+};
 
 export type ParamValues = Readonly<Record<string, ParamValue>>;
 
@@ -51,8 +94,27 @@ export function sliderParam(
   return { id, label, control: "slider", default: def, min, max, step, integer };
 }
 
-export function selectParam(id: string, label: string, options: readonly string[], def?: string): ParamDef {
-  return { id, label, control: "select", default: def ?? options[0], options };
+export function selectParam(
+  id: string,
+  label: string,
+  options: readonly string[],
+  def?: string,
+  optionLabels?: Readonly<Record<string, string>>,
+): ParamDef {
+  const labels = Object.fromEntries(
+    options.flatMap(option => {
+      const words = optionLabels?.[option] ?? PLAYER_OPTION_LABELS[option];
+      return words === undefined ? [] : [[option, words]];
+    }),
+  );
+  return {
+    id,
+    label,
+    control: "select",
+    default: def ?? options[0],
+    options,
+    ...(Object.keys(labels).length > 0 ? { optionLabels: labels } : {}),
+  };
 }
 
 export function booleanParam(id: string, label: string, def = false): ParamDef {

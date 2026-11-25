@@ -36,7 +36,7 @@ export default defineDecl(PreFaintReviveAbAttr, {
   tier: "B",
   kind: "calc-modifier",
   when: "calc.damage-taken",
-  label: "Survive a knock-out hit with 1 HP left",
+  label: "Survive a knockout with 1 HP left, at an HP level you set",
   summary: params =>
     `A hit that would knock me out leaves me on 1 HP instead. ${
       Number(params.firstHitsOnly) === 0

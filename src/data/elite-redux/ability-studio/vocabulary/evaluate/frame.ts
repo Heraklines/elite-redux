@@ -42,6 +42,8 @@ export interface Frame {
   readonly ally?: Pokemon | undefined;
   readonly simulated: boolean;
   readonly hits?: HitCounters | undefined;
+  /** The running type-chart multiplier (calc.move-immunity and calc.type-matchup), read when the frame is built. */
+  readonly typeMultiplier?: number | undefined;
   /**
    * Memory writes (time.once-per, time.nth-use) wait here while the IF list is read, and the carrier
    * runs them in apply(), after every IF and the chance roll passed. Absent when a condition is
@@ -127,6 +129,7 @@ export function frameFromAttrParams(whenId: string, params: object): Frame {
     },
     simulated: raw.simulated === true,
     hits: hitCount === undefined ? undefined : { count: hitCount, index: 1 },
+    typeMultiplier: numberOf(raw.typeMultiplier),
   };
 }
 

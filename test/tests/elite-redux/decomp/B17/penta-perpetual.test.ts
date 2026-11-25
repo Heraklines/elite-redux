@@ -90,8 +90,11 @@ describe("B17 chunk 2: Penta-Punch and Perpetual Motion", () => {
     const module = declRegistry.get("PentaPunchFuryPowerAbAttr")!;
     const built = buildAttr(module, { power: 120 }, { gate: { block: "move.damaging" } }) as PentaPunchFuryPowerAbAttr;
     expect(built.power).toBe(120);
-    // Why the gate stays legacy: the library atom resolves a name in MoveId, and Five-Star Fury is only in ErMoveId.
-    expect(() => compileCondition({ block: "move.is-move", params: { moveId: "FIVE_STAR_FURY" } })).toThrow();
+    // The library atom now resolves a name in MoveId first and ErMoveId second (librarian pass B19, request R10), so
+    // Five-Star Fury can be named; the gate binding itself stays legacy until the completion pass rebinds it.
+    const furyGate = compileCondition({ block: "move.is-move", params: { moveId: "FIVE_STAR_FURY" } });
+    expect(furyGate({ holder: {} as never, move: { id: 5156 } as never, simulated: true })).toBe(true);
+    expect(furyGate({ holder: {} as never, move: { id: MoveId.TACKLE } as never, simulated: true })).toBe(false);
   });
 
   it("Perpetual Motion Trigger: old canApply (damaging, hit landed, not the queued follow-up) over every hit result, move and marker", async () => {

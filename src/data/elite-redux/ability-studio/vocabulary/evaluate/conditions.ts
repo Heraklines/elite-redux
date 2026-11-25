@@ -8,29 +8,35 @@
 // original lambda used (isFullHp(), doesFlagEffectApply(), hpCrossedBelow(), ...). Conditions are
 // compiled ONCE into closures; they are never interpreted per call on a hot path.
 
-import { hpCrossedBelow, isComatoseLike } from "#abilities/ab-attrs";
+import { getWeatherCondition, hpCrossedBelow, isComatoseLike } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { TrappedTag } from "#data/battler-tags";
 import { allMoves } from "#data/data-lists";
 import { DAMAGING_HIT_RESULTS } from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { ConditionalDamageAbAttr } from "#data/elite-redux/archetypes/conditional-damage";
 import { Gender } from "#data/gender";
+import { noAbilityTypeOverrideMoves } from "#data/moves/invalid-moves";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import { SpeciesFormChangeManualTrigger } from "#data/pokemon-forms/form-change-triggers";
 import { TerrainType } from "#data/terrain";
+import { isFogWeather } from "#data/weather";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import { ErMoveId } from "#enums/er-move-id";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
+import { MoveResult } from "#enums/move-result";
 import { MoveTarget } from "#enums/move-target";
+import { MoveUseMode } from "#enums/move-use-mode";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import { BerryModifier } from "#modifiers/modifier";
+import { randSeedFloat } from "#utils/common";
 import { matchesAbilityStudioMoveFilter } from "../../rule-ab-attrs";
 import { type BlockRef, type ConditionNode, isGroupAll, isGroupAny, isGroupNot } from "../composition-types";
 import { type ConditionDef, getCondition } from "../conditions";
@@ -61,6 +67,20 @@ function enumValue<T extends Record<string, string | number>>(table: T, name: st
     throw new Error(`"${name}" is not a known ${what}`);
   }
   return table[name] as T[keyof T];
+}
+
+/**
+ * A move name from a setting: a vanilla move (MoveId) or an Elite Redux custom move (ErMoveId, ids from 5000 up).
+ * The two enums never share a name, so the vanilla table is asked first.
+ */
+export function moveIdOf(name: string): number {
+  if (Object.hasOwn(MoveId, name)) {
+    return (MoveId as unknown as Record<string, number>)[name];
+  }
+  if (Object.hasOwn(ErMoveId, name)) {
+    return (ErMoveId as Record<string, number>)[name];
+  }
+  throw new Error(`"${name}" is not a known move`);
 }
 
 const STAT_BY_NAME = Stat as unknown as Record<string, number>;
@@ -170,24 +190,49 @@ function scopeMarker(pokemon: Pokemon, scope: string): unknown {
   }
 }
 
+/** The Pokemon an HP atom reads: one Pokemon, or every opponent for "any foe" (the atom is then true when any matches). */
+function hpTargets(frame: Frame, who: string): Pokemon[] {
+  if (who === "any-foe") {
+    // The original Opportunist closure wrapped the whole read in try/catch and answered false on any error.
+    try {
+      return frame.holder.getOpponents();
+    } catch {
+      return [];
+    }
+  }
+  const target = holderLikeOf(frame, who);
+  return target === undefined ? [] : [target];
+}
+
+/** "RAIN, HEAVY_RAIN" -> ["RAIN", "HEAVY_RAIN"]; an empty text is an empty list. */
+function listOf(text: string): string[] {
+  return text
+    .split(",")
+    .map(part => part.trim())
+    .filter(part => part.length > 0);
+}
+
+function enumList<T extends Record<string, string | number>>(table: T, text: string, what: string): T[keyof T][] {
+  return listOf(text).map(name => enumValue(table, name, what));
+}
+
 const FACTORIES: Readonly<Record<string, Factory>> = {
   // HP
   "hp.full": p => frame => holderLikeOf(frame, String(p.who))?.isFullHp() ?? false,
-  "hp.at-most": p => frame => {
-    const target = holderLikeOf(frame, String(p.who));
-    return target !== undefined && hpAtMost(target.hp, target.getMaxHp(), Number(p.pct), p.rounding as HpRounding);
-  },
-  "hp.at-least": p => frame => {
-    const target = holderLikeOf(frame, String(p.who));
-    return target !== undefined && hpAtLeast(target.hp, target.getMaxHp(), Number(p.pct), p.rounding as HpRounding);
-  },
+  "hp.at-most": p => frame =>
+    hpTargets(frame, String(p.who)).some(target =>
+      hpAtMost(target.hp, target.getMaxHp(), Number(p.pct), p.rounding as HpRounding),
+    ),
+  "hp.at-least": p => frame =>
+    hpTargets(frame, String(p.who)).some(target =>
+      hpAtLeast(target.hp, target.getMaxHp(), Number(p.pct), p.rounding as HpRounding),
+    ),
   "hp.between": p => frame => {
-    const target = holderLikeOf(frame, String(p.who));
     const rounding = p.rounding as HpRounding;
-    return (
-      target !== undefined
-      && hpAtLeast(target.hp, target.getMaxHp(), Number(p.minPct), rounding)
-      && hpAtMost(target.hp, target.getMaxHp(), Number(p.maxPct), rounding)
+    return hpTargets(frame, String(p.who)).some(
+      target =>
+        hpAtLeast(target.hp, target.getMaxHp(), Number(p.minPct), rounding)
+        && hpAtMost(target.hp, target.getMaxHp(), Number(p.maxPct), rounding),
     );
   },
   "hp.crossed-below": p => frame => {
@@ -265,10 +310,10 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
   },
   "move.drains": () => frame => frame.move?.hasAttr("HitHealAttr") ?? false,
   "hit.landed-damage": () => frame => frame.hitResult !== undefined && DAMAGING_HIT_RESULTS.has(frame.hitResult),
-  "hit.critical": () => frame => !!frame.other?.turnData?.attacksReceived?.[0]?.critical,
+  "hit.critical": p => frame => !!holderLikeOf(frame, String(p.who))?.turnData?.attacksReceived?.[0]?.critical,
   "move.has-effect-chance": () => frame => frame.move !== undefined && frame.move.chance >= 0,
   "move.is-move": p => {
-    const id = enumValue(MoveId, String(p.moveId), "move");
+    const id = moveIdOf(String(p.moveId));
     return frame => frame.move !== undefined && frame.move.id === id;
   },
 
@@ -357,7 +402,7 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
   "time.first-turn": () => frame => frame.holder.tempSummonData.waveTurnCount === 1,
   "time.turn-count": p => frame => compare(frame.holder.tempSummonData.turnCount, p.cmp as CompareOp, Number(p.n)),
   "time.last-move": p => {
-    const id = enumValue(MoveId, String(p.moveId), "move");
+    const id = moveIdOf(String(p.moveId));
     return frame => holderLikeOf(frame, String(p.who))?.getLastXMoves()[0]?.move === id;
   },
   "time.last-move-flag": p => {
@@ -503,11 +548,178 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
     );
   },
 
+  // ---- Librarian pass (B19): atoms requested by the batch agents -------------------------------
+
+  // Hits and damage
+  "hit.dealt-damage": () => frame => frame.damage !== undefined && frame.damage > 0,
+  "hit.would-knock-out": p => frame => {
+    const target = holderLikeOf(frame, String(p.who));
+    if (target === undefined || frame.damage === undefined) {
+      return false;
+    }
+    // Written the way the classes write it, so a NaN damage answers the same (the 1 max HP form is the negated or).
+    return p.ignoreOneHpMax === true
+      ? !(target.getMaxHp() <= 1 || frame.damage < target.hp)
+      : frame.damage >= target.hp;
+  },
+  "hit.first-strike": p => frame => {
+    const mover = holderLikeOf(frame, String(p.who));
+    return mover !== undefined && mover.turnData.hitCount === mover.turnData.hitsLeft;
+  },
+
+  // Moves
+  "move.is-attack-move": () => frame => frame.move?.is("AttackMove") ?? false,
+  "move.targets-whole-side": () => frame =>
+    frame.move !== undefined
+    && [MoveTarget.BOTH_SIDES, MoveTarget.ENEMY_SIDE, MoveTarget.USER_SIDE].includes(frame.move.moveTarget),
+  "move.effective-priority": p => frame =>
+    frame.move !== undefined
+    && frame.moveUser !== undefined
+    && compare(frame.move.getPriority(frame.moveUser), p.cmp as CompareOp, Number(p.n)),
+  "move.has-flinch-effect": () => frame => frame.move?.hasAttr("FlinchAttr") ?? false,
+  "move.hits-substitute": () => frame => {
+    if (frame.move === undefined || frame.moveUser === undefined) {
+      return false;
+    }
+    const defender = frame.moveUser === frame.holder ? frame.other : frame.holder;
+    return defender !== undefined && frame.move.hitsSubstitute(frame.moveUser, defender);
+  },
+  "move.type-chart-effectiveness": p => frame => {
+    if (frame.move === undefined || frame.moveUser === undefined) {
+      return false;
+    }
+    const defender = frame.moveUser === frame.holder ? frame.other : frame.holder;
+    return (
+      defender !== undefined
+      && compare(
+        defender.getAttackTypeEffectiveness(frame.moveUser.getMoveType(frame.move), {
+          source: frame.moveUser,
+          move: frame.move,
+        }),
+        p.cmp as CompareOp,
+        Number(p.n),
+      )
+    );
+  },
+  "move.type-multiplier": p => frame =>
+    frame.typeMultiplier !== undefined && compare(frame.typeMultiplier, p.cmp as CompareOp, Number(p.n)),
+  "move.inflicts-status": p => {
+    const name = String(p.status);
+    const effect = enumValue(StatusEffect, name, "status");
+    return frame =>
+      frame.move !== undefined
+      && (frame.move.getAttrs("StatusEffectAttr").some(attr => attr.effect === effect)
+        || (name === "FREEZE"
+          && frame.move.getAttrs("AddBattlerTagAttr").some(attr => attr.tagType === BattlerTagType.ER_FROSTBITE)));
+  },
+  "move.ability-can-change-type": () => frame =>
+    frame.move !== undefined && !noAbilityTypeOverrideMoves.has(frame.move.id),
+  "mon.is-first-ally": () => frame => frame.other !== undefined && frame.holder.getAlly() === frame.other,
+
+  // Field
+  "field.weather-in-effect": p => {
+    const weathers = enumList(WeatherType, String(p.weathers), "weather") as WeatherType[];
+    if (p.reapAndSow === true) {
+      // Exactly the game's own helper, Reap and Sow rule included.
+      const condition = getWeatherCondition(...weathers);
+      return frame => condition(frame.holder);
+    }
+    return () => {
+      const weather = globalScene.arena.weather;
+      return !!weather && !weather.isEffectSuppressed() && weathers.includes(weather.weatherType);
+    };
+  },
+  "field.weather-lasting": () => () => globalScene.arena.weather?.isImmutable() ?? false,
+  "field.weather-fog": () => () => isFogWeather(globalScene.arena.weather?.weatherType),
+  "field.terrain-unhidden": p => {
+    const terrains = enumList(TerrainType, String(p.terrains), "terrain") as TerrainType[];
+    return () => {
+      const terrain = globalScene.arena.terrain?.terrainType;
+      return !!terrain && terrains.includes(terrain);
+    };
+  },
+  "field.terrain-just-set": p => {
+    const terrains = enumList(TerrainType, String(p.terrains), "terrain") as TerrainType[];
+    // `find` then `!!`, as the class writes it: a listed NONE (0) is found but falsy, so it never counts.
+    return frame => !!terrains.find(terrain => terrain === frame.terrain);
+  },
+
+  // Status and battle effects
+  "status.has-any": p => {
+    const statuses = enumList(StatusEffect, String(p.statuses), "status") as StatusEffect[];
+    return frame => {
+      const status = holderLikeOf(frame, String(p.who))?.status;
+      return status != null && (statuses.length === 0 || statuses.includes(status.effect));
+    };
+  },
+  "tag.has-any": p => {
+    const tags = enumList(BattlerTagType, String(p.tags), "battle effect") as BattlerTagType[];
+    return frame => {
+      const target = holderLikeOf(frame, String(p.who));
+      return target !== undefined && tags.some(tag => !!target.getTag(tag));
+    };
+  },
+  "status.just-set": p => {
+    const statuses = enumList(StatusEffect, String(p.statuses), "status") as StatusEffect[];
+    return frame => frame.status !== undefined && statuses.includes(frame.status);
+  },
+
+  // Pokemon and party
+  "mon.fainted": p => frame => holderLikeOf(frame, String(p.who))?.isFainted() ?? false,
+  "mon.level": p => frame => {
+    const target = holderLikeOf(frame, String(p.who));
+    return target !== undefined && compare(target.level, p.cmp as CompareOp, Number(p.n));
+  },
+  "mon.form-number": p => frame => {
+    const target = holderLikeOf(frame, String(p.who));
+    return target !== undefined && compare(target.formIndex, p.cmp as CompareOp, Number(p.n));
+  },
+  "mon.terastallized": p => frame => !!holderLikeOf(frame, String(p.who))?.isTerastallized,
+  "party.ally-active": () => frame => !!frame.holder.getAlly()?.isActive(true),
+  "party.multi-battle": () => () => (globalScene.currentBattle?.getBattlerCount() ?? 1) > 1,
+  "party.bench-count": p => frame =>
+    compare(
+      partyOf(frame.holder).filter(member => !member.isFainted() && !member.isOnField()).length,
+      p.cmp as CompareOp,
+      Number(p.n),
+    ),
+
+  // Time and memory (read only; the writes belong to the class or to time.once-per)
+  "time.turn-count-multiple": p => frame => {
+    const turn = frame.holder.tempSummonData?.turnCount ?? 0;
+    return turn > 0 && turn % Number(p.n) === 0;
+  },
+  "time.switched-in-this-turn": p => frame => !!holderLikeOf(frame, String(p.who))?.turnData?.switchedInThisTurn,
+  "time.failed-run-away": p => frame => !!holderLikeOf(frame, String(p.who))?.turnData?.failedRunAway,
+  "time.last-move-result": p => {
+    const want = enumValue(MoveResult, String(p.result), "move result");
+    return frame => {
+      const result = holderLikeOf(frame, String(p.who))?.getLastXMoves(1)[0]?.result;
+      return p.negate === true ? result !== want : result === want;
+    };
+  },
+  "time.last-move-was-follow-up": p => frame =>
+    holderLikeOf(frame, String(p.who))?.getLastXMoves(1)[0]?.useMode === MoveUseMode.INDIRECT,
+  "time.marker-set": p => {
+    const scope = String(p.scope);
+    const key = String(p.key);
+    const prefix = p.match === "prefix";
+    return frame => {
+      const target = holderLikeOf(frame, String(p.who));
+      const data =
+        scope === "battle" ? target?.battleData : scope === "switch-in" ? target?.summonData : target?.turnData;
+      const markers = data?.erAbilityProvenance ?? [];
+      return prefix ? markers.some(marker => marker.startsWith(key)) : markers.includes(key);
+    };
+  },
+
   // RNG: evaluated at its own position in the IF list, the only impure atom.
   "rng.chance": p => frame => {
     const pct = Number(p.pct);
-    return frame.simulated || pct >= 100 || frame.holder.randBattleSeedInt(100) < pct;
+    return frame.simulated || (p.alwaysRoll !== true && pct >= 100) || frame.holder.randBattleSeedInt(100) < pct;
   },
+  // One draw from the global stream, always (even at 100), compared the way PostTurnRestoreBerryAbAttr compares it.
+  "rng.chance-float": p => () => Number(p.pct) / 100 >= randSeedFloat(),
 
   // Escape hatches
   "escape.engine-guard": p => {

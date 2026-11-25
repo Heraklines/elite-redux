@@ -1039,7 +1039,11 @@
     return `<span class="cb-badge cb-badge-package" title="${esc(reason || "A single mechanic that cannot be split into smaller blocks. You can still set its settings and reuse it as a whole.")}">Works as one piece</span>`;
   }
 
-  function optionText(value) {
+  function optionText(value, def) {
+    const given = def?.optionLabels?.[value];
+    if (given !== undefined) {
+      return given;
+    }
     const words = VALUE_WORDS[value];
     return words === undefined ? pretty(value) : upperFirst(words);
   }
@@ -1070,7 +1074,7 @@
         control = `<select aria-label="${label}" ${attrs}>${(def.options ?? [])
           .map(
             option =>
-              `<option value="${esc(option)}"${option === current ? " selected" : ""}>${esc(optionText(option))}</option>`,
+              `<option value="${esc(option)}"${option === current ? " selected" : ""}>${esc(optionText(option, def))}</option>`,
           )
           .join("")}</select>`;
         break;
@@ -1326,7 +1330,7 @@
   function pickItemHtml(model, kind, entry) {
     if (kind === "when") {
       const { def, fit } = entry;
-      return `<button type="button" role="option" class="cb-pick${fit.ok ? "" : " cb-pick-off"}" data-cb-action="pick" data-cb-block="${esc(def.id)}"${fit.ok ? "" : " disabled"}><span class="cb-pick-main"><b>${esc(def.label)}</b>${fit.ok ? "" : `<small>${esc(fit.reason)}</small>`}</span><span class="cb-pick-tags"><i>${esc(def.group)}</i></span></button>`;
+      return `<button type="button" role="option" class="cb-pick${fit.ok ? "" : " cb-pick-off"}" data-cb-action="pick" data-cb-block="${esc(def.id)}"${fit.ok ? "" : " disabled"}><span class="cb-pick-main"><b>${esc(def.label)}</b>${fit.ok ? (def.summary ? `<small>${esc(def.summary)}</small>` : "") : `<small>${esc(fit.reason)}</small>`}</span><span class="cb-pick-tags"><i>${esc(def.group)}</i></span></button>`;
     }
     const { def, fit } = entry;
     const label = upperFirst(model.renderLabel(def.label, model.defaultParams(def), def.params));
@@ -1339,7 +1343,7 @@
           : def.kind === "package"
             ? "Whole mechanic"
             : "Event";
-    return `<button type="button" role="option" class="cb-pick${fit.ok ? "" : " cb-pick-off"}" data-cb-action="pick" data-cb-block="${esc(def.id)}"${fit.ok ? "" : " disabled"}><span class="cb-pick-main"><b>${esc(label)}</b>${fit.ok ? (def.examples[0] ? `<small>e.g. ${esc(def.examples[0])}</small>` : "") : `<small>${esc(fit.reason)}</small>`}</span><span class="cb-pick-tags">${badge}<i>${esc(tag)}</i></span></button>`;
+    return `<button type="button" role="option" class="cb-pick${fit.ok ? "" : " cb-pick-off"}" data-cb-action="pick" data-cb-block="${esc(def.id)}"${fit.ok ? "" : " disabled"}><span class="cb-pick-main"><b>${esc(label)}</b>${fit.ok ? (def.summary ? `<small>${esc(def.summary)}</small>` : def.examples[0] ? `<small>e.g. ${esc(def.examples[0])}</small>` : "") : `<small>${esc(fit.reason)}</small>`}</span><span class="cb-pick-tags">${badge}<i>${esc(tag)}</i></span></button>`;
   }
 
   function pickerListHtml(model, rule) {

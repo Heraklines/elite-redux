@@ -387,6 +387,10 @@ export const TEMPLATES: Readonly<Record<string, ScenarioSpec>> = {
 /** Moment families for WHENs that need no battle of their own. */
 export const STATIC_WHEN_REASONS: Readonly<Record<string, string>> = {
   "while.active": "A flag checked by presence (instanceof / hasAttr); nothing is dispatched.",
+  "event.wild-pokemon-created":
+    "Wild encounter generation: no battle exists yet at that moment, so no scenario can reach it (B07 drives the dispatch directly).",
+  "event.ability-lost":
+    "Dispatched when an ability is replaced or switched off (Gastro Acid, Neutralizing Gas); no shared scenario does either (B07 drives the dispatch directly).",
 };
 
 const t = {

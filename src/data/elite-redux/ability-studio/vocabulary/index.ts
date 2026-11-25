@@ -8,6 +8,7 @@
 // The game-side evaluators live in ./evaluate/.
 
 // biome-ignore lint/performance/noBarrelFile: the pure entry point the editor worker bundles
+export * from "./block-categories";
 export * from "./blocks";
 export * from "./composition-types";
 export * from "./conditions";
@@ -17,6 +18,7 @@ export * from "./enums";
 export * from "./guards";
 export * from "./params";
 export * from "./slots";
+export * from "./texts";
 export * from "./validate-composition";
 export { STATEFUL_CONDITION_IDS, validateCompositionWith, validateConditionSpecWith } from "./validate-core";
 export * from "./vocabulary-json";

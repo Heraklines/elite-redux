@@ -58,13 +58,13 @@ export default defineDecl(GlamRockAbAttr, {
   tier: "B",
   kind: "package",
   when: "event.end-of-turn",
-  label: "Eat a layer of a hazard on my side and raise my defences",
+  label: "Eat a layer of a hazard on my side and raise my defenses",
   summary: params =>
     `At the end of the turn, if an entry hazard is on my side, one hazard loses ${params.layersRemoved} layer (or disappears) and my ${params.firstStat} and ${params.secondStat} rise by ${params.stages} stage.`,
   synonyms: [
     "clear hazards",
     "eat spikes",
-    "hazard to defence",
+    "hazard to defense",
     "stealth rock eater",
     "hazard removal boost",
     "glam rock",

@@ -47,7 +47,7 @@ export default defineDecl(AnnealAbAttr, {
   tier: "B",
   kind: "package",
   when: "event.after-hit",
-  label: "Raise a defence after a resisted hit, a few times per entry",
+  label: "Raise a defense after a resisted hit, a few times per entry",
   summary: params =>
     `After a damaging hit that my typing resists (but does not block), I gain ${params.stages} stage${Number(params.stages) === 1 ? "" : "s"} of ${params.physicalStat} if it was physical, else ${params.specialStat}. At most ${params.maxTriggers} times per switch-in, once per foe move.`,
   synonyms: [
