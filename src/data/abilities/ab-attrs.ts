@@ -3719,7 +3719,6 @@ export class PostSummonTerrainChangeAbAttr extends PostSummonAbAttr {
 /** Heals a status effect if the Pokemon is afflicted with it upon switch in (or gain) */
 export class PostSummonHealStatusAbAttr extends PostSummonRemoveEffectAbAttr {
   private readonly immuneEffects: readonly StatusEffect[];
-  private statusHealed: StatusEffect;
 
   /**
    * @param immuneEffects - The {@linkcode StatusEffect}s the Pokémon is immune to.
@@ -3755,19 +3754,19 @@ export class PostSummonHealStatusAbAttr extends PostSummonRemoveEffectAbAttr {
 
   public override apply({ pokemon }: AbAttrBaseParams): void {
     // TODO: should probably check against simulated...
-    const status = pokemon.status?.effect;
-    if (status != null) {
-      this.statusHealed = status;
+    if (pokemon.status?.effect != null) {
       pokemon.resetStatus(false);
       pokemon.updateInfo();
     }
   }
 
+  /**
+   * Names the status that is about to be cured. The dispatcher asks for the message before `apply` runs, so it reads the
+   * holder's current status; a remembered field would show the previous cure of this (shared) instance, or nothing.
+   */
   public override getTriggerMessage({ pokemon }: AbAttrBaseParams): string | null {
-    if (this.statusHealed) {
-      return getStatusEffectHealText(this.statusHealed, getPokemonNameWithAffix(pokemon));
-    }
-    return null;
+    const status = pokemon.status?.effect;
+    return status == null ? null : getStatusEffectHealText(status, getPokemonNameWithAffix(pokemon));
   }
 }
 

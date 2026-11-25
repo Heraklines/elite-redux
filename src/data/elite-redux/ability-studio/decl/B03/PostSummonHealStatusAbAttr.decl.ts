@@ -9,9 +9,9 @@
 //   canApply (gate && residual, in that order)
 //     gate      my status is one of the listed ones, or ANY status when the list is empty
 //     residual  I have a status at all (`pokemon.status?.effect != null`)
-//   apply       cures whatever status I have (`resetStatus(false)` + `updateInfo()`), remembers it for the message;
-//               it does NOT look at `simulated`
-//   message     `getTriggerMessage` reads the remembered status ("<name> was cured of its <status>")
+//   apply       cures whatever status I have (`resetStatus(false)` + `updateInfo()`); it does NOT look at `simulated`
+//   message     `getTriggerMessage` names the holder's current status, i.e. the one about to be cured (it is asked for
+//               before `apply`); before 2026-11-25 it read a field `apply` had set on an earlier cure (stale message bug)
 //
 // The two clauses of the original `status != null && (list empty || list includes status)` are pure, so the list test
 // runs first and "I have a status" second with the same answer. The list is read only by the gate: `apply` cures
@@ -62,8 +62,7 @@ export default defineDecl(PostSummonHealStatusAbAttr, {
       ctorIndex: 0,
       path: "immuneEffects",
       control: "text",
-      label:
-        "Status problems that cure me (Poison, Bad poison, Paralysis, Sleep, Freeze, Burn; empty = any)",
+      label: "Status problems that cure me (Poison, Bad poison, Paralysis, Sleep, Freeze, Burn; empty = any)",
       editable: false,
       default: "Paralysis",
       options: STATUS_NAMES,

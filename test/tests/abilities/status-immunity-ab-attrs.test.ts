@@ -1,4 +1,7 @@
+import { PostSummonHealStatusAbAttr } from "#abilities/ab-attrs";
+import { getPokemonNameWithAffix } from "#app/messages";
 import { allMoves } from "#data/data-lists";
+import { getStatusEffectHealText } from "#data/status-effect";
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { MoveResult } from "#enums/move-result";
@@ -72,6 +75,30 @@ describe.each<{ name: string; ability: AbilityId; status: StatusEffect }>([
     await game.toEndOfTurn();
 
     expect(feebas.status?.effect).toBeUndefined();
+  });
+
+  // Regression: the message used to read a field that `apply` set on the previous cure of the same (shared) attr
+  // instance. The dispatcher asks for the message before `apply`, so a fresh instance said nothing on its first cure and
+  // a used one could name another holder's status.
+  it(`should announce the cure of ${statusStr} on the first cure, naming that status`, async () => {
+    await game.classicMode.startBattle(SpeciesId.FEEBAS);
+
+    const feebas = game.field.getPlayerPokemon();
+    feebas.doSetStatus(status);
+    const expected = getStatusEffectHealText(status, getPokemonNameWithAffix(feebas));
+
+    // applySingleAbAttrs asks for the message before `apply`: an instance that has never cured anything must name it.
+    const fresh = new PostSummonHealStatusAbAttr(status);
+    expect(fresh.getTriggerMessage({ pokemon: feebas, simulated: false })).toBe(expected);
+
+    // And in battle, through Skill Swap.
+    game.textInterceptor.clearLogs();
+    game.move.use(MoveId.SPLASH);
+    await game.move.forceEnemyMove(MoveId.SKILL_SWAP);
+    await game.toEndOfTurn();
+
+    expect(feebas.status?.effect).toBeUndefined();
+    expect(game.textInterceptor.logs).toContain(expected);
   });
 
   // TODO: This does not propagate failures currently
