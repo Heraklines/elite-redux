@@ -288,7 +288,8 @@ export const EFFECT_TEXTS: Readonly<Record<string, VocabularyText>> = {
     category: "Status conditions",
   },
   "effect.cure-status": {
-    summary: "Cures a status condition, or any status. Example: cure my own paralysis when I enter.",
+    summary:
+      "Cures a status condition, or any status, of the chosen Pokemon or of everyone on my side. Example: cure my own paralysis when I enter.",
     category: "Status conditions",
   },
   "effect.apply-tag": {
@@ -312,7 +313,8 @@ export const EFFECT_TEXTS: Readonly<Record<string, VocabularyText>> = {
 
   // ---- Weather and terrain ----------------------------------------------------------------
   "effect.set-weather": {
-    summary: "Changes the weather. Example: set Rain when I enter, like Drizzle.",
+    summary:
+      "Changes the weather. Turns 0 keeps the usual length; another number sets how many turns it lasts. Example: Rain for 8 turns when I enter, like Drizzle.",
     category: "Weather & terrain",
   },
   "effect.clear-weather": {
@@ -321,7 +323,8 @@ export const EFFECT_TEXTS: Readonly<Record<string, VocabularyText>> = {
     category: "Weather & terrain",
   },
   "effect.set-terrain": {
-    summary: "Changes the terrain. Example: set Electric Terrain when I enter, like Electric Surge.",
+    summary:
+      "Changes the terrain. Turns 0 keeps the usual length; another number sets how many turns it lasts. Example: Electric Terrain for 8 turns, like Electric Surge.",
     category: "Weather & terrain",
   },
   "effect.arena-tag": {
@@ -539,7 +542,7 @@ export const EFFECT_TEXTS: Readonly<Record<string, VocabularyText>> = {
   },
   "effect.remove-arena-tags": {
     summary:
-      "Removes listed field effects such as screens or hazards from a side; the other Pokemon's side needs a trigger with one. Example: Screen Cleaner.",
+      "Removes field effects from a side: screens, Smokescreen, Spikes, Toxic Spikes, Stealth Rock, Sticky Web or Tailwind. The other Pokemon's side needs a trigger with one. Example: Screen Cleaner.",
     category: "Weather & terrain",
   },
 };

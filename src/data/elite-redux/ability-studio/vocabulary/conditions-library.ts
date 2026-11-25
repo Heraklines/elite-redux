@@ -405,7 +405,7 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "party.ally-active",
     group: "Party",
-    label: "I have an ally that can still fight",
+    label: "My first ally can still fight (advanced)",
     requires: ["holder"],
     params: [],
     pure: true,
@@ -527,17 +527,17 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "time.marker-set",
     group: "Time",
-    label: "A marker called {key} is set on {who} (advanced)",
+    label: "The reminder {key} is set on {who} (advanced)",
     requires: [],
     whoParam: "who",
     params: [
       WHO(),
-      selectParam("scope", "How long the marker lasts", ["battle", "switch-in", "turn"], "battle", {
+      selectParam("scope", "How long the reminder lasts", ["battle", "switch-in", "turn"], "battle", {
         battle: "The whole battle",
         "switch-in": "Until I switch out",
         turn: "This turn only",
       }),
-      textParam("key", "Marker name", "marker"),
+      textParam("key", "Reminder name", "marker"),
       selectParam("match", "Match the name", ["exact", "prefix"], "exact", {
         exact: "Exactly this name",
         prefix: "Starts with this name",
@@ -551,7 +551,7 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
       source:
         "src/data/pokemon/pokemon-data.ts:322, :533, :686 erAbilityProvenance; fakemon-pitch-mechanics.ts:630, :664",
     },
-    synonyms: ["marker", "flag", "memory", "already marked", "remembered", "tagged"],
+    synonyms: ["marker", "flag", "memory", "already marked", "remembered", "tagged", "reminder"],
     examples: ["Only if my entry marker is not set yet"],
   },
 
@@ -584,7 +584,7 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
       source:
         "src/data/elite-redux/archetypes/stab-add.ts:138-140 (negated, getTypes(false, false)); src/data/elite-redux/archetypes/stab-suppress-aura.ts:59-60 (getTypes(true))",
     },
-    synonyms: ["same type attack", "stab", "matches my type", "on-type move", "my own type"],
+    synonyms: ["same type attack", "stab", "matches my type", "on-type move", "my own type", "same type as me"],
     examples: ["Boost only moves that do not match my types, like Mystic Power"],
   },
   {
@@ -635,14 +635,15 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "mon.species",
     group: "Pokemon",
-    label: "{who} is a {species}",
+    label: "{who}'s species is {species}",
     requires: [],
     whoParam: "who",
     params: [WHO(), textParam("species", "Which Pokemon species (type its name)", "Terapagos")],
     pure: true,
     formula: {
-      expr: "pokemon.hasSpecies(SpeciesId[species])  (an unknown name is refused when the rule is built)",
-      source: "src/data/elite-redux/abilities/fakemon-pitch-raichu.ts:124; src/field/pokemon.ts:2605 hasSpecies",
+      expr: "pokemon.hasSpecies(id), id = SpeciesId[species] first (every name that resolved before keeps its id), then ErSpeciesId (Elite Redux species); an unknown name is refused when the rule is built",
+      source:
+        "src/data/elite-redux/abilities/fakemon-pitch-raichu.ts:124; src/field/pokemon.ts:2605 hasSpecies; src/enums/er-species-id.ts",
     },
     synonyms: ["species", "which pokemon", "is this pokemon", "pokedex entry", "signature pokemon"],
     examples: ["Only when I am a Terapagos"],
@@ -693,7 +694,7 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "time.hits-taken",
     group: "Time",
-    label: "{who} has been hit {cmp} {n} times this battle",
+    label: "The number of times {who} was hit this battle is {cmp} {n}",
     requires: [],
     whoParam: "who",
     params: [WHO(), CMP(), numberParam("n", "Number of hits taken", 1, 0, 99, 1, true)],
@@ -766,18 +767,20 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "time.acted-before",
     group: "Time",
-    label: "{first} moved before {second} this turn",
+    label: "{order} this turn",
     requires: ["holder", "other"],
     params: [
-      selectParam("first", "Which Pokemon moved first", HIT_SIDE_OPTIONS, "holder"),
-      selectParam("second", "Which Pokemon moved later", HIT_SIDE_OPTIONS, "other"),
+      selectParam("order", "Who moved first", ["holder-first", "other-first"], "holder-first", {
+        "holder-first": "I moved before the other Pokemon",
+        "other-first": "The other Pokemon moved before me",
+      }),
     ],
     pure: true,
     formula: {
-      expr: "pokemonActedBefore(first, second): order = getLastTurnOrder(); first absent -> no; second absent -> yes; else index(first) < index(second)",
+      expr: "holder-first: pokemonActedBefore(holder, other) ; other-first: pokemonActedBefore(other, holder) ; order = getLastTurnOrder(); first absent -> no; second absent -> yes; else index(first) < index(second)",
       source: "src/data/elite-redux/abilities/relativity.ts:53-62 (the exported helper is called)",
     },
-    synonyms: ["moved first", "outsped", "acted first", "turn order", "relativity"],
+    synonyms: ["moved first", "outsped", "acted first", "turn order", "relativity", "faster", "went first"],
     examples: ["Take less damage from a foe that moved after me, like Relativity"],
   },
   {
@@ -801,9 +804,9 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
     requires: [],
     params: [
       selectParam("aura", "Which aura", ["dark", "fairy", "either"], "either", {
-        dark: "Dark Aura",
-        fairy: "Fairy Aura",
-        either: "Dark Aura or Fairy Aura",
+        dark: "the Dark Aura ability",
+        fairy: "the Fairy Aura ability",
+        either: "the Dark Aura or Fairy Aura ability",
       }),
     ],
     pure: true,
@@ -874,17 +877,17 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "mon.charge-stacks",
     group: "Pokemon",
-    label: "{who} has {cmp} {n} charge stacks",
+    label: "{who}'s electric charges are {cmp} {n}",
     requires: [],
     whoParam: "who",
-    params: [WHO(), CMP(), numberParam("n", "Charge stacks (0-4)", 1, 0, 4, 1, true)],
+    params: [WHO(), CMP(), numberParam("n", "Electric charges (0-4)", 1, 0, 4, 1, true)],
     pure: true,
     formula: {
       expr: "compare(getCharge(pokemon), cmp, n)  (the shared charge store; 0 when unset)",
       source: "src/data/elite-redux/abilities/charge-stack.ts:31-33 getCharge",
     },
-    synonyms: ["charge", "stacks", "capacitor bank", "overloaded", "stored charge"],
-    examples: ["Boost power once I hold at least 2 charge stacks"],
+    synonyms: ["charge", "stacks", "capacitor bank", "overloaded", "stored charge", "electric charge", "charge stacks"],
+    examples: ["Boost power once I hold at least 2 electric charges"],
   },
   {
     id: "mon.mega-evolved",
@@ -892,7 +895,7 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
     label: "{who} is Mega Evolved",
     requires: [],
     whoParam: "who",
-    params: [selectParam("who", "Which Pokemon", HIT_SIDE_OPTIONS, "other")],
+    params: [selectParam("who", "Which Pokemon", HIT_SIDE_OPTIONS, "holder")],
     pure: true,
     formula: {
       expr: "!!pokemon && pokemon.isMega()",
@@ -907,7 +910,7 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
     label: "{who} is in a Gigantamax form",
     requires: [],
     whoParam: "who",
-    params: [selectParam("who", "Which Pokemon", HIT_SIDE_OPTIONS, "other")],
+    params: [selectParam("who", "Which Pokemon", HIT_SIDE_OPTIONS, "holder")],
     pure: true,
     formula: {
       expr: "!!pokemon && /gmax|gigantamax/i.test(pokemon.getFormKey())",
@@ -919,7 +922,7 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
   {
     id: "time.max-uses-per-wave",
     group: "Time",
-    label: "Counter {key} has under {max} uses this wave (advanced)",
+    label: "Uses of counter {key} this wave are below {max} (advanced)",
     requires: ["holder"],
     params: [
       textParam("key", "Counter name", "wishmaker"),
@@ -927,7 +930,7 @@ export const LIBRARY_CONDITIONS: readonly ConditionBase[] = [
     ],
     pure: true,
     formula: {
-      expr: 'count of k in holder.waveData.entryEffectsFired with k.startsWith(key + "#") < max  (read only: the class writes key#n when it casts; a preview passes in the class before this read)',
+      expr: 'count of k in holder.waveData.entryEffectsFired with k.startsWith(key + "#") < max  (read only: only the built-in class writes key#n when it casts, no block does; a preview passes in the class before this read)',
       source: "src/data/elite-redux/archetypes/post-summon-scripted-move.ts:109-117 countUses, :137-141 gate",
     },
     synonyms: ["uses left", "limited uses", "times per wave", "use cap", "wishmaker"],

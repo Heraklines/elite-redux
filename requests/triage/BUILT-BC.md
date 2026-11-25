@@ -6,7 +6,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 # Built: waves B (guards) and C (effects)
 
-Test file: `test/tests/elite-redux/decomp/library-completion-wave-bc.test.ts` (47 tests). Short paths as in BUILD-LIST.md.
+Test file: `test/tests/elite-redux/decomp/library-completion-wave-bc.test.ts` (66 tests). Short paths as in BUILD-LIST.md.
 No declaration was changed. The "classes" column lists the declarations a later completion pass can rebind.
 
 ## Wave B: guards
@@ -151,7 +151,92 @@ Count: 36 blocks (37 ids). All of them compile with default settings (the last t
   Rock, Sticky Web and Tailwind (every shipped user).
 - biome reports 5 cognitive-complexity infos in `EV/effects.ts` (information only, not errors).
 
+## Round 3: twin tests (and the one library change they caused)
+
+Each twin gives the same inputs to the real class (its checks, then its `apply`, including the preview and the
+already-active or blocked case where the class has one) and to the compiled block (its safety checks, then its run). It
+then compares the observable result: state, queued phases and messages, and random draws.
+
+**Library change from a twin:** `effect.clear-weather` with `keepExtreme: false` now carries
+PostSummonClearWeatherAbAttr's pre-check as feasibility (`arena.weather` is set and is not NONE). Before, the block called
+`trySetWeather(NONE)` with no weather up, where the class does nothing. PreLeaveFieldClearWeatherAbAttr's own-weather
+clause implies the same check, so both classes still match. The `keepExtreme: true` path is unchanged.
+
+The classes' replaceable conditions (gates) are rule IFs, not part of a block. Where a twin calls a class, it calls
+`residual` + `apply` (or `canApply` + `apply` when the class has no gate split), and the block's feasibility + run.
+
+## Round 4: staff text fixes (FinalStaff B1, B3, nb5, nb7, nb8, nb9, nb10, nb11)
+
+Text only; no formula changed.
+- **Labels now show the setting that matters:**
+  - hit-n-times: "Add {extraStrikes} hits to the move"
+  - cure-status: "Cure {target} of {status} (cured: {scope})"
+  - stat-stages: "Change {stats} of {target} by {stages} stage(s)", with player-word target choices
+  - change-own-type: "Change {who} type to {type}"
+  - hurt-percent-of-max-hp: "Hurt {targets} by {fraction} of their own max HP"
+  - drain-adjacent-foes: "Take {fraction} of each adjacent foe's max HP and heal me"
+  - add-stat-share: "Add {share} of my {sourceStat} to the stat"
+  - multiply-stat-per-fainted-ally: "Raise the stat by {share} of itself per fainted teammate"
+  - drain-pp: "Take {amount} PP from the other Pokemon: {which}"
+  - change-charge-stacks: "Change my electric charge: {mode} (amount {amount})"
+  - stat-stage-on-highest: "Change {target} highest of {stats} by {stages} stage(s)"
+  - steal-item: "Steal a random held item from {from}"
+- **Choice wording:**
+  - remove-type uses "me".
+  - heal-fraction: "My active adjacent allies (shows a message)", and its smallest share is now 1/2.
+  - Same-sounding choices are split inside cure-status (scope), heal-fraction and reset-stat-stages (side vs "next to me").
+  - multiply-power-per-count's default now renders in 57 characters.
+- set-weather / set-terrain: templates have no optional parts, so the summaries now explain `turns`.
+- remove-arena-tags lists its accepted names in the setting label and the summary.
+- The search words requested in B3 were added.
+- A test now renders every wave-C default label with its choice words and checks the 60-character limit.
+
 ## Test counts
 
-Run: wave-bc + vocabulary-naming + l0-lint + evaluate-conditions → 4 files, 93 tests, all passing (wave-bc has 47). biome
-reports no errors on my files (infos only); tsc reports nothing in them.
+Run: wave-bc + vocabulary-naming + l0-lint + evaluate-conditions → 4 files, 116 tests, all passing (wave-bc has 66).
+biome reports no errors on my files (infos only); tsc reports nothing in them.
+
+## Twin table
+
+| block | twin class | twin test name |
+|---|---|---|
+| guard `not-simulated` | no class: a clause in several classes' checks (BypassSpeedChanceAbAttr's first clause is covered by the jump-turn-order twin) | not-simulated is !simulated |
+| guard `another-holder-keeps-weather` | PreLeaveFieldClearWeatherAbAttr.canApply | another-holder-keeps-weather (with 'the weather is X') twins PreLeaveFieldClearWeatherAbAttr.canApply |
+| guard `foe-can-be-trapped` | ArenaTrapAbAttr.canApply clauses 2-3 (clause 1 is the class's own trap condition) | foe-can-be-trapped matches ArenaTrapAbAttr clauses 2 and 3 (Ghost with tera rules, Run Away) |
+| `effect.add-stat-share` | SpeedBonusToStatAbAttr | add-stat-share equals SpeedBonusToStatAbAttr (floor on the bonus only), add and replace |
+| `effect.multiply-stat` | StatMultiplierAbAttr | multiply-stat equals StatMultiplierAbAttr; 'the stat being calculated' skips the stat check |
+| `effect.multiply-stat-per-fainted-ally` | FaintedAllyStatMultiplierAbAttr | multiply-stat-per-fainted-ally equals FaintedAllyStatMultiplierAbAttr and never counts the holder |
+| `effect.set-accuracy` | SetMoveAccuracyAbAttr | set-accuracy equals SetMoveAccuracyAbAttr residual and apply at the boundaries (-1, N-1, N) |
+| `effect.ignore-secondary-effects` | IgnoreMoveEffectsAbAttr | ignore-secondary-effects equals IgnoreMoveEffectsAbAttr at 0 and 1 |
+| `effect.multiply-power-per-count` | FanFavoritePowerAbAttr, HeavyweightPowerAbAttr | multiply-power-per-count twins FanFavoritePowerAbAttr (bench) and HeavyweightPowerAbAttr (weight classes) |
+| `effect.multiply-accuracy-per-count` | FanFavoriteAccuracyAbAttr | multiply-accuracy-per-count twins FanFavoriteAccuracyAbAttr (guard, bench counts 0 to 6) |
+| `effect.use-weaker-defense` | CritUseLowerDefensiveStatAbAttr | use-weaker-defense equals CritUseLowerDefensiveStatAbAttr, tie goes to Defense |
+| `effect.trap-foe` | ArenaTrapAbAttr.apply | trap-foe twins ArenaTrapAbAttr.apply |
+| `effect.jump-turn-order` | BypassSpeedChanceAbAttr (its chance roll is the rule's rng.chance IF) | jump-turn-order twins BypassSpeedChanceAbAttr (the chance roll is the rule's rng.chance IF) |
+| `effect.reflect-stat-drop` | ReflectStatStageChangeAbAttr | reflect-stat-drop equals ReflectStatStageChangeAbAttr on the real dispatch parameters (cancel.stat-reflect) |
+| `effect.hit-n-times` | HitMultiplierAbAttr.apply | hit-n-times twins HitMultiplierAbAttr.apply |
+| `effect.scripted-move-at` | PostSummonScriptedMoveAbAttr | scripted-move-at twins PostSummonScriptedMoveAbAttr (first foe, every foe, myself; no foe standing) |
+| `effect.cancel-recharge` | PostVictoryClearRechargeAbAttr.apply | cancel-recharge twins PostVictoryClearRechargeAbAttr.apply |
+| `effect.remove-type` | PostAttackRemoveTargetTypeAbAttr (ab-attrs and archetype) | remove-type twins both PostAttackRemoveTargetTypeAbAttr classes (Tera rules / UNKNOWN, plain / NORMAL) |
+| `effect.change-own-type` | PostAttackChangeTargetTypeAbAttr | change-own-type twins PostAttackChangeTargetTypeAbAttr (a fixed type, the move's type, a preview) |
+| `effect.stat-stage-on-highest` | SelfHighestStatBoostOnSummonAbAttr, TypeImmunityHighestAttackStatStageAbAttr | stat-stage-on-highest twins SelfHighestStatBoostOnSummonAbAttr and TypeImmunityHighestAttackStatStageAbAttr |
+| `effect.drain-adjacent-foes` | PostTurnDrainAbAttr | drain-adjacent-foes twins PostTurnDrainAbAttr (fainted, trapped-only, previews) |
+| `effect.force-other-out` | PostDamageForceAttackerOutAbAttr (without its once-per-switch-in memory) | force-other-out twins PostDamageForceAttackerOutAbAttr (switch possible or not, preview) |
+| `effect.set-marker` | `unique`: claimSummonAbilityProvenance (a function, not a class); plain push: no class (an inline push inside several FPM classes) | clear-marker twins BallasterResetAbAttr; set-marker `unique` twins claimSummonAbilityProvenance |
+| `effect.clear-marker` | BallasterResetAbAttr | clear-marker twins BallasterResetAbAttr; set-marker `unique` twins claimSummonAbilityProvenance |
+| `effect.change-charge-stacks` | no class: the charge-stack.ts functions themselves | change-charge-stacks uses the shared store (clamped at 4) |
+| `effect.drain-pp` | PpReductionOnContactAbAttr, OnFaintEffectAbAttr (attacker PP drain), FoulHarvestAbAttr (the drain part) | drain-pp twins PpReductionOnContactAbAttr, OnFaintEffectAbAttr (attacker PP drain) and FoulHarvestAbAttr |
+| `effect.match-weather-form` | PostSummonFormChangeByWeatherAbAttr | match-weather-form twins PostSummonFormChangeByWeatherAbAttr (a form it can take, one it cannot, a preview) |
+| `effect.give-ability` | PostAttackAbilityGiveAbAttr, PostDefendAbilityGiveAbAttr | give-ability twins PostAttackAbilityGiveAbAttr and PostDefendAbilityGiveAbAttr (residuals, Mummy rules, preview) |
+| `effect.remove-arena-tags` | PostSummonRemoveArenaTagAbAttr, BreakScreensOnAttackAbAttr | remove-arena-tags twins PostSummonRemoveArenaTagAbAttr (each side mode) and BreakScreensOnAttackAbAttr |
+| `effect.clear-weather` | EntryTailwindClearWeatherAbAttr (keep extreme), PostSummonClearWeatherAbAttr (any) | clear-weather twins EntryTailwindClearWeatherAbAttr (keep extreme) and PostSummonClearWeatherAbAttr (any) |
+| `effect.reset-stat-stages` | ClearOpponentStatBuffsOnSummonAbAttr | reset-stat-stages twins ClearOpponentStatBuffsOnSummonAbAttr (raised stats only, fainted foes, no foes) |
+| `effect.hurt-percent-of-max-hp` | PostTurnHurtNonTypedAbAttr | hurt-percent-of-max-hp equals PostTurnHurtNonTypedAbAttr (spared types, fainted foes, the indirect-damage check) |
+| `effect.heal-fraction-of-max-hp` | PostSummonAllyHealAbAttr (my adjacent allies); other targets: no class | heal-fraction-of-max-hp twins PostSummonAllyHealAbAttr (active and inactive allies, animation, preview) |
+| `effect.stat-stages` | PostSummonStatStageChangeAbAttr (me; every adjacent foe with Intimidate rules), PostDefendStatStageChangeAbAttr (the other; every other adjacent) | stat-stages twins PostSummonStatStageChangeAbAttr (me) and PostDefendStatStageChangeAbAttr (the other, every other adjacent); stat-stages on every adjacent foe with Intimidate rules equals PostSummonStatStageChangeAbAttr |
+| `effect.steal-item` | PostAttackStealHeldItemAbAttr / ErMagicianStealAbAttr / ScavengerLootAbAttr (from other), VoidPostTurnStealAbAttr (any foe) | steal-item from the other Pokemon equals PostAttackStealHeldItemAbAttr (the check's draw is reused); Magician's unpacked do steals what ErMagicianStealAbAttr steals (the Pokemon it hit); Scavenger's unpacked do loots what ScavengerLootAbAttr loots (the fainted victim); steal-item from any foe equals VoidPostTurnStealAbAttr (one draw only when something can be taken) |
+| `effect.message` | PostSummonMessageAbAttr (announcement), PostSummonUnnamedMessageAbAttr (text) | message twins PostSummonMessageAbAttr (a built-in announcement) and PostSummonUnnamedMessageAbAttr (text) |
+| `effect.cure-status` (new options) | PostSummonUserFieldRemoveStatusEffectAbAttr (my side), PreSwitchOutResetStatusAbAttr (ER ailments); defaults: the V1 runner | cure-status on my side equals PostSummonUserFieldRemoveStatusEffectAbAttr; cure-status with ER ailments equals PreSwitchOutResetStatusAbAttr; live entries keep today's V1 payload and context with default settings |
+| `effect.heal-percent` `instant` | PreSwitchOutHealAbAttr | heal-percent instant equals PreSwitchOutHealAbAttr (33% of max HP, at least 1) |
+| `effect.set-weather` `turns` | ErWeatherSummonAbAttr | set-weather with turns equals ErWeatherSummonAbAttr (canApply then apply), including an active weather |
+| `effect.set-terrain` `turns` | ErTerrainSummonAbAttr | set-terrain with turns equals ErTerrainSummonAbAttr (canApply then apply), including an active terrain |

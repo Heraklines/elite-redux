@@ -15,6 +15,7 @@ import { getBinding } from "#data/elite-redux/ability-studio/bindings";
 import { readDeclParams } from "#data/elite-redux/ability-studio/build-attr";
 import { declRegistry } from "#data/elite-redux/ability-studio/decl-registry";
 import type { DeclGateParam } from "#data/elite-redux/ability-studio/define-decl";
+import { validateComposition } from "#data/elite-redux/ability-studio/vocabulary/validate-composition";
 import { getVocabularyJson } from "#data/elite-redux/ability-studio/vocabulary/vocabulary-json";
 import { allAttrSites } from "#test/tests/elite-redux/decomp/harness/sites";
 import { writeFileSync } from "node:fs";
@@ -139,7 +140,13 @@ describe("tools - dump composition builder data", () => {
         }
       }
       if (legacy !== undefined) {
-        gates[key] = { ...base, unpackable: false, reason: `a condition has no block yet: ${legacy}` };
+        // Staff see `reason`; the developer note (closure text, request ids) stays in `detail`.
+        gates[key] = {
+          ...base,
+          unpackable: false,
+          reason: "a condition of this ability has not been rebuilt from blocks yet",
+          detail: legacy,
+        };
         continue;
       }
       const doParams: Json = {};
@@ -148,15 +155,28 @@ describe("tools - dump composition builder data", () => {
           doParams[id] = params[id];
         }
       }
-      // A declaration that hands the block class settings it does not have (e.g. `message`, `berryOnly`) would be refused
-      // by the editor's validator anyway; say why here instead of offering an Unpack that cannot work.
-      const blockSettings = new Set(effectDef.params.map(param => param.id));
-      const unknown = Object.keys(doParams).filter(id => !blockSettings.has(id));
-      if (unknown.length > 0) {
+      // Offer Unpack only when the editor would accept the rule: the same check the editor runs (settings the block does
+      // not have, values that do not fit). Staff see a plain reason; the validator's own message stays in `detail`.
+      const doList = [{ block: declEffect.id, ...(Object.keys(doParams).length > 0 ? { params: doParams } : {}) }];
+      const problems = validateComposition([
+        {
+          key: "unpack-check",
+          when: { block: decl.when },
+          ...(ifList.length > 0 ? { if: ifList } : {}),
+          do: doList,
+          chance: 100,
+        },
+      ]);
+      if (problems.length > 0) {
+        const blockSettings = new Set(effectDef.params.map(param => param.id));
+        const unknownSetting = Object.keys(doParams).some(id => !blockSettings.has(id));
         gates[key] = {
           ...base,
           unpackable: false,
-          reason: `the block has no setting for ${unknown.join(", ")} yet`,
+          reason: unknownSetting
+            ? "this ability uses settings the block does not have yet"
+            : "this ability's settings do not fit the block's choices yet",
+          detail: problems.join("; "),
         };
         continue;
       }
@@ -164,7 +184,7 @@ describe("tools - dump composition builder data", () => {
         ...base,
         unpackable: true,
         if: ifList,
-        do: [{ block: declEffect.id, ...(Object.keys(doParams).length > 0 ? { params: doParams } : {}) }],
+        do: doList,
         guards: decl.guards,
         params,
         paramPaths: Object.fromEntries(decl.params.filter(p => p.path !== undefined).map(p => [p.id, p.path])),

@@ -354,7 +354,7 @@ export const CONDITION_TEXTS: Readonly<Record<string, VocabularyText>> = {
   },
   "time.marker-set": {
     summary:
-      "Advanced: yes when a named marker that another block set is on the Pokemon. Example: only if my entry marker is not set yet.",
+      "Advanced: yes when a named reminder that another block put on the Pokemon is still there. Example: only if my entry reminder is not set yet.",
     category: "Other",
   },
 
@@ -393,7 +393,7 @@ export const CONDITION_TEXTS: Readonly<Record<string, VocabularyText>> = {
   },
   "party.ally-active": {
     summary:
-      "Yes when my partner is on the field and can still fight. Example: Costar only copies from an ally that is still fighting.",
+      "Yes when my first ally is on the field and can still fight. In a triple battle only one of my two allies is checked. Example: Costar copies from that ally.",
     category: "Other",
   },
   "party.ally-ability": {
@@ -582,7 +582,7 @@ export const CONDITION_TEXTS: Readonly<Record<string, VocabularyText>> = {
   },
   "time.acted-before": {
     summary:
-      "Yes when the first Pokemon has already moved this turn and moved before the second one. Example: I moved, the foe has not moved yet.",
+      "Yes when I moved before the other Pokemon this turn, or the other way round, as you pick. Example: I moved, the foe has not moved yet.",
     category: "Other",
   },
   "foe.average-defense-not-higher": {
@@ -602,7 +602,7 @@ export const CONDITION_TEXTS: Readonly<Record<string, VocabularyText>> = {
   },
   "party.any-ally-active": {
     summary:
-      "Yes when any of my allies is on the field and can still fight, not only the one next to me. Example: in doubles, my partner is fighting.",
+      'In a triple battle this looks at both my allies; in a double battle it is the same as "My first ally can still fight". Yes when one can still fight.',
     category: "Other",
   },
   "party.active-ally-chose-damaging-move": {
@@ -616,7 +616,7 @@ export const CONDITION_TEXTS: Readonly<Record<string, VocabularyText>> = {
   },
   "mon.charge-stacks": {
     summary:
-      "Yes when the chosen Pokemon's charge stacks pass the comparison. It can hold up to 4. Example: at least 2 stacks for Overloaded.",
+      "Yes when the chosen Pokemon's electric charges pass the comparison. It can hold up to 4. Example: at least 2 electric charges for Overloaded.",
     category: "Other",
   },
   "mon.mega-evolved": {
@@ -630,7 +630,7 @@ export const CONDITION_TEXTS: Readonly<Record<string, VocabularyText>> = {
   },
   "time.max-uses-per-wave": {
     summary:
-      "Advanced: yes while the named counter was used fewer times this wave than the limit. Example: Wishmaker can cast 3 times per wave.",
+      "Advanced: yes while the named counter was used fewer times this wave than the limit. Only the built-in ability adds to the count; no block does, so on its own it stays yes.",
     category: "Other",
   },
 };

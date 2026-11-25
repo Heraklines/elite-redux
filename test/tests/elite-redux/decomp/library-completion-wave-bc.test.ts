@@ -7,11 +7,25 @@
 // Library completion pass, waves B (guards) and C (effects): every block checked against the class or engine expression
 // it was lifted from. Numeric effects get boundary tests; where the class is cheap to build it runs on the same input.
 import {
+  ArenaTrapAbAttr,
+  BypassSpeedChanceAbAttr,
   CritUseLowerDefensiveStatAbAttr,
+  ForceSwitchOutHelper,
   IgnoreMoveEffectsAbAttr,
+  PostAttackAbilityGiveAbAttr,
+  PostAttackRemoveTargetTypeAbAttr,
   PostAttackStealHeldItemAbAttr,
+  PostDefendAbilityGiveAbAttr,
+  PostDefendStatStageChangeAbAttr,
+  PostSummonAllyHealAbAttr,
+  PostSummonClearWeatherAbAttr,
+  PostSummonFormChangeByWeatherAbAttr,
+  PostSummonMessageAbAttr,
+  PostSummonRemoveArenaTagAbAttr,
   PostSummonStatStageChangeAbAttr,
+  PostSummonUnnamedMessageAbAttr,
   PostSummonUserFieldRemoveStatusEffectAbAttr,
+  PreLeaveFieldClearWeatherAbAttr,
   PreSwitchOutHealAbAttr,
   PreSwitchOutResetStatusAbAttr,
   ReflectStatStageChangeAbAttr,
@@ -19,24 +33,55 @@ import {
   StatMultiplierAbAttr,
 } from "#abilities/ab-attrs";
 import { initGlobalScene } from "#app/global-scene";
+import { allAbilities, allMoves } from "#data/data-lists";
 import { VoidPostTurnStealAbAttr } from "#data/elite-redux/abilities/bernerd-roster-mechanics";
 import { addCharge, clearCharge, getCharge } from "#data/elite-redux/abilities/charge-stack";
-import { heavyweightMultiplier, livingBenchCount } from "#data/elite-redux/abilities/newcomer-signature-mechanics";
+import { BallasterResetAbAttr } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
+import {
+  FanFavoriteAccuracyAbAttr,
+  FanFavoritePowerAbAttr,
+  FoulHarvestAbAttr,
+  HeavyweightPowerAbAttr,
+  heavyweightMultiplier,
+  livingBenchCount,
+  recordSignatureExecutedMove,
+} from "#data/elite-redux/abilities/newcomer-signature-mechanics";
 import { PostTurnHurtNonTypedAbAttr } from "#data/elite-redux/abilities/post-turn-hurt-non-typed";
+import { PpReductionOnContactAbAttr } from "#data/elite-redux/abilities/pp-reduction-on-contact";
+import { ANNOUNCEMENTS } from "#data/elite-redux/ability-studio/decl/B03/codecs";
 import { getEffect } from "#data/elite-redux/ability-studio/vocabulary/effects";
 import { compileEffect } from "#data/elite-redux/ability-studio/vocabulary/evaluate/effects";
 import { type Frame, frameFromAttrParams } from "#data/elite-redux/ability-studio/vocabulary/evaluate/frame";
 import { evaluateGuard } from "#data/elite-redux/ability-studio/vocabulary/evaluate/guards";
 import { getGuard } from "#data/elite-redux/ability-studio/vocabulary/guards";
-import { FaintedAllyStatMultiplierAbAttr } from "#data/elite-redux/ability-upgrades/attrs/requested-combat-riders";
-import { ScavengerLootAbAttr } from "#data/elite-redux/archetypes/lifesteal";
-import { SpeedBonusToStatAbAttr } from "#data/elite-redux/archetypes/speed-bonus-to-stat";
+import { claimSummonAbilityProvenance } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import {
+  BreakScreensOnAttackAbAttr,
+  FaintedAllyStatMultiplierAbAttr,
+} from "#data/elite-redux/ability-upgrades/attrs/requested-combat-riders";
+import { EntryTailwindClearWeatherAbAttr } from "#data/elite-redux/archetypes/entry-tailwind-clear-weather";
+import { HitMultiplierAbAttr } from "#data/elite-redux/archetypes/hit-multiplier";
+import { ScavengerLootAbAttr } from "#data/elite-redux/archetypes/lifesteal";
+import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
+import { PostAttackChangeTargetTypeAbAttr } from "#data/elite-redux/archetypes/post-attack-change-target-type";
+import { PostAttackRemoveTargetTypeAbAttr as ArchetypeRemoveTargetTypeAbAttr } from "#data/elite-redux/archetypes/post-attack-remove-target-type";
+import { PostDamageForceAttackerOutAbAttr } from "#data/elite-redux/archetypes/post-damage-force-attacker-out";
+import { PostSummonScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-summon-scripted-move";
+import { PostTurnDrainAbAttr } from "#data/elite-redux/archetypes/post-turn-drain";
+import { PostVictoryClearRechargeAbAttr } from "#data/elite-redux/archetypes/post-victory-clear-recharge";
+import { SelfHighestStatBoostOnSummonAbAttr } from "#data/elite-redux/archetypes/self-highest-stat-boost-on-summon";
+import { SpeedBonusToStatAbAttr } from "#data/elite-redux/archetypes/speed-bonus-to-stat";
+import { TypeImmunityHighestAttackStatStageAbAttr } from "#data/elite-redux/archetypes/type-immunity-highest-attack-stat-stage";
+import {
+  ClearOpponentStatBuffsOnSummonAbAttr,
   ErMagicianStealAbAttr,
   ErTerrainSummonAbAttr,
   ErWeatherSummonAbAttr,
 } from "#data/elite-redux/init-elite-redux-vanilla-rebalance";
+import { PokemonMove } from "#data/moves/pokemon-move";
+import { pokemonFormChanges } from "#data/pokemon-forms";
 import { TerrainType } from "#data/terrain";
+import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -619,6 +664,14 @@ describe("Wave C event effects", () => {
     for (const id of ids) {
       expect(getEffect(id)?.implemented, id).toBe(true);
       expect(() => effect(id), id).not.toThrow();
+      // The default label as staff see it (choices in their player words) stays within the 60-character limit.
+      const def = getEffect(id);
+      const shown = (def?.label ?? "").replace(/\{([A-Za-z0-9_]+)\}/g, (_whole, key: string) => {
+        const param = def?.params.find(p => p.id === key);
+        const value = String(param?.default ?? "");
+        return param?.optionLabels?.[value] ?? value;
+      });
+      expect(shown.length, `${id}: "${shown}"`).toBeLessThanOrEqual(60);
     }
   });
 });
@@ -991,6 +1044,829 @@ describe("Wave C review fixes (the real class as oracle where it can be)", () =>
       expect(ask(aim), `${aim} someone else's follow-up`).toBe(true);
       scene({}, { is: () => false });
       expect(ask(aim), `${aim} outside a move`).toBe(true);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Twins: the same inputs go to the real class (its checks, then its apply) and to the compiled block (its safety checks,
+// then its run), and the observable result is compared: state, queued phases and messages, random draws.
+
+/** Battle objects in a recorded call, reduced to something two separate fake battles can compare. */
+function plain(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(plain);
+  }
+  if (typeof value === "object" && value !== null && "getBattlerIndex" in value && "id" in value) {
+    return `mon#${(value as { id: number }).id}`;
+  }
+  if (typeof value === "object" && value !== null && "moveId" in value) {
+    return `move#${(value as { moveId: number }).moveId}`;
+  }
+  return value;
+}
+
+const calls = (fn: unknown): unknown => plain((fn as Mock).mock.calls);
+
+describe("Twins: the real class and the compiled block on the same battle", () => {
+  it("change-own-type twins PostAttackChangeTargetTypeAbAttr (a fixed type, the move's type, a preview)", () => {
+    for (const [setting, classType] of [
+      ["WATER", PokemonType.WATER],
+      ["move-type", "moveType"],
+    ] as const) {
+      for (const simulated of [false, true]) {
+        const run = (useClass: boolean) => {
+          const target = mon({ id: 2 });
+          const holder = mon({ getMoveType: () => PokemonType.FIRE });
+          const params = { pokemon: holder, opponent: target, move: { id: MoveId.EMBER }, simulated, hitResult: 1 };
+          if (useClass) {
+            new PostAttackChangeTargetTypeAbAttr({ type: classType, contactOnly: false }).apply(params as never);
+          } else {
+            effect("effect.change-own-type", { who: "other", type: setting }).run({
+              frame: frameFromAttrParams("event.after-my-hit", params),
+              params,
+            });
+          }
+          return [(target.summonData as { types: unknown }).types, calls(target.updateInfo)];
+        };
+        expect(run(false), `${setting} simulated ${simulated}`).toEqual(run(true));
+      }
+    }
+  });
+
+  it("remove-type twins both PostAttackRemoveTargetTypeAbAttr classes (Tera rules / UNKNOWN, plain / NORMAL)", () => {
+    const targets = () => [
+      mon({ id: 2, getTypes: () => [PokemonType.WATER, PokemonType.GHOST] }),
+      mon({ id: 3, getTypes: () => [PokemonType.GHOST] }),
+      mon({ id: 4, getTypes: () => [PokemonType.GHOST], isTerastallized: true, getTeraType: () => PokemonType.GHOST }),
+    ];
+    for (const index of [0, 1, 2]) {
+      for (const simulated of [false, true]) {
+        const abAttrs = (useClass: boolean) => {
+          const target = targets()[index];
+          const params = { pokemon: mon(), opponent: target, move: { category: 0 }, simulated };
+          if (useClass) {
+            const cls = new PostAttackRemoveTargetTypeAbAttr(PokemonType.GHOST);
+            if (cls.residual(params as never)) {
+              cls.apply(params as never);
+            }
+          } else {
+            const compiled = effect("effect.remove-type", { who: "other", type: "GHOST" });
+            const f = frameFromAttrParams("event.after-my-hit", params);
+            if (compiled.feasible?.({ frame: f, params }) !== false) {
+              compiled.run({ frame: f, params });
+            }
+          }
+          return (target.summonData as { types: unknown }).types;
+        };
+        expect(abAttrs(false), `ab-attrs target ${index}`).toEqual(abAttrs(true));
+        const archetype = (useClass: boolean) => {
+          const target = targets()[index];
+          const params = { pokemon: mon(), opponent: target, move: { category: 0 }, simulated };
+          if (useClass) {
+            new ArchetypeRemoveTargetTypeAbAttr({ type: PokemonType.GHOST }).apply(params as never);
+          } else {
+            effect("effect.remove-type", { who: "other", type: "GHOST", fallback: "NORMAL", teraRules: false }).run({
+              frame: frameFromAttrParams("event.after-my-hit", params),
+              params,
+            });
+          }
+          return (target.summonData as { types: unknown }).types;
+        };
+        expect(archetype(false), `archetype target ${index}`).toEqual(archetype(true));
+      }
+    }
+  });
+
+  it("stat-stage-on-highest twins SelfHighestStatBoostOnSummonAbAttr and TypeImmunityHighestAttackStatStageAbAttr", () => {
+    for (const [atk, spatk] of [
+      [120, 90],
+      [90, 120],
+      [100, 100],
+    ]) {
+      for (const simulated of [false, true]) {
+        const holder = mon({ getStat: (s: Stat, live: boolean) => (live ? -1 : s === Stat.ATK ? atk : spatk) });
+        const summon = (useClass: boolean) => {
+          const phases = scene();
+          if (useClass) {
+            new SelfHighestStatBoostOnSummonAbAttr({ candidates: [Stat.ATK, Stat.SPATK], stages: 1 }).apply({
+              pokemon: holder,
+              simulated,
+            } as never);
+          } else {
+            effect("effect.stat-stage-on-highest", { stats: "Attack, Sp. Atk" }).run({
+              frame: frame(holder, { simulated }),
+              params: {},
+            });
+          }
+          return calls(phases.unshiftNew);
+        };
+        expect(summon(false), `${atk}/${spatk}`).toEqual(summon(true));
+        const immunity = (useClass: boolean) => {
+          const phases = scene();
+          if (useClass) {
+            new TypeImmunityHighestAttackStatStageAbAttr({ immuneType: PokemonType.GROUND, stages: 1 }).apply({
+              pokemon: holder,
+              simulated,
+              cancelled: { value: false },
+              typeMultiplier: new NumberHolder(1),
+            } as never);
+          } else {
+            effect("effect.stat-stage-on-highest", { stats: "Attack, Sp. Atk" }).run({
+              frame: frame(holder, { simulated }),
+              params: {},
+            });
+          }
+          return calls(phases.unshiftNew);
+        };
+        expect(immunity(false), `immunity ${atk}/${spatk}`).toEqual(immunity(true));
+      }
+    }
+  });
+
+  it("drain-adjacent-foes twins PostTurnDrainAbAttr (fainted, trapped-only, previews)", () => {
+    for (const onlyTrapped of [false, true]) {
+      for (const simulated of [false, true]) {
+        const run = (useClass: boolean) => {
+          const foe = (id: number, maxHp: number, trapped: boolean, fainted = false) => {
+            const f = mon({
+              id,
+              hp: fainted ? 0 : 50,
+              getMaxHp: () => maxHp,
+              isFainted: () => fainted,
+              isTrapped: () => trapped,
+              getBattlerIndex: () => id,
+              getPostBattleAbilitySources: () => [],
+            });
+            f.damageAndUpdate = vi.fn((d: number) => {
+              f.hp = Math.max(0, (f.hp as number) - d);
+            });
+            return f;
+          };
+          const foes = [foe(2, 160, true), foe(3, 9, false), foe(4, 100, true, true)];
+          const holder = mon({
+            getAdjacentOpponents: () => foes,
+            getOpponents: () => foes,
+            getAbility: () => ({ name: "Life Steal" }),
+          });
+          const phases = scene();
+          const params = { pokemon: holder, simulated };
+          if (useClass) {
+            const cls = new PostTurnDrainAbAttr({ fraction: 0.125, onlyIfTrapped: onlyTrapped });
+            if (cls.residual(params as never)) {
+              cls.apply(params as never);
+            }
+          } else {
+            const compiled = effect("effect.drain-adjacent-foes", { fraction: 0.125, onlyTrapped });
+            if (compiled.feasible?.({ frame: frame(holder, { simulated }), params })) {
+              compiled.run({ frame: frame(holder, { simulated }), params });
+            }
+          }
+          return [foes.map(f => calls(f.damageAndUpdate)), calls(phases.unshiftNew)];
+        };
+        expect(run(false), `trapped ${onlyTrapped} simulated ${simulated}`).toEqual(run(true));
+      }
+    }
+  });
+
+  it("force-other-out twins PostDamageForceAttackerOutAbAttr (switch possible or not, preview)", () => {
+    const condition = vi.spyOn(ForceSwitchOutHelper.prototype, "getSwitchOutCondition");
+    const switchOut = vi.spyOn(ForceSwitchOutHelper.prototype, "switchOutLogic").mockReturnValue(true);
+    try {
+      for (const canSwitch of [true, false]) {
+        for (const simulated of [false, true]) {
+          condition.mockReturnValue(canSwitch);
+          const run = (useClass: boolean) => {
+            switchOut.mockClear();
+            const holder = mon();
+            const source = mon({ id: 2 });
+            const params = { pokemon: holder, source, simulated, damage: 10 };
+            if (useClass) {
+              const cls = new PostDamageForceAttackerOutAbAttr();
+              if (cls.residual(params as never)) {
+                cls.apply(params as never);
+              }
+            } else {
+              const compiled = effect("effect.force-other-out");
+              const f = frame(holder, { other: source as never, simulated });
+              if (compiled.feasible?.({ frame: f, params })) {
+                compiled.run({ frame: f, params });
+              }
+            }
+            return calls(switchOut);
+          };
+          expect(run(false), `switch ${canSwitch} simulated ${simulated}`).toEqual(run(true));
+        }
+      }
+    } finally {
+      condition.mockRestore();
+      switchOut.mockRestore();
+    }
+  });
+
+  it("match-weather-form twins PostSummonFormChangeByWeatherAbAttr (a form it can take, one it cannot, a preview)", () => {
+    const species = 99_001;
+    const forms = pokemonFormChanges as unknown as Record<number, unknown>;
+    try {
+      for (const canChange of [true, false]) {
+        forms[species] = [{ findTrigger: () => true, canChange: () => canChange }];
+        for (const simulated of [false, true]) {
+          const run = (useClass: boolean) => {
+            const trigger = vi.fn();
+            scene({ triggerPokemonFormChange: trigger });
+            const holder = mon({ species: { speciesId: species } });
+            const params = { pokemon: holder, simulated };
+            if (useClass) {
+              const cls = new PostSummonFormChangeByWeatherAbAttr();
+              if (cls.canApply(params as never)) {
+                cls.apply(params as never);
+              }
+            } else {
+              const compiled = effect("effect.match-weather-form");
+              if (compiled.feasible?.({ frame: frame(holder, { simulated }), params })) {
+                compiled.run({ frame: frame(holder, { simulated }), params });
+              }
+            }
+            return calls(trigger);
+          };
+          expect(run(false), `change ${canChange} simulated ${simulated}`).toEqual(run(true));
+        }
+      }
+    } finally {
+      delete forms[species];
+    }
+  });
+
+  it("give-ability twins PostAttackAbilityGiveAbAttr and PostDefendAbilityGiveAbAttr (residuals, Mummy rules, preview)", () => {
+    const targets = () => [
+      mon({ id: 2, getAbility: () => ({ suppressable: true, hasAttr: () => false }), hasAbility: () => false }),
+      mon({ id: 3, getAbility: () => ({ suppressable: false, hasAttr: () => false }), hasAbility: () => false }),
+      mon({
+        id: 4,
+        getAbility: () => ({ suppressable: true, hasAttr: (n: string) => n === "PostAttackAbilityGiveAbAttr" }),
+        hasAbility: () => false,
+      }),
+      mon({
+        id: 5,
+        getAbility: () => ({ suppressable: true, hasAttr: (n: string) => n === "PostDefendAbilityGiveAbAttr" }),
+        hasAbility: () => false,
+      }),
+      mon({
+        id: 6,
+        getAbility: () => ({ suppressable: true, hasAttr: () => false }),
+        hasAbility: (id: AbilityId) => id === AbilityId.LINGERING_AROMA,
+      }),
+    ];
+    for (const [giver, Cls] of [
+      ["after-my-attack", PostAttackAbilityGiveAbAttr],
+      ["when-hit", PostDefendAbilityGiveAbAttr],
+    ] as const) {
+      for (const index of [0, 1, 2, 3, 4]) {
+        for (const simulated of [false, true]) {
+          const run = (useClass: boolean) => {
+            const target = targets()[index];
+            target.setTempAbility = vi.fn();
+            const params = { pokemon: mon(), opponent: target, simulated };
+            if (useClass) {
+              const cls = new Cls(AbilityId.MUMMY);
+              if (cls.residual(params as never)) {
+                cls.apply(params as never);
+              }
+            } else {
+              const compiled = effect("effect.give-ability", { ability: "Mummy", giver });
+              const f = frame(mon(), { other: target as never, simulated });
+              if (compiled.feasible?.({ frame: f, params })) {
+                compiled.run({ frame: f, params });
+              }
+            }
+            return (target.setTempAbility as Mock).mock.calls.map(c => c[0] === allAbilities[AbilityId.MUMMY]);
+          };
+          expect(run(false), `${giver} target ${index} simulated ${simulated}`).toEqual(run(true));
+        }
+      }
+    }
+  });
+
+  it("reset-stat-stages twins ClearOpponentStatBuffsOnSummonAbAttr (raised stats only, fainted foes, no foes)", () => {
+    for (const foeCount of [0, 2]) {
+      for (const simulated of [false, true]) {
+        const run = (useClass: boolean) => {
+          const foe = (id: number, fainted: boolean) => {
+            const stages: number[] = [2, -1, 0, 1, -3, 0, 4];
+            return mon({
+              id,
+              stages,
+              isFainted: () => fainted,
+              getStatStage: (s: Stat) => stages[s - 1],
+              setStatStage: (s: Stat, v: number) => {
+                stages[s - 1] = v;
+              },
+            });
+          };
+          const foes = [foe(2, false), foe(3, true)].slice(0, foeCount);
+          const holder = mon({ getAdjacentOpponents: () => foes, getOpponents: () => foes });
+          const params = { pokemon: holder, simulated };
+          if (useClass) {
+            const cls = new ClearOpponentStatBuffsOnSummonAbAttr();
+            if (cls.canApply(params as never)) {
+              cls.apply(params as never);
+            }
+          } else {
+            const compiled = effect("effect.reset-stat-stages", { target: "adjacent-foes", onlyRaised: true });
+            if (compiled.feasible?.({ frame: frame(holder, { simulated }), params })) {
+              compiled.run({ frame: frame(holder, { simulated }), params });
+            }
+          }
+          return foes.map(f => [f.stages, calls(f.updateInfo)]);
+        };
+        expect(run(false), `foes ${foeCount} simulated ${simulated}`).toEqual(run(true));
+      }
+    }
+  });
+
+  it("heal-fraction-of-max-hp twins PostSummonAllyHealAbAttr (active and inactive allies, animation, preview)", () => {
+    for (const showAnimation of [false, true]) {
+      for (const simulated of [false, true]) {
+        const run = (useClass: boolean) => {
+          const allies = [
+            mon({ id: 2, getBattlerIndex: () => 2, isActive: () => true }),
+            mon({ id: 3, getBattlerIndex: () => 3, isActive: () => false }),
+          ];
+          const holder = mon({ name: "Butter", getMaxHp: () => 203, getAdjacentAllies: () => allies });
+          const phases = scene();
+          const params = { pokemon: holder, simulated };
+          if (useClass) {
+            const cls = new PostSummonAllyHealAbAttr(4, showAnimation);
+            if (cls.canApply(params as never)) {
+              cls.apply(params as never);
+            }
+          } else {
+            const compiled = effect("effect.heal-fraction-of-max-hp", {
+              target: "adjacent-allies",
+              denominator: 4,
+              basedOn: "holder",
+              showAnimation,
+            });
+            if (compiled.feasible?.({ frame: frame(holder, { simulated }), params })) {
+              compiled.run({ frame: frame(holder, { simulated }), params });
+            }
+          }
+          return calls(phases.unshiftNew);
+        };
+        expect(run(false), `animation ${showAnimation} simulated ${simulated}`).toEqual(run(true));
+      }
+    }
+  });
+
+  it("stat-stages twins PostSummonStatStageChangeAbAttr (me) and PostDefendStatStageChangeAbAttr (the other, every other adjacent)", () => {
+    for (const simulated of [false, true]) {
+      const holder = () =>
+        mon({
+          getAdjacentOpponents: () => [mon({ id: 2, getBattlerIndex: () => 2 })],
+          getAdjacentAllies: () => [mon({ id: 3, getBattlerIndex: () => 1 })],
+        });
+      const cases: [Record<string, string | number | boolean>, (p: object) => void][] = [
+        [
+          { target: "me", stats: "Attack, Sp. Atk", stages: 1 },
+          p => new PostSummonStatStageChangeAbAttr([Stat.ATK, Stat.SPATK], 1, true).apply(p as never),
+        ],
+        [
+          { target: "the other Pokemon", stats: "Speed", stages: -1 },
+          p => new PostDefendStatStageChangeAbAttr(() => true, Stat.SPD, -1, false).apply(p as never),
+        ],
+        [
+          { target: "every other adjacent Pokemon", stats: "Speed", stages: -1 },
+          p => new PostDefendStatStageChangeAbAttr(() => true, Stat.SPD, -1, false, true).apply(p as never),
+        ],
+      ];
+      for (const [settings, classRun] of cases) {
+        const run = (useClass: boolean) => {
+          const phases = scene();
+          const attacker = mon({ id: 9, getBattlerIndex: () => 3 });
+          const params = { pokemon: holder(), opponent: attacker, simulated };
+          if (useClass) {
+            classRun(params);
+          } else {
+            effect("effect.stat-stages", settings).run({
+              frame: frame(params.pokemon, { other: attacker as never, simulated }),
+              params,
+            });
+          }
+          return calls(phases.unshiftNew);
+        };
+        expect(run(false), `${settings.target} simulated ${simulated}`).toEqual(run(true));
+      }
+    }
+  });
+
+  it("message twins PostSummonMessageAbAttr (a built-in announcement) and PostSummonUnnamedMessageAbAttr (text)", () => {
+    for (const simulated of [false, true]) {
+      const run = (useClass: boolean, announced: boolean) => {
+        const phases = scene();
+        const params = { pokemon: mon(), simulated };
+        if (useClass) {
+          (announced
+            ? new PostSummonMessageAbAttr(ANNOUNCEMENTS.PRESSURE.build())
+            : new PostSummonUnnamedMessageAbAttr("Hello there")
+          ).apply(params as never);
+        } else {
+          effect("effect.message", announced ? { announcement: "PRESSURE" } : { text: "Hello there" }).run({
+            frame: frame(params.pokemon, { simulated }),
+            params,
+          });
+        }
+        return phases.queueMessage.mock.calls;
+      };
+      expect(run(false, true)).toEqual(run(true, true));
+      expect(run(false, false)).toEqual(run(true, false));
+    }
+  });
+
+  it("hit-n-times twins HitMultiplierAbAttr.apply", () => {
+    for (const extraStrikes of [1, 2, 4]) {
+      const theirs = new NumberHolder(1);
+      new HitMultiplierAbAttr({ extraStrikes }).apply({ hitCount: theirs } as never);
+      const mine = new NumberHolder(1);
+      effect("effect.hit-n-times", { extraStrikes }).run({ frame: frame(mon()), params: { hitCount: mine } });
+      expect(mine.value).toBe(theirs.value);
+    }
+  });
+
+  it("trap-foe twins ArenaTrapAbAttr.apply", () => {
+    const theirs = { value: false };
+    new ArenaTrapAbAttr(() => true).apply({ trapped: theirs } as never);
+    const mine = { value: false };
+    effect("effect.trap-foe").run({ frame: frame(mon()), params: { trapped: mine } });
+    expect(mine).toEqual(theirs);
+  });
+
+  it("jump-turn-order twins BypassSpeedChanceAbAttr (the chance roll is the rule's rng.chance IF)", () => {
+    for (const canAdd of [true, false]) {
+      for (const simulated of [false, true]) {
+        const run = (useClass: boolean) => {
+          const holder = mon({ addTag: vi.fn(), canAddTag: () => canAdd, randBattleSeedInt: () => 0 });
+          scene({ currentBattle: { turnCommands: [{ move: { move: MoveId.TACKLE } }] } });
+          const params = { pokemon: holder, simulated };
+          if (useClass) {
+            const cls = new BypassSpeedChanceAbAttr(100);
+            if (cls.canApply(params as never)) {
+              cls.apply(params as never);
+            }
+          } else {
+            const compiled = effect("effect.jump-turn-order");
+            if (compiled.feasible?.({ frame: frame(holder, { simulated }), params })) {
+              compiled.run({ frame: frame(holder, { simulated }), params });
+            }
+          }
+          return calls(holder.addTag);
+        };
+        expect(run(false), `can add ${canAdd} simulated ${simulated}`).toEqual(run(true));
+      }
+    }
+  });
+
+  it("clear-weather twins EntryTailwindClearWeatherAbAttr (keep extreme) and PostSummonClearWeatherAbAttr (any)", () => {
+    const weathers = [
+      undefined,
+      { weatherType: WeatherType.NONE, isImmutable: () => false },
+      { weatherType: WeatherType.RAIN, isImmutable: () => false },
+      { weatherType: WeatherType.HEAVY_RAIN, isImmutable: () => true },
+    ];
+    for (const [index, weather] of weathers.entries()) {
+      for (const simulated of [false, true]) {
+        for (const keepExtreme of [true, false]) {
+          const run = (useClass: boolean) => {
+            const trySetWeather = vi.fn();
+            scene({ arena: { weather, trySetWeather, addTag: vi.fn() } });
+            const params = { pokemon: mon(), simulated };
+            if (useClass) {
+              const cls = keepExtreme ? new EntryTailwindClearWeatherAbAttr() : new PostSummonClearWeatherAbAttr();
+              if (cls.canApply(params as never)) {
+                cls.apply(params as never);
+              }
+            } else {
+              const compiled = effect("effect.clear-weather", { keepExtreme });
+              if (compiled.feasible?.({ frame: frame(params.pokemon, { simulated }), params }) !== false) {
+                compiled.run({ frame: frame(params.pokemon, { simulated }), params });
+              }
+            }
+            return trySetWeather.mock.calls;
+          };
+          expect(run(false), `weather ${index} keep ${keepExtreme} simulated ${simulated}`).toEqual(run(true));
+        }
+      }
+    }
+  });
+
+  it("cancel-recharge twins PostVictoryClearRechargeAbAttr.apply", () => {
+    for (const simulated of [false, true]) {
+      const run = (useClass: boolean) => {
+        const queue = [{ move: MoveId.NONE }, { move: MoveId.TACKLE }];
+        const holder = mon({ removeTag: vi.fn(), getMoveQueue: () => queue });
+        const params = { pokemon: holder, simulated };
+        if (useClass) {
+          new PostVictoryClearRechargeAbAttr().apply(params as never);
+        } else {
+          effect("effect.cancel-recharge").run({ frame: frame(holder, { simulated }), params });
+        }
+        return [calls(holder.removeTag), queue];
+      };
+      expect(run(false)).toEqual(run(true));
+    }
+  });
+
+  it("clear-marker twins BallasterResetAbAttr; set-marker `unique` twins claimSummonAbilityProvenance", () => {
+    const reset = (useClass: boolean) => {
+      const holder = mon();
+      (holder.summonData as { erAbilityProvenance: string[] }).erAbilityProvenance = [
+        "ballaster:1",
+        "x",
+        "ballaster:1",
+      ];
+      if (useClass) {
+        new BallasterResetAbAttr().apply({ pokemon: holder, simulated: false } as never);
+      } else {
+        effect("effect.clear-marker", { scope: "switch-in", key: "ballaster:1" }).run({
+          frame: frame(holder),
+          params: {},
+        });
+      }
+      return (holder.summonData as { erAbilityProvenance: string[] }).erAbilityProvenance;
+    };
+    expect(reset(false)).toEqual(reset(true));
+    const claim = (useClass: boolean) => {
+      const holder = mon();
+      for (let i = 0; i < 2; i++) {
+        if (useClass) {
+          claimSummonAbilityProvenance(holder as never, "booby-trap:entry");
+        } else {
+          effect("effect.set-marker", { scope: "switch-in", key: "booby-trap:entry", unique: true }).run({
+            frame: frame(holder),
+            params: {},
+          });
+        }
+      }
+      return (holder.summonData as { erAbilityProvenance: string[] }).erAbilityProvenance;
+    };
+    expect(claim(false)).toEqual(claim(true));
+  });
+
+  it("remove-arena-tags twins PostSummonRemoveArenaTagAbAttr (each side mode) and BreakScreensOnAttackAbAttr", () => {
+    for (const present of [true, false]) {
+      for (const simulated of [false, true]) {
+        for (const [sideMode, side] of [
+          ["own", "holder-side"],
+          ["opponent", "opposing-side"],
+          ["both", "both"],
+        ] as const) {
+          const run = (useClass: boolean) => {
+            const arena = { hasTag: vi.fn(() => present), removeTagsOnSide: vi.fn() };
+            scene({ arena });
+            const params = { pokemon: mon(), simulated };
+            if (useClass) {
+              const cls = new PostSummonRemoveArenaTagAbAttr(
+                [ArenaTagType.REFLECT, ArenaTagType.LIGHT_SCREEN],
+                sideMode,
+              );
+              if (cls.canApply(params as never)) {
+                cls.apply(params as never);
+              }
+            } else {
+              const compiled = effect("effect.remove-arena-tags", { tags: "Reflect, Light Screen", side });
+              if (compiled.feasible?.({ frame: frame(params.pokemon, { simulated }), params })) {
+                compiled.run({ frame: frame(params.pokemon, { simulated }), params });
+              }
+            }
+            return arena.removeTagsOnSide.mock.calls;
+          };
+          expect(run(false), `${sideMode} present ${present} simulated ${simulated}`).toEqual(run(true));
+        }
+      }
+      const screens = (useClass: boolean) => {
+        const arena = { hasTag: vi.fn(() => present), removeTagsOnSide: vi.fn() };
+        scene({ arena });
+        const opponent = mon({ id: 2, isPlayer: () => false });
+        const params = { pokemon: mon(), opponent, simulated: false };
+        if (useClass) {
+          new BreakScreensOnAttackAbAttr().apply(params as never);
+        } else {
+          effect("effect.remove-arena-tags", { side: "target-side", onlyWhenPresent: false }).run({
+            frame: frame(params.pokemon, { other: opponent as never }),
+            params,
+          });
+        }
+        return arena.removeTagsOnSide.mock.calls;
+      };
+      expect(screens(false)).toEqual(screens(true));
+    }
+  });
+
+  it("another-holder-keeps-weather (with 'the weather is X') twins PreLeaveFieldClearWeatherAbAttr.canApply", () => {
+    for (const weatherType of [WeatherType.HEAVY_RAIN, WeatherType.SUNNY]) {
+      for (const otherKeeps of [WeatherType.HEAVY_RAIN, WeatherType.HARSH_SUN, undefined] as const) {
+        const cls = new PreLeaveFieldClearWeatherAbAttr(WeatherType.HEAVY_RAIN);
+        const holder = mon({ getAbilityAttrs: () => [cls] });
+        const other = mon({
+          id: 2,
+          getAbilityAttrs: () => (otherKeeps === undefined ? [] : [new PreLeaveFieldClearWeatherAbAttr(otherKeeps)]),
+        });
+        scene({ arena: { weatherType }, getField: () => [holder, other] });
+        const theirs = cls.canApply({ pokemon: holder, simulated: false } as never);
+        const mine =
+          weatherType === WeatherType.HEAVY_RAIN && evaluateGuard("another-holder-keeps-weather", frame(holder));
+        expect(mine, `${weatherType} other ${otherKeeps}`).toBe(theirs);
+      }
+    }
+  });
+
+  it("drain-pp twins PpReductionOnContactAbAttr, OnFaintEffectAbAttr (attacker PP drain) and FoulHarvestAbAttr", () => {
+    for (const ppUsed of [0, 33, 35]) {
+      for (const simulated of [false, true]) {
+        const spite = (useClass: boolean) => {
+          const moveset = [new PokemonMove(MoveId.TACKLE, ppUsed)];
+          const attacker = mon({ id: 2, moveset, getMoveset: () => moveset });
+          const params = { pokemon: mon(), opponent: attacker, move: allMoves[MoveId.TACKLE], simulated, hitResult: 1 };
+          if (useClass) {
+            const cls = new PpReductionOnContactAbAttr({ reduction: 4 });
+            if (cls.residual(params as never)) {
+              cls.apply(params as never);
+            }
+          } else {
+            const compiled = effect("effect.drain-pp", { which: "used-move", amount: 4 });
+            const f = frameFromAttrParams("event.after-hit", params);
+            if (compiled.feasible?.({ frame: f, params })) {
+              compiled.run({ frame: f, params });
+            }
+          }
+          return moveset.map(m => m.ppUsed);
+        };
+        expect(spite(false), `spite ${ppUsed} ${simulated}`).toEqual(spite(true));
+        const illWill = (useClass: boolean) => {
+          const moveset = [new PokemonMove(MoveId.TACKLE, ppUsed)];
+          const attacker = mon({ id: 2, moveset, getMoveset: () => moveset });
+          const dispatchEvent = vi.fn();
+          const phases = scene({ eventTarget: { dispatchEvent } });
+          const params = { pokemon: mon(), attacker, move: allMoves[MoveId.TACKLE], simulated };
+          if (useClass) {
+            const cls = new OnFaintEffectAbAttr({ effect: { kind: "attacker-pp-drain" } } as never);
+            if (cls.residual(params as never)) {
+              cls.apply(params as never);
+            }
+          } else {
+            const compiled = effect("effect.drain-pp", { which: "used-move-all" });
+            const f = frameFromAttrParams("event.faint", params);
+            if (compiled.feasible?.({ frame: f, params })) {
+              compiled.run({ frame: f, params });
+            }
+          }
+          return [moveset.map(m => m.ppUsed), dispatchEvent.mock.calls.length, phases.queueMessage.mock.calls];
+        };
+        expect(illWill(false), `ill will ${ppUsed} ${simulated}`).toEqual(illWill(true));
+      }
+    }
+    for (const recorded of [true, false]) {
+      const foul = (useClass: boolean) => {
+        const draws: number[] = [];
+        const moveset = [new PokemonMove(MoveId.TACKLE, 0), new PokemonMove(MoveId.EMBER, 0)];
+        const opponent = mon({ id: 2, moveset, getMoveset: () => moveset, getNameToRender: () => "Foe" });
+        if (recorded) {
+          recordSignatureExecutedMove(opponent as never, allMoves[MoveId.EMBER]);
+        }
+        const holder = mon({
+          getNameToRender: () => "Me",
+          getLastXMoves: () => [{}],
+          randBattleSeedInt: (n: number) => {
+            draws.push(n);
+            return 0;
+          },
+        });
+        const phases = scene();
+        const params = { pokemon: holder, opponent, simulated: false };
+        if (useClass) {
+          new FoulHarvestAbAttr(undefined, undefined, 3).apply(params as never);
+        } else {
+          effect("effect.drain-pp", { which: "last-used-else-random", amount: 3 }).run({
+            frame: frame(holder, { other: opponent as never }),
+            params,
+          });
+        }
+        // The class also stores a Foul Harvest charge and says so; that second message is the class's own memory.
+        return [draws, moveset.map(m => m.ppUsed), phases.queueMessage.mock.calls[0]];
+      };
+      expect(foul(false), `recorded ${recorded}`).toEqual(foul(true));
+    }
+  });
+
+  it("multiply-accuracy-per-count twins FanFavoriteAccuracyAbAttr (guard, bench counts 0 to 6)", () => {
+    for (const benched of [0, 1, 5, 6]) {
+      for (const start of [0, 80]) {
+        const run = (useClass: boolean) => {
+          const holder = mon();
+          const bench = Array.from({ length: benched }, (_, i) => mon({ id: 10 + i, isOnField: () => false }));
+          scene({ getPlayerParty: () => [holder, ...bench] });
+          const accuracy = new NumberHolder(start);
+          const params = { pokemon: holder, accuracy, move: { id: MoveId.TACKLE } };
+          if (useClass) {
+            const cls = new FanFavoriteAccuracyAbAttr(5, 5);
+            // guards, then the gate (at least one benched teammate: the rule's IF), then apply.
+            if (cls.guards(params as never) && cls.gate(params as never)) {
+              cls.apply(params as never);
+            }
+          } else {
+            const compiled = effect("effect.multiply-accuracy-per-count");
+            if (compiled.feasible?.({ frame: frame(holder), params }) && livingBenchCount(holder as never, 5) > 0) {
+              compiled.run({ frame: frame(holder), params });
+            }
+          }
+          return accuracy.value;
+        };
+        expect(run(false), `bench ${benched} accuracy ${start}`).toBe(run(true));
+      }
+    }
+  });
+
+  it("scripted-move-at twins PostSummonScriptedMoveAbAttr (first foe, every foe, myself; no foe standing)", () => {
+    for (const [opts, aim] of [
+      [{}, "first-living-foe"],
+      [{ allOpponents: true }, "every-living-foe"],
+      [{ targetsSelf: true }, "holder"],
+    ] as const) {
+      for (const standing of [true, false]) {
+        const run = (useClass: boolean) => {
+          const foes = [
+            mon({ id: 2, getBattlerIndex: () => 2, isFainted: () => true }),
+            mon({ id: 3, getBattlerIndex: () => 3, isFainted: () => !standing }),
+          ];
+          const holder = mon({ getOpponents: () => foes });
+          const phases = scene();
+          const params = { pokemon: holder, simulated: false };
+          if (useClass) {
+            const cls = new PostSummonScriptedMoveAbAttr({ moveId: MoveId.SPIKES, power: 20, ...opts });
+            if (cls.residual(params as never)) {
+              cls.apply(params as never);
+            }
+          } else {
+            const compiled = effect("effect.scripted-move-at", { moveId: "Spikes", power: 20, aim });
+            if (compiled.feasible?.({ frame: frame(holder), params })) {
+              compiled.run({ frame: frame(holder), params });
+            }
+          }
+          return calls(phases.unshiftNew);
+        };
+        expect(run(false), `${aim} standing ${standing}`).toEqual(run(true));
+      }
+    }
+  });
+
+  it("multiply-power-per-count twins FanFavoritePowerAbAttr (bench) and HeavyweightPowerAbAttr (weight classes)", () => {
+    for (const benched of [0, 1, 5, 6]) {
+      const run = (useClass: boolean) => {
+        const holder = mon();
+        const bench = Array.from({ length: benched }, (_, i) => mon({ id: 10 + i, isOnField: () => false }));
+        scene({ getPlayerParty: () => [holder, ...bench] });
+        const power = new NumberHolder(80);
+        const params = { pokemon: holder, power };
+        if (useClass) {
+          const cls = new FanFavoritePowerAbAttr(5, 5);
+          if (cls.residual(params as never)) {
+            cls.apply(params as never);
+          }
+        } else {
+          const compiled = effect("effect.multiply-power-per-count", {
+            counter: "benched-teammates",
+            percent: 5,
+            max: 5,
+          });
+          if (compiled.feasible?.({ frame: frame(holder), params })) {
+            compiled.run({ frame: frame(holder), params });
+          }
+        }
+        return power.value;
+      };
+      expect(run(false), `bench ${benched}`).toBe(run(true));
+    }
+    for (const [mine, theirs] of [
+      [200, 10],
+      [10, 200],
+      [25, 24.9],
+      [1000, 1],
+    ]) {
+      const run = (useClass: boolean) => {
+        const user = mon({ getWeight: () => mine });
+        const target = mon({ id: 2, getWeight: () => theirs });
+        const power = new NumberHolder(100);
+        const params = { pokemon: user, opponent: target, power };
+        if (useClass) {
+          new HeavyweightPowerAbAttr(10, 5).apply(params as never);
+        } else {
+          effect("effect.multiply-power-per-count", { counter: "weight-classes", percent: 10, max: 5 }).run({
+            frame: frame(user, { other: target as never }),
+            params,
+          });
+        }
+        return power.value;
+      };
+      expect(run(false), `${mine} vs ${theirs}`).toBe(run(true));
     }
   });
 });

@@ -16,7 +16,7 @@ Tests: `test/tests/elite-redux/decomp/library-completion-wave-a.test.ts` (prefix
 | A2 | `stat.is{stats}` | atom | B04 8-21, R-B11-C5-03, R-B15-28 | `A:4327`; `ER/abilities/pressure-vessel.ts:92` | StatBlend, Pressure Vessel, World in Pieces, FaintedAllyStatMultiplier, `cancel.stat-*` rules (with C1/C2) | stat atoms › stat.is reads the stat slot ... |
 | A3 | `stat.is-highest{stats}` | atom | R-B18-23, R-B11-C4-01 | RCR:446-453; `self-highest-stat-multiplier.ts:96-106` | SelfHighestStatMultiplier (Solar Power, Sand Force, Whiteout, Big Leaves, ...), HigherStatMultiplier | stat atoms › stat.is-highest is HigherStatMultiplierAbAttr.gate ... |
 | A4 | `mon.tera-type{who, type}` | atom | R-B14-5.6 | RAI:123 | MoveTypeChange (B02-14, 13 abilities) + Electrodynamics riders | Pokemon atoms › mon.tera-type and mon.species ... |
-| A5 | `mon.species{who, species}` | atom | R-B14-5.7 | RAI:124; `pokemon.ts:2605` | same as A4 | Pokemon atoms › mon.tera-type and mon.species ... |
+| A5 | `mon.species{who, species}` | atom | R-B14-5.7 | RAI:124; `pokemon.ts:2605`; names: `SpeciesId` first, then `ErSpeciesId` (`speciesIdOf`) | same as A4 | Pokemon atoms › mon.tera-type and mon.species ... |
 | A6 | `move.type-counts-as{type}` | atom | R-B10-c3-07 | `ER/archetypes/post-attack-scripted-move.ts:162-170` | PostAttackScriptedMove (Volcano Rage, Frost Burn, High Tide, Ebb and Flow, Glacial Rage, Frost Dragon, Lunar Wrath) | move and type atoms › move.type-counts-as ... |
 | A7 | `status.asleep-or-comatose{who}` | atom | R-B10-23 | `A:8459-8463` (`isComatoseLike`, called) | Sweet Dreams, Peaceful Slumber, Bad Dreams foe filter | Pokemon atoms › status.asleep-or-comatose ... |
 | A8 | `move.accuracy{cmp, n}` | atom | (B-list A8) | `ER/archetypes/priority-modifier.ts:227` | PriorityModifier `maxAccuracy` (Sighting System, Iron Barrage) | move and type atoms › move.accuracy: boundaries ... |
@@ -25,7 +25,7 @@ Tests: `test/tests/elite-redux/decomp/library-completion-wave-a.test.ts` (prefix
 | A11 | `move.sets-weather` | atom | R-B11-C1-07 | `move.ts:397` hasAttr("WeatherChangeAttr") | Forecast follow-up gate (full only with C32) | move and type atoms › move.sets-weather and move.spread ... |
 | A12 | `move.spread` | atom | R-B13-39 | `move.ts:484-498`; NSM:1334-1336 | CenterSpreadReduction (0 abilities) | move and type atoms › move.sets-weather and move.spread ... |
 | A13 | `move.can-be-multi-strike-enhanced` (requires `move`, `moveUser`) | atom | B17 R30 | `A:2012-2013`, `A:2067-2068` | HitMultiplier, AddSecondStrike (with C8) | move and type atoms › move.can-be-multi-strike-enhanced answers like AddSecondStrikeAbAttr.canApply for the move user |
-| A14 | `time.acted-before{first, second}` | atom | R-B15-36 | `ER/abilities/relativity.ts:53-62` (helper called) | RelativityDefenseReduction | time atoms › time.acted-before calls the exported pokemonActedBefore helper |
+| A14 | `time.acted-before{order: holder-first \| other-first}` | atom | R-B15-36 | `ER/abilities/relativity.ts:53-62` (helper called) | RelativityDefenseReduction | time atoms › time.acted-before calls the exported pokemonActedBefore helper |
 | A15 | `foe.average-defense-not-higher` | atom (includes feasibility) | B03 c3-41 | `A:3618-3650` | DownloadAbAttr (Download) | stat atoms › foe.average-defense-not-higher is DownloadAbAttr canApply ... and gate |
 | A16 | `field.aura-on-field{aura}` | atom | B03 c2-29 | `init-abilities.ts:1350, 1356, 1362-1365` | Aura Break (3 attrs), Nihil Blaster (once the `extra` slot exists) | field and party atoms › field.aura-on-field ... |
 | A17 | `mon.has-type` option `originalIfStellar` | option on live atom | B04 11-31 | `pokemon.ts:2880-2886` | Flower Veil, Jungle's Guard | options on the live atoms › mon.has-type ... |
@@ -88,6 +88,24 @@ Notes for the rebinding pass:
   id listed. Digit strings and unknown names are still refused.
 - Formula text of these three live entries was updated to describe the options (generated JSON changes once the
   integrator regenerates).
+
+## Final staff review (FinalStaff) text and data fixes
+
+- Labels: `mon.charge-stacks` "{who}'s electric charges are {cmp} {n}" (the effects' word); `mon.species`
+  "{who}'s species is {species}"; `time.max-uses-per-wave` "Uses of counter {key} this wave are below {max} (advanced)";
+  `time.hits-taken` "The number of times {who} was hit this battle is {cmp} {n}" (both plural-safe at 1);
+  `field.aura-on-field` choices "the Dark Aura ability" / "the Fairy Aura ability" / "the Dark Aura or Fairy Aura
+  ability".
+- `time.acted-before`: the two Pokemon pickers (which could both pick the owner) became one `order` choice, "I moved
+  before the other Pokemon" / "The other Pokemon moved before me". New block, no binding names its settings.
+- `party.ally-active` (live) relabelled "My first ally can still fight (advanced)", label and summary only;
+  `party.any-ally-active` summary states the triple-battle difference.
+- `time.marker-set` (live) label and setting labels say "reminder" like the effects; behaviour unchanged.
+- Synonyms: "same type as me", "faster", "went first", "electric charge", "reminder".
+- `mon.species` also resolves `ErSpeciesId` names (vanilla `SpeciesId` first; the test checks every vanilla name keeps
+  its id; Grotom, Phantowl, "Grotom Glass" resolve).
+- `mon.mega-evolved` / `mon.gigantamax-form` default `who` is now the ability owner (new blocks, no bindings).
+- `time.max-uses-per-wave` summary says only the built-in ability adds to the count.
 
 ## Skipped (need a decision)
 

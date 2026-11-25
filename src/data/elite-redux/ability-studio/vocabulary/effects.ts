@@ -262,7 +262,7 @@ const BASE_EFFECTS: readonly EffectBase[] = [
   {
     id: "effect.hit-n-times",
     kind: "calc",
-    label: "Add {extraStrikes} extra hits to the move",
+    label: "Add {extraStrikes} hits to the move",
     requires: [],
     params: [numberParam("extraStrikes", "Extra hits added (1 = hits twice)", 1, 1, 9, 1, true)],
     modifies: "hitCount",
@@ -316,21 +316,21 @@ const BASE_EFFECTS: readonly EffectBase[] = [
   {
     id: "effect.cure-status",
     kind: "event",
-    label: "Cure {target} of {status}",
+    label: "Cure {target} of {status} (cured: {scope})",
     requires: [],
     params: [
       TARGET(),
       selectParam("status", "Which status", ["ANY", ...STATUS_OPTIONS], "ANY"),
       selectParam("scope", "Who is cured", ["target", "my-side"], "target", {
-        target: "The Pokemon picked above",
-        "my-side": "Every Pokemon on my side, with a message",
+        target: "only the Pokemon chosen in 'Who is affected'",
+        "my-side": "everyone on my team's side instead, with a cure message",
       }),
       textParam("statuses", "Statuses cured on my side (names, separated by commas; empty = the status above)", ""),
       booleanParam("alsoErAilments", "Cure every status plus frostbite, bleeding and fear, at once", false),
     ],
     v1Kind: "cure-status",
     implemented: true,
-    synonyms: ["heal status", "remove burn", "cleanse", "cure"],
+    synonyms: ["heal status", "remove burn", "cleanse", "cure", "cure frostbite", "cure bleeding", "cure my team"],
     examples: ["Cure my own status"],
   },
   {
@@ -359,7 +359,17 @@ const BASE_EFFECTS: readonly EffectBase[] = [
     ],
     v1Kind: "set-weather",
     implemented: true,
-    synonyms: ["summon rain", "drizzle", "drought", "sand stream", "snow warning"],
+    synonyms: [
+      "summon rain",
+      "drizzle",
+      "drought",
+      "sand stream",
+      "snow warning",
+      "weather for 8 turns",
+      "rain for 8 turns",
+      "weather turns",
+      "longer weather",
+    ],
     examples: ["Summon rain"],
   },
   {
@@ -373,7 +383,16 @@ const BASE_EFFECTS: readonly EffectBase[] = [
     ],
     v1Kind: "set-terrain",
     implemented: true,
-    synonyms: ["surge", "electric surge", "grassy surge", "terrain"],
+    synonyms: [
+      "surge",
+      "electric surge",
+      "grassy surge",
+      "terrain",
+      "terrain for 8 turns",
+      "electric terrain for 8 turns",
+      "terrain turns",
+      "longer terrain",
+    ],
     examples: ["Set Electric Terrain"],
   },
 
@@ -536,12 +555,12 @@ const BASE_EFFECTS: readonly EffectBase[] = [
   {
     id: "effect.steal-item",
     kind: "event",
-    label: "Steal a held item from {from}",
+    label: "Steal a random held item from {from}",
     requires: [],
     params: [
       selectParam("from", "Steal from", ["other", "any-foe"], "other", {
-        other: "The other Pokemon (one of its items at random)",
-        "any-foe": "Any foe (one takeable item at random)",
+        other: "the other Pokemon",
+        "any-foe": "any foe (only items that can be taken)",
       }),
     ],
     feasibility: ["A foe must hold an item that can be taken"],

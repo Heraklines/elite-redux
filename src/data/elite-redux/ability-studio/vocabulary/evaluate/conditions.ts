@@ -30,6 +30,7 @@ import { BattlerTagType } from "#enums/battler-tag-type";
 import { Command } from "#enums/command";
 import { ErAbilityId } from "#enums/er-ability-id";
 import { ErMoveId } from "#enums/er-move-id";
+import { ErSpeciesId } from "#enums/er-species-id";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
@@ -174,6 +175,29 @@ function abilityIdsSpelled(candidates: readonly string[]): Set<number> {
     }
   }
   return ids;
+}
+
+/**
+ * A species name from a setting: the vanilla table first, exactly as before (every name that resolved keeps its id),
+ * then the Elite Redux species (ErSpeciesId, ids from 10000 up) as written, as its player-name constant and in the key
+ * spelling ("Abra Redux" is ABRA_REDUX). Unknown names and digit strings are refused.
+ */
+export function speciesIdOf(name: string): SpeciesId {
+  try {
+    return enumValue(SpeciesId, name, "Pokemon species") as SpeciesId;
+  } catch (error) {
+    if (/^\s*\d+\s*$/.test(name)) {
+      throw error;
+    }
+    const erTable = ErSpeciesId as unknown as Record<string, unknown>;
+    for (const candidate of [name, constantName(name), erAbilityKey(name)]) {
+      const value = Object.hasOwn(erTable, candidate) ? erTable[candidate] : undefined;
+      if (typeof value === "number") {
+        return value as SpeciesId;
+      }
+    }
+    throw error;
+  }
 }
 
 /**
@@ -881,7 +905,7 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
     return frame => holderLikeOf(frame, String(p.who))?.getTeraType() === type;
   },
   "mon.species": p => {
-    const species = enumValue(SpeciesId, String(p.species), "Pokemon species") as SpeciesId;
+    const species = speciesIdOf(String(p.species));
     return frame => holderLikeOf(frame, String(p.who))?.hasSpecies(species) ?? false;
   },
   "move.type-counts-as": p => {
@@ -934,9 +958,11 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
     return frame.move.canBeMultiStrikeEnhanced(frame.moveUser, true, target ?? null);
   },
   "time.acted-before": p => frame => {
-    const first = holderLikeOf(frame, String(p.first));
-    const second = holderLikeOf(frame, String(p.second));
-    return first !== undefined && second !== undefined && pokemonActedBefore(first, second);
+    const { holder, other } = frame;
+    if (other === undefined) {
+      return false;
+    }
+    return p.order === "other-first" ? pokemonActedBefore(other, holder) : pokemonActedBefore(holder, other);
   },
   // getEffectiveStat runs the stat abilities of the foes and of the field, which on a stat trigger can be this very
   // rule (or the same rule on the foe, which reads my stats back): latched per holder.

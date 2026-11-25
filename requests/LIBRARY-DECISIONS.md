@@ -221,8 +221,9 @@ stays legacy until the owner decides whether it deserves a block.
   (612 entries, B03, B04, B10, B11, B13 to B18). Where those files disagree with this document, they carry the evidence;
   `requests/triage/README.md` lists the aliases and planned effects here that must NOT be used for rebinding as written.
 - Built afterwards (2026-11-25, library completion): the triage's justified-unbuilt rows were merged into 74 unique
-  blocks (`requests/triage/BUILD-LIST.md`). The 64 pure additions are implemented with tests against the original class
-  or engine helper: 25 conditions (`requests/triage/BUILT-A.md`), 3 guards and 36 effects (`requests/triage/BUILT-BC.md`,
+  blocks (`requests/triage/BUILD-LIST.md`). The 64 pure additions are implemented with tests, against the original class
+  or engine helper where the builders could (the BUILT files say which ones are not yet twinned with their class): 25
+  conditions (`requests/triage/BUILT-A.md`), 3 guards and 36 effects (`requests/triage/BUILT-BC.md`,
   which also lists the integrator notes for rebinding). Two review rounds each; every change to a live block is an
   optional setting whose default is today's call. Not built, needing an owner or engine decision: 6 WHEN/slot/frame
   changes (Wave D), `matchup.defender-has-type` and `move.effect-chance-between` (new frame slots), `effect.multiply-recoil`

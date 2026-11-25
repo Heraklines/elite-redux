@@ -299,7 +299,7 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
   {
     id: "effect.stat-stages",
     kind: "event",
-    label: "Change several stats at once ({stats}) by {stages} stages",
+    label: "Change {stats} of {target} by {stages} stage(s)",
     requires: [],
     params: [
       selectParam(
@@ -307,6 +307,12 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
         "Who gets the change",
         ["me", "the other Pokemon", "every adjacent foe", "every other adjacent Pokemon"],
         "me",
+        {
+          me: "me",
+          "the other Pokemon": "the other Pokemon",
+          "every adjacent foe": "every foe next to me",
+          "every other adjacent Pokemon": "every Pokemon next to me (foes and partners)",
+        },
       ),
       textParam("stats", "Stats (names, separated by commas)", "Attack, Sp. Atk"),
       numberParam("stages", "Number of stages (-6 to 6)", 1, -6, 6, 1, true),
@@ -333,12 +339,15 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
   {
     id: "effect.change-own-type",
     kind: "event",
-    label: "Change a Pokemon's type to one type",
+    label: "Change {who} type to {type}",
     requires: [],
     params: [
-      selectParam("who", "Whose type changes", ["holder", "other"], "holder"),
+      selectParam("who", "Whose type changes", ["holder", "other"], "holder", {
+        holder: "my",
+        other: "the other Pokemon's",
+      }),
       selectParam("type", "New type", [...TYPE_OPTIONS, "move-type"], "NORMAL", {
-        "move-type": "The type of the move being used",
+        "move-type": "the type of the move being used",
       }),
     ],
     implemented: true,
@@ -359,12 +368,12 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
   {
     id: "effect.hurt-percent-of-max-hp",
     kind: "event",
-    label: "Hurt {targets} by a share of their own max HP",
+    label: "Hurt {targets} by {fraction} of their own max HP",
     requires: [],
     params: [
       selectParam("targets", "Who is hurt", ["foes", "everyone-else"], "foes", {
-        foes: "Every foe",
-        "everyone-else": "Every other Pokemon on the field",
+        foes: "every foe",
+        "everyone-else": "every other Pokemon on the field",
       }),
       numberParam("fraction", "Share of max HP (0.125 = one eighth)", 0.125, 0.0625, 1, 0.0625),
       textParam("sparedTypes", "Types that are spared (names, separated by commas)", ""),
@@ -372,7 +381,7 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
     ],
     feasibility: ["Someone must be standing who is not of a spared type"],
     implemented: true,
-    synonyms: ["chip damage", "toxic spill", "damage share of max hp", "lose hp", "field damage"],
+    synonyms: ["chip damage", "toxic spill", "damage share of max hp", "lose hp", "field damage", "damage all foes"],
     examples: ["Every foe that is not Poison type loses an eighth of its max HP each turn"],
   },
   {
@@ -382,9 +391,10 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
     requires: [],
     params: [
       selectParam("target", "Who is healed", [...TARGET_OPTIONS, "adjacent-allies"], "holder", {
-        "adjacent-allies": "My active adjacent allies, with a message",
+        "holder-side": "Me and every ally on my side",
+        "adjacent-allies": "My active adjacent allies (shows a message)",
       }),
-      numberParam("denominator", "Share of max HP (8 = one eighth)", 8, 1, 64, 1, true),
+      numberParam("denominator", "Share of max HP (8 = one eighth)", 8, 2, 64, 1, true),
       selectParam("basedOn", "Whose max HP sets the amount", ["target", "holder"], "target", {
         target: "The healed Pokemon",
         holder: "The ability owner",
@@ -392,7 +402,15 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
       booleanParam("showAnimation", "Show the healing animation", false),
     ],
     implemented: true,
-    synonyms: ["rain dish", "ice body", "regenerate a fraction", "heal sixteenth", "residual heal", "hospitality"],
+    synonyms: [
+      "rain dish",
+      "ice body",
+      "regenerate a fraction",
+      "heal sixteenth",
+      "residual heal",
+      "hospitality",
+      "heal ally",
+    ],
     examples: ["Heal an eighth of max HP every turn", "Heal my partner by a quarter of my max HP, like Hospitality"],
   },
   {
@@ -412,7 +430,9 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
     requires: [],
     params: [
       selectParam("target", "Whose stat changes", [...TARGET_OPTIONS, "adjacent-foes"], "holder", {
-        "adjacent-foes": "Every adjacent foe",
+        "holder-side": "Me and every ally on my side",
+        "opposing-side": "Every foe on the field",
+        "adjacent-foes": "Only the foes next to me",
       }),
       booleanParam("onlyRaised", "Only reset stats that went up (drops stay)", false),
     ],
@@ -475,7 +495,7 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
   {
     id: "effect.add-stat-share",
     kind: "calc",
-    label: "Add a share of my {sourceStat} to the stat",
+    label: "Add {share} of my {sourceStat} to the stat",
     requires: [],
     params: [
       selectParam("stat", "Only for this stat", ["any", ...STAT_OPTIONS], "any", {
@@ -494,7 +514,7 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
   {
     id: "effect.multiply-stat-per-fainted-ally",
     kind: "calc",
-    label: "Multiply the stat by {share} more per fainted teammate",
+    label: "Raise the stat by {share} of itself per fainted teammate",
     requires: [],
     params: [numberParam("share", "Extra share per fainted teammate (0.05 = 5%)", 0.05, 0, 1, 0.01)],
     modifies: "statValue",
@@ -533,8 +553,8 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
     requires: [],
     params: [
       selectParam("counter", "What is counted", ["benched-teammates", "weight-classes"], "benched-teammates", {
-        "benched-teammates": "Healthy teammate waiting on the bench",
-        "weight-classes": "Weight class I am above the target",
+        "benched-teammates": "benched teammate",
+        "weight-classes": "weight class above the target",
       }),
       numberParam("percent", "Extra power per counted one (%)", 5, 0, 100, 1),
       numberParam("max", "Most counted ones (number)", 5, 0, 5, 1, true),
@@ -659,7 +679,10 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
     label: "Remove the {type} type from {who}",
     requires: [],
     params: [
-      selectParam("who", "Who loses the type", ["holder", "other"], "holder"),
+      selectParam("who", "Who loses the type", ["holder", "other"], "holder", {
+        holder: "me",
+        other: "the other Pokemon",
+      }),
       selectParam("type", "Which type", TYPE_OPTIONS, "GHOST"),
       selectParam("fallback", "Type left when no type remains", ["UNKNOWN", "NORMAL"], "UNKNOWN", {
         UNKNOWN: "No type (typeless)",
@@ -675,10 +698,13 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
   {
     id: "effect.stat-stage-on-highest",
     kind: "event",
-    label: "Change {target}'s highest stat of {stats} by {stages}",
+    label: "Change {target} highest of {stats} by {stages} stage(s)",
     requires: [],
     params: [
-      selectParam("target", "Whose stat", ["holder", "other"], "holder"),
+      selectParam("target", "Whose stat", ["holder", "other"], "holder", {
+        holder: "my",
+        other: "the other Pokemon's",
+      }),
       textParam("stats", "Stats to compare (names, separated by commas)", "Attack, Sp. Atk"),
       numberParam("stages", "Number of stages (-6 to 6)", 1, -6, 6, 1, true),
       selectParam("tie", "On a tie", ["first", "last"], "first", {
@@ -697,7 +723,7 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
   {
     id: "effect.drain-adjacent-foes",
     kind: "event",
-    label: "Take HP from every adjacent foe and heal me by it",
+    label: "Take {fraction} of each adjacent foe's max HP and heal me",
     requires: [],
     params: [
       numberParam("fraction", "Share of each foe's max HP (0.125 = one eighth)", 0.125, 0.0625, 1, 0.0625),
@@ -716,7 +742,16 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
     params: [],
     feasibility: ["The other Pokemon must be able to switch out"],
     implemented: true,
-    synonyms: ["force out", "red card", "chuckster", "restraining order", "drag out"],
+    synonyms: [
+      "force out",
+      "red card",
+      "chuckster",
+      "restraining order",
+      "drag out",
+      "switch out the foe",
+      "roar",
+      "whirlwind",
+    ],
     examples: ["The attacker is forced to switch out after hitting me"],
   },
   {
@@ -757,36 +792,36 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
   {
     id: "effect.change-charge-stacks",
     kind: "event",
-    label: "Change my electric charge ({mode})",
+    label: "Change my electric charge: {mode} (amount {amount})",
     requires: [],
     params: [
       selectParam("mode", "How it changes", ["add", "spend", "spend-all"], "add", {
-        add: "Add charges (at most 4)",
-        spend: "Spend charges",
-        "spend-all": "Spend every charge",
+        add: "add (at most 4)",
+        spend: "spend",
+        "spend-all": "spend all (the amount is not used)",
       }),
       numberParam("amount", "Number of charges", 1, 1, 4, 1, true),
     ],
     implemented: true,
-    synonyms: ["charge stack", "capacitor", "overloaded", "store charge", "electric charge"],
+    synonyms: ["charge stack", "capacitor", "overloaded", "store charge", "electric charge", "spend charge"],
     examples: ["Store one charge when an Electric move hits me"],
   },
   {
     id: "effect.drain-pp",
     kind: "event",
-    label: "Take PP from one of the other Pokemon's moves",
+    label: "Take {amount} PP from the other Pokemon: {which}",
     requires: ["other"],
     params: [
       selectParam("which", "Which move", ["used-move", "used-move-all", "last-used-else-random"], "used-move", {
-        "used-move": "The move it just used",
-        "used-move-all": "The move it just used, every PP",
-        "last-used-else-random": "The move it used last, or a random one",
+        "used-move": "the move it just used",
+        "used-move-all": "the move it just used: every PP, the amount is not used",
+        "last-used-else-random": "the move it used last, or a random one",
       }),
       numberParam("amount", "PP taken (number)", 4, 1, 64, 1, true),
     ],
     feasibility: ["The other Pokemon must know that move (and have PP left to take, when taking every PP)"],
     implemented: true,
-    synonyms: ["spite", "pressure", "drain pp", "ill will", "lower pp"],
+    synonyms: ["spite", "pressure", "drain pp", "ill will", "lower pp", "reduce pp", "remove pp"],
     examples: ["The attacker's move loses 4 PP when it hits me, like Spiteful"],
   },
   {
@@ -814,7 +849,15 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
     ],
     feasibility: ["The other Pokemon's ability must be replaceable"],
     implemented: true,
-    synonyms: ["mummy", "lingering aroma", "spread ability", "pass ability", "infect"],
+    synonyms: [
+      "mummy",
+      "lingering aroma",
+      "spread ability",
+      "pass ability",
+      "infect",
+      "change ability",
+      "replace ability",
+    ],
     examples: ["The attacker's ability becomes Mummy when it touches me"],
   },
   {
@@ -823,14 +866,30 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
     label: "Remove {tags} from {side}",
     requires: [],
     params: [
-      textParam("tags", "Field effects (names, separated by commas)", "Reflect, Light Screen, Aurora Veil"),
+      textParam(
+        "tags",
+        "Any of: Reflect, Light Screen, Aurora Veil, Smokescreen, Spikes, Toxic Spikes, Stealth Rock, Sticky Web, Tailwind",
+        "Reflect, Light Screen, Aurora Veil",
+      ),
       selectParam("side", "Which side", ["holder-side", "opposing-side", "both", "target-side"], "both", {
-        "target-side": "The other Pokemon's side",
+        "holder-side": "my side",
+        "opposing-side": "the foes' side",
+        both: "both sides",
+        "target-side": "the other Pokemon's side",
       }),
       booleanParam("onlyWhenPresent", "Only when one of them is on the field", true),
     ],
     implemented: true,
-    synonyms: ["screen cleaner", "pickup hazards", "remove screens", "clear hazards", "break screens"],
+    synonyms: [
+      "screen cleaner",
+      "pickup hazards",
+      "remove screens",
+      "clear hazards",
+      "break screens",
+      "remove spikes",
+      "remove stealth rock",
+      "defog",
+    ],
     examples: ["Remove Reflect and Light Screen from both sides, like Screen Cleaner"],
   },
 ];

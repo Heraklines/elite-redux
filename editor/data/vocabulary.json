@@ -6714,7 +6714,7 @@
     {
       "id": "party.ally-active",
       "group": "Party",
-      "label": "I have an ally that can still fight",
+      "label": "My first ally can still fight (advanced)",
       "requires": [
         "holder"
       ],
@@ -6734,7 +6734,7 @@
       "examples": [
         "Copy my ally's stat changes only while my ally is still fighting"
       ],
-      "summary": "Yes when my partner is on the field and can still fight. Example: Costar only copies from an ally that is still fighting.",
+      "summary": "Yes when my first ally is on the field and can still fight. In a triple battle only one of my two allies is checked. Example: Costar copies from that ally.",
       "category": "Other"
     },
     {
@@ -7045,7 +7045,7 @@
     {
       "id": "time.marker-set",
       "group": "Time",
-      "label": "A marker called {key} is set on {who} (advanced)",
+      "label": "The reminder {key} is set on {who} (advanced)",
       "requires": [],
       "whoParam": "who",
       "params": [
@@ -7067,7 +7067,7 @@
         },
         {
           "id": "scope",
-          "label": "How long the marker lasts",
+          "label": "How long the reminder lasts",
           "control": "select",
           "default": "battle",
           "options": [
@@ -7083,7 +7083,7 @@
         },
         {
           "id": "key",
-          "label": "Marker name",
+          "label": "Reminder name",
           "control": "text",
           "default": "marker"
         },
@@ -7113,12 +7113,13 @@
         "memory",
         "already marked",
         "remembered",
-        "tagged"
+        "tagged",
+        "reminder"
       ],
       "examples": [
         "Only if my entry marker is not set yet"
       ],
-      "summary": "Advanced: yes when a named marker that another block set is on the Pokemon. Example: only if my entry marker is not set yet.",
+      "summary": "Advanced: yes when a named reminder that another block put on the Pokemon is still there. Example: only if my entry reminder is not set yet.",
       "category": "Other"
     },
     {
@@ -7182,7 +7183,8 @@
         "stab",
         "matches my type",
         "on-type move",
-        "my own type"
+        "my own type",
+        "same type as me"
       ],
       "examples": [
         "Boost only moves that do not match my types, like Mystic Power"
@@ -7349,7 +7351,7 @@
     {
       "id": "mon.species",
       "group": "Pokemon",
-      "label": "{who} is a {species}",
+      "label": "{who}'s species is {species}",
       "requires": [],
       "whoParam": "who",
       "params": [
@@ -7378,8 +7380,8 @@
       ],
       "pure": true,
       "formula": {
-        "expr": "pokemon.hasSpecies(SpeciesId[species])  (an unknown name is refused when the rule is built)",
-        "source": "src/data/elite-redux/abilities/fakemon-pitch-raichu.ts:124; src/field/pokemon.ts:2605 hasSpecies"
+        "expr": "pokemon.hasSpecies(id), id = SpeciesId[species] first (every name that resolved before keeps its id), then ErSpeciesId (Elite Redux species); an unknown name is refused when the rule is built",
+        "source": "src/data/elite-redux/abilities/fakemon-pitch-raichu.ts:124; src/field/pokemon.ts:2605 hasSpecies; src/enums/er-species-id.ts"
       },
       "synonyms": [
         "species",
@@ -7570,7 +7572,7 @@
     {
       "id": "time.hits-taken",
       "group": "Time",
-      "label": "{who} has been hit {cmp} {n} times this battle",
+      "label": "The number of times {who} was hit this battle is {cmp} {n}",
       "requires": [],
       "whoParam": "who",
       "params": [
@@ -7808,44 +7810,30 @@
     {
       "id": "time.acted-before",
       "group": "Time",
-      "label": "{first} moved before {second} this turn",
+      "label": "{order} this turn",
       "requires": [
         "holder",
         "other"
       ],
       "params": [
         {
-          "id": "first",
-          "label": "Which Pokemon moved first",
+          "id": "order",
+          "label": "Who moved first",
           "control": "select",
-          "default": "holder",
+          "default": "holder-first",
           "options": [
-            "holder",
-            "other"
+            "holder-first",
+            "other-first"
           ],
           "optionLabels": {
-            "holder": "The ability owner",
-            "other": "The other Pokemon"
-          }
-        },
-        {
-          "id": "second",
-          "label": "Which Pokemon moved later",
-          "control": "select",
-          "default": "other",
-          "options": [
-            "holder",
-            "other"
-          ],
-          "optionLabels": {
-            "holder": "The ability owner",
-            "other": "The other Pokemon"
+            "holder-first": "I moved before the other Pokemon",
+            "other-first": "The other Pokemon moved before me"
           }
         }
       ],
       "pure": true,
       "formula": {
-        "expr": "pokemonActedBefore(first, second): order = getLastTurnOrder(); first absent -> no; second absent -> yes; else index(first) < index(second)",
+        "expr": "holder-first: pokemonActedBefore(holder, other) ; other-first: pokemonActedBefore(other, holder) ; order = getLastTurnOrder(); first absent -> no; second absent -> yes; else index(first) < index(second)",
         "source": "src/data/elite-redux/abilities/relativity.ts:53-62 (the exported helper is called)"
       },
       "synonyms": [
@@ -7853,12 +7841,14 @@
         "outsped",
         "acted first",
         "turn order",
-        "relativity"
+        "relativity",
+        "faster",
+        "went first"
       ],
       "examples": [
         "Take less damage from a foe that moved after me, like Relativity"
       ],
-      "summary": "Yes when the first Pokemon has already moved this turn and moved before the second one. Example: I moved, the foe has not moved yet.",
+      "summary": "Yes when I moved before the other Pokemon this turn, or the other way round, as you pick. Example: I moved, the foe has not moved yet.",
       "category": "Other"
     },
     {
@@ -7904,9 +7894,9 @@
             "either"
           ],
           "optionLabels": {
-            "dark": "Dark Aura",
-            "fairy": "Fairy Aura",
-            "either": "Dark Aura or Fairy Aura"
+            "dark": "the Dark Aura ability",
+            "fairy": "the Fairy Aura ability",
+            "either": "the Dark Aura or Fairy Aura ability"
           }
         }
       ],
@@ -7975,7 +7965,7 @@
       "examples": [
         "Only while one of my allies is fighting next to me"
       ],
-      "summary": "Yes when any of my allies is on the field and can still fight, not only the one next to me. Example: in doubles, my partner is fighting.",
+      "summary": "In a triple battle this looks at both my allies; in a double battle it is the same as \"My first ally can still fight\". Yes when one can still fight.",
       "category": "Other"
     },
     {
@@ -8048,7 +8038,7 @@
     {
       "id": "mon.charge-stacks",
       "group": "Pokemon",
-      "label": "{who} has {cmp} {n} charge stacks",
+      "label": "{who}'s electric charges are {cmp} {n}",
       "requires": [],
       "whoParam": "who",
       "params": [
@@ -8090,7 +8080,7 @@
         },
         {
           "id": "n",
-          "label": "Charge stacks (0-4)",
+          "label": "Electric charges (0-4)",
           "control": "number",
           "default": 1,
           "min": 0,
@@ -8109,12 +8099,14 @@
         "stacks",
         "capacitor bank",
         "overloaded",
-        "stored charge"
+        "stored charge",
+        "electric charge",
+        "charge stacks"
       ],
       "examples": [
-        "Boost power once I hold at least 2 charge stacks"
+        "Boost power once I hold at least 2 electric charges"
       ],
-      "summary": "Yes when the chosen Pokemon's charge stacks pass the comparison. It can hold up to 4. Example: at least 2 stacks for Overloaded.",
+      "summary": "Yes when the chosen Pokemon's electric charges pass the comparison. It can hold up to 4. Example: at least 2 electric charges for Overloaded.",
       "category": "Other"
     },
     {
@@ -8128,7 +8120,7 @@
           "id": "who",
           "label": "Which Pokemon",
           "control": "select",
-          "default": "other",
+          "default": "holder",
           "options": [
             "holder",
             "other"
@@ -8167,7 +8159,7 @@
           "id": "who",
           "label": "Which Pokemon",
           "control": "select",
-          "default": "other",
+          "default": "holder",
           "options": [
             "holder",
             "other"
@@ -8198,7 +8190,7 @@
     {
       "id": "time.max-uses-per-wave",
       "group": "Time",
-      "label": "Counter {key} has under {max} uses this wave (advanced)",
+      "label": "Uses of counter {key} this wave are below {max} (advanced)",
       "requires": [
         "holder"
       ],
@@ -8222,7 +8214,7 @@
       ],
       "pure": true,
       "formula": {
-        "expr": "count of k in holder.waveData.entryEffectsFired with k.startsWith(key + \"#\") < max  (read only: the class writes key#n when it casts; a preview passes in the class before this read)",
+        "expr": "count of k in holder.waveData.entryEffectsFired with k.startsWith(key + \"#\") < max  (read only: only the built-in class writes key#n when it casts, no block does; a preview passes in the class before this read)",
         "source": "src/data/elite-redux/archetypes/post-summon-scripted-move.ts:109-117 countUses, :137-141 gate"
       },
       "synonyms": [
@@ -8235,7 +8227,7 @@
       "examples": [
         "Cast my wish at most 3 times per wave, like Wishmaker"
       ],
-      "summary": "Advanced: yes while the named counter was used fewer times this wave than the limit. Example: Wishmaker can cast 3 times per wave.",
+      "summary": "Advanced: yes while the named counter was used fewer times this wave than the limit. Only the built-in ability adds to the count; no block does, so on its own it stays yes.",
       "category": "Other"
     }
   ],
@@ -8808,7 +8800,7 @@
     {
       "id": "effect.hit-n-times",
       "kind": "calc",
-      "label": "Add {extraStrikes} extra hits to the move",
+      "label": "Add {extraStrikes} hits to the move",
       "requires": [],
       "params": [
         {
@@ -9073,7 +9065,7 @@
     {
       "id": "effect.cure-status",
       "kind": "event",
-      "label": "Cure {target} of {status}",
+      "label": "Cure {target} of {status} (cured: {scope})",
       "requires": [],
       "params": [
         {
@@ -9128,8 +9120,8 @@
             "my-side"
           ],
           "optionLabels": {
-            "target": "The Pokemon picked above",
-            "my-side": "Every Pokemon on my side, with a message"
+            "target": "only the Pokemon chosen in 'Who is affected'",
+            "my-side": "everyone on my team's side instead, with a cure message"
           }
         },
         {
@@ -9151,12 +9143,15 @@
         "heal status",
         "remove burn",
         "cleanse",
-        "cure"
+        "cure",
+        "cure frostbite",
+        "cure bleeding",
+        "cure my team"
       ],
       "examples": [
         "Cure my own status"
       ],
-      "summary": "Cures a status condition, or any status. Example: cure my own paralysis when I enter.",
+      "summary": "Cures a status condition, or any status, of the chosen Pokemon or of everyone on my side. Example: cure my own paralysis when I enter.",
       "category": "Status conditions"
     },
     {
@@ -9274,12 +9269,16 @@
         "drizzle",
         "drought",
         "sand stream",
-        "snow warning"
+        "snow warning",
+        "weather for 8 turns",
+        "rain for 8 turns",
+        "weather turns",
+        "longer weather"
       ],
       "examples": [
         "Summon rain"
       ],
-      "summary": "Changes the weather. Example: set Rain when I enter, like Drizzle.",
+      "summary": "Changes the weather. Turns 0 keeps the usual length; another number sets how many turns it lasts. Example: Rain for 8 turns when I enter, like Drizzle.",
       "category": "Weather & terrain"
     },
     {
@@ -9327,12 +9326,16 @@
         "surge",
         "electric surge",
         "grassy surge",
-        "terrain"
+        "terrain",
+        "terrain for 8 turns",
+        "electric terrain for 8 turns",
+        "terrain turns",
+        "longer terrain"
       ],
       "examples": [
         "Set Electric Terrain"
       ],
-      "summary": "Changes the terrain. Example: set Electric Terrain when I enter, like Electric Surge.",
+      "summary": "Changes the terrain. Turns 0 keeps the usual length; another number sets how many turns it lasts. Example: Electric Terrain for 8 turns, like Electric Surge.",
       "category": "Weather & terrain"
     },
     {
@@ -9769,7 +9772,7 @@
     {
       "id": "effect.steal-item",
       "kind": "event",
-      "label": "Steal a held item from {from}",
+      "label": "Steal a random held item from {from}",
       "requires": [],
       "params": [
         {
@@ -9782,8 +9785,8 @@
             "any-foe"
           ],
           "optionLabels": {
-            "other": "The other Pokemon (one of its items at random)",
-            "any-foe": "Any foe (one takeable item at random)"
+            "other": "the other Pokemon",
+            "any-foe": "any foe (only items that can be taken)"
           }
         }
       ],
@@ -10698,7 +10701,7 @@
     {
       "id": "effect.stat-stages",
       "kind": "event",
-      "label": "Change several stats at once ({stats}) by {stages} stages",
+      "label": "Change {stats} of {target} by {stages} stage(s)",
       "requires": [],
       "params": [
         {
@@ -10711,7 +10714,13 @@
             "the other Pokemon",
             "every adjacent foe",
             "every other adjacent Pokemon"
-          ]
+          ],
+          "optionLabels": {
+            "me": "me",
+            "the other Pokemon": "the other Pokemon",
+            "every adjacent foe": "every foe next to me",
+            "every other adjacent Pokemon": "every Pokemon next to me (foes and partners)"
+          }
         },
         {
           "id": "stats",
@@ -10755,7 +10764,7 @@
     {
       "id": "effect.change-own-type",
       "kind": "event",
-      "label": "Change a Pokemon's type to one type",
+      "label": "Change {who} type to {type}",
       "requires": [],
       "params": [
         {
@@ -10768,8 +10777,8 @@
             "other"
           ],
           "optionLabels": {
-            "holder": "The ability owner",
-            "other": "The other Pokemon"
+            "holder": "my",
+            "other": "the other Pokemon's"
           }
         },
         {
@@ -10819,7 +10828,7 @@
             "DARK": "Dark",
             "FAIRY": "Fairy",
             "STELLAR": "Stellar",
-            "move-type": "The type of the move being used"
+            "move-type": "the type of the move being used"
           }
         }
       ],
@@ -10934,7 +10943,7 @@
     {
       "id": "effect.hurt-percent-of-max-hp",
       "kind": "event",
-      "label": "Hurt {targets} by a share of their own max HP",
+      "label": "Hurt {targets} by {fraction} of their own max HP",
       "requires": [],
       "params": [
         {
@@ -10947,8 +10956,8 @@
             "everyone-else"
           ],
           "optionLabels": {
-            "foes": "Every foe",
-            "everyone-else": "Every other Pokemon on the field"
+            "foes": "every foe",
+            "everyone-else": "every other Pokemon on the field"
           }
         },
         {
@@ -10983,7 +10992,8 @@
         "toxic spill",
         "damage share of max hp",
         "lose hp",
-        "field damage"
+        "field damage",
+        "damage all foes"
       ],
       "examples": [
         "Every foe that is not Poison type loses an eighth of its max HP each turn"
@@ -11012,9 +11022,9 @@
           "optionLabels": {
             "holder": "The ability owner",
             "other": "The other Pokemon",
-            "holder-side": "My side of the field",
+            "holder-side": "Me and every ally on my side",
             "opposing-side": "The foes' side of the field",
-            "adjacent-allies": "My active adjacent allies, with a message"
+            "adjacent-allies": "My active adjacent allies (shows a message)"
           }
         },
         {
@@ -11022,7 +11032,7 @@
           "label": "Share of max HP (8 = one eighth)",
           "control": "number",
           "default": 8,
-          "min": 1,
+          "min": 2,
           "max": 64,
           "step": 1,
           "integer": true
@@ -11055,7 +11065,8 @@
         "regenerate a fraction",
         "heal sixteenth",
         "residual heal",
-        "hospitality"
+        "hospitality",
+        "heal ally"
       ],
       "examples": [
         "Heal an eighth of max HP every turn",
@@ -11112,9 +11123,9 @@
           "optionLabels": {
             "holder": "The ability owner",
             "other": "The other Pokemon",
-            "holder-side": "My side of the field",
-            "opposing-side": "The foes' side of the field",
-            "adjacent-foes": "Every adjacent foe"
+            "holder-side": "Me and every ally on my side",
+            "opposing-side": "Every foe on the field",
+            "adjacent-foes": "Only the foes next to me"
           }
         },
         {
@@ -11243,7 +11254,7 @@
     {
       "id": "effect.add-stat-share",
       "kind": "calc",
-      "label": "Add a share of my {sourceStat} to the stat",
+      "label": "Add {share} of my {sourceStat} to the stat",
       "requires": [],
       "params": [
         {
@@ -11330,7 +11341,7 @@
     {
       "id": "effect.multiply-stat-per-fainted-ally",
       "kind": "calc",
-      "label": "Multiply the stat by {share} more per fainted teammate",
+      "label": "Raise the stat by {share} of itself per fainted teammate",
       "requires": [],
       "params": [
         {
@@ -11434,8 +11445,8 @@
             "weight-classes"
           ],
           "optionLabels": {
-            "benched-teammates": "Healthy teammate waiting on the bench",
-            "weight-classes": "Weight class I am above the target"
+            "benched-teammates": "benched teammate",
+            "weight-classes": "weight class above the target"
           }
         },
         {
@@ -11749,8 +11760,8 @@
             "other"
           ],
           "optionLabels": {
-            "holder": "The ability owner",
-            "other": "The other Pokemon"
+            "holder": "me",
+            "other": "the other Pokemon"
           }
         },
         {
@@ -11842,7 +11853,7 @@
     {
       "id": "effect.stat-stage-on-highest",
       "kind": "event",
-      "label": "Change {target}'s highest stat of {stats} by {stages}",
+      "label": "Change {target} highest of {stats} by {stages} stage(s)",
       "requires": [],
       "params": [
         {
@@ -11855,8 +11866,8 @@
             "other"
           ],
           "optionLabels": {
-            "holder": "The ability owner",
-            "other": "The other Pokemon"
+            "holder": "my",
+            "other": "the other Pokemon's"
           }
         },
         {
@@ -11921,7 +11932,7 @@
     {
       "id": "effect.drain-adjacent-foes",
       "kind": "event",
-      "label": "Take HP from every adjacent foe and heal me by it",
+      "label": "Take {fraction} of each adjacent foe's max HP and heal me",
       "requires": [],
       "params": [
         {
@@ -11975,7 +11986,10 @@
         "red card",
         "chuckster",
         "restraining order",
-        "drag out"
+        "drag out",
+        "switch out the foe",
+        "roar",
+        "whirlwind"
       ],
       "examples": [
         "The attacker is forced to switch out after hitting me"
@@ -12078,7 +12092,7 @@
     {
       "id": "effect.change-charge-stacks",
       "kind": "event",
-      "label": "Change my electric charge ({mode})",
+      "label": "Change my electric charge: {mode} (amount {amount})",
       "requires": [],
       "params": [
         {
@@ -12092,9 +12106,9 @@
             "spend-all"
           ],
           "optionLabels": {
-            "add": "Add charges (at most 4)",
-            "spend": "Spend charges",
-            "spend-all": "Spend every charge"
+            "add": "add (at most 4)",
+            "spend": "spend",
+            "spend-all": "spend all (the amount is not used)"
           }
         },
         {
@@ -12114,7 +12128,8 @@
         "capacitor",
         "overloaded",
         "store charge",
-        "electric charge"
+        "electric charge",
+        "spend charge"
       ],
       "examples": [
         "Store one charge when an Electric move hits me"
@@ -12125,7 +12140,7 @@
     {
       "id": "effect.drain-pp",
       "kind": "event",
-      "label": "Take PP from one of the other Pokemon's moves",
+      "label": "Take {amount} PP from the other Pokemon: {which}",
       "requires": [
         "other"
       ],
@@ -12141,9 +12156,9 @@
             "last-used-else-random"
           ],
           "optionLabels": {
-            "used-move": "The move it just used",
-            "used-move-all": "The move it just used, every PP",
-            "last-used-else-random": "The move it used last, or a random one"
+            "used-move": "the move it just used",
+            "used-move-all": "the move it just used: every PP, the amount is not used",
+            "last-used-else-random": "the move it used last, or a random one"
           }
         },
         {
@@ -12166,7 +12181,9 @@
         "pressure",
         "drain pp",
         "ill will",
-        "lower pp"
+        "lower pp",
+        "reduce pp",
+        "remove pp"
       ],
       "examples": [
         "The attacker's move loses 4 PP when it hits me, like Spiteful"
@@ -12235,7 +12252,9 @@
         "lingering aroma",
         "spread ability",
         "pass ability",
-        "infect"
+        "infect",
+        "change ability",
+        "replace ability"
       ],
       "examples": [
         "The attacker's ability becomes Mummy when it touches me"
@@ -12251,7 +12270,7 @@
       "params": [
         {
           "id": "tags",
-          "label": "Field effects (names, separated by commas)",
+          "label": "Any of: Reflect, Light Screen, Aurora Veil, Smokescreen, Spikes, Toxic Spikes, Stealth Rock, Sticky Web, Tailwind",
           "control": "text",
           "default": "Reflect, Light Screen, Aurora Veil"
         },
@@ -12267,10 +12286,10 @@
             "target-side"
           ],
           "optionLabels": {
-            "holder-side": "My side of the field",
-            "opposing-side": "The foes' side of the field",
-            "both": "Both sides of the field",
-            "target-side": "The other Pokemon's side"
+            "holder-side": "my side",
+            "opposing-side": "the foes' side",
+            "both": "both sides",
+            "target-side": "the other Pokemon's side"
           }
         },
         {
@@ -12286,12 +12305,15 @@
         "pickup hazards",
         "remove screens",
         "clear hazards",
-        "break screens"
+        "break screens",
+        "remove spikes",
+        "remove stealth rock",
+        "defog"
       ],
       "examples": [
         "Remove Reflect and Light Screen from both sides, like Screen Cleaner"
       ],
-      "summary": "Removes listed field effects such as screens or hazards from a side; the other Pokemon's side needs a trigger with one. Example: Screen Cleaner.",
+      "summary": "Removes field effects from a side: screens, Smokescreen, Spikes, Toxic Spikes, Stealth Rock, Sticky Web or Tailwind. The other Pokemon's side needs a trigger with one. Example: Screen Cleaner.",
       "category": "Weather & terrain"
     }
   ],
@@ -12718,5 +12740,5 @@
       "category": "Switching"
     }
   ],
-  "hash": "1686486219eef3"
+  "hash": "17fe683763823c"
 }

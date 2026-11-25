@@ -15,7 +15,11 @@ import { addCharge } from "#data/elite-redux/abilities/charge-stack";
 import { StellarizePowerAbAttr } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
 import { pokemonActedBefore } from "#data/elite-redux/abilities/relativity";
 import { getCondition } from "#data/elite-redux/ability-studio/vocabulary/conditions";
-import { abilityIdOf, compileConditionBlock } from "#data/elite-redux/ability-studio/vocabulary/evaluate/conditions";
+import {
+  abilityIdOf,
+  compileConditionBlock,
+  speciesIdOf,
+} from "#data/elite-redux/ability-studio/vocabulary/evaluate/conditions";
 import { type Frame, frameFromAttrParams } from "#data/elite-redux/ability-studio/vocabulary/evaluate/frame";
 import { compareNumbers } from "#data/elite-redux/ability-studio/vocabulary/hp-math";
 import { constantName } from "#data/elite-redux/ability-studio/vocabulary/player-names";
@@ -28,6 +32,7 @@ import { StabAddAbAttr } from "#data/elite-redux/archetypes/stab-add";
 import { AbilityId } from "#enums/ability-id";
 import { Command } from "#enums/command";
 import { ErAbilityId } from "#enums/er-ability-id";
+import { ErSpeciesId } from "#enums/er-species-id";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
@@ -310,6 +315,20 @@ describe("wave A: Pokemon atoms", () => {
     expect(atom("mon.species", { species: "PIKACHU" })(frame(holder))).toBe(false);
     expect(() => atom("mon.species", { species: "Not a mon" })).toThrow();
     expect(() => atom("mon.species", { species: "25" })).toThrow();
+    // Elite Redux species resolve after the vanilla table: as written, as a player name, or by its key.
+    const grotom = mon({ hasSpecies: (species: number) => species === ErSpeciesId.GROTOM });
+    expect(atom("mon.species", { species: "Grotom" })(frame(grotom))).toBe(true);
+    expect(atom("mon.species", { species: "GROTOM" })(frame(grotom))).toBe(true);
+    expect(atom("mon.species", { species: "Grotom glass" })(frame(grotom))).toBe(false);
+    expect(speciesIdOf("Phantowl")).toBe(ErSpeciesId.PHANTOWL);
+    expect(speciesIdOf("Grotom Glass")).toBe(ErSpeciesId.GROTOM_GLASS);
+    // Every vanilla name keeps the id it had.
+    for (const [name, value] of Object.entries(SpeciesId)) {
+      if (typeof value === "number" && !/^\d+$/.test(name)) {
+        expect(speciesIdOf(name), name).toBe(value);
+      }
+    }
+    expect(() => speciesIdOf("12")).toThrow();
   });
 
   it("status.asleep-or-comatose is SLEEP or the real isComatoseLike", () => {
@@ -347,16 +366,21 @@ describe("wave A: Pokemon atoms", () => {
       mon({ isTerastallized: false, isMega: () => false, getFormKey: () => "" }),
     ];
     for (const target of cases) {
-      const mega = atom("mon.mega-evolved")(frame(mon(), { other: target as never }));
-      const gmax = atom("mon.gigantamax-form")(frame(mon(), { other: target as never }));
+      const mega = atom("mon.mega-evolved", { who: "other" })(frame(mon(), { other: target as never }));
+      const gmax = atom("mon.gigantamax-form", { who: "other" })(frame(mon(), { other: target as never }));
       // With a Normal move and a non-Tera target the class condition is exactly "mega or gigantamax".
       expect(mega || gmax, JSON.stringify(target)).toBe(stellarize.condition(mon(), target, normalMove));
       // Each piece alone: the other piece switched off on a copy of the target.
       expect(mega).toBe(stellarize.condition(mon(), { ...target, getFormKey: () => "" }, normalMove));
       expect(gmax).toBe(stellarize.condition(mon(), { ...target, isMega: () => false }, normalMove));
     }
-    expect(atom("mon.mega-evolved")(frame(mon()))).toBe(false);
-    expect(atom("mon.gigantamax-form")(frame(mon()))).toBe(false);
+    expect(atom("mon.mega-evolved", { who: "other" })(frame(mon()))).toBe(false);
+    expect(atom("mon.gigantamax-form", { who: "other" })(frame(mon()))).toBe(false);
+    // The default reads the ability owner.
+    expect(getCondition("mon.mega-evolved")?.params[0].default).toBe("holder");
+    expect(getCondition("mon.gigantamax-form")?.params[0].default).toBe("holder");
+    expect(atom("mon.mega-evolved")(frame(cases[0]))).toBe(true);
+    expect(atom("mon.gigantamax-form")(frame(cases[1]))).toBe(true);
     expect(stellarize.condition(mon(), null, normalMove)).toBe(false);
   });
 });
@@ -395,7 +419,7 @@ describe("wave A: time atoms", () => {
       expect(atom("time.acted-before")(frame(a, { other: b as never }))).toBe(
         pokemonActedBefore(a as never, b as never),
       );
-      expect(atom("time.acted-before", { first: "other", second: "holder" })(frame(a, { other: b as never }))).toBe(
+      expect(atom("time.acted-before", { order: "other-first" })(frame(a, { other: b as never }))).toBe(
         pokemonActedBefore(b as never, a as never),
       );
     }

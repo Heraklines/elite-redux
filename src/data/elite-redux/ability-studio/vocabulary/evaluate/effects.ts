@@ -894,18 +894,25 @@ const COMPLETION_EVENT_FACTORIES: Readonly<Record<string, EffectFactory>> = {
   // EntryTailwindClearWeatherAbAttr (B09-20: a mutable weather only) or PostSummonClearWeatherAbAttr /
   // PreLeaveFieldClearWeatherAbAttr.apply (ab-attrs.ts:4021-4024, 4214-4217: any weather).
   "effect.clear-weather": v => {
-    const keepExtreme = v.keepExtreme === true;
-    return ({ frame }) => {
-      if (frame.simulated) {
-        return;
-      }
-      if (keepExtreme) {
-        if (globalScene.arena.weather && !globalScene.arena.weather.isImmutable()) {
+    if (v.keepExtreme === true) {
+      return ({ frame }) => {
+        if (!frame.simulated && globalScene.arena.weather && !globalScene.arena.weather.isImmutable()) {
           globalScene.arena.trySetWeather(WeatherType.NONE);
         }
-        return;
-      }
-      globalScene.arena.trySetWeather(WeatherType.NONE);
+      };
+    }
+    // PostSummonClearWeatherAbAttr.canApply: a weather is up (PreLeaveFieldClearWeatherAbAttr.canApply's own-weather
+    // clause implies the same).
+    return {
+      run: ({ frame }) => {
+        if (!frame.simulated) {
+          globalScene.arena.trySetWeather(WeatherType.NONE);
+        }
+      },
+      feasible: () => {
+        const weather = globalScene.arena.weather;
+        return !!weather && weather.weatherType !== WeatherType.NONE;
+      },
     };
   },
   // ClearOpponentStatBuffsOnSummonAbAttr (init-elite-redux-vanilla-rebalance.ts:1942-1964).
