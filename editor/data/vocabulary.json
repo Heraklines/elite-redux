@@ -230,6 +230,23 @@
       "composable": true
     },
     {
+      "id": "event.turn-start",
+      "kind": "event",
+      "dispatchKey": "PreemptivePriorityCounterAbAttr",
+      "provides": [
+        "holder"
+      ],
+      "label": "At the start of the turn, before anyone moves",
+      "group": "Turn",
+      "synonyms": [
+        "start of turn",
+        "turn begins",
+        "before moves",
+        "after commands are chosen",
+        "surprise"
+      ]
+    },
+    {
       "id": "event.wake-up",
       "kind": "event",
       "dispatchKey": "PostWakeUpAbAttr",
@@ -1191,6 +1208,24 @@
         "party aura",
         "field aura",
         "rat king"
+      ]
+    },
+    {
+      "id": "calc.recoil-taken",
+      "kind": "calc",
+      "dispatchKey": "RecoilDamageMultiplierAbAttr",
+      "provides": [
+        "holder"
+      ],
+      "label": "While the game calculates the recoil I take",
+      "group": "Damage and power",
+      "modifies": "recoilMultiplier",
+      "synonyms": [
+        "recoil",
+        "crash damage",
+        "recoil damage",
+        "jump kick crash",
+        "rock head"
       ]
     },
     {
@@ -5941,5 +5976,5 @@
       ]
     }
   ],
-  "hash": "114bb71614b8e2"
+  "hash": "0afdc52c3a464e"
 }
