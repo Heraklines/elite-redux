@@ -239,6 +239,42 @@ const BASE_GUARDS: readonly GuardBase[] = [
     },
     synonyms: ["magic guard", "no chip damage", "indirect damage block", "weather damage block"],
   },
+  // ---- Library completion pass (wave B) ------------------------------------------------------
+  {
+    id: "not-simulated",
+    label: "Not while the game is only previewing",
+    why: "A preview must never change the battle; acting during one would roll dice or write memory for nothing.",
+    requires: ["simulated"],
+    formula: {
+      expr: "!simulated",
+      source:
+        "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts:1812 (SouthernCrossPunch guards), 1890, 2136, 2176, 2220, 2263; src/data/abilities/ab-attrs.ts:7906 (BypassSpeedChanceAbAttr.canApply)",
+    },
+    synonyms: ["not a preview", "real battle only", "not simulated", "not while previewing"],
+  },
+  {
+    id: "another-holder-keeps-weather",
+    label: "Not while another Pokemon on the field keeps this weather up",
+    why: "Ending an extreme weather that another Pokemon on the field still holds up would be a bug.",
+    requires: ["holder"],
+    formula: {
+      expr: '!getField(true).some(p => p !== holder && p.getAbilityAttrs("PreLeaveFieldClearWeatherAbAttr").some(a => a.weatherType === arena.weatherType))',
+      source:
+        "src/data/abilities/ab-attrs.ts:4203-4210 PreLeaveFieldClearWeatherAbAttr.canApply (the class's own weather equals the current weather once its first clause passed)",
+    },
+    synonyms: ["delta stream", "primordial sea", "desolate land", "weather keeper", "other holder"],
+  },
+  {
+    id: "foe-can-be-trapped",
+    label: "Not when the foe is a Ghost type or can always run away",
+    why: "Ghost types and Run Away users can never be trapped; trapping them would be a bug.",
+    requires: ["other"],
+    formula: {
+      expr: '!other.isOfType(GHOST, true, true) && !other.hasAbilityWithAttr("RunSuccessAbAttr")',
+      source: "src/data/abilities/ab-attrs.ts:6871-6875 ArenaTrapAbAttr.canApply clauses 2 and 3",
+    },
+    synonyms: ["ghost escapes", "run away", "cannot be trapped", "trap immunity", "shadow tag"],
+  },
 ];
 
 export const GUARD_REGISTRY: readonly GuardDef[] = BASE_GUARDS.map(def => withVocabularyText(def));

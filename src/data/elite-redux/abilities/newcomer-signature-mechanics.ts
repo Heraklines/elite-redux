@@ -253,7 +253,7 @@ interface FoulHarvestState {
 }
 
 const FOUL_HARVEST = new WeakMap<Pokemon, FoulHarvestState>();
-const LAST_EXECUTED_MOVE = new WeakMap<Pokemon, string>();
+export const LAST_EXECUTED_MOVE = new WeakMap<Pokemon, string>();
 
 export function recordSignatureExecutedMove(pokemon: Pokemon, move: Move): void {
   if (pokemon.getMoveset().some(slot => slot.getMove().name === move.name)) {
@@ -605,7 +605,7 @@ function weightClass(weight: number): number {
 function isHeavyweightMove(move: Move): boolean {
   return move.id === MoveId.HEAVY_SLAM || move.id === MoveId.HEAT_CRASH || move.hasFlag(MoveFlags.PUNCHING_MOVE);
 }
-function heavyweightMultiplier(user: Pokemon, target: Pokemon, percentPerClass = 10, maxClasses = 5): number {
+export function heavyweightMultiplier(user: Pokemon, target: Pokemon, percentPerClass = 10, maxClasses = 5): number {
   return (
     1
     + Math.min(maxClasses, Math.max(0, weightClass(user.getWeight()) - weightClass(target.getWeight())))
@@ -1095,7 +1095,7 @@ export class SetlistAccuracyAbAttr extends SetMoveAccuracyAbAttr implements Gate
   }
 }
 
-function livingBenchCount(pokemon: Pokemon, maxCount = 5): number {
+export function livingBenchCount(pokemon: Pokemon, maxCount = 5): number {
   const party = pokemon.isPlayer() ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
   return Math.min(maxCount, party.filter(member => !member.isFainted() && !member.isOnField()).length);
 }

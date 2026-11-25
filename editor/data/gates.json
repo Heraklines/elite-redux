@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "vocabularyHash": "0670f4e7070a77",
+  "vocabularyHash": "1686486219eef3",
   "gates": {
     "1:0": {
       "abilityId": 1,
@@ -1370,8 +1370,23 @@
       "className": "PostSummonMessageAbAttr",
       "when": "event.on-entry",
       "effect": "effect.message",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.message",
+          "params": {
+            "message": "PRESSURE"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "message": "PRESSURE"
+      },
+      "paramPaths": {
+        "message": "messageFunc"
+      }
     },
     "46:2": {
       "abilityId": 46,
@@ -2200,8 +2215,23 @@
       "className": "PostSummonUnnamedMessageAbAttr",
       "when": "event.on-entry",
       "effect": "effect.message",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.message",
+          "params": {
+            "message": "The effects of the weather disappeared."
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "message": "The effects of the weather disappeared."
+      },
+      "paramPaths": {
+        "message": "message"
+      }
     },
     "76:2": {
       "abilityId": 76,
@@ -2391,8 +2421,36 @@
       "className": "ChancePostAttackStealHeldItemAbAttr",
       "when": "event.after-my-hit",
       "effect": "effect.steal-item",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [
+        {
+          "block": "rng.chance",
+          "params": {
+            "pct": 30
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.steal-item",
+          "params": {
+            "berryOnly": true
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "chance": 30,
+        "berryOnly": true,
+        "contactRequired": true,
+        "moveIds": ""
+      },
+      "paramPaths": {
+        "chance": "options",
+        "berryOnly": "options",
+        "contactRequired": "options",
+        "moveIds": "options"
+      }
     },
     "83:0": {
       "abilityId": 83,
@@ -2771,8 +2829,23 @@
       "className": "PostSummonMessageAbAttr",
       "when": "event.on-entry",
       "effect": "effect.message",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.message",
+          "params": {
+            "message": "MOLD_BREAKER"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "message": "MOLD_BREAKER"
+      },
+      "paramPaths": {
+        "message": "messageFunc"
+      }
     },
     "104:1": {
       "abilityId": 104,
@@ -2817,7 +2890,7 @@
       "when": "event.on-entry",
       "effect": "effect.message",
       "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "reason": "the ability also has a condition of its own that blocks cannot express yet"
     },
     "107:1": {
       "abilityId": 107,
@@ -3202,7 +3275,7 @@
       "when": "event.after-hit",
       "effect": "effect.steal-item",
       "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "reason": "the ability also has a condition of its own that blocks cannot express yet"
     },
     "125:0": {
       "abilityId": 125,
@@ -3780,7 +3853,7 @@
       "when": "event.on-entry",
       "effect": "effect.message",
       "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "reason": "the ability also has a condition of its own that blocks cannot express yet"
     },
     "140:2": {
       "abilityId": 140,
@@ -4365,8 +4438,23 @@
       "className": "PostSummonMessageAbAttr",
       "when": "event.on-entry",
       "effect": "effect.message",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.message",
+          "params": {
+            "message": "TURBOBLAZE"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "message": "TURBOBLAZE"
+      },
+      "paramPaths": {
+        "message": "messageFunc"
+      }
     },
     "163:1": {
       "abilityId": 163,
@@ -4383,8 +4471,23 @@
       "className": "PostSummonMessageAbAttr",
       "when": "event.on-entry",
       "effect": "effect.message",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.message",
+          "params": {
+            "message": "TERAVOLT"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "message": "TERAVOLT"
+      },
+      "paramPaths": {
+        "message": "messageFunc"
+      }
     },
     "164:1": {
       "abilityId": 164,
@@ -4498,8 +4601,25 @@
       "className": "ErMagicianStealAbAttr",
       "when": "event.after-my-hit",
       "effect": "effect.steal-item",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [
+        {
+          "not": {
+            "block": "move.flag",
+            "params": {
+              "flag": "MAKES_CONTACT"
+            }
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.steal-item"
+        }
+      ],
+      "guards": [],
+      "params": {},
+      "paramPaths": {}
     },
     "171:0": {
       "abilityId": 171,
@@ -4794,8 +4914,23 @@
       "className": "PostSummonMessageAbAttr",
       "when": "event.on-entry",
       "effect": "effect.message",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.message",
+          "params": {
+            "message": "DARK_AURA"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "message": "DARK_AURA"
+      },
+      "paramPaths": {
+        "message": "messageFunc"
+      }
     },
     "186:1": {
       "abilityId": 186,
@@ -4829,8 +4964,23 @@
       "className": "PostSummonMessageAbAttr",
       "when": "event.on-entry",
       "effect": "effect.message",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.message",
+          "params": {
+            "message": "FAIRY_AURA"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "message": "FAIRY_AURA"
+      },
+      "paramPaths": {
+        "message": "messageFunc"
+      }
     },
     "187:1": {
       "abilityId": 187,
@@ -4883,7 +5033,7 @@
       "when": "event.on-entry",
       "effect": "effect.message",
       "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "reason": "the ability also has a condition of its own that blocks cannot express yet"
     },
     "189:0": {
       "abilityId": 189,
@@ -6954,8 +7104,23 @@
       "className": "PostSummonMessageAbAttr",
       "when": "event.on-entry",
       "effect": "effect.message",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.message",
+          "params": {
+            "message": "TWO_ABILITIES_GLASTRIER"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "message": "TWO_ABILITIES_GLASTRIER"
+      },
+      "paramPaths": {
+        "message": "messageFunc"
+      }
     },
     "266:1": {
       "abilityId": 266,
@@ -6981,8 +7146,23 @@
       "className": "PostSummonMessageAbAttr",
       "when": "event.on-entry",
       "effect": "effect.message",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.message",
+          "params": {
+            "message": "TWO_ABILITIES_SPECTRIER"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "message": "TWO_ABILITIES_SPECTRIER"
+      },
+      "paramPaths": {
+        "message": "messageFunc"
+      }
     },
     "267:1": {
       "abilityId": 267,
@@ -7377,7 +7557,7 @@
       "when": "event.on-entry",
       "effect": "effect.message",
       "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "reason": "the ability also has a condition of its own that blocks cannot express yet"
     },
     "279:0": {
       "abilityId": 279,
@@ -7475,8 +7655,23 @@
       "className": "PostSummonMessageAbAttr",
       "when": "event.on-entry",
       "effect": "effect.message",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.message",
+          "params": {
+            "message": "VESSEL_OF_RUIN"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "message": "VESSEL_OF_RUIN"
+      },
+      "paramPaths": {
+        "message": "messageFunc"
+      }
     },
     "285:0": {
       "abilityId": 285,
@@ -7493,8 +7688,23 @@
       "className": "PostSummonMessageAbAttr",
       "when": "event.on-entry",
       "effect": "effect.message",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.message",
+          "params": {
+            "message": "SWORD_OF_RUIN"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "message": "SWORD_OF_RUIN"
+      },
+      "paramPaths": {
+        "message": "messageFunc"
+      }
     },
     "286:0": {
       "abilityId": 286,
@@ -7511,8 +7721,23 @@
       "className": "PostSummonMessageAbAttr",
       "when": "event.on-entry",
       "effect": "effect.message",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.message",
+          "params": {
+            "message": "TABLETS_OF_RUIN"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "message": "TABLETS_OF_RUIN"
+      },
+      "paramPaths": {
+        "message": "messageFunc"
+      }
     },
     "287:0": {
       "abilityId": 287,
@@ -7529,8 +7754,23 @@
       "className": "PostSummonMessageAbAttr",
       "when": "event.on-entry",
       "effect": "effect.message",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.message",
+          "params": {
+            "message": "BEADS_OF_RUIN"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "message": "BEADS_OF_RUIN"
+      },
+      "paramPaths": {
+        "message": "messageFunc"
+      }
     },
     "288:0": {
       "abilityId": 288,
@@ -9853,8 +10093,27 @@
       "className": "ScavengerLootAbAttr",
       "when": "event.on-ko",
       "effect": "effect.steal-item",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [
+        {
+          "block": "rng.chance",
+          "params": {
+            "pct": 50
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.steal-item"
+        }
+      ],
+      "guards": ["not-fainted"],
+      "params": {
+        "chance": 50
+      },
+      "paramPaths": {
+        "chance": "lootChance"
+      }
     },
     "5085:0": {
       "abilityId": 5085,
@@ -10640,8 +10899,36 @@
       "className": "ChancePostAttackStealHeldItemAbAttr",
       "when": "event.after-my-hit",
       "effect": "effect.steal-item",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [
+        {
+          "block": "rng.chance",
+          "params": {
+            "pct": 30
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.steal-item",
+          "params": {
+            "berryOnly": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "chance": 30,
+        "berryOnly": false,
+        "contactRequired": false,
+        "moveIds": "Feint attack"
+      },
+      "paramPaths": {
+        "chance": "options",
+        "berryOnly": "options",
+        "contactRequired": "options",
+        "moveIds": "options"
+      }
     },
     "5122:0": {
       "abilityId": 5122,
@@ -11796,8 +12083,36 @@
       "className": "ChancePostAttackStealHeldItemAbAttr",
       "when": "event.after-my-hit",
       "effect": "effect.steal-item",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [
+        {
+          "block": "rng.chance",
+          "params": {
+            "pct": 30
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.steal-item",
+          "params": {
+            "berryOnly": false
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "chance": 30,
+        "berryOnly": false,
+        "contactRequired": false,
+        "moveIds": "Scratch"
+      },
+      "paramPaths": {
+        "chance": "options",
+        "berryOnly": "options",
+        "contactRequired": "options",
+        "moveIds": "options"
+      }
     },
     "5165:0": {
       "abilityId": 5165,
@@ -19487,8 +19802,23 @@
       "className": "PostSummonMessageAbAttr",
       "when": "event.on-entry",
       "effect": "effect.message",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.message",
+          "params": {
+            "message": "SWORD_OF_RUIN"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "message": "SWORD_OF_RUIN"
+      },
+      "paramPaths": {
+        "message": "messageFunc"
+      }
     },
     "5393:0": {
       "abilityId": 5393,
@@ -19653,8 +19983,23 @@
       "className": "PostSummonMessageAbAttr",
       "when": "event.on-entry",
       "effect": "effect.message",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.message",
+          "params": {
+            "message": "MOLD_BREAKER"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "message": "MOLD_BREAKER"
+      },
+      "paramPaths": {
+        "message": "messageFunc"
+      }
     },
     "5397:3": {
       "abilityId": 5397,
@@ -29476,7 +29821,7 @@
       "when": "event.on-entry",
       "effect": "effect.message",
       "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "reason": "the ability also has a condition of its own that blocks cannot express yet"
     },
     "5679:3": {
       "abilityId": 5679,
@@ -30533,8 +30878,27 @@
       "className": "ScavengerLootAbAttr",
       "when": "event.on-ko",
       "effect": "effect.steal-item",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [
+        {
+          "block": "rng.chance",
+          "params": {
+            "pct": 50
+          }
+        }
+      ],
+      "do": [
+        {
+          "block": "effect.steal-item"
+        }
+      ],
+      "guards": ["not-fainted"],
+      "params": {
+        "chance": 50
+      },
+      "paramPaths": {
+        "chance": "lootChance"
+      }
     },
     "5702:2": {
       "abilityId": 5702,
@@ -32478,8 +32842,23 @@
       "className": "PostSummonMessageAbAttr",
       "when": "event.on-entry",
       "effect": "effect.message",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.message",
+          "params": {
+            "message": "FAIRY_AURA"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "message": "FAIRY_AURA"
+      },
+      "paramPaths": {
+        "message": "messageFunc"
+      }
     },
     "5935:1": {
       "abilityId": 5935,
@@ -35785,8 +36164,23 @@
       "className": "PostSummonMessageAbAttr",
       "when": "event.on-entry",
       "effect": "effect.message",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.message",
+          "params": {
+            "message": "SWORD_OF_RUIN"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "message": "SWORD_OF_RUIN"
+      },
+      "paramPaths": {
+        "message": "messageFunc"
+      }
     },
     "6023:3": {
       "abilityId": 6023,
@@ -38792,8 +39186,23 @@
       "className": "PostSummonMessageAbAttr",
       "when": "event.on-entry",
       "effect": "effect.message",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.message",
+          "params": {
+            "message": "DARK_AURA"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "message": "DARK_AURA"
+      },
+      "paramPaths": {
+        "message": "messageFunc"
+      }
     },
     "20001:1": {
       "abilityId": 20001,
@@ -39153,8 +39562,23 @@
       "className": "PostSummonUnnamedMessageAbAttr",
       "when": "event.on-entry",
       "effect": "effect.message",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.message",
+          "params": {
+            "message": "The effects of the weather disappeared."
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "message": "The effects of the weather disappeared."
+      },
+      "paramPaths": {
+        "message": "message"
+      }
     },
     "20007:0": {
       "abilityId": 20007,
@@ -39441,8 +39865,23 @@
       "className": "PostSummonMessageAbAttr",
       "when": "event.on-entry",
       "effect": "effect.message",
-      "unpackable": false,
-      "reason": "its trigger or its effect is not wired into the block builder yet"
+      "unpackable": true,
+      "if": [],
+      "do": [
+        {
+          "block": "effect.message",
+          "params": {
+            "message": "FAIRY_AURA"
+          }
+        }
+      ],
+      "guards": [],
+      "params": {
+        "message": "FAIRY_AURA"
+      },
+      "paramPaths": {
+        "message": "messageFunc"
+      }
     },
     "20013:1": {
       "abilityId": 20013,

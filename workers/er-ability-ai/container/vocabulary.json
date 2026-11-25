@@ -4961,12 +4961,18 @@
           "label": "Which ability (type its name)",
           "control": "text",
           "default": "Plus"
+        },
+        {
+          "id": "current",
+          "label": "Only my ally's main ability counts, not innate or passive ones",
+          "control": "boolean",
+          "default": false
         }
       ],
       "pure": true,
       "formula": {
-        "expr": "holder.getAlly()?.hasAbility(AbilityId[ability])",
-        "source": "src/field/pokemon.ts:3848 (hasAbility)"
+        "expr": "plain: holder.getAlly()?.hasAbility(id) ; current: holder.getAlly()?.getAbility().id === id ; id = AbilityId, then ErAbilityId, then the registered abilities",
+        "source": "src/field/pokemon.ts:3853 (hasAbility); current: src/data/elite-redux/archetypes/set-target-ability-on-move.ts:69 (getAbility().id); Elite Redux names: requests R-B11-C4-13, R-B11-14, R-B14-5.3"
       },
       "synonyms": [
         "partner ability",
@@ -5200,12 +5206,18 @@
             "FAIRY": "Fairy",
             "STELLAR": "Stellar"
           }
+        },
+        {
+          "id": "originalIfStellar",
+          "label": "A Stellar Tera Pokemon keeps its own types",
+          "control": "boolean",
+          "default": false
         }
       ],
       "pure": true,
       "formula": {
-        "expr": "pokemon.isOfType(PokemonType[type])",
-        "source": "src/field/pokemon.ts:2875 (isOfType)"
+        "expr": "plain: pokemon.isOfType(PokemonType[type]) ; originalIfStellar: pokemon.isOfType(PokemonType[type], true, true)",
+        "source": "src/field/pokemon.ts:2880 (isOfType); request B04 11-31 (Flower Veil, Jungle's Guard)"
       },
       "synonyms": [
         "is fire type",
@@ -5311,12 +5323,18 @@
           "label": "Which ability (type its name)",
           "control": "text",
           "default": "Levitate"
+        },
+        {
+          "id": "current",
+          "label": "Only its main ability counts, not innate or passive ones",
+          "control": "boolean",
+          "default": false
         }
       ],
       "pure": true,
       "formula": {
-        "expr": "pokemon.hasAbility(AbilityId[ability])",
-        "source": "src/field/pokemon.ts:3848 (hasAbility)"
+        "expr": "plain: pokemon.hasAbility(id) ; current: pokemon.getAbility().id === id ; id = AbilityId, then ErAbilityId, then the registered abilities",
+        "source": "src/field/pokemon.ts:3853 (hasAbility); current: src/data/elite-redux/archetypes/set-target-ability-on-move.ts:69 (getAbility().id); Elite Redux names: requests R-B11-C4-13, R-B11-14, R-B14-5.3"
       },
       "synonyms": [
         "has ability",
@@ -7137,6 +7155,1088 @@
       ],
       "summary": "Advanced: the same percent, rolled as one decimal number like Harvest, so the game's random numbers shift differently. Most rules want the plain chance.",
       "category": "Other"
+    },
+    {
+      "id": "move.type-is-mine",
+      "group": "Move",
+      "label": "The move's type is one of my own types",
+      "requires": [
+        "holder",
+        "move"
+      ],
+      "params": [
+        {
+          "id": "includeTera",
+          "label": "Count my Tera type as one of my types",
+          "control": "boolean",
+          "default": false
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "holder.getTypes(includeTera, false).includes(holder.getMoveType(move))  (the holder's resolved move type, even when the holder is not the move user; a re-entrant ask for the same holder while getMoveType runs answers no)",
+        "source": "src/data/elite-redux/archetypes/stab-add.ts:138-140 (negated, getTypes(false, false)); src/data/elite-redux/archetypes/stab-suppress-aura.ts:59-60 (getTypes(true))"
+      },
+      "synonyms": [
+        "same type attack",
+        "stab",
+        "matches my type",
+        "on-type move",
+        "my own type"
+      ],
+      "examples": [
+        "Boost only moves that do not match my types, like Mystic Power"
+      ],
+      "summary": "Yes when the move's type, after any type change, is one of my types. Example: a Fire move used by a Fire and Flying Pokemon is a yes.",
+      "category": "Types & immunities"
+    },
+    {
+      "id": "stat.is",
+      "group": "Pokemon",
+      "label": "The stat being worked out is one of {stats}",
+      "requires": [
+        "stat"
+      ],
+      "params": [
+        {
+          "id": "stats",
+          "label": "Stats (names, separated by commas)",
+          "control": "text",
+          "default": "Attack, Sp. Atk"
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "stats.includes(frame.stat)  (frame.stat is the first stat when the trigger passes several)",
+        "source": "src/data/abilities/ab-attrs.ts:4327 (stat === protectedStat); src/data/elite-redux/abilities/pressure-vessel.ts:92"
+      },
+      "synonyms": [
+        "which stat",
+        "this stat",
+        "stat check",
+        "attack stat",
+        "defense stat"
+      ],
+      "examples": [
+        "Only change my Speed, not my other stats"
+      ],
+      "summary": "Yes when the stat the game is working out right now is one you listed. Example: list Speed to change only my Speed.",
+      "category": "Stats"
+    },
+    {
+      "id": "stat.is-highest",
+      "group": "Pokemon",
+      "label": "The stat being worked out is my highest of {stats}",
+      "requires": [
+        "holder",
+        "stat"
+      ],
+      "params": [
+        {
+          "id": "stats",
+          "label": "Stats to compare (names, separated by commas)",
+          "control": "text",
+          "default": "Attack, Sp. Atk"
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "highest = stats[0]; for s of stats[1..]: if holder.getStat(s, false) > holder.getStat(highest, false) highest = s; frame.stat === highest  (a tie goes to the stat listed first; raw stats, no stage or ability step)",
+        "source": "src/data/elite-redux/ability-upgrades/attrs/requested-combat-riders.ts:446-453; src/data/elite-redux/archetypes/self-highest-stat-multiplier.ts:96-106"
+      },
+      "synonyms": [
+        "highest stat",
+        "best stat",
+        "strongest stat",
+        "protosynthesis",
+        "beast boost"
+      ],
+      "examples": [
+        "Boost whichever of my Attack or Sp. Atk is higher in the sun"
+      ],
+      "summary": "Yes when the stat being worked out is my highest of the listed stats, before stages. A tie goes to the first listed. Example: 120 Attack beats 110 Sp. Atk.",
+      "category": "Stats"
+    },
+    {
+      "id": "mon.tera-type",
+      "group": "Pokemon",
+      "label": "{who}'s Tera type is {type}",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Which Pokemon",
+          "control": "select",
+          "default": "holder",
+          "options": [
+            "holder",
+            "other",
+            "ally"
+          ],
+          "optionLabels": {
+            "holder": "The ability owner",
+            "other": "The other Pokemon",
+            "ally": "My ally"
+          }
+        },
+        {
+          "id": "type",
+          "label": "Which Tera type",
+          "control": "select",
+          "default": "STELLAR",
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ],
+          "optionLabels": {
+            "NORMAL": "Normal",
+            "FIGHTING": "Fighting",
+            "FLYING": "Flying",
+            "POISON": "Poison",
+            "GROUND": "Ground",
+            "ROCK": "Rock",
+            "BUG": "Bug",
+            "GHOST": "Ghost",
+            "STEEL": "Steel",
+            "FIRE": "Fire",
+            "WATER": "Water",
+            "GRASS": "Grass",
+            "ELECTRIC": "Electric",
+            "PSYCHIC": "Psychic",
+            "ICE": "Ice",
+            "DRAGON": "Dragon",
+            "DARK": "Dark",
+            "FAIRY": "Fairy",
+            "STELLAR": "Stellar"
+          }
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "pokemon.getTeraType() === PokemonType[type]  (whether or not it has Terastallized)",
+        "source": "src/data/elite-redux/abilities/fakemon-pitch-raichu.ts:123"
+      },
+      "synonyms": [
+        "tera type",
+        "stellar",
+        "tera kind",
+        "terastal type"
+      ],
+      "examples": [
+        "Only when my Tera type is Stellar"
+      ],
+      "summary": "Yes when the chosen Pokemon's Tera type is the one you pick, even before it Terastallizes. Example: Terapagos has the Stellar Tera type.",
+      "category": "Types & immunities"
+    },
+    {
+      "id": "mon.species",
+      "group": "Pokemon",
+      "label": "{who} is a {species}",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Which Pokemon",
+          "control": "select",
+          "default": "holder",
+          "options": [
+            "holder",
+            "other",
+            "ally"
+          ],
+          "optionLabels": {
+            "holder": "The ability owner",
+            "other": "The other Pokemon",
+            "ally": "My ally"
+          }
+        },
+        {
+          "id": "species",
+          "label": "Which Pokemon species (type its name)",
+          "control": "text",
+          "default": "Terapagos"
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "pokemon.hasSpecies(SpeciesId[species])  (an unknown name is refused when the rule is built)",
+        "source": "src/data/elite-redux/abilities/fakemon-pitch-raichu.ts:124; src/field/pokemon.ts:2605 hasSpecies"
+      },
+      "synonyms": [
+        "species",
+        "which pokemon",
+        "is this pokemon",
+        "pokedex entry",
+        "signature pokemon"
+      ],
+      "examples": [
+        "Only when I am a Terapagos"
+      ],
+      "summary": "Yes when the chosen Pokemon is the species you name, in any form, or is fused with it. Example: only when I am a Terapagos.",
+      "category": "Other"
+    },
+    {
+      "id": "move.type-counts-as",
+      "group": "Move",
+      "label": "The move counts as {type} type for my abilities",
+      "requires": [
+        "holder",
+        "move"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Which type",
+          "control": "select",
+          "default": "FIRE",
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ],
+          "optionLabels": {
+            "NORMAL": "Normal",
+            "FIGHTING": "Fighting",
+            "FLYING": "Flying",
+            "POISON": "Poison",
+            "GROUND": "Ground",
+            "ROCK": "Rock",
+            "BUG": "Bug",
+            "GHOST": "Ghost",
+            "STEEL": "Steel",
+            "FIRE": "Fire",
+            "WATER": "Water",
+            "GRASS": "Grass",
+            "ELECTRIC": "Electric",
+            "PSYCHIC": "Psychic",
+            "ICE": "Ice",
+            "DRAGON": "Dragon",
+            "DARK": "Dark",
+            "FAIRY": "Fairy",
+            "STELLAR": "Stellar"
+          }
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "new Set([move.type, ...for every attr of holder.getAllActiveAbilityAttrs() with getTriggeredMoveTypes: attr.getTriggeredMoveTypes(move)]).has(PokemonType[type])",
+        "source": "src/data/elite-redux/archetypes/post-attack-scripted-move.ts:162-170"
+      },
+      "synonyms": [
+        "counts as fire",
+        "treated as type",
+        "extra move type",
+        "type trigger",
+        "volcano rage"
+      ],
+      "examples": [
+        "Follow up with an eruption after a Fire move, like Volcano Rage"
+      ],
+      "summary": "Yes when the move is the type you pick, or one of my abilities makes it count as that type too. Example: a Fire move for Volcano Rage.",
+      "category": "Moves"
+    },
+    {
+      "id": "status.asleep-or-comatose",
+      "group": "Status",
+      "label": "{who} is asleep or counts as asleep",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Which Pokemon",
+          "control": "select",
+          "default": "holder",
+          "options": [
+            "holder",
+            "other"
+          ],
+          "optionLabels": {
+            "holder": "The ability owner",
+            "other": "The other Pokemon"
+          }
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "pokemon.status?.effect === 4 || isComatoseLike(pokemon)",
+        "source": "src/data/abilities/ab-attrs.ts:8459-8463 isComatoseLike; Sweet Dreams, Peaceful Slumber"
+      },
+      "synonyms": [
+        "asleep",
+        "sleeping",
+        "comatose",
+        "dozing",
+        "sweet dreams"
+      ],
+      "examples": [
+        "Heal each turn while asleep, like Sweet Dreams"
+      ],
+      "summary": "Yes when the chosen Pokemon is asleep, or has an ability like Comatose that makes it count as asleep. Example: Sweet Dreams heals while asleep.",
+      "category": "Status conditions"
+    },
+    {
+      "id": "move.accuracy",
+      "group": "Move",
+      "label": "The move's accuracy is {cmp} {n}%",
+      "requires": [
+        "move"
+      ],
+      "params": [
+        {
+          "id": "cmp",
+          "label": "How to compare",
+          "control": "select",
+          "default": "gte",
+          "options": [
+            "lt",
+            "lte",
+            "eq",
+            "gte",
+            "gt"
+          ],
+          "optionLabels": {
+            "lt": "less than",
+            "lte": "at most",
+            "eq": "exactly",
+            "gte": "at least",
+            "gt": "more than"
+          }
+        },
+        {
+          "id": "n",
+          "label": "Accuracy (%)",
+          "control": "number",
+          "default": 80,
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "move.accuracy >= 0 && compare(move.accuracy, cmp, n)  (a move that never misses has accuracy -1 and is always a no)",
+        "source": "src/data/elite-redux/archetypes/priority-modifier.ts:227"
+      },
+      "synonyms": [
+        "accuracy",
+        "inaccurate move",
+        "low accuracy",
+        "hit chance",
+        "sighting system"
+      ],
+      "examples": [
+        "Give priority to moves with less than 80% accuracy"
+      ],
+      "summary": "Yes when the move's accuracy passes the comparison. Moves that never miss are always a no. Example: less than 80% is a yes for Focus Blast (70%).",
+      "category": "Moves"
+    },
+    {
+      "id": "time.hits-taken",
+      "group": "Time",
+      "label": "{who} has been hit {cmp} {n} times this battle",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Which Pokemon",
+          "control": "select",
+          "default": "holder",
+          "options": [
+            "holder",
+            "other",
+            "ally"
+          ],
+          "optionLabels": {
+            "holder": "The ability owner",
+            "other": "The other Pokemon",
+            "ally": "My ally"
+          }
+        },
+        {
+          "id": "cmp",
+          "label": "How to compare",
+          "control": "select",
+          "default": "gte",
+          "options": [
+            "lt",
+            "lte",
+            "eq",
+            "gte",
+            "gt"
+          ],
+          "optionLabels": {
+            "lt": "less than",
+            "lte": "at most",
+            "eq": "exactly",
+            "gte": "at least",
+            "gt": "more than"
+          }
+        },
+        {
+          "id": "n",
+          "label": "Number of hits taken",
+          "control": "number",
+          "default": 1,
+          "min": 0,
+          "max": 99,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "compare(pokemon.battleData.hitCount, cmp, n)  (the Rage Fist counter: direct hits taken this battle)",
+        "source": "src/data/pokemon/pokemon-data.ts:537 hitCount"
+      },
+      "synonyms": [
+        "times hit",
+        "hits taken",
+        "rage fist count",
+        "damage count",
+        "struck"
+      ],
+      "examples": [
+        "Raise my crit chance once I have been hit at least once"
+      ],
+      "summary": "Yes when the number of direct hits the chosen Pokemon took this battle passes the comparison. Example: at least 1 hit after the first attack lands.",
+      "category": "Damage"
+    },
+    {
+      "id": "time.last-move-type",
+      "group": "Time",
+      "label": "{who}'s last move was {type} type",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Which Pokemon",
+          "control": "select",
+          "default": "holder",
+          "options": [
+            "holder",
+            "other"
+          ],
+          "optionLabels": {
+            "holder": "The ability owner",
+            "other": "The other Pokemon"
+          }
+        },
+        {
+          "id": "type",
+          "label": "Which type",
+          "control": "select",
+          "default": "ELECTRIC",
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ],
+          "optionLabels": {
+            "NORMAL": "Normal",
+            "FIGHTING": "Fighting",
+            "FLYING": "Flying",
+            "POISON": "Poison",
+            "GROUND": "Ground",
+            "ROCK": "Rock",
+            "BUG": "Bug",
+            "GHOST": "Ghost",
+            "STEEL": "Steel",
+            "FIRE": "Fire",
+            "WATER": "Water",
+            "GRASS": "Grass",
+            "ELECTRIC": "Electric",
+            "PSYCHIC": "Psychic",
+            "ICE": "Ice",
+            "DRAGON": "Dragon",
+            "DARK": "Dark",
+            "FAIRY": "Fairy",
+            "STELLAR": "Stellar"
+          }
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "allMoves[pokemon.getLastXMoves(1)[0]?.move]?.type === PokemonType[type]  (the move's own type; no if there is no last move)",
+        "source": "src/data/elite-redux/archetypes/recharge-on-electric-terrain.ts:68-71 RechargeChargedOnElectricKoAbAttr.gate (Energized); requests/B11.md:83"
+      },
+      "synonyms": [
+        "last move type",
+        "previous move type",
+        "used an electric move",
+        "after a type move"
+      ],
+      "examples": [
+        "Boost Speed after I used an Electric move, like Energized"
+      ],
+      "summary": "Yes when the chosen Pokemon's last move was of the type you pick. No when it has not moved yet. Example: Energized after an Electric move.",
+      "category": "Moves"
+    },
+    {
+      "id": "move.sets-weather",
+      "group": "Move",
+      "label": "The move changes the weather",
+      "requires": [
+        "move"
+      ],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "move.hasAttr(\"WeatherChangeAttr\")",
+        "source": "src/data/moves/move.ts:397 Move.hasAttr; request R-B11-C1-07"
+      },
+      "synonyms": [
+        "weather move",
+        "rain dance",
+        "sunny day",
+        "sets weather",
+        "forecast"
+      ],
+      "examples": [
+        "React when a move like Rain Dance is used"
+      ],
+      "summary": "Yes when the move sets a weather, like Rain Dance or Sunny Day. Example: Tackle is a no.",
+      "category": "Weather & terrain"
+    },
+    {
+      "id": "move.spread",
+      "group": "Move",
+      "label": "The move hits more than one target",
+      "requires": [
+        "move"
+      ],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "move.isMultiTarget()  (the aim alone, not how many Pokemon are on the field)",
+        "source": "src/data/moves/move.ts:484-498 isMultiTarget; src/data/elite-redux/abilities/newcomer-signature-mechanics.ts:1334-1336"
+      },
+      "synonyms": [
+        "spread move",
+        "multi target",
+        "hits both foes",
+        "area move",
+        "earthquake"
+      ],
+      "examples": [
+        "Take less damage from moves that hit several Pokemon"
+      ],
+      "summary": "Yes when the move is aimed at more than one Pokemon, like Earthquake or Surf, even if only one is on the field. Example: Tackle is a no.",
+      "category": "Moves"
+    },
+    {
+      "id": "move.can-be-multi-strike-enhanced",
+      "group": "Move",
+      "label": "The move can be given extra strikes",
+      "requires": [
+        "move",
+        "moveUser"
+      ],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "move.canBeMultiStrikeEnhanced(moveUser, true, (moveUser === holder ? other : holder) ?? null)  (the attacker, as the class's `pokemon` on calc.hit-count; spread moves excluded)",
+        "source": "src/data/abilities/ab-attrs.ts:2012-2013 and :2067-2068; src/data/moves/move.ts:1595"
+      },
+      "synonyms": [
+        "parental bond",
+        "extra strike",
+        "hit twice",
+        "multi strike",
+        "second hit"
+      ],
+      "examples": [
+        "Hit twice with single-strike moves, like Parental Bond"
+      ],
+      "summary": "Yes when the move may be given extra strikes, like Parental Bond does. Spread moves, moves that already hit several times and most charge moves are a no.",
+      "category": "Moves"
+    },
+    {
+      "id": "time.acted-before",
+      "group": "Time",
+      "label": "{first} moved before {second} this turn",
+      "requires": [
+        "holder",
+        "other"
+      ],
+      "params": [
+        {
+          "id": "first",
+          "label": "Which Pokemon moved first",
+          "control": "select",
+          "default": "holder",
+          "options": [
+            "holder",
+            "other"
+          ],
+          "optionLabels": {
+            "holder": "The ability owner",
+            "other": "The other Pokemon"
+          }
+        },
+        {
+          "id": "second",
+          "label": "Which Pokemon moved later",
+          "control": "select",
+          "default": "other",
+          "options": [
+            "holder",
+            "other"
+          ],
+          "optionLabels": {
+            "holder": "The ability owner",
+            "other": "The other Pokemon"
+          }
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "pokemonActedBefore(first, second): order = getLastTurnOrder(); first absent -> no; second absent -> yes; else index(first) < index(second)",
+        "source": "src/data/elite-redux/abilities/relativity.ts:53-62 (the exported helper is called)"
+      },
+      "synonyms": [
+        "moved first",
+        "outsped",
+        "acted first",
+        "turn order",
+        "relativity"
+      ],
+      "examples": [
+        "Take less damage from a foe that moved after me, like Relativity"
+      ],
+      "summary": "Yes when the first Pokemon has already moved this turn and moved before the second one. Example: I moved, the foe has not moved yet.",
+      "category": "Other"
+    },
+    {
+      "id": "foe.average-defense-not-higher",
+      "group": "Pokemon",
+      "label": "The adjacent foes' Defense is not above their Sp. Def",
+      "requires": [
+        "holder"
+      ],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "over holder.getAdjacentOpponents() (nulls skipped): n > 0, def = round(sum DEF_eff / n), spDef = round(sum SPDEF_eff / n), def > 0 && spDef > 0 && def <= spDef  (a re-entrant ask for the same holder while getEffectiveStat runs answers no)",
+        "source": "src/data/abilities/ab-attrs.ts:3618-3650 DownloadAbAttr.prepare, residual and gate"
+      },
+      "synonyms": [
+        "download",
+        "weaker defense",
+        "lower defense",
+        "foe bulk",
+        "average defense"
+      ],
+      "examples": [
+        "Raise Attack when the foes' Defense is the weaker side, like Download"
+      ],
+      "summary": "Yes when the adjacent foes' average Defense is at most their average Sp. Def. Example: Download raises Attack against 80 Defense and 100 Sp. Def.",
+      "category": "Stats"
+    },
+    {
+      "id": "field.aura-on-field",
+      "group": "Field",
+      "label": "A Pokemon on the field has {aura}",
+      "requires": [],
+      "params": [
+        {
+          "id": "aura",
+          "label": "Which aura",
+          "control": "select",
+          "default": "either",
+          "options": [
+            "dark",
+            "fairy",
+            "either"
+          ],
+          "optionLabels": {
+            "dark": "Dark Aura",
+            "fairy": "Fairy Aura",
+            "either": "Dark Aura or Fairy Aura"
+          }
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "getField(true).some(p => abilityQuery(p, DARK_AURA_FIELD) [|| abilityQuery(p, FAIRY_AURA_FIELD)])",
+        "source": "src/data/abilities/init-abilities.ts:1350, :1356, :1362-1365 (Aura Break)"
+      },
+      "synonyms": [
+        "aura break",
+        "dark aura",
+        "fairy aura",
+        "aura active",
+        "aura on field"
+      ],
+      "examples": [
+        "Turn the aura around while Dark Aura is out, like Aura Break"
+      ],
+      "summary": "Yes when any Pokemon on the field has Dark Aura or Fairy Aura, as you pick. Example: Aura Break turns the aura around while Dark Aura is out.",
+      "category": "Other"
+    },
+    {
+      "id": "move.chosen-is-damaging",
+      "group": "Move",
+      "label": "The move I chose this turn deals damage",
+      "requires": [
+        "holder"
+      ],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "id = turnCommands[holder.getBattlerIndex()]?.move?.move; m = id ? allMoves[id] : null; m?.category === PHYSICAL || m?.category === SPECIAL",
+        "source": "src/data/abilities/ab-attrs.ts:7900-7904 (Quick Draw; the class rolls its chance before this check)"
+      },
+      "synonyms": [
+        "chose an attack",
+        "picked a damaging move",
+        "quick draw",
+        "attacking this turn"
+      ],
+      "examples": [
+        "Sometimes move first when I picked an attack, like Quick Draw"
+      ],
+      "summary": "Yes when the move I picked for this turn is physical or special. Example: Quick Draw only works when I picked an attack.",
+      "category": "Moves"
+    },
+    {
+      "id": "party.any-ally-active",
+      "group": "Party",
+      "label": "Any of my allies is out and can still fight",
+      "requires": [
+        "holder"
+      ],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "holder.getAllies().find(a => a?.isActive(true)) !== undefined  (every ally, where party.ally-active asks only the first)",
+        "source": "src/data/elite-redux/abilities/plusle-minun.ts:111-113 activeAlly"
+      },
+      "synonyms": [
+        "ally on field",
+        "partner fighting",
+        "active ally",
+        "teammate out"
+      ],
+      "examples": [
+        "Only while one of my allies is fighting next to me"
+      ],
+      "summary": "Yes when any of my allies is on the field and can still fight, not only the one next to me. Example: in doubles, my partner is fighting.",
+      "category": "Other"
+    },
+    {
+      "id": "party.active-ally-chose-damaging-move",
+      "group": "Party",
+      "label": "My fighting ally chose a damaging move this turn",
+      "requires": [
+        "holder"
+      ],
+      "params": [],
+      "pure": true,
+      "formula": {
+        "expr": "ally = holder.getAllies().find(a => a?.isActive(true)); cmd = turnCommands[ally.getBattlerIndex()]; cmd?.command === FIGHT && cmd.move?.move !== undefined && allMoves[cmd.move.move]?.category !== undefined && !== STATUS",
+        "source": "src/data/elite-redux/abilities/plusle-minun.ts:75-87 and :111-113"
+      },
+      "synonyms": [
+        "ally attacking",
+        "partner attacks",
+        "both attack",
+        "ally chose attack",
+        "synchronized"
+      ],
+      "examples": [
+        "Boost power when my ally is also attacking this turn"
+      ],
+      "summary": "Yes when my fighting ally chose to use a damaging move this turn. Example: both of us attack this turn.",
+      "category": "Moves"
+    },
+    {
+      "id": "time.attacked-this-turn",
+      "group": "Time",
+      "label": "{who} attacked with a damaging move this turn",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Which Pokemon",
+          "control": "select",
+          "default": "holder",
+          "options": [
+            "holder",
+            "other",
+            "ally"
+          ],
+          "optionLabels": {
+            "holder": "The ability owner",
+            "other": "The other Pokemon",
+            "ally": "My ally"
+          }
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "pokemon.turnData.acted && last = getLastXMoves(1)[0]; last !== undefined && last.move !== NONE && allMoves[last.move]?.category !== STATUS",
+        "source": "src/data/elite-redux/abilities/plusle-minun.ts:102-108 attackedThisTurn"
+      },
+      "synonyms": [
+        "attacked",
+        "used an attack",
+        "dealt an attack",
+        "did not use a status move"
+      ],
+      "examples": [
+        "Heal at the end of the turn if neither of us attacked"
+      ],
+      "summary": "Yes when the chosen Pokemon moved this turn and its last move was a damaging move. Example: a status move or a skipped turn is a no.",
+      "category": "Moves"
+    },
+    {
+      "id": "mon.charge-stacks",
+      "group": "Pokemon",
+      "label": "{who} has {cmp} {n} charge stacks",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Which Pokemon",
+          "control": "select",
+          "default": "holder",
+          "options": [
+            "holder",
+            "other",
+            "ally"
+          ],
+          "optionLabels": {
+            "holder": "The ability owner",
+            "other": "The other Pokemon",
+            "ally": "My ally"
+          }
+        },
+        {
+          "id": "cmp",
+          "label": "How to compare",
+          "control": "select",
+          "default": "gte",
+          "options": [
+            "lt",
+            "lte",
+            "eq",
+            "gte",
+            "gt"
+          ],
+          "optionLabels": {
+            "lt": "less than",
+            "lte": "at most",
+            "eq": "exactly",
+            "gte": "at least",
+            "gt": "more than"
+          }
+        },
+        {
+          "id": "n",
+          "label": "Charge stacks (0-4)",
+          "control": "number",
+          "default": 1,
+          "min": 0,
+          "max": 4,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "compare(getCharge(pokemon), cmp, n)  (the shared charge store; 0 when unset)",
+        "source": "src/data/elite-redux/abilities/charge-stack.ts:31-33 getCharge"
+      },
+      "synonyms": [
+        "charge",
+        "stacks",
+        "capacitor bank",
+        "overloaded",
+        "stored charge"
+      ],
+      "examples": [
+        "Boost power once I hold at least 2 charge stacks"
+      ],
+      "summary": "Yes when the chosen Pokemon's charge stacks pass the comparison. It can hold up to 4. Example: at least 2 stacks for Overloaded.",
+      "category": "Other"
+    },
+    {
+      "id": "mon.mega-evolved",
+      "group": "Pokemon",
+      "label": "{who} is Mega Evolved",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Which Pokemon",
+          "control": "select",
+          "default": "other",
+          "options": [
+            "holder",
+            "other"
+          ],
+          "optionLabels": {
+            "holder": "The ability owner",
+            "other": "The other Pokemon"
+          }
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "!!pokemon && pokemon.isMega()",
+        "source": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts:1367"
+      },
+      "synonyms": [
+        "mega",
+        "mega evolution",
+        "mega form",
+        "mega evolved"
+      ],
+      "examples": [
+        "Hit harder against Mega Evolved foes, like Bejeweled"
+      ],
+      "summary": "Yes when the chosen Pokemon is Mega Evolved. Example: Bejeweled hits harder against a Mega Evolved foe.",
+      "category": "Form changes"
+    },
+    {
+      "id": "mon.gigantamax-form",
+      "group": "Pokemon",
+      "label": "{who} is in a Gigantamax form",
+      "requires": [],
+      "whoParam": "who",
+      "params": [
+        {
+          "id": "who",
+          "label": "Which Pokemon",
+          "control": "select",
+          "default": "other",
+          "options": [
+            "holder",
+            "other"
+          ],
+          "optionLabels": {
+            "holder": "The ability owner",
+            "other": "The other Pokemon"
+          }
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "!!pokemon && /gmax|gigantamax/i.test(pokemon.getFormKey())",
+        "source": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts:1367"
+      },
+      "synonyms": [
+        "gigantamax",
+        "gmax",
+        "dynamax form",
+        "giant form"
+      ],
+      "examples": [
+        "Hit harder against Gigantamax foes, like Bejeweled"
+      ],
+      "summary": "Yes when the chosen Pokemon is in a Gigantamax form. Example: Bejeweled hits harder against a Gigantamax foe.",
+      "category": "Form changes"
+    },
+    {
+      "id": "time.max-uses-per-wave",
+      "group": "Time",
+      "label": "Counter {key} has under {max} uses this wave (advanced)",
+      "requires": [
+        "holder"
+      ],
+      "params": [
+        {
+          "id": "key",
+          "label": "Counter name",
+          "control": "text",
+          "default": "wishmaker"
+        },
+        {
+          "id": "max",
+          "label": "Most uses per wave",
+          "control": "number",
+          "default": 3,
+          "min": 1,
+          "max": 20,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "pure": true,
+      "formula": {
+        "expr": "count of k in holder.waveData.entryEffectsFired with k.startsWith(key + \"#\") < max  (read only: the class writes key#n when it casts; a preview passes in the class before this read)",
+        "source": "src/data/elite-redux/archetypes/post-summon-scripted-move.ts:109-117 countUses, :137-141 gate"
+      },
+      "synonyms": [
+        "uses left",
+        "limited uses",
+        "times per wave",
+        "use cap",
+        "wishmaker"
+      ],
+      "examples": [
+        "Cast my wish at most 3 times per wave, like Wishmaker"
+      ],
+      "summary": "Advanced: yes while the named counter was used fewer times this wave than the limit. Example: Wishmaker can cast 3 times per wave.",
+      "category": "Other"
     }
   ],
   "groupOperators": [
@@ -7570,7 +8670,8 @@
             "SPDEF",
             "SPD",
             "ACC",
-            "EVA"
+            "EVA",
+            "current"
           ],
           "optionLabels": {
             "ATK": "Attack",
@@ -7579,7 +8680,8 @@
             "SPDEF": "Sp. Def",
             "SPD": "Speed",
             "ACC": "Accuracy",
-            "EVA": "Evasion"
+            "EVA": "Evasion",
+            "current": "The stat being calculated"
           }
         },
         {
@@ -7594,7 +8696,10 @@
         }
       ],
       "modifies": "statValue",
-      "implemented": false,
+      "feasibility": [
+        "Only changes the chosen stat (any stat when it is the stat being calculated)"
+      ],
+      "implemented": true,
       "synonyms": [
         "stat boost",
         "attack up",
@@ -7703,31 +8808,33 @@
     {
       "id": "effect.hit-n-times",
       "kind": "calc",
-      "label": "Hit {count} times",
+      "label": "Add {extraStrikes} extra hits to the move",
       "requires": [],
       "params": [
         {
-          "id": "count",
-          "label": "Number of hits",
+          "id": "extraStrikes",
+          "label": "Extra hits added (1 = hits twice)",
           "control": "number",
-          "default": 2,
+          "default": 1,
           "min": 1,
-          "max": 10,
+          "max": 9,
           "step": 1,
           "integer": true
         }
       ],
       "modifies": "hitCount",
-      "implemented": false,
+      "implemented": true,
       "synonyms": [
         "multi hit",
         "parental bond",
-        "extra strike"
+        "extra strike",
+        "hit twice",
+        "more hits"
       ],
       "examples": [
         "Hit twice"
       ],
-      "summary": "Makes the move hit a set number of times. Example: 3 makes it strike three times.",
+      "summary": "Adds extra hits to the move. Example: 1 makes a one-hit move strike twice, like Parental Bond.",
       "category": "Damage"
     },
     {
@@ -8010,6 +9117,32 @@
             "FREEZE": "Freeze",
             "BURN": "Burn"
           }
+        },
+        {
+          "id": "scope",
+          "label": "Who is cured",
+          "control": "select",
+          "default": "target",
+          "options": [
+            "target",
+            "my-side"
+          ],
+          "optionLabels": {
+            "target": "The Pokemon picked above",
+            "my-side": "Every Pokemon on my side, with a message"
+          }
+        },
+        {
+          "id": "statuses",
+          "label": "Statuses cured on my side (names, separated by commas; empty = the status above)",
+          "control": "text",
+          "default": ""
+        },
+        {
+          "id": "alsoErAilments",
+          "label": "Cure every status plus frostbite, bleeding and fear, at once",
+          "control": "boolean",
+          "default": false
         }
       ],
       "v1Kind": "cure-status",
@@ -8059,6 +9192,12 @@
           "max": 100,
           "step": 1,
           "integer": true
+        },
+        {
+          "id": "instant",
+          "label": "Heal at once, without a healing step",
+          "control": "boolean",
+          "default": false
         }
       ],
       "v1Kind": "heal-percent",
@@ -8116,6 +9255,16 @@
             "SNOWY_WRATH": "Snowy wrath",
             "EERIE_FOG": "Eerie fog"
           }
+        },
+        {
+          "id": "turns",
+          "label": "Turns it lasts (0 = the usual length)",
+          "control": "number",
+          "default": 0,
+          "min": 0,
+          "max": 20,
+          "step": 1,
+          "integer": true
         }
       ],
       "v1Kind": "set-weather",
@@ -8160,6 +9309,16 @@
             "PSYCHIC": "Psychic",
             "TOXIC": "Toxic"
           }
+        },
+        {
+          "id": "turns",
+          "label": "Turns it lasts (0 = the usual length)",
+          "control": "number",
+          "default": 0,
+          "min": 0,
+          "max": 20,
+          "step": 1,
+          "integer": true
         }
       ],
       "v1Kind": "set-terrain",
@@ -8610,31 +9769,28 @@
     {
       "id": "effect.steal-item",
       "kind": "event",
-      "label": "Steal {target}'s item",
-      "requires": [
-        "other"
-      ],
+      "label": "Steal a held item from {from}",
+      "requires": [],
       "params": [
         {
-          "id": "target",
-          "label": "Who is affected",
+          "id": "from",
+          "label": "Steal from",
           "control": "select",
-          "default": "holder",
+          "default": "other",
           "options": [
-            "holder",
             "other",
-            "holder-side",
-            "opposing-side"
+            "any-foe"
           ],
           "optionLabels": {
-            "holder": "The ability owner",
-            "other": "The other Pokemon",
-            "holder-side": "My side of the field",
-            "opposing-side": "The foes' side of the field"
+            "other": "The other Pokemon (one of its items at random)",
+            "any-foe": "Any foe (one takeable item at random)"
           }
         }
       ],
-      "implemented": false,
+      "feasibility": [
+        "A foe must hold an item that can be taken"
+      ],
+      "implemented": true,
       "synonyms": [
         "thief",
         "magician",
@@ -8644,7 +9800,7 @@
       "examples": [
         "Steal the foe's item"
       ],
-      "summary": "Takes the chosen Pokemon's held item for myself. Example: steal a berry from a foe.",
+      "summary": "Takes a random held item for myself from the other Pokemon (needs a trigger with one), or from any foe. Example: steal a berry from the foe I hit.",
       "category": "Items"
     },
     {
@@ -8675,10 +9831,50 @@
           "id": "text",
           "label": "Message text",
           "control": "text",
-          "default": ""
+          "default": "The air grows tense!"
+        },
+        {
+          "id": "announcement",
+          "label": "Built-in announcement with my name (replaces the text)",
+          "control": "select",
+          "default": "none",
+          "options": [
+            "none",
+            "PRESSURE",
+            "MOLD_BREAKER",
+            "ANTICIPATION",
+            "TURBOBLAZE",
+            "TERAVOLT",
+            "DARK_AURA",
+            "FAIRY_AURA",
+            "AURA_BREAK",
+            "TWO_ABILITIES_GLASTRIER",
+            "TWO_ABILITIES_SPECTRIER",
+            "VESSEL_OF_RUIN",
+            "SWORD_OF_RUIN",
+            "TABLETS_OF_RUIN",
+            "BEADS_OF_RUIN"
+          ],
+          "optionLabels": {
+            "none": "None, show the text",
+            "PRESSURE": "Pressure",
+            "MOLD_BREAKER": "Mold Breaker",
+            "ANTICIPATION": "Anticipation",
+            "TURBOBLAZE": "Turboblaze",
+            "TERAVOLT": "Teravolt",
+            "DARK_AURA": "Dark Aura",
+            "FAIRY_AURA": "Fairy Aura",
+            "AURA_BREAK": "Aura Break",
+            "TWO_ABILITIES_GLASTRIER": "As One (Glastrier)",
+            "TWO_ABILITIES_SPECTRIER": "As One (Spectrier)",
+            "VESSEL_OF_RUIN": "Vessel of Ruin",
+            "SWORD_OF_RUIN": "Sword of Ruin",
+            "TABLETS_OF_RUIN": "Tablets of Ruin",
+            "BEADS_OF_RUIN": "Beads of Ruin"
+          }
         }
       ],
-      "implemented": false,
+      "implemented": true,
       "synonyms": [
         "text",
         "announce",
@@ -8688,7 +9884,7 @@
       "examples": [
         "Show a short announcement"
       ],
-      "summary": "Shows a line of text in the battle log. Example: Pokemon enters with a custom message.",
+      "summary": "Shows a line of text in the battle log, or a built-in announcement with my name. Example: Pressure's entry message.",
       "category": "Other"
     },
     {
@@ -9532,9 +10728,15 @@
           "max": 6,
           "step": 1,
           "integer": true
+        },
+        {
+          "id": "intimidateRules",
+          "label": "Follow the Intimidate rules (foe abilities can block it, Substitute stops it)",
+          "control": "boolean",
+          "default": false
         }
       ],
-      "implemented": false,
+      "implemented": true,
       "synonyms": [
         "raise several stats",
         "boost two stats",
@@ -9553,9 +10755,23 @@
     {
       "id": "effect.change-own-type",
       "kind": "event",
-      "label": "Change my type to {type}",
+      "label": "Change a Pokemon's type to one type",
       "requires": [],
       "params": [
+        {
+          "id": "who",
+          "label": "Whose type changes",
+          "control": "select",
+          "default": "holder",
+          "options": [
+            "holder",
+            "other"
+          ],
+          "optionLabels": {
+            "holder": "The ability owner",
+            "other": "The other Pokemon"
+          }
+        },
         {
           "id": "type",
           "label": "New type",
@@ -9580,7 +10796,8 @@
             "DRAGON",
             "DARK",
             "FAIRY",
-            "STELLAR"
+            "STELLAR",
+            "move-type"
           ],
           "optionLabels": {
             "NORMAL": "Normal",
@@ -9601,23 +10818,25 @@
             "DRAGON": "Dragon",
             "DARK": "Dark",
             "FAIRY": "Fairy",
-            "STELLAR": "Stellar"
+            "STELLAR": "Stellar",
+            "move-type": "The type of the move being used"
           }
         }
       ],
-      "implemented": false,
+      "implemented": true,
       "synonyms": [
         "become type",
         "color change",
         "protean",
         "libero",
         "mimicry",
-        "type change"
+        "type change",
+        "soak"
       ],
       "examples": [
         "Become Fire type after being hit by a Fire move, like Color Change"
       ],
-      "summary": "Changes this Pokemon's type to the one you pick. Example: become Fire type after a Fire move hits, like Color Change.",
+      "summary": "Changes a Pokemon's type to one type or the move's type; the other Pokemon needs a trigger with one. Example: become Fire type after a Fire move hits me.",
       "category": "Types & immunities"
     },
     {
@@ -9715,50 +10934,61 @@
     {
       "id": "effect.hurt-percent-of-max-hp",
       "kind": "event",
-      "label": "Hurt {target} for {percent}% of {target}'s max HP",
+      "label": "Hurt {targets} by a share of their own max HP",
       "requires": [],
       "params": [
         {
-          "id": "target",
-          "label": "Who",
+          "id": "targets",
+          "label": "Who is hurt",
           "control": "select",
-          "default": "holder",
+          "default": "foes",
           "options": [
-            "holder",
-            "other",
-            "holder-side",
-            "opposing-side"
+            "foes",
+            "everyone-else"
           ],
           "optionLabels": {
-            "holder": "The ability owner",
-            "other": "The other Pokemon",
-            "holder-side": "My side of the field",
-            "opposing-side": "The foes' side of the field"
+            "foes": "Every foe",
+            "everyone-else": "Every other Pokemon on the field"
           }
         },
         {
-          "id": "percent",
-          "label": "Percent of max HP (12.5 = one eighth)",
+          "id": "fraction",
+          "label": "Share of max HP (0.125 = one eighth)",
           "control": "number",
-          "default": 12.5,
-          "min": 0.5,
-          "max": 100,
-          "step": 0.5,
+          "default": 0.125,
+          "min": 0.0625,
+          "max": 1,
+          "step": 0.0625,
           "integer": false
+        },
+        {
+          "id": "sparedTypes",
+          "label": "Types that are spared (names, separated by commas)",
+          "control": "text",
+          "default": ""
+        },
+        {
+          "id": "poisonHealRecovers",
+          "label": "Poison Heal users heal the same amount instead",
+          "control": "boolean",
+          "default": false
         }
       ],
-      "implemented": false,
+      "feasibility": [
+        "Someone must be standing who is not of a spared type"
+      ],
+      "implemented": true,
       "synonyms": [
         "chip damage",
-        "rough skin",
-        "iron barbs",
+        "toxic spill",
         "damage share of max hp",
-        "lose hp"
+        "lose hp",
+        "field damage"
       ],
       "examples": [
-        "The attacker loses an eighth of its max HP, like Rough Skin"
+        "Every foe that is not Poison type loses an eighth of its max HP each turn"
       ],
-      "summary": "Takes a share of the target's max HP away. Example: 12.5 on the attacker is an eighth of its max HP, like Rough Skin.",
+      "summary": "Takes a share of max HP from every foe, or everyone else, except spared types. Example: 0.125 takes an eighth from each foe that is not Poison type.",
       "category": "Damage"
     },
     {
@@ -9769,20 +10999,22 @@
       "params": [
         {
           "id": "target",
-          "label": "Who",
+          "label": "Who is healed",
           "control": "select",
           "default": "holder",
           "options": [
             "holder",
             "other",
             "holder-side",
-            "opposing-side"
+            "opposing-side",
+            "adjacent-allies"
           ],
           "optionLabels": {
             "holder": "The ability owner",
             "other": "The other Pokemon",
             "holder-side": "My side of the field",
-            "opposing-side": "The foes' side of the field"
+            "opposing-side": "The foes' side of the field",
+            "adjacent-allies": "My active adjacent allies, with a message"
           }
         },
         {
@@ -9794,18 +11026,40 @@
           "max": 64,
           "step": 1,
           "integer": true
+        },
+        {
+          "id": "basedOn",
+          "label": "Whose max HP sets the amount",
+          "control": "select",
+          "default": "target",
+          "options": [
+            "target",
+            "holder"
+          ],
+          "optionLabels": {
+            "target": "The healed Pokemon",
+            "holder": "The ability owner"
+          }
+        },
+        {
+          "id": "showAnimation",
+          "label": "Show the healing animation",
+          "control": "boolean",
+          "default": false
         }
       ],
-      "implemented": false,
+      "implemented": true,
       "synonyms": [
         "rain dish",
         "ice body",
         "regenerate a fraction",
         "heal sixteenth",
-        "residual heal"
+        "residual heal",
+        "hospitality"
       ],
       "examples": [
-        "Heal an eighth of max HP every turn"
+        "Heal an eighth of max HP every turn",
+        "Heal my partner by a quarter of my max HP, like Hospitality"
       ],
       "summary": "Restores one part of max HP, such as an eighth or a sixteenth. Example: 8 heals 1/8 of max HP, at least 1 HP.",
       "category": "Healing"
@@ -9813,10 +11067,17 @@
     {
       "id": "effect.clear-weather",
       "kind": "event",
-      "label": "Clear the weather (extreme weather stays)",
+      "label": "Clear the weather",
       "requires": [],
-      "params": [],
-      "implemented": false,
+      "params": [
+        {
+          "id": "keepExtreme",
+          "label": "Extreme weather (Heavy Rain, Harsh Sun, Strong Winds) stays",
+          "control": "boolean",
+          "default": true
+        }
+      ],
+      "implemented": true,
       "synonyms": [
         "remove weather",
         "clear sky",
@@ -9827,7 +11088,7 @@
       "examples": [
         "Clear the weather when I come in, except Heavy Rain and Harsh Sun"
       ],
-      "summary": "Ends the current weather, but extreme weather like Heavy Rain stays. Example: Cloud-clearing entry effects.",
+      "summary": "Ends the current weather. By default extreme weather like Heavy Rain stays; turn that off to end it too. Example: Cloud Nine on entry.",
       "category": "Weather & terrain"
     },
     {
@@ -9838,24 +11099,32 @@
       "params": [
         {
           "id": "target",
-          "label": "Who",
+          "label": "Whose stat changes",
           "control": "select",
           "default": "holder",
           "options": [
             "holder",
             "other",
             "holder-side",
-            "opposing-side"
+            "opposing-side",
+            "adjacent-foes"
           ],
           "optionLabels": {
             "holder": "The ability owner",
             "other": "The other Pokemon",
             "holder-side": "My side of the field",
-            "opposing-side": "The foes' side of the field"
+            "opposing-side": "The foes' side of the field",
+            "adjacent-foes": "Every adjacent foe"
           }
+        },
+        {
+          "id": "onlyRaised",
+          "label": "Only reset stats that went up (drops stay)",
+          "control": "boolean",
+          "default": false
         }
       ],
-      "implemented": false,
+      "implemented": true,
       "synonyms": [
         "clear boosts",
         "haze",
@@ -9970,6 +11239,1060 @@
       ],
       "summary": "Makes the other Pokemon faint on the spot. Example: take down the attacker that knocked me out.",
       "category": "Other"
+    },
+    {
+      "id": "effect.add-stat-share",
+      "kind": "calc",
+      "label": "Add a share of my {sourceStat} to the stat",
+      "requires": [],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Only for this stat",
+          "control": "select",
+          "default": "any",
+          "options": [
+            "any",
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "optionLabels": {
+            "any": "The stat being calculated, whichever it is",
+            "ATK": "Attack",
+            "DEF": "Defense",
+            "SPATK": "Sp. Atk",
+            "SPDEF": "Sp. Def",
+            "SPD": "Speed",
+            "ACC": "Accuracy",
+            "EVA": "Evasion"
+          }
+        },
+        {
+          "id": "sourceStat",
+          "label": "Stat whose share is added",
+          "control": "select",
+          "default": "SPD",
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD"
+          ],
+          "optionLabels": {
+            "ATK": "Attack",
+            "DEF": "Defense",
+            "SPATK": "Sp. Atk",
+            "SPDEF": "Sp. Def",
+            "SPD": "Speed"
+          }
+        },
+        {
+          "id": "share",
+          "label": "Share of that stat (0.2 = a fifth)",
+          "control": "number",
+          "default": 0.2,
+          "min": 0,
+          "max": 2,
+          "step": 0.05,
+          "integer": false
+        },
+        {
+          "id": "replace",
+          "label": "Use the share instead of the stat (replace it)",
+          "control": "boolean",
+          "default": false
+        }
+      ],
+      "modifies": "statValue",
+      "feasibility": [
+        "Only changes the chosen stat, when one is chosen"
+      ],
+      "implemented": true,
+      "synonyms": [
+        "speed bonus",
+        "stat blend",
+        "add speed to attack",
+        "use speed as attack",
+        "stat share"
+      ],
+      "examples": [
+        "Add a fifth of my Speed to my Attack"
+      ],
+      "summary": "Adds a share of one of my stats to the stat being calculated, or uses it instead. Example: 0.2 of my 100 Speed adds 20 to my Attack.",
+      "category": "Stats"
+    },
+    {
+      "id": "effect.multiply-stat-per-fainted-ally",
+      "kind": "calc",
+      "label": "Multiply the stat by {share} more per fainted teammate",
+      "requires": [],
+      "params": [
+        {
+          "id": "share",
+          "label": "Extra share per fainted teammate (0.05 = 5%)",
+          "control": "number",
+          "default": 0.05,
+          "min": 0,
+          "max": 1,
+          "step": 0.01,
+          "integer": false
+        }
+      ],
+      "modifies": "statValue",
+      "implemented": true,
+      "synonyms": [
+        "fainted allies",
+        "soul harvest",
+        "grows with losses",
+        "fallen teammates",
+        "avenger"
+      ],
+      "examples": [
+        "Attack is 5% higher for each fainted teammate"
+      ],
+      "summary": "Raises the stat for every fainted teammate, not counting me. Example: 0.05 with 2 fainted teammates gives 10% more.",
+      "category": "Stats"
+    },
+    {
+      "id": "effect.set-accuracy",
+      "kind": "calc",
+      "label": "Set my move's accuracy to {accuracy}% when it is lower",
+      "requires": [],
+      "params": [
+        {
+          "id": "accuracy",
+          "label": "Accuracy (%)",
+          "control": "slider",
+          "default": 80,
+          "min": 1,
+          "max": 100,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "modifies": "accuracy",
+      "feasibility": [
+        "Moves that never miss are left alone, and accuracy is only ever raised"
+      ],
+      "implemented": true,
+      "synonyms": [
+        "hypnotist",
+        "accuracy override",
+        "more accurate",
+        "fixed accuracy",
+        "sure aim"
+      ],
+      "examples": [
+        "Hypnosis has 90% accuracy, like Hypnotist"
+      ],
+      "summary": "Raises a move's accuracy to the number you set, never lowering it. Example: 90 turns Hypnosis from 60% into 90%.",
+      "category": "Moves"
+    },
+    {
+      "id": "effect.ignore-secondary-effects",
+      "kind": "calc",
+      "label": "Stop the extra effects of the move",
+      "requires": [],
+      "params": [],
+      "modifies": "effectChance",
+      "feasibility": [
+        "Does nothing when the move has no extra effect chance"
+      ],
+      "implemented": true,
+      "synonyms": [
+        "shield dust",
+        "no secondary effects",
+        "zero effect chance",
+        "covert cloak",
+        "effect immunity"
+      ],
+      "examples": [
+        "Moves aimed at me never flinch, burn or lower my stats, like Shield Dust"
+      ],
+      "summary": "Sets the chance of a move's extra effect to zero. Example: Flamethrower aimed at me can never burn, like Shield Dust.",
+      "category": "Moves"
+    },
+    {
+      "id": "effect.multiply-power-per-count",
+      "kind": "calc",
+      "label": "Multiply the move's power by {percent}% more per {counter}",
+      "requires": [],
+      "params": [
+        {
+          "id": "counter",
+          "label": "What is counted",
+          "control": "select",
+          "default": "benched-teammates",
+          "options": [
+            "benched-teammates",
+            "weight-classes"
+          ],
+          "optionLabels": {
+            "benched-teammates": "Healthy teammate waiting on the bench",
+            "weight-classes": "Weight class I am above the target"
+          }
+        },
+        {
+          "id": "percent",
+          "label": "Extra power per counted one (%)",
+          "control": "number",
+          "default": 5,
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "integer": false
+        },
+        {
+          "id": "max",
+          "label": "Most counted ones (number)",
+          "control": "number",
+          "default": 5,
+          "min": 0,
+          "max": 5,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "modifies": "power",
+      "feasibility": [
+        "Benched teammates: at least one healthy teammate must wait on the bench"
+      ],
+      "implemented": true,
+      "synonyms": [
+        "fan favorite",
+        "heavyweight",
+        "bench bonus",
+        "weight power",
+        "crowd power"
+      ],
+      "examples": [
+        "5% more power for each healthy teammate on the bench, like Fan Favorite"
+      ],
+      "summary": "Raises the move's power for each counted thing, up to a limit. Example: 5% per healthy benched teammate, 3 waiting gives 15% more.",
+      "category": "Damage"
+    },
+    {
+      "id": "effect.multiply-accuracy-per-count",
+      "kind": "calc",
+      "label": "Multiply accuracy by {percent}% more per benched teammate",
+      "requires": [],
+      "params": [
+        {
+          "id": "percent",
+          "label": "Extra accuracy per healthy benched teammate (%)",
+          "control": "number",
+          "default": 5,
+          "min": 0,
+          "max": 100,
+          "step": 1,
+          "integer": false
+        },
+        {
+          "id": "max",
+          "label": "Most benched teammates counted (number)",
+          "control": "number",
+          "default": 5,
+          "min": 0,
+          "max": 5,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "modifies": "accuracy",
+      "feasibility": [
+        "Moves that never miss are left alone"
+      ],
+      "implemented": true,
+      "synonyms": [
+        "fan favorite accuracy",
+        "bench accuracy",
+        "crowd aim",
+        "team support",
+        "more accurate"
+      ],
+      "examples": [
+        "5% more accuracy for each healthy teammate on the bench"
+      ],
+      "summary": "Raises the move's accuracy for each counted thing, up to a limit. Example: 5% per healthy benched teammate.",
+      "category": "Moves"
+    },
+    {
+      "id": "effect.use-weaker-defense",
+      "kind": "calc",
+      "label": "Make my attack hit the foe's weaker defense",
+      "requires": [],
+      "params": [],
+      "modifies": "statValue",
+      "implemented": true,
+      "synonyms": [
+        "deadeye",
+        "exploit weakness",
+        "lower defense",
+        "weaker defensive stat",
+        "hit the soft spot"
+      ],
+      "examples": [
+        "Critical hits use the lower of the foe's Defense and Sp. Def, like Deadeye"
+      ],
+      "summary": "Makes my attack use the lower of the foe's Defense and Sp. Def. Example: a crit on a foe with 100 Def and 60 Sp. Def uses 60.",
+      "category": "Stats"
+    },
+    {
+      "id": "effect.trap-foe",
+      "kind": "calc",
+      "label": "Stop the foe from fleeing or switching out",
+      "requires": [
+        "other"
+      ],
+      "params": [],
+      "modifies": "trapped",
+      "guards": [
+        "foe-can-be-trapped"
+      ],
+      "implemented": true,
+      "synonyms": [
+        "arena trap",
+        "shadow tag",
+        "trap",
+        "no escape",
+        "cannot switch"
+      ],
+      "examples": [
+        "Grounded foes cannot escape, like Arena Trap"
+      ],
+      "summary": "Keeps the foe from fleeing or switching out. Ghost types and Run Away users always escape. Example: Arena Trap.",
+      "category": "Switching"
+    },
+    {
+      "id": "effect.jump-turn-order",
+      "kind": "calc",
+      "label": "Move first among moves of my priority",
+      "requires": [],
+      "params": [
+        {
+          "id": "memoName",
+          "label": "Name of the turn reminder to set (empty = none)",
+          "control": "text",
+          "default": ""
+        }
+      ],
+      "modifies": "bypass",
+      "feasibility": [
+        "I must be able to get the go-first effect this turn"
+      ],
+      "implemented": true,
+      "synonyms": [
+        "quick draw",
+        "quick claw",
+        "go first",
+        "jump the queue",
+        "act first"
+      ],
+      "examples": [
+        "Sometimes act first in my priority bracket, like Quick Draw"
+      ],
+      "summary": "Lets me act before others that picked moves of the same priority this turn. Example: Quick Draw going first.",
+      "category": "Moves"
+    },
+    {
+      "id": "effect.reflect-stat-drop",
+      "kind": "calc",
+      "label": "Bounce a stat drop back at the Pokemon that caused it",
+      "requires": [
+        "other",
+        "stat",
+        "stages"
+      ],
+      "params": [],
+      "modifies": "cancelled",
+      "feasibility": [
+        "A Pokemon must have caused the drop, and nothing has blocked it yet"
+      ],
+      "implemented": true,
+      "synonyms": [
+        "mirror armor",
+        "reflect stat drop",
+        "bounce drop",
+        "return stat change",
+        "mirror"
+      ],
+      "examples": [
+        "Intimidate lowers the user's Attack instead of mine, like Mirror Armor"
+      ],
+      "summary": "Blocks a stat drop and gives it to the Pokemon that caused it. Example: an Intimidate aimed at me lowers the user's Attack, like Mirror Armor.",
+      "category": "Stats"
+    },
+    {
+      "id": "effect.scripted-move-at",
+      "kind": "event",
+      "label": "Use {moveId} aimed at {aim}",
+      "requires": [],
+      "params": [
+        {
+          "id": "moveId",
+          "label": "Which move (type its name)",
+          "control": "text",
+          "default": "Steam Eruption"
+        },
+        {
+          "id": "usedMove",
+          "label": "Use the move that was just used instead",
+          "control": "boolean",
+          "default": false
+        },
+        {
+          "id": "power",
+          "label": "Move power (0 = the move's own power)",
+          "control": "number",
+          "default": 0,
+          "min": 0,
+          "max": 250,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "powerShare",
+          "label": "Share of the used move's power (0 = not used, 0.5 = half)",
+          "control": "number",
+          "default": 0,
+          "min": 0,
+          "max": 1,
+          "step": 0.05,
+          "integer": false
+        },
+        {
+          "id": "aim",
+          "label": "Who it is aimed at",
+          "control": "select",
+          "default": "first-living-foe",
+          "options": [
+            "first-living-foe",
+            "every-living-foe",
+            "holder",
+            "move-targets",
+            "neighbour-ally",
+            "other"
+          ],
+          "optionLabels": {
+            "first-living-foe": "The first foe still standing",
+            "every-living-foe": "Every foe still standing",
+            "holder": "Myself",
+            "move-targets": "The move's normal targets",
+            "neighbour-ally": "A standing partner of the other Pokemon",
+            "other": "The other Pokemon"
+          }
+        },
+        {
+          "id": "alwaysHit",
+          "label": "The move never misses",
+          "control": "boolean",
+          "default": false
+        }
+      ],
+      "feasibility": [
+        "A foe must still be standing when it is aimed at foes; aimed at the other Pokemon, both must stand",
+        "Never starts from a follow-up move (its own included), so a follow-up cannot trigger another follow-up"
+      ],
+      "implemented": true,
+      "synonyms": [
+        "follow up move",
+        "entry move",
+        "free move",
+        "cast a move",
+        "scripted move"
+      ],
+      "examples": [
+        "Use Spikes at the first standing foe when I enter"
+      ],
+      "summary": "Uses a free move at a foe, every foe, me or its normal targets; aims at the other Pokemon need a trigger with one. Example: Spikes when I enter.",
+      "category": "Moves"
+    },
+    {
+      "id": "effect.cancel-recharge",
+      "kind": "event",
+      "label": "Clear my recharge turn",
+      "requires": [],
+      "params": [],
+      "implemented": true,
+      "synonyms": [
+        "no recharge",
+        "skip recharge",
+        "rampage",
+        "act again",
+        "hyper beam"
+      ],
+      "examples": [
+        "After a knockout, Hyper Beam needs no recharge turn, like Rampage"
+      ],
+      "summary": "Ends my recharge turn so I can act next turn. Example: after Hyper Beam knocks out a foe, no recharge turn, like Rampage.",
+      "category": "Moves"
+    },
+    {
+      "id": "effect.remove-type",
+      "kind": "event",
+      "label": "Remove the {type} type from {who}",
+      "requires": [],
+      "params": [
+        {
+          "id": "who",
+          "label": "Who loses the type",
+          "control": "select",
+          "default": "holder",
+          "options": [
+            "holder",
+            "other"
+          ],
+          "optionLabels": {
+            "holder": "The ability owner",
+            "other": "The other Pokemon"
+          }
+        },
+        {
+          "id": "type",
+          "label": "Which type",
+          "control": "select",
+          "default": "GHOST",
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ],
+          "optionLabels": {
+            "NORMAL": "Normal",
+            "FIGHTING": "Fighting",
+            "FLYING": "Flying",
+            "POISON": "Poison",
+            "GROUND": "Ground",
+            "ROCK": "Rock",
+            "BUG": "Bug",
+            "GHOST": "Ghost",
+            "STEEL": "Steel",
+            "FIRE": "Fire",
+            "WATER": "Water",
+            "GRASS": "Grass",
+            "ELECTRIC": "Electric",
+            "PSYCHIC": "Psychic",
+            "ICE": "Ice",
+            "DRAGON": "Dragon",
+            "DARK": "Dark",
+            "FAIRY": "Fairy",
+            "STELLAR": "Stellar"
+          }
+        },
+        {
+          "id": "fallback",
+          "label": "Type left when no type remains",
+          "control": "select",
+          "default": "UNKNOWN",
+          "options": [
+            "UNKNOWN",
+            "NORMAL"
+          ],
+          "optionLabels": {
+            "UNKNOWN": "No type (typeless)",
+            "NORMAL": "Normal"
+          }
+        },
+        {
+          "id": "teraRules",
+          "label": "A Terastallized Pokemon keeps its Tera type",
+          "control": "boolean",
+          "default": true
+        }
+      ],
+      "feasibility": [
+        "Tera rules on: does nothing to a Pokemon Terastallized into that type"
+      ],
+      "implemented": true,
+      "synonyms": [
+        "strip type",
+        "lose a type",
+        "illuminate",
+        "refrigerator",
+        "remove type"
+      ],
+      "examples": [
+        "A Ghost type I hit loses its Ghost type"
+      ],
+      "summary": "Takes one type from a Pokemon and keeps its others; the other Pokemon needs a trigger with one. Example: a Water and Ghost foe I hit becomes only Water.",
+      "category": "Types & immunities"
+    },
+    {
+      "id": "effect.stat-stage-on-highest",
+      "kind": "event",
+      "label": "Change {target}'s highest stat of {stats} by {stages}",
+      "requires": [],
+      "params": [
+        {
+          "id": "target",
+          "label": "Whose stat",
+          "control": "select",
+          "default": "holder",
+          "options": [
+            "holder",
+            "other"
+          ],
+          "optionLabels": {
+            "holder": "The ability owner",
+            "other": "The other Pokemon"
+          }
+        },
+        {
+          "id": "stats",
+          "label": "Stats to compare (names, separated by commas)",
+          "control": "text",
+          "default": "Attack, Sp. Atk"
+        },
+        {
+          "id": "stages",
+          "label": "Number of stages (-6 to 6)",
+          "control": "number",
+          "default": 1,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "tie",
+          "label": "On a tie",
+          "control": "select",
+          "default": "first",
+          "options": [
+            "first",
+            "last"
+          ],
+          "optionLabels": {
+            "first": "The first stat listed wins",
+            "last": "The last stat listed wins"
+          }
+        },
+        {
+          "id": "source",
+          "label": "Stats compared",
+          "control": "select",
+          "default": "in-battle",
+          "options": [
+            "in-battle",
+            "stored"
+          ],
+          "optionLabels": {
+            "in-battle": "The stats in this battle",
+            "stored": "The stored stats, without battle changes"
+          }
+        }
+      ],
+      "implemented": true,
+      "synonyms": [
+        "raise highest stat",
+        "beast boost",
+        "highest stat",
+        "best stat",
+        "sun worship"
+      ],
+      "examples": [
+        "Raise my higher attacking stat by 1 when I enter"
+      ],
+      "summary": "Changes whichever listed stat is highest; the other Pokemon needs a trigger with one. Example: Attack 120 and Sp. Atk 90 means Attack goes up by 1.",
+      "category": "Stats"
+    },
+    {
+      "id": "effect.drain-adjacent-foes",
+      "kind": "event",
+      "label": "Take HP from every adjacent foe and heal me by it",
+      "requires": [],
+      "params": [
+        {
+          "id": "fraction",
+          "label": "Share of each foe's max HP (0.125 = one eighth)",
+          "control": "number",
+          "default": 0.125,
+          "min": 0.0625,
+          "max": 1,
+          "step": 0.0625,
+          "integer": false
+        },
+        {
+          "id": "onlyTrapped",
+          "label": "Only foes that are trapped",
+          "control": "boolean",
+          "default": false
+        }
+      ],
+      "feasibility": [
+        "A foe must still be standing (and trapped, when only trapped foes count)"
+      ],
+      "implemented": true,
+      "synonyms": [
+        "life steal",
+        "soul tap",
+        "drain foes",
+        "leech every turn",
+        "sap hp"
+      ],
+      "examples": [
+        "Every turn, take an eighth of each foe's max HP and heal by it"
+      ],
+      "summary": "Takes a share of max HP from each adjacent foe and heals me by what they lost. Example: 0.125 takes an eighth every turn.",
+      "category": "Healing"
+    },
+    {
+      "id": "effect.force-other-out",
+      "kind": "event",
+      "label": "Switch out the other Pokemon",
+      "requires": [
+        "other"
+      ],
+      "params": [],
+      "feasibility": [
+        "The other Pokemon must be able to switch out"
+      ],
+      "implemented": true,
+      "synonyms": [
+        "force out",
+        "red card",
+        "chuckster",
+        "restraining order",
+        "drag out"
+      ],
+      "examples": [
+        "The attacker is forced to switch out after hitting me"
+      ],
+      "summary": "Makes the other Pokemon switch out for a party member. Example: the attacker is dragged out after hitting me.",
+      "category": "Switching"
+    },
+    {
+      "id": "effect.set-marker",
+      "kind": "event",
+      "label": "Put the reminder {key} on me until {scope} ends",
+      "requires": [],
+      "params": [
+        {
+          "id": "scope",
+          "label": "How long it stays",
+          "control": "select",
+          "default": "battle",
+          "options": [
+            "battle",
+            "switch-in",
+            "turn"
+          ],
+          "optionLabels": {
+            "battle": "This battle",
+            "switch-in": "This switch-in",
+            "turn": "This turn"
+          }
+        },
+        {
+          "id": "key",
+          "label": "Reminder name (any short word)",
+          "control": "text",
+          "default": "marker"
+        },
+        {
+          "id": "unique",
+          "label": "Only once (skip when it is already set)",
+          "control": "boolean",
+          "default": false
+        }
+      ],
+      "implemented": true,
+      "synonyms": [
+        "remember",
+        "mark",
+        "set flag",
+        "note it",
+        "once per entry"
+      ],
+      "examples": [
+        "Remember that the trap was used on this switch-in"
+      ],
+      "summary": "Puts a named reminder on me for the battle, this switch-in or this turn, so a condition can check it. Example: remember a trap was used.",
+      "category": "Other"
+    },
+    {
+      "id": "effect.clear-marker",
+      "kind": "event",
+      "label": "Remove the reminder {key} from me",
+      "requires": [],
+      "params": [
+        {
+          "id": "scope",
+          "label": "Where it was kept",
+          "control": "select",
+          "default": "battle",
+          "options": [
+            "battle",
+            "switch-in",
+            "turn"
+          ],
+          "optionLabels": {
+            "battle": "This battle",
+            "switch-in": "This switch-in",
+            "turn": "This turn"
+          }
+        },
+        {
+          "id": "key",
+          "label": "Reminder name (any short word)",
+          "control": "text",
+          "default": "marker"
+        }
+      ],
+      "implemented": true,
+      "synonyms": [
+        "forget",
+        "unmark",
+        "clear flag",
+        "reset reminder",
+        "re-arm"
+      ],
+      "examples": [
+        "Forget the stored charge when I enter, like Ballaster"
+      ],
+      "summary": "Removes a named reminder from me. Example: forget a stored charge when I enter again.",
+      "category": "Other"
+    },
+    {
+      "id": "effect.change-charge-stacks",
+      "kind": "event",
+      "label": "Change my electric charge ({mode})",
+      "requires": [],
+      "params": [
+        {
+          "id": "mode",
+          "label": "How it changes",
+          "control": "select",
+          "default": "add",
+          "options": [
+            "add",
+            "spend",
+            "spend-all"
+          ],
+          "optionLabels": {
+            "add": "Add charges (at most 4)",
+            "spend": "Spend charges",
+            "spend-all": "Spend every charge"
+          }
+        },
+        {
+          "id": "amount",
+          "label": "Number of charges",
+          "control": "number",
+          "default": 1,
+          "min": 1,
+          "max": 4,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "implemented": true,
+      "synonyms": [
+        "charge stack",
+        "capacitor",
+        "overloaded",
+        "store charge",
+        "electric charge"
+      ],
+      "examples": [
+        "Store one charge when an Electric move hits me"
+      ],
+      "summary": "Adds or spends my stored electric charges, at most 4 at a time. Example: add 1 when an Electric move hits me.",
+      "category": "Other"
+    },
+    {
+      "id": "effect.drain-pp",
+      "kind": "event",
+      "label": "Take PP from one of the other Pokemon's moves",
+      "requires": [
+        "other"
+      ],
+      "params": [
+        {
+          "id": "which",
+          "label": "Which move",
+          "control": "select",
+          "default": "used-move",
+          "options": [
+            "used-move",
+            "used-move-all",
+            "last-used-else-random"
+          ],
+          "optionLabels": {
+            "used-move": "The move it just used",
+            "used-move-all": "The move it just used, every PP",
+            "last-used-else-random": "The move it used last, or a random one"
+          }
+        },
+        {
+          "id": "amount",
+          "label": "PP taken (number)",
+          "control": "number",
+          "default": 4,
+          "min": 1,
+          "max": 64,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "feasibility": [
+        "The other Pokemon must know that move (and have PP left to take, when taking every PP)"
+      ],
+      "implemented": true,
+      "synonyms": [
+        "spite",
+        "pressure",
+        "drain pp",
+        "ill will",
+        "lower pp"
+      ],
+      "examples": [
+        "The attacker's move loses 4 PP when it hits me, like Spiteful"
+      ],
+      "summary": "Takes PP from one of the other Pokemon's moves. Example: the move that hit me loses 4 PP, like Spiteful.",
+      "category": "Moves"
+    },
+    {
+      "id": "effect.match-weather-form",
+      "kind": "event",
+      "label": "Change my form to match the weather",
+      "requires": [],
+      "params": [],
+      "feasibility": [
+        "My species must have a weather form it can change into now"
+      ],
+      "implemented": true,
+      "synonyms": [
+        "forecast",
+        "flower gift",
+        "weather form",
+        "castform",
+        "cherrim"
+      ],
+      "examples": [
+        "Castform takes its Rainy form when it enters in rain"
+      ],
+      "summary": "Changes me into the form that matches the weather. Example: Castform turns into its Rainy form in rain.",
+      "category": "Form changes"
+    },
+    {
+      "id": "effect.give-ability",
+      "kind": "event",
+      "label": "Give the other Pokemon the {ability} ability",
+      "requires": [
+        "other"
+      ],
+      "params": [
+        {
+          "id": "ability",
+          "label": "Which ability (type its name)",
+          "control": "text",
+          "default": "Mummy"
+        },
+        {
+          "id": "giver",
+          "label": "When the ability is passed on",
+          "control": "select",
+          "default": "when-hit",
+          "options": [
+            "after-my-attack",
+            "when-hit"
+          ],
+          "optionLabels": {
+            "after-my-attack": "After my attack (the target cannot already pass abilities on this way)",
+            "when-hit": "When I am hit (Mummy rules)"
+          }
+        }
+      ],
+      "feasibility": [
+        "The other Pokemon's ability must be replaceable"
+      ],
+      "implemented": true,
+      "synonyms": [
+        "mummy",
+        "lingering aroma",
+        "spread ability",
+        "pass ability",
+        "infect"
+      ],
+      "examples": [
+        "The attacker's ability becomes Mummy when it touches me"
+      ],
+      "summary": "Replaces the other Pokemon's ability with the one you name. Example: an attacker that touches me gets Mummy.",
+      "category": "Other"
+    },
+    {
+      "id": "effect.remove-arena-tags",
+      "kind": "event",
+      "label": "Remove {tags} from {side}",
+      "requires": [],
+      "params": [
+        {
+          "id": "tags",
+          "label": "Field effects (names, separated by commas)",
+          "control": "text",
+          "default": "Reflect, Light Screen, Aurora Veil"
+        },
+        {
+          "id": "side",
+          "label": "Which side",
+          "control": "select",
+          "default": "both",
+          "options": [
+            "holder-side",
+            "opposing-side",
+            "both",
+            "target-side"
+          ],
+          "optionLabels": {
+            "holder-side": "My side of the field",
+            "opposing-side": "The foes' side of the field",
+            "both": "Both sides of the field",
+            "target-side": "The other Pokemon's side"
+          }
+        },
+        {
+          "id": "onlyWhenPresent",
+          "label": "Only when one of them is on the field",
+          "control": "boolean",
+          "default": true
+        }
+      ],
+      "implemented": true,
+      "synonyms": [
+        "screen cleaner",
+        "pickup hazards",
+        "remove screens",
+        "clear hazards",
+        "break screens"
+      ],
+      "examples": [
+        "Remove Reflect and Light Screen from both sides, like Screen Cleaner"
+      ],
+      "summary": "Removes listed field effects such as screens or hazards from a side; the other Pokemon's side needs a trigger with one. Example: Screen Cleaner.",
+      "category": "Weather & terrain"
     }
   ],
   "guards": [
@@ -10331,7 +12654,69 @@
       ],
       "summary": "Locked safety rule: does nothing to a Pokemon protected from indirect damage. Example: Magic Guard ignores the chip damage.",
       "category": "Damage"
+    },
+    {
+      "id": "not-simulated",
+      "label": "Not while the game is only previewing",
+      "why": "A preview must never change the battle; acting during one would roll dice or write memory for nothing.",
+      "requires": [
+        "simulated"
+      ],
+      "formula": {
+        "expr": "!simulated",
+        "source": "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts:1812 (SouthernCrossPunch guards), 1890, 2136, 2176, 2220, 2263; src/data/abilities/ab-attrs.ts:7906 (BypassSpeedChanceAbAttr.canApply)"
+      },
+      "synonyms": [
+        "not a preview",
+        "real battle only",
+        "not simulated",
+        "not while previewing"
+      ],
+      "summary": "Locked safety rule: does nothing while the game only previews the move. Example: no dice roll and no memory while the computer opponent looks ahead.",
+      "category": "Other"
+    },
+    {
+      "id": "another-holder-keeps-weather",
+      "label": "Not while another Pokemon on the field keeps this weather up",
+      "why": "Ending an extreme weather that another Pokemon on the field still holds up would be a bug.",
+      "requires": [
+        "holder"
+      ],
+      "formula": {
+        "expr": "!getField(true).some(p => p !== holder && p.getAbilityAttrs(\"PreLeaveFieldClearWeatherAbAttr\").some(a => a.weatherType === arena.weatherType))",
+        "source": "src/data/abilities/ab-attrs.ts:4203-4210 PreLeaveFieldClearWeatherAbAttr.canApply (the class's own weather equals the current weather once its first clause passed)"
+      },
+      "synonyms": [
+        "delta stream",
+        "primordial sea",
+        "desolate land",
+        "weather keeper",
+        "other holder"
+      ],
+      "summary": "Locked safety rule: keeps the weather while another Pokemon on the field holds it up. Example: Heavy Rain stays while a second Primordial Sea is out.",
+      "category": "Weather & terrain"
+    },
+    {
+      "id": "foe-can-be-trapped",
+      "label": "Not when the foe is a Ghost type or can always run away",
+      "why": "Ghost types and Run Away users can never be trapped; trapping them would be a bug.",
+      "requires": [
+        "other"
+      ],
+      "formula": {
+        "expr": "!other.isOfType(GHOST, true, true) && !other.hasAbilityWithAttr(\"RunSuccessAbAttr\")",
+        "source": "src/data/abilities/ab-attrs.ts:6871-6875 ArenaTrapAbAttr.canApply clauses 2 and 3"
+      },
+      "synonyms": [
+        "ghost escapes",
+        "run away",
+        "cannot be trapped",
+        "trap immunity",
+        "shadow tag"
+      ],
+      "summary": "Locked safety rule: never traps a Ghost type or a Pokemon that can always run. Example: a Ghost foe escapes Arena Trap.",
+      "category": "Switching"
     }
   ],
-  "hash": "0670f4e7070a77"
+  "hash": "1686486219eef3"
 }

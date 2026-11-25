@@ -514,4 +514,123 @@ export const CONDITION_TEXTS: Readonly<Record<string, VocabularyText>> = {
       "A locked safety rule that the ability always keeps, such as not acting once fainted. It cannot be removed.",
     category: "Other",
   },
+
+  // ---- Library completion pass, wave A ------------------------------------------------------
+  "move.type-is-mine": {
+    summary:
+      "Yes when the move's type, after any type change, is one of my types. Example: a Fire move used by a Fire and Flying Pokemon is a yes.",
+    category: "Types & immunities",
+  },
+  "stat.is": {
+    summary:
+      "Yes when the stat the game is working out right now is one you listed. Example: list Speed to change only my Speed.",
+    category: "Stats",
+  },
+  "stat.is-highest": {
+    summary:
+      "Yes when the stat being worked out is my highest of the listed stats, before stages. A tie goes to the first listed. Example: 120 Attack beats 110 Sp. Atk.",
+    category: "Stats",
+  },
+  "mon.tera-type": {
+    summary:
+      "Yes when the chosen Pokemon's Tera type is the one you pick, even before it Terastallizes. Example: Terapagos has the Stellar Tera type.",
+    category: "Types & immunities",
+  },
+  "mon.species": {
+    summary:
+      "Yes when the chosen Pokemon is the species you name, in any form, or is fused with it. Example: only when I am a Terapagos.",
+    category: "Other",
+  },
+  "move.type-counts-as": {
+    summary:
+      "Yes when the move is the type you pick, or one of my abilities makes it count as that type too. Example: a Fire move for Volcano Rage.",
+    category: "Moves",
+  },
+  "status.asleep-or-comatose": {
+    summary:
+      "Yes when the chosen Pokemon is asleep, or has an ability like Comatose that makes it count as asleep. Example: Sweet Dreams heals while asleep.",
+    category: "Status conditions",
+  },
+  "move.accuracy": {
+    summary:
+      "Yes when the move's accuracy passes the comparison. Moves that never miss are always a no. Example: less than 80% is a yes for Focus Blast (70%).",
+    category: "Moves",
+  },
+  "time.hits-taken": {
+    summary:
+      "Yes when the number of direct hits the chosen Pokemon took this battle passes the comparison. Example: at least 1 hit after the first attack lands.",
+    category: "Damage",
+  },
+  "time.last-move-type": {
+    summary:
+      "Yes when the chosen Pokemon's last move was of the type you pick. No when it has not moved yet. Example: Energized after an Electric move.",
+    category: "Moves",
+  },
+  "move.sets-weather": {
+    summary: "Yes when the move sets a weather, like Rain Dance or Sunny Day. Example: Tackle is a no.",
+    category: "Weather & terrain",
+  },
+  "move.spread": {
+    summary:
+      "Yes when the move is aimed at more than one Pokemon, like Earthquake or Surf, even if only one is on the field. Example: Tackle is a no.",
+    category: "Moves",
+  },
+  "move.can-be-multi-strike-enhanced": {
+    summary:
+      "Yes when the move may be given extra strikes, like Parental Bond does. Spread moves, moves that already hit several times and most charge moves are a no.",
+    category: "Moves",
+  },
+  "time.acted-before": {
+    summary:
+      "Yes when the first Pokemon has already moved this turn and moved before the second one. Example: I moved, the foe has not moved yet.",
+    category: "Other",
+  },
+  "foe.average-defense-not-higher": {
+    summary:
+      "Yes when the adjacent foes' average Defense is at most their average Sp. Def. Example: Download raises Attack against 80 Defense and 100 Sp. Def.",
+    category: "Stats",
+  },
+  "field.aura-on-field": {
+    summary:
+      "Yes when any Pokemon on the field has Dark Aura or Fairy Aura, as you pick. Example: Aura Break turns the aura around while Dark Aura is out.",
+    category: "Other",
+  },
+  "move.chosen-is-damaging": {
+    summary:
+      "Yes when the move I picked for this turn is physical or special. Example: Quick Draw only works when I picked an attack.",
+    category: "Moves",
+  },
+  "party.any-ally-active": {
+    summary:
+      "Yes when any of my allies is on the field and can still fight, not only the one next to me. Example: in doubles, my partner is fighting.",
+    category: "Other",
+  },
+  "party.active-ally-chose-damaging-move": {
+    summary: "Yes when my fighting ally chose to use a damaging move this turn. Example: both of us attack this turn.",
+    category: "Moves",
+  },
+  "time.attacked-this-turn": {
+    summary:
+      "Yes when the chosen Pokemon moved this turn and its last move was a damaging move. Example: a status move or a skipped turn is a no.",
+    category: "Moves",
+  },
+  "mon.charge-stacks": {
+    summary:
+      "Yes when the chosen Pokemon's charge stacks pass the comparison. It can hold up to 4. Example: at least 2 stacks for Overloaded.",
+    category: "Other",
+  },
+  "mon.mega-evolved": {
+    summary: "Yes when the chosen Pokemon is Mega Evolved. Example: Bejeweled hits harder against a Mega Evolved foe.",
+    category: "Form changes",
+  },
+  "mon.gigantamax-form": {
+    summary:
+      "Yes when the chosen Pokemon is in a Gigantamax form. Example: Bejeweled hits harder against a Gigantamax foe.",
+    category: "Form changes",
+  },
+  "time.max-uses-per-wave": {
+    summary:
+      "Advanced: yes while the named counter was used fewer times this wave than the limit. Example: Wishmaker can cast 3 times per wave.",
+    category: "Other",
+  },
 };

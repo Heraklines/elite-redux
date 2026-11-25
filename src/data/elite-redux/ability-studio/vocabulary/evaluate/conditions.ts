@@ -11,7 +11,10 @@
 import { getWeatherCondition, hpCrossedBelow, isComatoseLike } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { TrappedTag } from "#data/battler-tags";
-import { allMoves } from "#data/data-lists";
+import { allAbilities, allMoves } from "#data/data-lists";
+import { getCharge } from "#data/elite-redux/abilities/charge-stack";
+import { pokemonActedBefore } from "#data/elite-redux/abilities/relativity";
+import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { DAMAGING_HIT_RESULTS } from "#data/elite-redux/archetypes/chance-status-on-hit";
 import { ConditionalDamageAbAttr } from "#data/elite-redux/archetypes/conditional-damage";
 import { Gender } from "#data/gender";
@@ -24,13 +27,17 @@ import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import { Command } from "#enums/command";
+import { ErAbilityId } from "#enums/er-ability-id";
 import { ErMoveId } from "#enums/er-move-id";
+import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
 import { MoveResult } from "#enums/move-result";
 import { MoveTarget } from "#enums/move-target";
 import { MoveUseMode } from "#enums/move-use-mode";
 import { PokemonType } from "#enums/pokemon-type";
+import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
@@ -97,6 +104,108 @@ export function moveIdOf(name: string): number {
     }
   }
   throw new Error(`"${name}" is not a known move`);
+}
+
+/** abilityNameToEnumKey's spelling: upper case, every run of other characters becomes one underscore. */
+function erAbilityKey(name: string): string {
+  return name
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+/** The " (N)" / " (P)" marker the game adds to the name of an unimplemented or partial ability. */
+const ABILITY_STATUS_MARKER = / \([NP]\)$/;
+
+/**
+ * An ability name from a setting. The vanilla table is asked first and returns at once, exactly as before (so every
+ * name that resolved already resolves to the same id). Otherwise every match is collected: the Elite Redux table
+ * (ErAbilityId) and the registered abilities, by the constant installed on AbilityId at runtime (ids missing from both
+ * tables, such as Electrodynamics 6062) or by the name shown in game (an ability renamed after its key was made, such
+ * as Ninja's Blade, key KUNOICHI_S_BLADE). Each is tried as written, as its player-name constant and in the Elite
+ * Redux key spelling, so "Jungle's Guard" finds JUNGLE_S_GUARD; a typed " (N)" / " (P)" marker is ignored, and a
+ * spelling with no letters or digits is never tried. One match is the answer; a name that matches several abilities
+ * (As One, Embody Aspect, Keen Edge 5009 and its partner composite 5952) is refused instead of picking one.
+ */
+export function abilityIdOf(name: string): AbilityId {
+  try {
+    return enumValue(AbilityId, name, "ability") as AbilityId;
+  } catch (error) {
+    if (/^\s*\d+\s*$/.test(name)) {
+      throw error;
+    }
+    const typed = name.trim().replace(ABILITY_STATUS_MARKER, "");
+    const candidates = [typed, constantName(typed), erAbilityKey(typed)].filter(candidate =>
+      /[A-Za-z0-9]/.test(candidate),
+    );
+    if (candidates.length === 0) {
+      throw error;
+    }
+    const ids = abilityIdsSpelled(candidates);
+    if (ids.size > 1) {
+      throw new Error(`"${name}" names ${ids.size} different abilities (${[...ids].join(", ")}); type the exact one`);
+    }
+    const [only] = ids;
+    if (only !== undefined) {
+      return only as AbilityId;
+    }
+    throw error;
+  }
+}
+
+/** Every ability id one of the spellings names: an ErAbilityId key, a runtime AbilityId constant or an in-game name. */
+function abilityIdsSpelled(candidates: readonly string[]): Set<number> {
+  const ids = new Set<number>();
+  const erTable = ErAbilityId as unknown as Record<string, unknown>;
+  for (const candidate of candidates) {
+    const value = Object.hasOwn(erTable, candidate) ? erTable[candidate] : undefined;
+    if (typeof value === "number") {
+      ids.add(value);
+    }
+  }
+  const reverse = AbilityId as unknown as Record<number, string | undefined>;
+  for (const ability of allAbilities) {
+    if (
+      ability !== undefined
+      && (candidates.includes(reverse[ability.id] ?? "")
+        || candidates.includes(erAbilityKey(ability.name.replace(ABILITY_STATUS_MARKER, ""))))
+    ) {
+      ids.add(ability.id);
+    }
+  }
+  return ids;
+}
+
+/**
+ * Re-entrancy latch for an atom whose engine read can dispatch abilities again (getEffectiveStat runs the stat
+ * multipliers, getMoveType runs the type changers). While the holder is inside the read, the same atom asked again for
+ * that holder answers no, so a rule on a stat or move-type trigger cannot call itself without end. The outer answer
+ * is the one the engine read gives.
+ */
+function latched(latch: WeakSet<Pokemon>, holder: Pokemon, read: () => boolean): boolean {
+  if (latch.has(holder)) {
+    return false;
+  }
+  latch.add(holder);
+  try {
+    return read();
+  } finally {
+    latch.delete(holder);
+  }
+}
+
+const TYPE_IS_MINE_LATCH = new WeakSet<Pokemon>();
+const AVERAGE_DEFENSE_LATCH = new WeakSet<Pokemon>();
+
+/** The first stat listed wins a tie: a strict `>` scan over the raw stats, as the classes write it. */
+function highestStat(pokemon: Pokemon, stats: readonly number[]): number | undefined {
+  let highest = stats[0];
+  for (const stat of stats.slice(1)) {
+    if (pokemon.getStat(stat as never, false) > pokemon.getStat(highest as never, false)) {
+      highest = stat;
+    }
+  }
+  return highest;
 }
 
 const STAT_BY_NAME = Stat as unknown as Record<string, number>;
@@ -510,7 +619,10 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
   "side.is-player": p => frame => holderLikeOf(frame, String(p.who))?.isPlayer() ?? false,
   "party.ally-exists": () => frame => frame.holder.getAlly() !== undefined,
   "party.ally-ability": p => {
-    const ability = enumValue(AbilityId, String(p.ability), "ability") as AbilityId;
+    const ability = abilityIdOf(String(p.ability));
+    if (p.current === true) {
+      return frame => frame.holder.getAlly()?.getAbility().id === ability;
+    }
     return frame => frame.holder.getAlly()?.hasAbility(ability) ?? false;
   },
   "party.count": p => frame =>
@@ -523,6 +635,9 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
   // Type and ability
   "mon.has-type": p => {
     const type = enumValue(PokemonType, String(p.type), "type") as PokemonType;
+    if (p.originalIfStellar === true) {
+      return frame => holderLikeOf(frame, String(p.who))?.isOfType(type, true, true) ?? false;
+    }
     return frame => holderLikeOf(frame, String(p.who))?.isOfType(type) ?? false;
   },
   "mon.opposite-gender": () => frame => {
@@ -536,7 +651,10 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
   },
   "mon.grounded": p => frame => holderLikeOf(frame, String(p.who))?.isGrounded() ?? false,
   "mon.has-ability": p => {
-    const ability = enumValue(AbilityId, String(p.ability), "ability") as AbilityId;
+    const ability = abilityIdOf(String(p.ability));
+    if (p.current === true) {
+      return frame => holderLikeOf(frame, String(p.who))?.getAbility().id === ability;
+    }
     return frame => holderLikeOf(frame, String(p.who))?.hasAbility(ability) ?? false;
   },
   "mon.protected-from-effects": p => frame =>
@@ -732,6 +850,178 @@ const FACTORIES: Readonly<Record<string, Factory>> = {
         scope === "battle" ? target?.battleData : scope === "switch-in" ? target?.summonData : target?.turnData;
       const markers = data?.erAbilityProvenance ?? [];
       return prefix ? markers.some(marker => marker.startsWith(key)) : markers.includes(key);
+    };
+  },
+
+  // ---- Library completion pass, wave A ------------------------------------------------------------
+  // getMoveType runs the holder's type-changing abilities, which on calc.move-type is this very rule: latched.
+  "move.type-is-mine": p => frame => {
+    const move = frame.move;
+    if (move === undefined) {
+      return false;
+    }
+    return latched(TYPE_IS_MINE_LATCH, frame.holder, () => {
+      const moveType = frame.holder.getMoveType(move);
+      return frame.holder.getTypes(p.includeTera === true, false).includes(moveType);
+    });
+  },
+  "stat.is": p => {
+    const stats = enumList(Stat, String(p.stats), "stat") as number[];
+    return frame => frame.stat !== undefined && stats.includes(frame.stat);
+  },
+  "stat.is-highest": p => {
+    const stats = enumList(Stat, String(p.stats), "stat") as number[];
+    if (stats.length === 0) {
+      throw new Error("name at least one stat to compare");
+    }
+    return frame => frame.stat !== undefined && frame.stat === highestStat(frame.holder, stats);
+  },
+  "mon.tera-type": p => {
+    const type = enumValue(PokemonType, String(p.type), "type") as PokemonType;
+    return frame => holderLikeOf(frame, String(p.who))?.getTeraType() === type;
+  },
+  "mon.species": p => {
+    const species = enumValue(SpeciesId, String(p.species), "Pokemon species") as SpeciesId;
+    return frame => holderLikeOf(frame, String(p.who))?.hasSpecies(species) ?? false;
+  },
+  "move.type-counts-as": p => {
+    const type = enumValue(PokemonType, String(p.type), "type") as PokemonType;
+    return frame => {
+      const move = frame.move;
+      if (move === undefined) {
+        return false;
+      }
+      // The whole set first, then the lookup, as the class builds it (every active ability attr is asked).
+      const triggeredTypes = new Set<PokemonType>([move.type]);
+      for (const attr of frame.holder.getAllActiveAbilityAttrs()) {
+        if ("getTriggeredMoveTypes" in attr && typeof attr.getTriggeredMoveTypes === "function") {
+          for (const triggered of attr.getTriggeredMoveTypes(move)) {
+            triggeredTypes.add(triggered);
+          }
+        }
+      }
+      return triggeredTypes.has(type);
+    };
+  },
+  "status.asleep-or-comatose": p => frame => {
+    const target = holderLikeOf(frame, String(p.who));
+    return target !== undefined && (target.status?.effect === StatusEffect.SLEEP || isComatoseLike(target));
+  },
+  "move.accuracy": p => frame =>
+    frame.move !== undefined
+    && frame.move.accuracy >= 0
+    && compare(frame.move.accuracy, p.cmp as CompareOp, Number(p.n)),
+  "time.hits-taken": p => frame => {
+    const target = holderLikeOf(frame, String(p.who));
+    return target !== undefined && compare(target.battleData.hitCount, p.cmp as CompareOp, Number(p.n));
+  },
+  "time.last-move-type": p => {
+    const type = enumValue(PokemonType, String(p.type), "type") as PokemonType;
+    return frame => {
+      const last = holderLikeOf(frame, String(p.who))?.getLastXMoves(1)[0];
+      return last !== undefined && allMoves[last.move]?.type === type;
+    };
+  },
+  "move.sets-weather": () => frame => frame.move?.hasAttr("WeatherChangeAttr") ?? false,
+  "move.spread": () => frame => frame.move?.isMultiTarget() ?? false,
+  // The source asks for the attacker (`pokemon` of AddSecondStrikeAbAttr, the move user of calc.hit-count) and its
+  // opponent; read from the move user's side so a defender-side trigger answers for the attacker, not the holder.
+  "move.can-be-multi-strike-enhanced": () => frame => {
+    if (frame.move === undefined || frame.moveUser === undefined) {
+      return false;
+    }
+    const target = frame.moveUser === frame.holder ? frame.other : frame.holder;
+    return frame.move.canBeMultiStrikeEnhanced(frame.moveUser, true, target ?? null);
+  },
+  "time.acted-before": p => frame => {
+    const first = holderLikeOf(frame, String(p.first));
+    const second = holderLikeOf(frame, String(p.second));
+    return first !== undefined && second !== undefined && pokemonActedBefore(first, second);
+  },
+  // getEffectiveStat runs the stat abilities of the foes and of the field, which on a stat trigger can be this very
+  // rule (or the same rule on the foe, which reads my stats back): latched per holder.
+  "foe.average-defense-not-higher": () => frame =>
+    latched(AVERAGE_DEFENSE_LATCH, frame.holder, () => {
+      let def = 0;
+      let spDef = 0;
+      let count = 0;
+      for (const opponent of frame.holder.getAdjacentOpponents()) {
+        if (!opponent) {
+          continue;
+        }
+        count++;
+        def += opponent.getEffectiveStat(Stat.DEF);
+        spDef += opponent.getEffectiveStat(Stat.SPDEF);
+      }
+      if (count === 0) {
+        return false;
+      }
+      def = Math.round(def / count);
+      spDef = Math.round(spDef / count);
+      return def > 0 && spDef > 0 && def <= spDef;
+    }),
+  "field.aura-on-field": p => {
+    const aura = String(p.aura);
+    const dark = aura !== "fairy";
+    const fairy = aura !== "dark";
+    return () =>
+      globalScene
+        .getField(true)
+        .some(
+          pokemon =>
+            (dark && abilityQuery(pokemon, ENGINE_QUERY.DARK_AURA_FIELD))
+            || (fairy && abilityQuery(pokemon, ENGINE_QUERY.FAIRY_AURA_FIELD)),
+        );
+  },
+  "move.chosen-is-damaging": () => frame => {
+    const turnCommand = globalScene.currentBattle.turnCommands[frame.holder.getBattlerIndex()];
+    const move = turnCommand?.move?.move ? allMoves[turnCommand.move.move] : null;
+    return move?.category === MoveCategory.PHYSICAL || move?.category === MoveCategory.SPECIAL;
+  },
+  "party.any-ally-active": () => frame => frame.holder.getAllies().find(ally => ally?.isActive(true)) !== undefined,
+  "party.active-ally-chose-damaging-move": () => frame => {
+    const ally = frame.holder.getAllies().find(member => member?.isActive(true));
+    if (ally === undefined) {
+      return false;
+    }
+    const cmd = globalScene.currentBattle?.turnCommands?.[ally.getBattlerIndex()];
+    if (!cmd || cmd.command !== Command.FIGHT || cmd.move?.move === undefined) {
+      return false;
+    }
+    const category = allMoves[cmd.move.move]?.category;
+    return category !== undefined && category !== MoveCategory.STATUS;
+  },
+  "time.attacked-this-turn": p => frame => {
+    const target = holderLikeOf(frame, String(p.who));
+    if (target === undefined || !target.turnData.acted) {
+      return false;
+    }
+    const last = target.getLastXMoves(1)[0];
+    return last !== undefined && last.move !== MoveId.NONE && allMoves[last.move]?.category !== MoveCategory.STATUS;
+  },
+  "mon.charge-stacks": p => frame => {
+    const target = holderLikeOf(frame, String(p.who));
+    return target !== undefined && compare(getCharge(target), p.cmp as CompareOp, Number(p.n));
+  },
+  "mon.mega-evolved": p => frame => {
+    const target = holderLikeOf(frame, String(p.who));
+    return !!target && target.isMega();
+  },
+  "mon.gigantamax-form": p => frame => {
+    const target = holderLikeOf(frame, String(p.who));
+    return !!target && /gmax|gigantamax/i.test(target.getFormKey());
+  },
+  "time.max-uses-per-wave": p => {
+    const prefix = `${String(p.key)}#`;
+    const max = Number(p.max);
+    return frame => {
+      let used = 0;
+      for (const k of frame.holder.waveData.entryEffectsFired) {
+        if (k.startsWith(prefix)) {
+          used++;
+        }
+      }
+      return used < max;
     };
   },
 

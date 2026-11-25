@@ -2254,7 +2254,7 @@ function patchWeatherSummoner(ability: MutableAbility, weather: WeatherType, tur
  * from Mystical Rock. Re-apply the extender on top of ER's base so the bonus is preserved
  * (mirrors arena.trySetWeather's own FieldEffectModifier hook). No-op without the item.
  */
-function erFieldTurnsWithItems(pokemon: Pokemon, baseTurns: number): number {
+export function erFieldTurnsWithItems(pokemon: Pokemon, baseTurns: number): number {
   const dur = new NumberHolder(baseTurns);
   globalScene.applyModifier(FieldEffectModifier, pokemon.isPlayer(), pokemon, dur);
   return dur.value;

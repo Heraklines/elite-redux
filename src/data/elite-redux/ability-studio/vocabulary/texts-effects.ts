@@ -58,7 +58,7 @@ export const EFFECT_TEXTS: Readonly<Record<string, VocabularyText>> = {
   },
   "effect.hurt-percent-of-max-hp": {
     summary:
-      "Takes a share of the target's max HP away. Example: 12.5 on the attacker is an eighth of its max HP, like Rough Skin.",
+      "Takes a share of max HP from every foe, or everyone else, except spared types. Example: 0.125 takes an eighth from each foe that is not Poison type.",
     category: "Damage",
   },
   "effect.multiply-ally-damage-taken": {
@@ -82,7 +82,7 @@ export const EFFECT_TEXTS: Readonly<Record<string, VocabularyText>> = {
     category: "Damage",
   },
   "effect.hit-n-times": {
-    summary: "Makes the move hit a set number of times. Example: 3 makes it strike three times.",
+    summary: "Adds extra hits to the move. Example: 1 makes a one-hit move strike twice, like Parental Bond.",
     category: "Damage",
   },
   "effect.hit-random-times": {
@@ -253,7 +253,7 @@ export const EFFECT_TEXTS: Readonly<Record<string, VocabularyText>> = {
   },
   "effect.change-own-type": {
     summary:
-      "Changes this Pokemon's type to the one you pick. Example: become Fire type after a Fire move hits, like Color Change.",
+      "Changes a Pokemon's type to one type or the move's type; the other Pokemon needs a trigger with one. Example: become Fire type after a Fire move hits me.",
     category: "Types & immunities",
   },
   "effect.add-type": {
@@ -317,7 +317,7 @@ export const EFFECT_TEXTS: Readonly<Record<string, VocabularyText>> = {
   },
   "effect.clear-weather": {
     summary:
-      "Ends the current weather, but extreme weather like Heavy Rain stays. Example: Cloud-clearing entry effects.",
+      "Ends the current weather. By default extreme weather like Heavy Rain stays; turn that off to end it too. Example: Cloud Nine on entry.",
     category: "Weather & terrain",
   },
   "effect.set-terrain": {
@@ -375,7 +375,8 @@ export const EFFECT_TEXTS: Readonly<Record<string, VocabularyText>> = {
     category: "Items",
   },
   "effect.steal-item": {
-    summary: "Takes the chosen Pokemon's held item for myself. Example: steal a berry from a foe.",
+    summary:
+      "Takes a random held item for myself from the other Pokemon (needs a trigger with one), or from any foe. Example: steal a berry from the foe I hit.",
     category: "Items",
   },
   "effect.use-item": {
@@ -414,7 +415,8 @@ export const EFFECT_TEXTS: Readonly<Record<string, VocabularyText>> = {
     category: "Other",
   },
   "effect.message": {
-    summary: "Shows a line of text in the battle log. Example: Pokemon enters with a custom message.",
+    summary:
+      "Shows a line of text in the battle log, or a built-in announcement with my name. Example: Pressure's entry message.",
     category: "Other",
   },
   "effect.arm-effect": {
@@ -425,6 +427,120 @@ export const EFFECT_TEXTS: Readonly<Record<string, VocabularyText>> = {
     summary:
       "A one-off mechanic that works as one piece and cannot be taken apart. It keeps its own settings and can be reused whole.",
     category: "Other",
+  },
+
+  // ---- Library completion pass (wave C) ------------------------------------------------------
+  "effect.add-stat-share": {
+    summary:
+      "Adds a share of one of my stats to the stat being calculated, or uses it instead. Example: 0.2 of my 100 Speed adds 20 to my Attack.",
+    category: "Stats",
+  },
+  "effect.multiply-stat-per-fainted-ally": {
+    summary:
+      "Raises the stat for every fainted teammate, not counting me. Example: 0.05 with 2 fainted teammates gives 10% more.",
+    category: "Stats",
+  },
+  "effect.set-accuracy": {
+    summary:
+      "Raises a move's accuracy to the number you set, never lowering it. Example: 90 turns Hypnosis from 60% into 90%.",
+    category: "Moves",
+  },
+  "effect.ignore-secondary-effects": {
+    summary:
+      "Sets the chance of a move's extra effect to zero. Example: Flamethrower aimed at me can never burn, like Shield Dust.",
+    category: "Moves",
+  },
+  "effect.multiply-power-per-count": {
+    summary:
+      "Raises the move's power for each counted thing, up to a limit. Example: 5% per healthy benched teammate, 3 waiting gives 15% more.",
+    category: "Damage",
+  },
+  "effect.multiply-accuracy-per-count": {
+    summary:
+      "Raises the move's accuracy for each counted thing, up to a limit. Example: 5% per healthy benched teammate.",
+    category: "Moves",
+  },
+  "effect.use-weaker-defense": {
+    summary:
+      "Makes my attack use the lower of the foe's Defense and Sp. Def. Example: a crit on a foe with 100 Def and 60 Sp. Def uses 60.",
+    category: "Stats",
+  },
+  "effect.trap-foe": {
+    summary:
+      "Keeps the foe from fleeing or switching out. Ghost types and Run Away users always escape. Example: Arena Trap.",
+    category: "Switching",
+  },
+  "effect.jump-turn-order": {
+    summary:
+      "Lets me act before others that picked moves of the same priority this turn. Example: Quick Draw going first.",
+    category: "Moves",
+  },
+  "effect.reflect-stat-drop": {
+    summary:
+      "Blocks a stat drop and gives it to the Pokemon that caused it. Example: an Intimidate aimed at me lowers the user's Attack, like Mirror Armor.",
+    category: "Stats",
+  },
+  "effect.scripted-move-at": {
+    summary:
+      "Uses a free move at a foe, every foe, me or its normal targets; aims at the other Pokemon need a trigger with one. Example: Spikes when I enter.",
+    category: "Moves",
+  },
+  "effect.cancel-recharge": {
+    summary:
+      "Ends my recharge turn so I can act next turn. Example: after Hyper Beam knocks out a foe, no recharge turn, like Rampage.",
+    category: "Moves",
+  },
+  "effect.remove-type": {
+    summary:
+      "Takes one type from a Pokemon and keeps its others; the other Pokemon needs a trigger with one. Example: a Water and Ghost foe I hit becomes only Water.",
+    category: "Types & immunities",
+  },
+  "effect.stat-stage-on-highest": {
+    summary:
+      "Changes whichever listed stat is highest; the other Pokemon needs a trigger with one. Example: Attack 120 and Sp. Atk 90 means Attack goes up by 1.",
+    category: "Stats",
+  },
+  "effect.drain-adjacent-foes": {
+    summary:
+      "Takes a share of max HP from each adjacent foe and heals me by what they lost. Example: 0.125 takes an eighth every turn.",
+    category: "Healing",
+  },
+  "effect.force-other-out": {
+    summary:
+      "Makes the other Pokemon switch out for a party member. Example: the attacker is dragged out after hitting me.",
+    category: "Switching",
+  },
+  "effect.set-marker": {
+    summary:
+      "Puts a named reminder on me for the battle, this switch-in or this turn, so a condition can check it. Example: remember a trap was used.",
+    category: "Other",
+  },
+  "effect.clear-marker": {
+    summary: "Removes a named reminder from me. Example: forget a stored charge when I enter again.",
+    category: "Other",
+  },
+  "effect.change-charge-stacks": {
+    summary:
+      "Adds or spends my stored electric charges, at most 4 at a time. Example: add 1 when an Electric move hits me.",
+    category: "Other",
+  },
+  "effect.drain-pp": {
+    summary: "Takes PP from one of the other Pokemon's moves. Example: the move that hit me loses 4 PP, like Spiteful.",
+    category: "Moves",
+  },
+  "effect.match-weather-form": {
+    summary: "Changes me into the form that matches the weather. Example: Castform turns into its Rainy form in rain.",
+    category: "Form changes",
+  },
+  "effect.give-ability": {
+    summary:
+      "Replaces the other Pokemon's ability with the one you name. Example: an attacker that touches me gets Mummy.",
+    category: "Other",
+  },
+  "effect.remove-arena-tags": {
+    summary:
+      "Removes listed field effects such as screens or hazards from a side; the other Pokemon's side needs a trigger with one. Example: Screen Cleaner.",
+    category: "Weather & terrain",
   },
 };
 
@@ -518,5 +634,21 @@ export const GUARD_TEXTS: Readonly<Record<string, VocabularyText>> = {
     summary:
       "Locked safety rule: does nothing to a Pokemon protected from indirect damage. Example: Magic Guard ignores the chip damage.",
     category: "Damage",
+  },
+  // ---- Library completion pass (wave B) -----------------------------------------------------
+  "not-simulated": {
+    summary:
+      "Locked safety rule: does nothing while the game only previews the move. Example: no dice roll and no memory while the computer opponent looks ahead.",
+    category: "Other",
+  },
+  "another-holder-keeps-weather": {
+    summary:
+      "Locked safety rule: keeps the weather while another Pokemon on the field holds it up. Example: Heavy Rain stays while a second Primordial Sea is out.",
+    category: "Weather & terrain",
+  },
+  "foe-can-be-trapped": {
+    summary:
+      "Locked safety rule: never traps a Ghost type or a Pokemon that can always run. Example: a Ghost foe escapes Arena Trap.",
+    category: "Switching",
   },
 };

@@ -9,13 +9,16 @@
 // PostDamageForceSwitchAbAttr.canApply (ab-attrs.ts), in the original order and with the original
 // nesting: guards 2 to 4 only apply when the source has a last move on record.
 
+import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import { abilityQuery, ENGINE_QUERY } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { AbilityId } from "#enums/ability-id";
 import { HitResult } from "#enums/hit-result";
 import { MoveId } from "#enums/move-id";
 import { MoveResult } from "#enums/move-result";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
+import type { WeatherType } from "#enums/weather-type";
 import type { Frame } from "./frame";
 
 export type GuardPredicate = (frame: Frame) => boolean;
@@ -98,6 +101,26 @@ export const GUARD_EVALUATORS: Readonly<Record<string, GuardPredicate>> = {
     return !!lastAttack && lastAttack.sourceId === frame.holder.id;
   },
   "not-protected-from-indirect-damage": frame => !frame.holder.hasAbilityWithAttr("BlockNonDirectDamageAbAttr"),
+  // ---- Library completion pass (wave B) -----------------------------------------------------
+  "not-simulated": frame => !frame.simulated,
+  // PreLeaveFieldClearWeatherAbAttr.canApply: its first clause makes the class's weather the current weather.
+  "another-holder-keeps-weather": frame => {
+    const weather = globalScene.arena.weatherType;
+    return !globalScene.getField(true).some(
+      p =>
+        p !== frame.holder
+        && p.getAbilityAttrs("PreLeaveFieldClearWeatherAbAttr").some(attr => {
+          // `weatherType` is private on the class; the original canApply reads it from other holders the same way.
+          const kept = attr as unknown as { readonly weatherType: WeatherType };
+          return kept.weatherType === weather;
+        }),
+    );
+  },
+  // ArenaTrapAbAttr.canApply clauses 2 and 3.
+  "foe-can-be-trapped": frame =>
+    frame.other !== undefined
+    && !frame.other.isOfType(PokemonType.GHOST, true, true)
+    && !frame.other.hasAbilityWithAttr("RunSuccessAbAttr"),
 };
 
 export function evaluateGuard(name: string, frame: Frame): boolean {

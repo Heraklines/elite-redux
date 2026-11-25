@@ -125,6 +125,7 @@ describe("L3 metamorphic properties", () => {
     });
   });
 
+  // Every pure atom over the whole state grid: about 22 s after the library completion (more atoms), over the 20 s default.
   it("AND with an always-true condition and OR with an always-false condition equal the original, for every pure atom", () => {
     const atoms = usableAtoms();
     const problems: string[] = [];
@@ -157,7 +158,7 @@ describe("L3 metamorphic properties", () => {
     console.log(`DECOMP_L3 metamorphic atoms=${atoms.length} skipped=${skipped.size} evaluations=${evaluations}`);
     expect(problems.slice(0, 10)).toEqual([]);
     expect(atoms.length - skipped.size).toBeGreaterThan(30);
-  });
+  }, 120_000);
 
   it("adding an IF never increases the number of states in which a rule fires", () => {
     const atoms = usableAtoms();

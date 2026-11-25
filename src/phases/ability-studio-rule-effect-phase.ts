@@ -15,7 +15,7 @@ import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import { toDmgValue } from "#utils/common";
 
-function resolveTargets(target: AbilityStudioTarget, context: AbilityStudioRuleContext): Pokemon[] {
+export function resolveTargets(target: AbilityStudioTarget, context: AbilityStudioRuleContext): Pokemon[] {
   switch (target) {
     case "holder":
       return [context.holder];
