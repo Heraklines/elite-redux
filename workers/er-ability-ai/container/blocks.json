@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "vocabularyHash": "0afdc52c3a464e",
-  "hash": "0ad375f0258db2",
+  "hash": "18154e7745e065",
   "blocks": [
     {
       "id": "block.absorbant",
@@ -48,6 +48,71 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.activate-once-per-battle-entry-window",
+      "className": "ActivateOncePerBattleEntryWindowAbAttr",
+      "label": "Start a shield timer the first time I enter (like Forewarn)",
+      "summary": "The first time I enter in a wave, I start a timer called \"entry-window\". It lasts until I leave the field and cannot restart in the same wave. Shields with the same timer name use it.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "start a timer when I enter",
+        "first entry only",
+        "once per wave on entry",
+        "first switch-in timer",
+        "temporary shield timer",
+        "forewarn"
+      ],
+      "examples": [
+        "The first time I enter, start a shield timer that lasts until I leave, like Forewarn"
+      ],
+      "params": [
+        {
+          "id": "key",
+          "label": "Name of the timer (any short text; the shield that uses this timer must use the same name)",
+          "control": "text",
+          "default": "entry-window",
+          "editable": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "time.once-per",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens when the game only previews the move",
+        "The window closes when I leave the field and cannot reopen in the same wave"
+      ],
+      "gateParams": [
+        {
+          "param": "key",
+          "block": "time.once-per",
+          "field": "key"
+        }
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "key"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "legacy-closure-pending-request. Package for the effect only: opening a NAMED window (an entry-local flag in `tempSummonData.abilityEntryWindows` that resets on switch, plus the per-wave 'already opened' memory) has no library effect (R-B12-15) and the window has no reading atom (R-B12-16: `time.in-entry-window{key}`). 1 attr: Forewarn (108 attr 1, key 'upgrade:forewarn:two-turn-soothsayer', the shipped upgrade that gives Forewarn a two-turn Soothsayer; attr 0 is EntryEffectAbAttr, attr 2 TimeLimitedEffectivenessFloorAbAttr). The gate is `canApply` moved into `gate` (Tier B split, pure move of code). Its natural library form is time.once-per { wave, key }, which reads and writes the same Set (`waveData.entryEffectsFired`), BUT the carrier writes the key right BEFORE this class's `apply` runs, and `apply` returns early when the key is already present, so the window would never open (a test in B12/chunk2.test.ts proves it). So the user's gate stays a legacy-closure until the library offers either the window effect (R-B12-15) or a once-per whose write waits until after the effect. Oddities, not fixed: (a) the name says 'once per battle' but the memory is `waveData`, which is reset every wave, so the window opens once per WAVE; (b) `apply` re-tests the key although the dispatcher already ran `canApply`, which is harmless but is what makes the library atom unusable; (c) a simulated call neither opens the window nor remembers the key.",
+      "uses": 1
     },
     {
       "id": "block.add-type-to-attacker-on-contact",
@@ -10882,6 +10947,53 @@
       "uses": 6
     },
     {
+      "id": "block.faint-count-trigger",
+      "className": "FaintCountTriggerAbAttr",
+      "label": "Count every other Pokemon that faints while I am out",
+      "summary": "Each time a Pokemon other than me faints while I am on the field, my faint count for this battle goes up by 1. The count resets in the next battle.",
+      "tier": "B",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-ko",
+      "whenLabel": "When I knock out a Pokemon",
+      "synonyms": [
+        "faint counter",
+        "count faints",
+        "soul harvest",
+        "tally knock outs",
+        "dead pokemon counter",
+        "snowball counter"
+      ],
+      "examples": [
+        "Add one to my faint count whenever any other Pokemon faints, like Soul Harvest"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "side.is",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Nothing is counted when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package (effect only), justified: the library has no counter memory, only yes/no memory (time.once-per, time.nth-use), and the count is read by PerFaintStatMultiplierAbAttr from the same private field of the holder's battle data, so the pair works together. The trigger and the one condition are separate blocks. Tier B: the gate is the single clause `victim.id !== pokemon.id`, expressed as not(side.is self) (the id comparison and the object comparison agree because every Pokemon has a unique id). 1 attr: Soul Harvest (5589 attr 0). Oddities, not fixed: (a) PostKnockOutAbAttr reaches the holder for every faint on the field, so an ally's faint and a foe's faint both count, as the Soul Harvest text says; (b) the count is stored under the Soul Harvest name in the shared battle data, so a second ability using this class would share one counter; (c) apply writes the counter and does not draw a random number.",
+      "uses": 1
+    },
+    {
       "id": "block.field-crit-boost",
       "className": "FieldCritBoostAbAttr",
       "label": "Raise the critical hit stage of every battler on the field",
@@ -13653,6 +13765,46 @@
       "uses": 15
     },
     {
+      "id": "block.intimidate-immunity-ab-attr-er",
+      "className": "IntimidateImmunityAbAttrEr",
+      "label": "Stay unaffected by Intimidate and Scare",
+      "summary": "While the game checks whether a foe's Intimidate lands on me, it does not. Example: a foe enters with Intimidate and my Attack stays the same.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.intimidate",
+      "whenLabel": "While the game checks if Intimidate lands on me",
+      "synonyms": [
+        "immune to intimidate",
+        "ignore intimidate",
+        "no attack drop on entry",
+        "inner focus",
+        "oblivious",
+        "discipline",
+        "overwhelm"
+      ],
+      "examples": [
+        "Intimidate and Scare no longer lower my stats, like Overwhelm",
+        "Immune to Intimidate like Inner Focus"
+      ],
+      "params": [],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Nothing else has already blocked the same Intimidate"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": false,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
       "id": "block.lifesteal-on-hit",
       "className": "LifestealOnHitAbAttr",
       "label": "Heal a share of the damage my attacks deal",
@@ -14857,6 +15009,107 @@
         "do": true
       },
       "uses": 26
+    },
+    {
+      "id": "block.offensive-type-multiplier",
+      "className": "OffensiveTypeMultiplierAbAttr",
+      "label": "Make my moves stronger against one type of Pokemon",
+      "summary": "My moves get 1.5 times their power against Dragon-type Pokemon. Example: 1.5 against Dragon types, like Dragonslayer.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "bonus against a type",
+        "hit one type harder",
+        "type hunter",
+        "slayer",
+        "stronger against dragons",
+        "dragonslayer",
+        "fae hunter",
+        "firefighter",
+        "lumberjack",
+        "monster hunter",
+        "king of the jungle"
+      ],
+      "examples": [
+        "My moves get 1.5 times their power against Dragon types, like Dragonslayer",
+        "My moves get 1.5 times their power against Fire types, like Firefighter"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "The foe's type that my moves hit harder",
+          "control": "select",
+          "default": "DRAGON",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.5 = 50% stronger)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "mon.has-type",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Moves that deal fixed damage are not changed by a power boost"
+      ],
+      "gateParams": [
+        {
+          "param": "type",
+          "block": "mon.has-type",
+          "field": "type"
+        }
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 6
     },
     {
       "id": "block.on-crit-stat-boost-lowest",
@@ -16936,6 +17189,76 @@
         "do": true
       },
       "uses": 17
+    },
+    {
+      "id": "block.per-faint-stat-multiplier",
+      "className": "PerFaintStatMultiplierAbAttr",
+      "label": "Grow a stat with every faint (like Soul Harvest)",
+      "summary": "My Attack goes up by 5% for every Pokemon that fainted while I was out. Example: 5% and 3 faints makes it x1.15.",
+      "tier": "A",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "soul harvest",
+        "snowball",
+        "faint boost",
+        "stat grows per faint",
+        "stronger for each knock out",
+        "faint counter boost"
+      ],
+      "examples": [
+        "Attack, Sp. Atk and Sp. Def each go up 5% for every Pokemon that fainted, like Soul Harvest"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat grows",
+          "control": "select",
+          "default": "ATK",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ]
+        },
+        {
+          "id": "perFaint",
+          "label": "Boost for each fainted Pokemon (% of the stat, 5 = 5%)",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 0.5,
+          "max": 100,
+          "step": 0.5
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Only the chosen stat is changed",
+        "Nothing changes until at least one Pokemon has fainted (the count starts at 0)"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "stat",
+          "perFaint"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package, justified: the multiplier is 1 + perFaint x the faint count, and the count is the private counter that FaintCountTriggerAbAttr keeps in the holder's battle data. The library has no counter to read and its multiply-stat effect is a fixed number, so the formula cannot be split further until R-B12-02 and R-B12-03 exist. Tier A: nothing to bind (the parent gets no closure). 3 attrs, all in Soul Harvest (5589): attr 1 Attack, attr 2 Sp. Atk, attr 3 Sp. Def, each 0.05 (5%). The percent shown to staff is perFaint x 100; the class keeps the fraction. Oddities, not fixed: (a) the parent `multiplier` stays 1, so code that reads it (the studio's reflection) sees 1, not the formula; (b) the multiplier is applied on every stat query, including previews and the AI; (c) the count is not capped, so a long battle can grow a stat without limit.",
+      "uses": 3
     },
     {
       "id": "block.persistent-field-aura",
@@ -28803,6 +29126,501 @@
       "uses": 2
     },
     {
+      "id": "block.stat-trigger-on-ally-stat-lowered",
+      "className": "StatTriggerOnAllyStatLoweredAbAttr",
+      "label": "Change my stats when someone lowers my ally's stats",
+      "summary": "When a foe (not my ally's own move) lowers my ally's stats, my stats change once for each stat lowered: Attack +1, Defense +1. Example: two stats lowered doubles it.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.ally-stat-changed",
+      "whenLabel": "When my ally's stat changes",
+      "synonyms": [
+        "king's wrath",
+        "queen's mourning",
+        "knight's honor",
+        "partner stat drop reaction",
+        "ally was lowered",
+        "avenge my partner",
+        "boost when my ally is weakened"
+      ],
+      "examples": [
+        "Raise my Attack and Defense by one stage for each stat a foe lowers on my ally, like King's Wrath",
+        "Raise my Sp. Atk and Sp. Def by one stage when my ally's stats are lowered, like Queen's Mourning"
+      ],
+      "params": [
+        {
+          "id": "stats",
+          "label": "Stat changes, like 'Attack +1, Defense +1' (stages -6 to 6; the game stops at 6, so 12 acts like 6)",
+          "control": "text",
+          "default": "Attack +1, Defense +1",
+          "editable": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "stage.just-changed",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only a drop caused by someone else counts, never one from my ally's own move (this rule stays in the ability for now)",
+        "I need an ally on the field: the game only tells an ally about the change",
+        "A stat that is already at its limit does not move further",
+        "Nothing happens when the game only previews the change"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stats"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 6
+    },
+    {
+      "id": "block.stat-trigger-on-entry",
+      "className": "StatTriggerOnEntryAbAttr",
+      "label": "Change my stats when I enter the battle",
+      "summary": "As soon as I enter the battle, my stats change: Sp. Def +1. Example: Sp. Def +1, like Headstrong. It also works when the ability is gained mid-battle.",
+      "tier": "A",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "headstrong",
+        "embody aspect",
+        "petal shield",
+        "switch in boost",
+        "start with a boost",
+        "entry boost",
+        "self buff on entry"
+      ],
+      "examples": [
+        "Raise Sp. Def by one stage when I enter the battle, like Headstrong",
+        "Raise Defense by 12 stages (the most the game allows is 6) when I enter, like Petal Shield"
+      ],
+      "params": [
+        {
+          "id": "stats",
+          "label": "Stat changes, like 'Sp. Def +1, Speed +1' (stages -6 to 6; the game stops at 6, so 12 acts like 6)",
+          "control": "text",
+          "default": "Sp. Def +1",
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A stat that is already at its limit does not move further",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stats"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.stat-trigger-on-hit",
+      "className": "StatTriggerOnHitAbAttr",
+      "label": "Change my stats when a move hits me",
+      "summary": "After a damaging move hits me, my stats change: Attack +1. Example: Attack +1, like Anger Point.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-hit",
+      "whenLabel": "After I am hit",
+      "synonyms": [
+        "anger point",
+        "inflatable",
+        "furnace",
+        "berserker rage",
+        "boost when hit",
+        "stat change when hit",
+        "react to being hit",
+        "weak armor",
+        "stamina"
+      ],
+      "examples": [
+        "Raise Defense and Sp. Def by one stage when I am hit by a Flying or Fire move, like Inflatable",
+        "Raise Speed by two stages when a Rock move hits me, like Furnace",
+        "Lower my own Speed by one stage when a contact move hits me, like Super Hot Goo"
+      ],
+      "params": [
+        {
+          "id": "stats",
+          "label": "Stat changes, like 'Defense +1, Sp. Def +1' (stages -6 to 6; the game stops at 6, so 12 acts like 6)",
+          "control": "text",
+          "default": "Attack +1",
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "filter",
+          "label": "Only moves of these types or properties, like 'Fire, Flying, Contact' (Any move = no limit)",
+          "control": "text",
+          "default": "Any move",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must have hit and done damage: a miss, a blocked move or a status move does not count",
+        "A stat that is already at its limit does not move further",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stats"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 13
+    },
+    {
+      "id": "block.stat-trigger-on-ko",
+      "className": "StatTriggerOnKoAbAttr",
+      "label": "Change my stats when I knock a Pokemon out",
+      "summary": "When I knock a Pokemon out, my stats change: Attack +1. Example: Attack +1, like Chilling Neigh.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-ko",
+      "whenLabel": "When I knock out a Pokemon",
+      "synonyms": [
+        "moxie",
+        "chilling neigh",
+        "beast boost",
+        "boost after a knock out",
+        "snowball",
+        "kill boost",
+        "hubris",
+        "adrenaline rush",
+        "forsaken heart"
+      ],
+      "examples": [
+        "Raise Attack by one stage after I knock a Pokemon out, like Chilling Neigh",
+        "Raise Attack and Speed by one stage each after a knock out, like Dragon's Ritual",
+        "Lower my Attack by one stage after a knock out, like Super Strain"
+      ],
+      "params": [
+        {
+          "id": "stats",
+          "label": "Stat changes, like 'Attack +1, Speed +2' (stages -6 to 6; the game stops at 6, so 12 acts like 6)",
+          "control": "text",
+          "default": "Attack +1",
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "triggerOnAnyFaint",
+          "label": "React to every faint on the field, not only knock outs I caused (yes or no)",
+          "control": "boolean",
+          "default": false,
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A stat that is already at its limit does not move further",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stats"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 10
+    },
+    {
+      "id": "block.stat-trigger-on-stat-lowered",
+      "className": "StatTriggerOnStatLoweredAbAttr",
+      "label": "Change my stats when someone lowers one of mine",
+      "summary": "When a foe (not my own move) lowers one of my stats, my stats change: Speed +2. It happens once per drop. Example: Speed +2, like Rattled.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.stat-changed",
+      "whenLabel": "When one of my stats changes",
+      "synonyms": [
+        "defiant",
+        "competitive",
+        "rattled",
+        "run away",
+        "boost after a stat drop",
+        "stat drop reaction",
+        "punish intimidate",
+        "king's wrath"
+      ],
+      "examples": [
+        "Raise Speed by two stages whenever a foe lowers one of my stats",
+        "Raise Attack and Defense by one stage for each stat a foe lowers, like King's Wrath"
+      ],
+      "params": [
+        {
+          "id": "stats",
+          "label": "Stat changes, like 'Speed +2' (stages -6 to 6; the game stops at 6, so 12 acts like 6)",
+          "control": "text",
+          "default": "Speed +2",
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "scope",
+          "label": "How often the change happens",
+          "control": "select",
+          "default": "Once per drop",
+          "editable": true,
+          "options": [
+            "Once per drop",
+            "Once for each stat lowered"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "stage.just-changed",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only a drop caused by someone else counts, never one from my own move (this rule stays in the ability for now)",
+        "A stat that is already at its limit does not move further",
+        "Nothing happens when the game only previews the change"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stats",
+          "scope"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 13
+    },
+    {
+      "id": "block.status-cascade",
+      "className": "StatusCascadeAbAttr",
+      "label": "Change the target's stats after my attack if it has a status",
+      "summary": "After my attack, if the target has Poison, its stats change: Attack -1, Sp. Atk -1, Speed -1. Example: a poisoned target loses Attack, Sp. Atk and Speed, like Neurotoxin.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "neurotoxin",
+        "poison also lowers stats",
+        "status cascade",
+        "extra stat drop on a poisoned foe",
+        "weaken a burned foe",
+        "debuff a statused target"
+      ],
+      "examples": [
+        "Lower the target's Attack, Sp. Atk and Speed by one stage after I hit it while it is poisoned, like Neurotoxin",
+        "Lower the target's Attack by one stage after I hit a burned target"
+      ],
+      "params": [
+        {
+          "id": "trigger",
+          "label": "The status the target must have",
+          "control": "select",
+          "default": "POISON",
+          "editable": true,
+          "options": [
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN"
+          ]
+        },
+        {
+          "id": "stats",
+          "label": "Stat changes for the target, like 'Attack -1, Speed -1' (stages -6 to 6)",
+          "control": "text",
+          "default": "Attack -1, Sp. Atk -1, Speed -1",
+          "editable": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "status.has",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The target must still be standing: a fainted target is left alone",
+        "A stat that is already at its limit does not move further",
+        "Nothing happens when the game only previews the move"
+      ],
+      "gateParams": [
+        {
+          "param": "trigger",
+          "block": "status.has",
+          "field": "status"
+        }
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stats"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.status-chance-multiplier",
+      "className": "StatusChanceMultiplierAbAttr",
+      "label": "Make my moves inflict one status more often",
+      "summary": "Moves of mine that can inflict Burn do it 5 times as often, never above 100%. Example: 5 = five times the chance. Other moves are left alone.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.effect-chance",
+      "whenLabel": "While the game calculates my move's effect chance",
+      "synonyms": [
+        "burn more often",
+        "freeze more often",
+        "frostbite chance",
+        "status chance boost",
+        "inflict status more often",
+        "serene grace for one status",
+        "pyromancy",
+        "cryomancy"
+      ],
+      "examples": [
+        "Moves inflict burn 5 times as often, like Pyromancy",
+        "Moves inflict frostbite 5 times as often, like Cryomancy"
+      ],
+      "params": [
+        {
+          "id": "status",
+          "label": "Status condition that becomes more likely (Freeze also covers frostbite)",
+          "control": "select",
+          "default": "BURN",
+          "editable": true,
+          "options": [
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Chance multiplier (5 = five times as often, 0 = never)",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 0,
+          "max": 10,
+          "step": 0.5,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move must already have an extra effect with a chance above 0 (a guaranteed or missing effect is left alone)",
+        "Order Up and Electro Shot are never changed",
+        "The new chance never goes above 100%"
+      ],
+      "gateParams": [
+        {
+          "param": "status",
+          "block": "move.inflicts-status",
+          "field": "status"
+        }
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 6
+    },
+    {
       "id": "block.status-effect-immunity",
       "className": "StatusEffectImmunityAbAttr",
       "label": "Be immune to chosen status conditions",
@@ -28861,6 +29679,58 @@
         "do": true
       },
       "uses": 21
+    },
+    {
+      "id": "block.status-effect-immunity-ab-attr-er",
+      "className": "StatusEffectImmunityAbAttrEr",
+      "label": "Block chosen status conditions from landing on me",
+      "summary": "Paralysis cannot land on me. Example: choose Paralysis and no foe can paralyse me.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "cancel.status-immunity",
+      "whenLabel": "While the game checks my status immunity",
+      "synonyms": [
+        "immune to paralysis",
+        "immune to status",
+        "cannot be statused",
+        "status immunity",
+        "limber",
+        "insomnia",
+        "comatose",
+        "never sleep"
+      ],
+      "examples": [
+        "Immune to paralysis, like Juggernaut",
+        "Immune to every status condition, like Hyper Cleanse"
+      ],
+      "params": [
+        {
+          "id": "statuses",
+          "label": "Status conditions I resist, comma separated: Poison, Bad poison, Paralysis, Sleep, Freeze, Burn (empty = all)",
+          "control": "text",
+          "default": "Paralysis",
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "A status that another ability or effect already blocked is left alone",
+        "Leaving the list empty blocks every status condition except fainting; fainting itself can never be blocked"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": [
+          "statuses"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 6
     },
     {
       "id": "block.stealth-rock-immunity",
@@ -28950,6 +29820,69 @@
         "do": true
       },
       "uses": 3
+    },
+    {
+      "id": "block.super-effective-multiplier-boost",
+      "className": "SuperEffectiveMultiplierBoostAbAttr",
+      "label": "Make my super effective moves stronger",
+      "summary": "When my move is super effective, its power is multiplied by 1.33. Example: 1.33 = 33% more power. Other moves are left alone.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "stronger super effective hits",
+        "boost super effective",
+        "weakness exploit",
+        "super effective damage bonus",
+        "type advantage bonus",
+        "winged king",
+        "iron serpent"
+      ],
+      "examples": [
+        "Super effective moves deal 33% more damage, like Winged King",
+        "Super effective moves get 10% more power"
+      ],
+      "params": [
+        {
+          "id": "factor",
+          "label": "Power multiplier (1.33 = 33% more power, 1 = no change)",
+          "control": "number",
+          "default": 1.33,
+          "editable": true,
+          "min": 0,
+          "max": 4,
+          "step": 0.01,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.effectiveness",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A move without a target is never boosted",
+        "If the game cannot work out the matchup, the move counts as not super effective"
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "factor"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 5
     },
     {
       "id": "block.suppress-field-abilities-when-enraged",
@@ -29158,6 +30091,61 @@
       "uses": 1
     },
     {
+      "id": "block.target-highest-stat-drop",
+      "className": "TargetHighestStatDropAbAttr",
+      "label": "Lower each foe's highest stat of a group when I enter",
+      "summary": "When I enter, each foe nearby loses stages in its highest stat of each group: Attack or Sp. Atk -1; Defense or Sp. Def -1. Example: the higher of Attack and Sp. Atk goes down by 1.",
+      "tier": "C",
+      "kind": "package",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "lower highest stat",
+        "intimidate on the best stat",
+        "drop the strongest stat",
+        "weaken foe's best stat",
+        "entry stat drop",
+        "malicious",
+        "break their best stat"
+      ],
+      "examples": [
+        "Lower the higher of the foe's Attack and Sp. Atk, and the higher of its Defense and Sp. Def, by one stage each when I enter, like Malicious",
+        "Lower the foe's highest of Attack, Sp. Atk and Speed by two stages when I enter"
+      ],
+      "params": [
+        {
+          "id": "rules",
+          "label": "Rules separated by ';', like 'Attack or Sp. Atk -1; Defense or Sp. Def -1' (stages -6 to 6)",
+          "control": "text",
+          "default": "Attack or Sp. Atk -1; Defense or Sp. Def -1",
+          "editable": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Needs at least one opposing Pokemon",
+        "Only foes next to me are affected (in a triple battle the far foe is not), and a fainted foe is skipped",
+        "The highest stat is compared by its real value with no stat stages; on a tie the first stat named wins",
+        "A stat that is already at its limit does not move further",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "rules"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "packageReason": "Package for the effect only, justified: the library's stat-stage effect has a fixed stat chosen by staff (one stat, one number of stages), and the library has no 'foe's highest stat of this group' choice; the stat is picked from the foe's live values at the moment of the effect, so it cannot be a fixed block (request R-B12-14: `effect.stat-stage` with `stat: highest-of-group`, target 'each foe next to me'). The effect still has a typed setting (the rule list, with a codec) and the trigger is the swappable shared WHEN `event.on-entry`; there is no condition inside. Tier C, 1 attr: Malicious (5305 attr 0): rules [Attack or Sp. Atk, -1] then [Defense or Sp. Def, -1] (read from the live attr). Oddities, not fixed: (0) the dispatcher comment and the archetype file header say 'the higher of Attack vs Defense and of Sp. Atk vs Sp. Def', but the live rules compare Attack with Sp. Atk and Defense with Sp. Def, which matches the ability text 'highest Attack and Defense stat'; (a) `canApply` counts ALL opponents (`getOpponents`) while `apply` walks only the adjacent ones, so in a triple battle with only a far foe the ability flashes and does nothing; (b) `apply` has no random draw but queues one phase per rule per foe, so the order of the rules is the order of the drops; (c) a tie between two candidates keeps the first listed because the comparison is strictly greater than; (d) the highest stat is measured without stat stages, so a foe whose Defense was raised by stages can still lose its (higher by base value) Attack.",
+      "uses": 1
+    },
+    {
       "id": "block.terrain-event-type-change",
       "className": "TerrainEventTypeChangeAbAttr",
       "label": "Change my type to match the terrain",
@@ -29306,6 +30294,389 @@
           "mistyType",
           "grassyType",
           "psychicType"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.time-limited-effectiveness-floor",
+      "className": "TimeLimitedEffectivenessFloorAbAttr",
+      "label": "Resist every attack for my first turns on the field",
+      "summary": "For my first 3 turns after I enter, no attack counts as more effective than not very effective (x0.5). Weaker matchups are left alone. Fixed-damage moves are skipped.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.type-matchup",
+      "whenLabel": "While the game calculates type matchup against me",
+      "synonyms": [
+        "no super effective hits for a few turns",
+        "temporary tera shell",
+        "early game shield",
+        "entry resistance",
+        "turns after entry shield",
+        "soothsayer",
+        "forewarn"
+      ],
+      "examples": [
+        "For three turns after I enter, every attack counts as not very effective, like Soothsayer",
+        "For my first two turns on the field, super effective hits count as resisted"
+      ],
+      "params": [
+        {
+          "id": "turns",
+          "label": "Number of turns after I enter (1 = only the entry turn)",
+          "control": "number",
+          "default": 3,
+          "editable": true,
+          "min": 1,
+          "max": 99,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "id": "ceiling",
+          "label": "Strongest matchup multiplier an attack may keep (0.5 = not very effective, 0.25 = barely effective, 0 = no effect)",
+          "control": "number",
+          "default": 0.5,
+          "editable": true,
+          "min": 0,
+          "max": 4,
+          "step": 0.25,
+          "gateIndependent": true
+        },
+        {
+          "id": "activeWindowKey",
+          "label": "Name of the timed window that must be open (empty = no window needed)",
+          "control": "text",
+          "default": "",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "time.turn-count",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Fixed-damage moves (Seismic Toss, Dragon Rage) are not affected",
+        "Only a matchup above x0.5 is lowered; an already weaker one (x0.25 or no effect) is never raised",
+        "Not used for status moves, and not when the attacker's move ignores abilities",
+        "The turn count starts at 1 on the turn I enter and starts again when I switch out and back in"
+      ],
+      "gateParams": [
+        {
+          "param": "turns",
+          "block": "time.turn-count",
+          "field": "n"
+        }
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "ceiling"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.toxic-terrain-self-poison-on-summon",
+      "className": "ToxicTerrainSelfPoisonOnSummonAbAttr",
+      "label": "Give myself a status condition when I enter the battle",
+      "summary": "As soon as I enter the battle I get Poison, even if I am flying. Example: Poison while Toxic Terrain is active, like Toxic Boost. Nothing happens if I already have a status.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.on-entry",
+      "whenLabel": "When I enter the battle",
+      "synonyms": [
+        "toxic boost",
+        "poison myself",
+        "self poison",
+        "toxic terrain",
+        "start poisoned",
+        "self inflicted status on entry",
+        "status on switch in"
+      ],
+      "examples": [
+        "Poison myself when I enter while Toxic Terrain is active, like Toxic Boost",
+        "Burn myself when I enter the battle (change the status setting)"
+      ],
+      "params": [
+        {
+          "id": "status",
+          "label": "Status condition I get (Toxic = badly poisoned)",
+          "control": "select",
+          "default": "POISON",
+          "editable": true,
+          "options": [
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens if I have fainted or already have a status condition",
+        "A Pokemon that cannot get the status (for example a Poison or Steel type for poison) stays unaffected",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.inflict-status",
+        "params": [
+          "status"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.toxic-terrain-self-poison-on-terrain-change",
+      "className": "ToxicTerrainSelfPoisonOnTerrainChangeAbAttr",
+      "label": "Give myself a status condition when the terrain changes",
+      "summary": "The moment the terrain changes I get Poison, even if I am flying. Example: Poison when the terrain becomes Toxic Terrain, like Toxic Boost. Nothing happens if I already have a status.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.terrain-changed",
+      "whenLabel": "When the terrain changes",
+      "synonyms": [
+        "toxic boost",
+        "poison myself",
+        "self poison",
+        "toxic terrain",
+        "poisoned by terrain",
+        "status when terrain changes",
+        "self inflicted status"
+      ],
+      "examples": [
+        "Poison myself when the terrain becomes Toxic Terrain, like Toxic Boost",
+        "Paralyze myself when the terrain changes (change the status and the terrain test)"
+      ],
+      "params": [
+        {
+          "id": "status",
+          "label": "Status condition I get (Toxic = badly poisoned)",
+          "control": "select",
+          "default": "POISON",
+          "editable": true,
+          "options": [
+            "POISON",
+            "TOXIC",
+            "PARALYSIS",
+            "SLEEP",
+            "FREEZE",
+            "BURN"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens if I have fainted or already have a status condition",
+        "A Pokemon that cannot get the status (for example a Poison or Steel type for poison) stays unaffected",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.inflict-status",
+        "params": [
+          "status"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.trap-duration-modifier",
+      "className": "TrapDurationModifierAbAttr",
+      "label": "Make my trapping moves last longer and hurt more",
+      "summary": "After my trapping move (Fire Spin, Wrap, Whirlpool...) lands, the trap lasts 6 turns and hurts 1/6 of the target's max HP each turn. Example: 6 turns, 1/6, like Tentalock.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "trap lasts longer",
+        "binding moves",
+        "wrap damage",
+        "partial trapping",
+        "grappler",
+        "fire spin duration",
+        "tentalock",
+        "tangled tails",
+        "wildfire"
+      ],
+      "examples": [
+        "Trapping moves last 6 turns and deal 1/6 of max HP, like Tentalock",
+        "Only Fire Spin lasts 4 turns and deals 1/6 of max HP, like Wildfire"
+      ],
+      "params": [
+        {
+          "id": "turns",
+          "label": "Turns the trap lasts (6 = six turns)",
+          "control": "number",
+          "default": 6,
+          "editable": true,
+          "min": 1,
+          "max": 15,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "denominator",
+          "label": "Trap damage each turn (1/N of the target's max HP, 6 = one sixth)",
+          "control": "number",
+          "default": 6,
+          "editable": true,
+          "min": 1,
+          "max": 16,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "moves",
+          "label": "Only these trapping moves, like 'Fire Spin, Wrap' (empty = every trapping move)",
+          "control": "text",
+          "default": "",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The target must still be on the field and standing",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "turns",
+          "denominator"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 3
+    },
+    {
+      "id": "block.turn-decay-damage-multiplier",
+      "className": "TurnDecayDamageMultiplierAbAttr",
+      "label": "Make my moves weaker every turn I stay in",
+      "summary": "My moves' power is x1 minus 0.2 for every turn I have been in, but never below x0.2. It starts over when I switch in. Example: 1, 0.2, 0.2 like Lethargy.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "lethargy",
+        "power fades",
+        "weaker each turn",
+        "damage decay",
+        "slow start",
+        "tire out",
+        "diminishing damage"
+      ],
+      "examples": [
+        "My damage drops by 20% of normal each turn I stay in, down to 20%, and resets on switch-in, like Lethargy"
+      ],
+      "params": [
+        {
+          "id": "start",
+          "label": "Power multiplier before any turn has passed (1 = normal power)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05
+        },
+        {
+          "id": "drop",
+          "label": "Power lost every turn (0.2 = the multiplier falls by 0.2 each turn)",
+          "control": "number",
+          "default": 0.2,
+          "editable": true,
+          "min": 0,
+          "max": 1,
+          "step": 0.01
+        },
+        {
+          "id": "floor",
+          "label": "Lowest the multiplier can fall to (0.2 = one fifth of normal power)",
+          "control": "number",
+          "default": 0.2,
+          "editable": true,
+          "min": 0,
+          "max": 4,
+          "step": 0.05
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "start",
+          "drop",
+          "floor"
         ]
       },
       "reusableAlone": {
@@ -29578,6 +30949,522 @@
           "type",
           "stat",
           "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.type-conversion",
+      "className": "TypeConversionAbAttr",
+      "label": "Turn my moves of one type or kind into another type",
+      "summary": "My Normal moves become Fire type when I use them. Example: Normal moves become Fire type, like Immolate. The extra power some of these abilities add is a separate block.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-type",
+      "whenLabel": "While the game decides a move's type",
+      "synonyms": [
+        "aerilate",
+        "pixilate",
+        "galvanize",
+        "refrigerate",
+        "normal moves become",
+        "convert move type",
+        "ate ability",
+        "sound moves become",
+        "immolate",
+        "crystallize"
+      ],
+      "examples": [
+        "Normal moves become Fire type, like Immolate",
+        "Sound moves that are Normal become Ground type, like Sand Song",
+        "Rock moves become Ice type, like Crystallize"
+      ],
+      "params": [
+        {
+          "id": "source",
+          "label": "Which moves change, like 'Normal' or 'Sound moves that are Normal'",
+          "control": "text",
+          "default": "Normal",
+          "editable": false
+        },
+        {
+          "id": "newType",
+          "label": "Type they become",
+          "control": "select",
+          "default": "FIRE",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ],
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move's own type is checked, before any other ability changes it (so it can never loop)"
+      ],
+      "effect": {
+        "id": "effect.change-move-type",
+        "params": [
+          "newType"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 39
+    },
+    {
+      "id": "block.type-conversion-power-boost",
+      "className": "TypeConversionPowerBoostAbAttr",
+      "label": "Make my moves of one type or kind stronger (ate power)",
+      "summary": "My Normal moves get 1.1 times their power. Example: Sound moves get 1.2 times their power, like Sand Song.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "aerilate boost",
+        "ate boost",
+        "sound moves stronger",
+        "normal moves stronger",
+        "power boost for converted moves",
+        "sand song",
+        "crystallize",
+        "extra power for one kind of move"
+      ],
+      "examples": [
+        "Sound moves get 1.2 times their power, like Sand Song",
+        "Rock moves get 1.1 times their power, like Crystallize"
+      ],
+      "params": [
+        {
+          "id": "source",
+          "label": "Which moves get stronger, like 'Normal' or 'Sound moves'",
+          "control": "text",
+          "default": "Normal",
+          "editable": false
+        },
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.2 = 20% stronger)",
+          "control": "number",
+          "default": 1.1,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move's own type is checked, before any other ability changes it",
+        "Moves that deal fixed damage are not changed by a power boost"
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 10
+    },
+    {
+      "id": "block.type-damage-boost",
+      "className": "TypeDamageBoostAbAttr",
+      "label": "Make my moves of one type stronger",
+      "summary": "My Fire moves get 1.3 times their power. Example: Electric 1.25, like Electrocytes.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "type boost",
+        "fire moves stronger",
+        "electric moves stronger",
+        "boost one type",
+        "pixilate second half",
+        "hellblaze",
+        "electrocytes",
+        "overgrow",
+        "blaze",
+        "torrent",
+        "swarm"
+      ],
+      "examples": [
+        "Electric moves get 1.25 times their power, like Electrocytes",
+        "Fire moves get 1.3 times their power, and 1.8 times when my HP is at or below one third, like Hellblaze"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Move type that gets stronger",
+          "control": "select",
+          "default": "FIRE",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.3 = 30% stronger)",
+          "control": "number",
+          "default": 1.3,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        },
+        {
+          "id": "lowHpMultiplier",
+          "label": "Power multiplier while my HP is low (1.8 = 80% stronger, 0 = no extra boost)",
+          "control": "number",
+          "default": 0,
+          "editable": true,
+          "min": 0,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        },
+        {
+          "id": "lowHpLine",
+          "label": "HP line for the extra boost (% of max HP; 33.33 means one third)",
+          "control": "number",
+          "default": 33.3333333333,
+          "editable": true,
+          "min": 1,
+          "max": 99,
+          "step": 0.01,
+          "gateIndependent": true
+        },
+        {
+          "id": "weathers",
+          "label": "Only in these weathers, like 'Rain, Heavy rain' (empty = any weather)",
+          "control": "text",
+          "default": "",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move's type is read after other abilities (such as a type-changing ability) have changed it",
+        "Moves that deal fixed damage are not changed by a power boost"
+      ],
+      "gateParams": [
+        {
+          "param": "type",
+          "block": "move.type",
+          "field": "type"
+        }
+      ],
+      "branches": [
+        {
+          "label": "Normal boost",
+          "conditions": [
+            "the move is the chosen type",
+            "my HP is above the line, or no extra boost is set"
+          ],
+          "effect": {
+            "id": "effect.multiply-power",
+            "params": [
+              "multiplier"
+            ]
+          }
+        },
+        {
+          "label": "Extra boost while my HP is low",
+          "conditions": [
+            "the move is the chosen type",
+            "my HP is at or below the line"
+          ],
+          "effect": {
+            "id": "effect.multiply-power",
+            "params": [
+              "lowHpMultiplier",
+              "lowHpLine"
+            ]
+          }
+        }
+      ],
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 63
+    },
+    {
+      "id": "block.type-filtered-effect-chance-multiplier",
+      "className": "TypeFilteredEffectChanceMultiplierAbAttr",
+      "label": "Make the extra effects of one move type more likely",
+      "summary": "The chance of the extra effects of my Psychic moves is multiplied by 1.4, up to 100%. Example: Psychic 1.4, so a 30% chance becomes 42%, like Corrupted Mind.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.effect-chance",
+      "whenLabel": "While the game calculates my move's effect chance",
+      "synonyms": [
+        "serene grace for one type",
+        "secondary effect chance",
+        "side effects more often",
+        "flinch chance boost",
+        "status chance boost",
+        "corrupted mind",
+        "more likely extra effects"
+      ],
+      "examples": [
+        "Psychic moves have 1.4 times the chance of their extra effects, like Corrupted Mind",
+        "Fire moves burn 1.5 times as often"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Move type whose extra effects become more likely",
+          "control": "select",
+          "default": "PSYCHIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Chance multiplier (1.4 = 40% more likely, 2 = twice as likely)",
+          "control": "number",
+          "default": 1.4,
+          "editable": true,
+          "min": 0.1,
+          "max": 10,
+          "step": 0.05,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only moves that have an extra effect (a chance above 0) are changed",
+        "Order Up and Electro Shot are never changed",
+        "The chance never goes above 100%"
+      ],
+      "gateParams": [
+        {
+          "param": "type",
+          "block": "move.type",
+          "field": "type"
+        }
+      ],
+      "effect": {
+        "id": "effect.package",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.type-gated-stat-trigger-on-attack",
+      "className": "TypeGatedStatTriggerOnAttackAbAttr",
+      "label": "Change my stats after using a move of one type",
+      "summary": "After I use a Fighting move, my stats change: Speed +1. It can also clear the hazards on my side. Example: Fighting, Speed +1 and clear hazards, like Spinning Top.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "stat boost after a type of move",
+        "speed boost after fighting move",
+        "clear hazards after attacking",
+        "rapid spin effect",
+        "spinning top",
+        "spin to win",
+        "type triggered boost"
+      ],
+      "examples": [
+        "After a Fighting move, raise my Speed by one stage and clear the hazards on my side, like Spinning Top",
+        "After a Water move, raise my Sp. Atk by one stage"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Move type that sets it off",
+          "control": "select",
+          "default": "FIGHTING",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "stats",
+          "label": "Stat changes, like 'Speed +1, Defense -1' (stages -6 to 6)",
+          "control": "text",
+          "default": "Speed +1",
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "clearHazards",
+          "label": "Also clear Spikes, Toxic Spikes, Stealth Rock and Sticky Web from my side",
+          "control": "boolean",
+          "default": false,
+          "editable": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.type",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A stat that is already at its limit does not move further",
+        "Nothing happens when the game only previews the move",
+        "Only hazards on my own side are cleared"
+      ],
+      "gateParams": [
+        {
+          "param": "type",
+          "block": "move.type",
+          "field": "type"
+        }
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stats",
+          "clearHazards"
         ]
       },
       "reusableAlone": {
@@ -29885,6 +31772,94 @@
       "uses": 9
     },
     {
+      "id": "block.type-immunity-highest-attack-stat-stage",
+      "className": "TypeImmunityHighestAttackStatStageAbAttr",
+      "label": "Absorb one move type and raise my better attacking stat",
+      "summary": "Moves of the Electric type do nothing to me, and my higher attacking stat (Attack or Sp. Atk) goes up by 1. Example: Electric, 1 stage, like Lightning Rod.",
+      "tier": "A",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-immunity",
+      "whenLabel": "While the game checks whether a move can hit me",
+      "synonyms": [
+        "lightning rod",
+        "storm drain",
+        "sap sipper",
+        "reservoir",
+        "lightning aspect",
+        "absorb and boost",
+        "immune and raise attack",
+        "type absorb",
+        "redirect and boost"
+      ],
+      "examples": [
+        "Electric moves do nothing to me and my higher attacking stat rises by one stage, like Lightning Rod",
+        "Grass moves do nothing to me and my higher attacking stat rises by one stage, like Sap Sipper"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Move type I absorb",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "stages",
+          "label": "Number of stages my higher attacking stat rises (1-6)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": 1,
+          "max": 6,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "conditions": [],
+      "guards": [],
+      "feasibility": [
+        "Moves that hit every Pokemon or a whole side (Spikes, Rain Dance) are never absorbed",
+        "A Pokemon never absorbs its own move",
+        "The higher attacking stat is picked from the raw stats, ignoring stat stages; Attack wins a tie",
+        "Nothing is raised when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.immune-to-type",
+        "params": [
+          "type",
+          "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 5
+    },
+    {
       "id": "block.type-immunity-stat-stage-change",
       "className": "TypeImmunityStatStageChangeAbAttr",
       "label": "Absorb a type of move and raise a stat instead",
@@ -30010,6 +31985,218 @@
       "uses": 4
     },
     {
+      "id": "block.type-recoil",
+      "className": "TypeRecoilAbAttr",
+      "label": "Take recoil from my damaging moves of one type",
+      "summary": "After my Electric damaging move lands, I take 10% of the damage it dealt, but never enough to knock me out. Rock Head and Magic Guard block it. Example: 10% on Dark moves, like Doom Blast.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.after-my-hit",
+      "whenLabel": "After my attack lands",
+      "synonyms": [
+        "recoil",
+        "self damage",
+        "life orb style",
+        "downside of a boost",
+        "pay for power",
+        "recoil for one type",
+        "doom blast",
+        "electric burst",
+        "infernal rage"
+      ],
+      "examples": [
+        "Take 10% of the damage I deal as recoil when I use an Electric move, like Electric Burst",
+        "Take 5% recoil on Fire moves, like Infernal Rage"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Move type that causes recoil",
+          "control": "select",
+          "default": "ELECTRIC",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "recoilPercent",
+          "label": "Recoil (% of the damage I deal, 10 = a tenth)",
+          "control": "number",
+          "default": 10,
+          "editable": true,
+          "min": 0.5,
+          "max": 100,
+          "step": 0.5,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Nothing happens when the move dealt no damage",
+        "Rock Head and Magic Guard stop the recoil",
+        "The recoil never takes more than my HP minus 1, so it cannot knock me out",
+        "Nothing happens when the game only previews the move"
+      ],
+      "gateParams": [
+        {
+          "param": "type",
+          "block": "move.type",
+          "field": "type"
+        }
+      ],
+      "effect": {
+        "id": "effect.recoil",
+        "params": [
+          "recoilPercent"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 5
+    },
+    {
+      "id": "block.typed-immunity-with-arena-tag",
+      "className": "TypedImmunityWithArenaTagAbAttr",
+      "label": "Block one move type and set a field effect on my side",
+      "summary": "Damaging Water moves do nothing to me, and Mist appears on my side for 5 turns. Example: Water, Mist, 5 turns, like Evaporate.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-immunity",
+      "whenLabel": "While the game checks whether a move can hit me",
+      "synonyms": [
+        "immune and set mist",
+        "absorb and field effect",
+        "evaporate",
+        "water immunity with mist",
+        "immunity that sets a screen",
+        "block a type and protect my side"
+      ],
+      "examples": [
+        "Water moves do nothing to me and Mist appears on my side for 5 turns, like Evaporate",
+        "Fire moves do nothing to me and Light Screen appears on my side for 5 turns"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Move type that does nothing to me",
+          "control": "select",
+          "default": "WATER",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "arenaTag",
+          "label": "Field effect that appears on my side",
+          "control": "select",
+          "default": "MIST",
+          "editable": true,
+          "options": [
+            "MIST",
+            "SAFEGUARD",
+            "REFLECT",
+            "LIGHT_SCREEN",
+            "AURORA_VEIL",
+            "TAILWIND"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "turns",
+          "label": "Turns the field effect lasts (5 = five turns)",
+          "control": "number",
+          "default": 5,
+          "editable": true,
+          "min": 1,
+          "max": 8,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Moves that hit every Pokemon or a whole side (Spikes, Rain Dance) are never blocked",
+        "A Pokemon never blocks its own move",
+        "The move's type is read after other abilities have changed it",
+        "Nothing is set when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.immune-to-type",
+        "params": [
+          "type",
+          "arenaTag",
+          "turns"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
       "id": "block.user-field-battler-tag-immunity",
       "className": "UserFieldBattlerTagImmunityAbAttr",
       "label": "Protect my partner from effects like taunt or infatuation",
@@ -30077,6 +32264,95 @@
         "do": true
       },
       "uses": 2
+    },
+    {
+      "id": "block.user-field-flag-immunity",
+      "className": "UserFieldFlagImmunityAbAttr",
+      "label": "Protect my side from moves with one property",
+      "summary": "Moves with the Sound based property do nothing to me or my ally. Example: Sound, so Hyper Voice and Growl fail, like Noise Cancel.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.incoming-move",
+      "whenLabel": "Before I take a hit",
+      "synonyms": [
+        "soundproof for the team",
+        "party soundproof",
+        "block sound moves for my ally",
+        "protect the party from a kind of move",
+        "noise cancel",
+        "immune to a move property"
+      ],
+      "examples": [
+        "Sound moves do nothing to me or my ally, like Noise Cancel",
+        "Punching moves do nothing to me or my ally"
+      ],
+      "params": [
+        {
+          "id": "flag",
+          "label": "Move property that is blocked (Sound, Punching, Biting...)",
+          "control": "select",
+          "default": "SOUND_BASED",
+          "editable": true,
+          "options": [
+            "MAKES_CONTACT",
+            "SOUND_BASED",
+            "BITING_MOVE",
+            "PULSE_MOVE",
+            "PUNCHING_MOVE",
+            "SLICING_MOVE",
+            "RECKLESS_MOVE",
+            "BALLBOMB_MOVE",
+            "POWDER_MOVE",
+            "DANCE_MOVE",
+            "WIND_MOVE",
+            "TRIAGE_MOVE",
+            "AIR_BASED",
+            "ARROW_BASED",
+            "BONE_BASED",
+            "DRILL_BASED",
+            "FIELD_BASED",
+            "HAMMER_BASED",
+            "HORN_BASED",
+            "KICKING_MOVE",
+            "LUNAR_MOVE",
+            "THROW_BASED",
+            "WEATHER_BASED"
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "lib": "move.flag",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A Pokemon never blocks its own move",
+        "At least one standing Pokemon of the protected side must be on the field",
+        "Status moves with the property are blocked too (there is no damaging-move test)"
+      ],
+      "gateParams": [
+        {
+          "param": "flag",
+          "block": "move.flag",
+          "field": "flag"
+        }
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
     },
     {
       "id": "block.user-field-self-stat-drop-immunity",
@@ -30195,6 +32471,390 @@
         "do": true
       },
       "uses": 1
+    },
+    {
+      "id": "block.wake-stat-boost",
+      "className": "WakeStatBoostAbAttr",
+      "label": "Change my stats the first time I wake up in a battle",
+      "summary": "The first time I wake up from sleep in a battle, these stats change by 1 stage(s): Attack, Defense, Sp. Atk, Sp. Def, Speed. Example: all five stats +1, like Rude Awakening.",
+      "tier": "B",
+      "kind": "event-effect",
+      "status": "decomposed",
+      "when": "event.wake-up",
+      "whenLabel": "When I wake up",
+      "synonyms": [
+        "wake up boost",
+        "boost after sleep",
+        "rude awakening",
+        "omniboost on wake",
+        "once per battle boost",
+        "sleep talk reward",
+        "wake up stat change"
+      ],
+      "examples": [
+        "The first time I wake up, raise all my stats by one stage, like Rude Awakening",
+        "The first time I wake up, raise my Attack and Speed by two stages"
+      ],
+      "params": [
+        {
+          "id": "stats",
+          "label": "Which stats change, like 'Attack, Speed' (any of Attack, Defense, Sp. Atk, Sp. Def, Speed)",
+          "control": "text",
+          "default": "Attack, Defense, Sp. Atk, Sp. Def, Speed",
+          "editable": true,
+          "gateIndependent": true
+        },
+        {
+          "id": "stages",
+          "label": "Number of stages (1 = one stage up, -1 = one stage down)",
+          "control": "number",
+          "default": 1,
+          "editable": true,
+          "min": -6,
+          "max": 6,
+          "step": 1,
+          "integer": true,
+          "gateIndependent": true
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A stat that is already at its limit does not move further",
+        "Nothing happens when the game only previews the move"
+      ],
+      "effect": {
+        "id": "effect.stat-stage",
+        "params": [
+          "stats",
+          "stages"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 1
+    },
+    {
+      "id": "block.weather-based-move-block",
+      "className": "WeatherBasedMoveBlockAbAttr",
+      "label": "Be immune to moves that depend on the weather",
+      "summary": "Weather Ball, Solar Beam, Hurricane, Thunder, Blizzard and the other weather-based moves of foes do nothing to me. Example: Weather Control.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-immunity",
+      "whenLabel": "While the game checks whether a move can hit me",
+      "synonyms": [
+        "weather control",
+        "neutralizing fog",
+        "immune to weather moves",
+        "block solar beam and thunder",
+        "no weather ball",
+        "weather move immunity"
+      ],
+      "examples": [
+        "Foes' weather-based moves such as Thunder and Solar Beam do nothing to me, like Weather Control",
+        "Block Hurricane and Blizzard"
+      ],
+      "params": [],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "A Pokemon never blocks its own move",
+        "Does nothing when another ability has already blocked the move"
+      ],
+      "effect": {
+        "id": "effect.negate",
+        "params": []
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.weather-damage-reduction",
+      "className": "WeatherDamageReductionAbAttr",
+      "label": "Take less damage while certain weather is active",
+      "summary": "While Hail, Snow is on, the damage I take is multiplied by 0.5. Weather that Cloud Nine or Air Lock switches off does not count. Example: 0.5 = half damage in hail.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.damage-taken",
+      "whenLabel": "While the game calculates damage I take",
+      "synonyms": [
+        "christmas spirit",
+        "dune terror",
+        "resist in weather",
+        "half damage in hail",
+        "less damage in a sandstorm",
+        "weather damage reduction",
+        "bulky in weather",
+        "tank in snow"
+      ],
+      "examples": [
+        "Take half damage in hail or snow, like Christmas Spirit",
+        "Take 35% less damage in a sandstorm, like Dune Terror"
+      ],
+      "params": [
+        {
+          "id": "multiplier",
+          "label": "Damage multiplier (0.5 = half damage, 1 = no change)",
+          "control": "number",
+          "default": 0.5,
+          "editable": true,
+          "min": 0.05,
+          "max": 1,
+          "step": 0.05,
+          "gateIndependent": true
+        },
+        {
+          "id": "weathers",
+          "label": "Weather that switches it on, like 'Hail, Snow' (at least one)",
+          "control": "text",
+          "default": "Hail, Snow",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Damage that is a fixed amount is not changed"
+      ],
+      "effect": {
+        "id": "effect.multiply-damage-taken",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
+    },
+    {
+      "id": "block.weather-stat-multiplier",
+      "className": "WeatherStatMultiplierAbAttr",
+      "label": "Multiply one of my stats while certain weather is active",
+      "summary": "While Rain is on, my Speed is multiplied by 1.5. Weather that Cloud Nine or Air Lock switches off does not count. Example: Speed 1.5 in fog.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.stat-value",
+      "whenLabel": "While the game calculates one of my stats",
+      "synonyms": [
+        "swift swim",
+        "chlorophyll",
+        "sand rush",
+        "slush rush",
+        "speed in rain",
+        "speed in the sun",
+        "stat boost in weather",
+        "weather speed boost",
+        "evasion in fog",
+        "thermal slide",
+        "ethereal rush"
+      ],
+      "examples": [
+        "Raise my Speed by 50% in fog, like Ethereal Rush",
+        "Raise my Speed by 50% in sun or hail, like Thermal Slide",
+        "Raise my Evasion by a third in fog, like Smokey Maneuvers"
+      ],
+      "params": [
+        {
+          "id": "stat",
+          "label": "Which stat (Attack, Defense, Sp. Atk, Sp. Def, Speed, Accuracy or Evasion)",
+          "control": "select",
+          "default": "SPD",
+          "editable": true,
+          "options": [
+            "ATK",
+            "DEF",
+            "SPATK",
+            "SPDEF",
+            "SPD",
+            "ACC",
+            "EVA"
+          ],
+          "gateIndependent": true
+        },
+        {
+          "id": "multiplier",
+          "label": "Stat multiplier (1.5 = 50% higher, 0.5 = half)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        },
+        {
+          "id": "weathers",
+          "label": "Weather that switches it on, like 'Hail, Snow' (at least one)",
+          "control": "text",
+          "default": "Rain",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "Only the chosen stat is changed; the game asks this block about every stat and it answers for one"
+      ],
+      "effect": {
+        "id": "effect.multiply-stat",
+        "params": [
+          "stat",
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 5
+    },
+    {
+      "id": "block.weather-type-boost",
+      "className": "WeatherTypeBoostAbAttr",
+      "label": "Make my moves of one type stronger in certain weather",
+      "summary": "While Rain is on, my Rock moves get 1.5 times their power. Weather that Cloud Nine or Air Lock switches off does not count. Example: Rock 1.5 in hail.",
+      "tier": "B",
+      "kind": "calc-modifier",
+      "status": "decomposed",
+      "when": "calc.move-power",
+      "whenLabel": "While the game calculates a move's power",
+      "synonyms": [
+        "catastrophe",
+        "type boost in weather",
+        "boost rock in hail",
+        "boost ice in sand",
+        "fire stronger in sun",
+        "water stronger in rain",
+        "weather type boost",
+        "weather power boost"
+      ],
+      "examples": [
+        "Rock moves get 1.5 times their power in hail or snow, like Catastrophe",
+        "Ice moves get 1.5 times their power in a sandstorm, like Catastrophe"
+      ],
+      "params": [
+        {
+          "id": "type",
+          "label": "Move type that gets stronger",
+          "control": "select",
+          "default": "ROCK",
+          "editable": true,
+          "options": [
+            "NORMAL",
+            "FIGHTING",
+            "FLYING",
+            "POISON",
+            "GROUND",
+            "ROCK",
+            "BUG",
+            "GHOST",
+            "STEEL",
+            "FIRE",
+            "WATER",
+            "GRASS",
+            "ELECTRIC",
+            "PSYCHIC",
+            "ICE",
+            "DRAGON",
+            "DARK",
+            "FAIRY",
+            "STELLAR"
+          ]
+        },
+        {
+          "id": "multiplier",
+          "label": "Power multiplier (1.5 = 50% stronger)",
+          "control": "number",
+          "default": 1.5,
+          "editable": true,
+          "min": 0.1,
+          "max": 4,
+          "step": 0.05,
+          "gateIndependent": true
+        },
+        {
+          "id": "weathers",
+          "label": "Weather that switches it on, like 'Hail, Snow' (at least one)",
+          "control": "text",
+          "default": "Rain",
+          "editable": false
+        }
+      ],
+      "conditions": [
+        {
+          "slot": "gate",
+          "removable": true,
+          "editable": true,
+          "optional": false
+        }
+      ],
+      "guards": [],
+      "feasibility": [
+        "The move's type is read after other abilities (such as a type-changing ability) have changed it",
+        "Moves that deal fixed damage are not changed by a power boost"
+      ],
+      "gateParams": [
+        {
+          "param": "type",
+          "block": "move.type",
+          "field": "type"
+        }
+      ],
+      "effect": {
+        "id": "effect.multiply-power",
+        "params": [
+          "multiplier"
+        ]
+      },
+      "reusableAlone": {
+        "when": true,
+        "if": true,
+        "do": true
+      },
+      "uses": 2
     },
     {
       "id": "block.weight-multiplier",
