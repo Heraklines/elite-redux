@@ -552,7 +552,17 @@ export function mappedWhenIds(): string[] {
 // Axes
 
 /** The axis names a declaration's probes may use. */
-export const KNOWN_AXES = ["hp", "foeHp", "foeLevel", "foeMove", "foeType", "weather", "status", "stage", "foeAbility"] as const;
+export const KNOWN_AXES = [
+  "hp",
+  "foeHp",
+  "foeLevel",
+  "foeMove",
+  "foeType",
+  "weather",
+  "status",
+  "stage",
+  "foeAbility",
+] as const;
 
 export function describeAxes(axes: Axes): string {
   const entries = Object.entries(axes);
@@ -698,7 +708,8 @@ export async function runScenario(
         if (
           lastHolderMove !== undefined
           && lastHolderMove !== chosen
-          && holder.findTag(t => t instanceof MoveRestrictionBattlerTag && t.isMoveRestricted(chosen, holder)) !== undefined
+          && holder.findTag(t => t instanceof MoveRestrictionBattlerTag && t.isMoveRestricted(chosen, holder))
+            !== undefined
         ) {
           chosen = lastHolderMove;
         }
