@@ -316,14 +316,14 @@ const BASE_EFFECTS: readonly EffectBase[] = [
   {
     id: "effect.cure-status",
     kind: "event",
-    label: "Cure {target} of {status} (cured: {scope})",
+    label: "Cure {target} of {status}",
     requires: [],
     params: [
       TARGET(),
       selectParam("status", "Which status", ["ANY", ...STATUS_OPTIONS], "ANY"),
       selectParam("scope", "Who is cured", ["target", "my-side"], "target", {
-        target: "only the Pokemon chosen in 'Who is affected'",
-        "my-side": "everyone on my team's side instead, with a cure message",
+        target: "Only the Pokemon chosen above",
+        "my-side": "Everyone on my side instead (shows a message)",
       }),
       textParam("statuses", "Statuses cured on my side (names, separated by commas; empty = the status above)", ""),
       booleanParam("alsoErAilments", "Cure every status plus frostbite, bleeding and fear, at once", false),

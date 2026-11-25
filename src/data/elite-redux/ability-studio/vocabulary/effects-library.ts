@@ -299,7 +299,7 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
   {
     id: "effect.stat-stages",
     kind: "event",
-    label: "Change {stats} of {target} by {stages} stage(s)",
+    label: "Change {stats} by {stages} stages for {target}",
     requires: [],
     params: [
       selectParam(
@@ -339,12 +339,12 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
   {
     id: "effect.change-own-type",
     kind: "event",
-    label: "Change {who} type to {type}",
+    label: "Change {who}'s type to {type}",
     requires: [],
     params: [
       selectParam("who", "Whose type changes", ["holder", "other"], "holder", {
-        holder: "my",
-        other: "the other Pokemon's",
+        holder: "The ability owner",
+        other: "The other Pokemon",
       }),
       selectParam("type", "New type", [...TYPE_OPTIONS, "move-type"], "NORMAL", {
         "move-type": "the type of the move being used",
@@ -432,7 +432,7 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
       selectParam("target", "Whose stat changes", [...TARGET_OPTIONS, "adjacent-foes"], "holder", {
         "holder-side": "Me and every ally on my side",
         "opposing-side": "Every foe on the field",
-        "adjacent-foes": "Only the foes next to me",
+        "adjacent-foes": "Only the adjacent foes",
       }),
       booleanParam("onlyRaised", "Only reset stats that went up (drops stay)", false),
     ],
@@ -698,12 +698,12 @@ export const LIBRARY_EFFECTS: readonly EffectBase[] = [
   {
     id: "effect.stat-stage-on-highest",
     kind: "event",
-    label: "Change {target} highest of {stats} by {stages} stage(s)",
+    label: "Change {target}'s top stat of {stats} by {stages}",
     requires: [],
     params: [
       selectParam("target", "Whose stat", ["holder", "other"], "holder", {
-        holder: "my",
-        other: "the other Pokemon's",
+        holder: "The ability owner",
+        other: "The other Pokemon",
       }),
       textParam("stats", "Stats to compare (names, separated by commas)", "Attack, Sp. Atk"),
       numberParam("stages", "Number of stages (-6 to 6)", 1, -6, 6, 1, true),

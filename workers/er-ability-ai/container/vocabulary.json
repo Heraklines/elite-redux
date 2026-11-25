@@ -9065,7 +9065,7 @@
     {
       "id": "effect.cure-status",
       "kind": "event",
-      "label": "Cure {target} of {status} (cured: {scope})",
+      "label": "Cure {target} of {status}",
       "requires": [],
       "params": [
         {
@@ -9120,8 +9120,8 @@
             "my-side"
           ],
           "optionLabels": {
-            "target": "only the Pokemon chosen in 'Who is affected'",
-            "my-side": "everyone on my team's side instead, with a cure message"
+            "target": "Only the Pokemon chosen above",
+            "my-side": "Everyone on my side instead (shows a message)"
           }
         },
         {
@@ -10701,7 +10701,7 @@
     {
       "id": "effect.stat-stages",
       "kind": "event",
-      "label": "Change {stats} of {target} by {stages} stage(s)",
+      "label": "Change {stats} by {stages} stages for {target}",
       "requires": [],
       "params": [
         {
@@ -10764,7 +10764,7 @@
     {
       "id": "effect.change-own-type",
       "kind": "event",
-      "label": "Change {who} type to {type}",
+      "label": "Change {who}'s type to {type}",
       "requires": [],
       "params": [
         {
@@ -10777,8 +10777,8 @@
             "other"
           ],
           "optionLabels": {
-            "holder": "my",
-            "other": "the other Pokemon's"
+            "holder": "The ability owner",
+            "other": "The other Pokemon"
           }
         },
         {
@@ -11125,7 +11125,7 @@
             "other": "The other Pokemon",
             "holder-side": "Me and every ally on my side",
             "opposing-side": "Every foe on the field",
-            "adjacent-foes": "Only the foes next to me"
+            "adjacent-foes": "Only the adjacent foes"
           }
         },
         {
@@ -11853,7 +11853,7 @@
     {
       "id": "effect.stat-stage-on-highest",
       "kind": "event",
-      "label": "Change {target} highest of {stats} by {stages} stage(s)",
+      "label": "Change {target}'s top stat of {stats} by {stages}",
       "requires": [],
       "params": [
         {
@@ -11866,8 +11866,8 @@
             "other"
           ],
           "optionLabels": {
-            "holder": "my",
-            "other": "the other Pokemon's"
+            "holder": "The ability owner",
+            "other": "The other Pokemon"
           }
         },
         {
@@ -12740,5 +12740,5 @@
       "category": "Switching"
     }
   ],
-  "hash": "17fe683763823c"
+  "hash": "193a35981e4c39"
 }
