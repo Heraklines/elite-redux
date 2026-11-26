@@ -1,0 +1,344 @@
+{
+  "invariant": "no-park",
+  "seed": 20261126,
+  "wave": 3,
+  "detail": "wave driving threw (strand/stall): guest reward WATCH HANG: watcher neither left nor advanced past interaction 2 after 32 drains (owner terminal never arrived) - see dev-logs/coop-duo/",
+  "replay": "SOAK_SEED=20261126",
+  "phaseState": {
+    "hostPhase": "SelectModifierPhase",
+    "guestPhase": "SelectModifierPhase",
+    "hostInteractionCounter": 2,
+    "guestInteractionCounter": 2,
+    "hostWave": 3,
+    "hostBattleType": 0,
+    "hostPlayerField": [
+      {
+        "id": 4158660795,
+        "battlerIndex": -1,
+        "speciesId": 143,
+        "speciesName": "Snorlax",
+        "hp": 303,
+        "maxHp": 303,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 2953933131,
+        "battlerIndex": -1,
+        "speciesId": 248,
+        "speciesName": "Tyranitar",
+        "hp": 225,
+        "maxHp": 225,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "hostEnemyField": [
+      {
+        "id": 1733073793,
+        "battlerIndex": -1,
+        "speciesId": 504,
+        "speciesName": "Patrat",
+        "hp": 0,
+        "maxHp": 16,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 158,
+            "ppUsed": 0
+          },
+          {
+            "id": 43,
+            "ppUsed": 0
+          },
+          {
+            "id": 116,
+            "ppUsed": 0
+          },
+          {
+            "id": 747,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 1189158951,
+        "battlerIndex": -1,
+        "speciesId": 265,
+        "speciesName": "Wurmple",
+        "hp": 0,
+        "maxHp": 16,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 522,
+            "ppUsed": 0
+          },
+          {
+            "id": 5048,
+            "ppUsed": 0
+          },
+          {
+            "id": 33,
+            "ppUsed": 0
+          },
+          {
+            "id": 40,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ],
+    "guestPlayerField": [
+      {
+        "id": 4158660795,
+        "battlerIndex": 0,
+        "speciesId": 143,
+        "speciesName": "Snorlax",
+        "hp": 303,
+        "maxHp": 303,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 2953933131,
+        "battlerIndex": 1,
+        "speciesId": 248,
+        "speciesName": "Tyranitar",
+        "hp": 225,
+        "maxHp": 225,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "guestEnemyField": [
+      {
+        "id": 1733073793,
+        "battlerIndex": 2,
+        "speciesId": 504,
+        "speciesName": "Patrat",
+        "hp": 0,
+        "maxHp": 16,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 158,
+            "ppUsed": 0
+          },
+          {
+            "id": 43,
+            "ppUsed": 0
+          },
+          {
+            "id": 116,
+            "ppUsed": 0
+          },
+          {
+            "id": 747,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 1189158951,
+        "battlerIndex": 3,
+        "speciesId": 265,
+        "speciesName": "Wurmple",
+        "hp": 0,
+        "maxHp": 16,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 522,
+            "ppUsed": 0
+          },
+          {
+            "id": 5048,
+            "ppUsed": 0
+          },
+          {
+            "id": 33,
+            "ppUsed": 0
+          },
+          {
+            "id": 40,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ]
+  },
+  "actionScript": [
+    "SKIP mysteryEncounterDisabledV1",
+    "content seed=coop-soak-20261126 preseeded=false",
+    "wave 1 turn 1: committed frontier omitted seat 1; guest remained a replay spectator until host action",
+    "wave 1: host slot move=85 guest slot move=0",
+    "wave 1 turn 1: progress enemyHp=[16:0/14] playerHp=[143:303/303]",
+    "wave 1: reward shop owner=host leave",
+    "wave 2 turn 1: replay guest crossed cmd:2:1 through real public COMMAND=opened",
+    "wave 2 turn 1: staged guest-owned lead at 1 HP on both engines",
+    "wave 2 turn 1: host SWITCH -> party[2]",
+    "wave 2: host slot move=53 guest slot move=53",
+    "wave 2 turn 1: forced-faint guest MEMENTO self-KO",
+    "wave 2 turn 1: progress enemyHp=[396:16/16,915:14/14] playerHp=[149:205/213,94:0/179]",
+    "wave 2 turn 2: replay guest crossed cmd:2:2 through real public COMMAND=opened",
+    "wave 2 turn 2: host SWITCH -> party[2]",
+    "wave 2 turn 3: replay guest crossed cmd:2:3 through real public COMMAND=opened",
+    "wave 2: reward shop owner=guest leave",
+    "wave 3 turn 1: replay guest crossed cmd:3:1 through real public COMMAND=opened",
+    "wave 3: host slot move=85 guest slot move=85",
+    "wave 3 turn 1: progress enemyHp=[504:0/16,265:0/16] playerHp=[143:303/303,248:225/225]"
+  ]
+}
