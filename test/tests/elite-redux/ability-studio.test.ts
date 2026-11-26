@@ -78,6 +78,27 @@ class GuardedReusableEffectAbAttr extends PostAttackAbAttr {
   }
 }
 
+/** Picks in canApply and acts on the pick in apply, like ScavengerLootAbAttr (lootItem) and Magician (stolenItem). */
+class PicksInCanApplyAbAttr extends PostAttackAbAttr {
+  private pick: string | undefined;
+  private readonly log: string[];
+
+  constructor(log: string[]) {
+    super(() => true, true);
+    this.log = log;
+  }
+
+  override canApply(_params: PostMoveInteractionAbAttrParams): boolean {
+    this.pick = `pick-${this.log.length}`;
+    return true;
+  }
+
+  override apply(_params: PostMoveInteractionAbAttrParams): void {
+    this.log.push(this.pick ?? "nothing picked");
+    this.pick = undefined;
+  }
+}
+
 class StructuredReusableEffectAbAttr extends AbAttr {
   private readonly rules = [{ stat: Stat.ATK, stages: 1 }];
   public readonly condition = () => true;
@@ -496,6 +517,30 @@ describe("Ability Studio", () => {
     expect(compiled.attrs[1].getCondition()?.(pokemon as never)).toBe(false);
     compiled.attrs[0].apply({ pokemon, simulated: false } as never);
     expect(compiled.attrs[1].getCondition()?.(pokemon as never)).toBe(true);
+  });
+
+  it("applies an attr on the same instance its own event IF gate checked (Scavenger, Magician)", () => {
+    const log: string[] = [];
+    const source = new AbBuilder(AbilityId.BLAZE, 3).attr(PicksInCanApplyAbAttr, log).build();
+    const ref = { abilityId: AbilityId.BLAZE, attrIndex: 0, attrType: "PicksInCanApplyAbAttr" };
+    const componentBlueprint: AbilityStudioBlueprintV1 = {
+      ...blueprint,
+      includes: [],
+      modifiers: [],
+      rules: [],
+      componentRules: [
+        { key: "loot", hook: ref, chance: 100, conditions: [{ ...ref, kind: "event" }], effects: [ref] },
+      ],
+    };
+    const compiled = compileAbilityStudioBlueprint(componentBlueprint, id =>
+      id === AbilityId.BLAZE ? source : undefined,
+    );
+    const carrier = compiled.attrs.find(attr => attr.constructor.name === "PicksInCanApplyAbAttr")!;
+    const params = { pokemon: { battleData: {}, randBattleSeedInt: () => 0 }, simulated: false };
+    expect(carrier.canApply(params as never)).toBe(true);
+    carrier.apply(params as never);
+    // Before the fix the effect ran on a second clone that never saw canApply: "nothing picked".
+    expect(log).toEqual(["pick-0"]);
   });
 
   it("observes an event IF gate across different runtime hooks", () => {

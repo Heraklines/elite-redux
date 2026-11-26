@@ -486,6 +486,8 @@ export function compileAbilityStudioRuntimeComponentRule(
     clonedSources.set(key, cloned);
     return cloned;
   };
+  /** Clones that explicit event gates of this rule run `canApply` on, by source, so the matching effect reuses them. */
+  const eventGateSources = new Map<string, { instanceKey: string; attr: AbAttr }>();
   const conditions = rule.conditions.map(reference => {
     if (!isRuntimeCondition(reference)) {
       if (reference.kind === "move" && !abilityStudioRuntimeHookContext(hookId).includes("move")) {
@@ -514,6 +516,12 @@ export function compileAbilityStudioRuntimeComponentRule(
       return (params: AbAttrBaseParams) => condition(params.pokemon);
     }
     if (abilityStudioRuntimeHookSupports(hookId, abilityStudioRuntimeHookId(source.attr))) {
+      if (reference.kind === "event") {
+        eventGateSources.set(runtimeSourceBaseKey(reference), {
+          instanceKey: runtimeSourceInstanceKey(configuredSource(reference)),
+          attr: source.attr,
+        });
+      }
       return (params: AbAttrBaseParams) => source.attr.canApply(params as never);
     }
     const satisfied = new WeakSet<object>();
@@ -595,8 +603,15 @@ export function compileAbilityStudioRuntimeComponentRule(
         },
       } as const;
     }
+    // The same attr as an explicit event gate of this rule: run `apply` on the clone whose `canApply` the gate just ran.
+    // Classes that pick in canApply and act on the pick in apply (Scavenger's loot, Magician's stolen item) keep that pick
+    // on the instance; a separate clone would loot nothing or draw a second, unchecked item. Only this direct path shares
+    // it: the paths above rewire the attr they get.
+    const gateSource = eventGateSources.get(runtimeSourceBaseKey(reference));
+    const sharesGate =
+      gateSource !== undefined && gateSource.instanceKey === runtimeSourceInstanceKey(configuredSource(reference));
     return {
-      attr: source.attr,
+      attr: sharesGate ? gateSource.attr : source.attr,
       checkEligibility: !explicitEventGates.has(runtimeSourceBaseKey(reference)),
     } as const;
   });
