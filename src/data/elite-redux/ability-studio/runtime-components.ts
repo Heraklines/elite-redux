@@ -486,8 +486,11 @@ export function compileAbilityStudioRuntimeComponentRule(
     clonedSources.set(key, cloned);
     return cloned;
   };
-  /** Clones that explicit event gates of this rule run `canApply` on, by source, so the matching effect reuses them. */
-  const eventGateSources = new Map<string, { instanceKey: string; attr: AbAttr }>();
+  /**
+   * Clones that explicit event gates of this rule run `canApply` on, by source, so the matching effect reuses them, and
+   * the dispatches (params objects) for which that clone's `canApply` passed: only then is its pick current.
+   */
+  const eventGateSources = new Map<string, { instanceKey: string; attr: AbAttr; passed: WeakSet<object> }>();
   const conditions = rule.conditions.map(reference => {
     if (!isRuntimeCondition(reference)) {
       if (reference.kind === "move" && !abilityStudioRuntimeHookContext(hookId).includes("move")) {
@@ -517,10 +520,19 @@ export function compileAbilityStudioRuntimeComponentRule(
     }
     if (abilityStudioRuntimeHookSupports(hookId, abilityStudioRuntimeHookId(source.attr))) {
       if (reference.kind === "event") {
+        const passed = new WeakSet<object>();
         eventGateSources.set(runtimeSourceBaseKey(reference), {
           instanceKey: runtimeSourceInstanceKey(configuredSource(reference)),
           attr: source.attr,
+          passed,
         });
+        return (params: AbAttrBaseParams) => {
+          const ok = source.attr.canApply(params as never);
+          if (ok) {
+            passed.add(params);
+          }
+          return ok;
+        };
       }
       return (params: AbAttrBaseParams) => source.attr.canApply(params as never);
     }
@@ -606,18 +618,25 @@ export function compileAbilityStudioRuntimeComponentRule(
     // The same attr as an explicit event gate of this rule: run `apply` on the clone whose `canApply` the gate just ran.
     // Classes that pick in canApply and act on the pick in apply (Scavenger's loot, Magician's stolen item) keep that pick
     // on the instance; a separate clone would loot nothing or draw a second, unchecked item. Only this direct path shares
-    // it: the paths above rewire the attr they get.
+    // it: the paths above rewire the attr they get. The pick is trusted only if the gate passed for THIS dispatch (an
+    // `any` rule can skip the gate, and a failed chance leaves an old pick behind); otherwise the clone checks again.
     const gateSource = eventGateSources.get(runtimeSourceBaseKey(reference));
-    const sharesGate =
-      gateSource !== undefined && gateSource.instanceKey === runtimeSourceInstanceKey(configuredSource(reference));
+    if (gateSource !== undefined && gateSource.instanceKey === runtimeSourceInstanceKey(configuredSource(reference))) {
+      return { attr: gateSource.attr, checkEligibility: true, gatePassed: gateSource.passed } as const;
+    }
     return {
-      attr: sharesGate ? gateSource.attr : source.attr,
+      attr: source.attr,
       checkEligibility: !explicitEventGates.has(runtimeSourceBaseKey(reference)),
     } as const;
   });
   const eligibleEffects = new WeakMap<AbAttrBaseParams, readonly boolean[]>();
   const resolveEligibleEffects = (params: AbAttrBaseParams): readonly boolean[] =>
-    effects.map(effect => ("attr" in effect && effect.checkEligibility ? effect.attr.canApply(params as never) : true));
+    effects.map(effect => {
+      if (!("attr" in effect) || !effect.checkEligibility) {
+        return true;
+      }
+      return ("gatePassed" in effect && effect.gatePassed?.has(params)) || effect.attr.canApply(params as never);
+    });
   const carrier = cloneRuntimeSourceAttr(configuredSource(rule.hook), hookSource.attr) as AbAttr & {
     apply: (params: AbAttrBaseParams) => void;
     canApply: (params: AbAttrBaseParams) => boolean;
